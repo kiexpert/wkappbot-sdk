@@ -1,0 +1,44 @@
+{
+  "id": "a11y-focus-tier-chain-ref",
+  "app": "wkappbot-workflow",
+  "title": "a11y focus tier chain: version history + incident ref",
+  "title_ko": null,
+  "desc": "T3 reference for a11y-focus-tier-chain. Version history of SmartSetWindowOrder + the 2026-05-19 FOCUS-STEAL investigation and dispatch.",
+  "steps": [
+    "VERSION HISTORY: v1.0 (2026-05-03) initial SmartSetWindowOrder -- child BringWindowToTop, root rank-2. v1.1 (2026-05-03) MDI child focus also moves root to rank-2. v2.0 (2026-05-03) full OS-level service -- iconic restore, topmost strip, GW_OWNER chain, PlaceRootBehindForeground helper, SuppressFullscreenOpaqueOverlays overlay guard. v2.1 (2026-05-03) SmartSetWindowOrder injected before 10 interactive write actions (invoke, click, type, set-value, set-range, toggle, expand, collapse, select, scroll)",
+    "FOCUS-STEAL bug investigation (2026-05-19): if a11y actions still steal focus despite zero-steal rules, audit for VIOLATIONS first -- grep for SetForegroundWindow / SetActiveWindow / AttachThreadInput / SwitchToThisWindow in a11y action paths. Bandaid guard (GetLastInputInfo defer) is defense-in-depth only; the real fix is removing the forbidden API call or routing it through SmartSetWindowOrder. Investigation order: (1) wkfind for forbidden APIs in a11y; (2) git log on offending file to find when the violation was introduced; (3) replace with SmartSetWindowOrder + UIA/Win32 SetFocus; (4) optionally add user-activity guard as belt-and-suspenders",
+    "FOCUS-STEAL fix dispatch (2026-05-19 18:40): delegated investigation to Opus subagent. Target: find zero-steal-rule violations (SetForegroundWindow / SetActiveWindow / AttachThreadInput / SwitchToThisWindow in a11y action paths) and replace with SmartSetWindowOrder + UIA/Win32 SetFocus. Defense-in-depth UserActivityGuard (GetLastInputInfo, ~500ms threshold) added only if a legitimate focus-theft path remains. 3 target suggests resolved 2026-05-19",
+    "Verified 2026-05-19: ev-2026-05-19-1840-focus-steal-sentinel-user-active-stale.sh (resolve ts=2026-04-19T16:20:57)"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read a11y-focus-tier-chain-ref",
+      "expect": "VERSION HISTORY",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read a11y-focus-tier-chain-ref",
+      "expect": "FOCUS-STEAL bug investigation",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read a11y-focus-tier-chain-ref",
+      "expect": "Verified",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "a11y",
+    "focus",
+    "ref",
+    "history",
+    "incident"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-07-02T07:23:04.1738053Z",
+  "updated": "2026-07-02T07:23:04.1738197Z",
+  "version": "1.0"
+}

@@ -1,0 +1,36 @@
+{
+  "id": "agy-opus-reflection",
+  "app": "wkappbot-workflow",
+  "title": "Agy-on-Opus reflection",
+  "title_ko": null,
+  "desc": "Reflection skill for agy (Antigravity) sessions running on top of the Opus model. Created 2026-07-03 to close a gap found while building agent-failure-reflection-gate: the reactive gate resolves failures reported with model 'agy-opus' to this canonical id, but no such skill existed yet.",
+  "steps": [
+    "TODO: this skill was created as a placeholder to satisfy agent-failure-reflection-gate's canonical-id convention (see that skill) for the compound model name 'agy-opus'. No agy-on-Opus-specific failure has been recorded here yet -- when one occurs, add a step describing the concrete failure and fix, tagged BUG:/TODO:/IMPROVEMENT: per the convention documented in agent-failure-reflection-gate.",
+    "CORRECTION 2026-07-03 (user-verified via real agy CLI check): this skill was created on a FALSE PREMISE. agy (Antigravity CLI) does NOT run on top of Claude Opus/Sonnet/Haiku at all -- it exclusively runs on Google's Gemini model family (confirmed via ~/.gemini/antigravity-cli/settings.json showing a Gemini model, and no Claude-backend config anywhere). The compound model name 'agy-opus' this skill was created for CANNOT actually occur in practice. DO NOT add real content here expecting an agy-on-Opus failure -- it will never happen. The correct agy compound skills are agy-gemini-flash-reflection / agy-gemini-pro-reflection / agy-root-reflection. Lesson: verify a tool's actual supported-model list via its real CLI/config BEFORE creating a placeholder skill for an assumed model combination -- an unverified assumption (even one repeated by the user in passing) can be wrong."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read agy-opus-reflection",
+      "expect": "placeholder",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read agent-failure-reflection-gate",
+      "expect": "tagging convention",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill search agy-opus",
+      "expect": "agy-opus-reflection",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-07-03T06:30:13.2408182Z",
+  "updated": "2026-07-03T06:44:19.7627633Z",
+  "version": "1.1"
+}

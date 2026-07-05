@@ -1,0 +1,74 @@
+{
+  "id": "wkchat-auto-startup-registration",
+  "app": "wkappbot-core",
+  "title": "wkchat auto-startup HKCU\\Run registration -- per-cwd persistent chat session",
+  "title_ko": null,
+  "desc": "Each `wkappbot chat` interactive session auto-registers itself in HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run keyed by cwd hash so the same chat reopens at next login. Skipped when stdin/stdout is redirected (scripts/CI), when re-entering from the previous startup (WKAPPBOT_CHAT_FROM_STARTUP=1), and when --no-autostart is passed (which also unregisters). Idempotent per-process via Interlocked CAS.",
+  "steps": [
+    "[REGISTRY KEY SHAPE] Subkey: Software\\Microsoft\\Windows\\CurrentVersion\\Run. Value name: WKAppBot_Chat_{cwdHash} where cwdHash is an 8-char digest of Environment.CurrentDirectory (case-insensitive). Per-cwd keying lets users have separate persistent chats in WKAppBot, WkAutoQuant, WkFeedQuant, etc., all auto-restoring after reboot.",
+    "[VALUE FORMAT] cmd /c \"set WKAPPBOT_CHAT_FROM_STARTUP=1 && start \"\" \"<wt.exe>\" --window 0 nt -d \"<cwd>\" \"<wkappbot.exe>\" chat\". The WKAPPBOT_CHAT_FROM_STARTUP=1 marker is the silent re-entry guard -- when chat re-launches itself on next login, EnsureChatAutoStartupRegistration sees this env var and skips registry churn. start \"\" detaches so the spawning cmd.exe can exit cleanly.",
+    "[ENTRY POINT] EnsureChatAutoStartupRegistration(args) called once at ChatCommand entry. First line: Interlocked.Exchange(ref _chatAutoStartupChecked, 1) -- if already 1 returns immediately. Chat re-enters its own command for AI-REPL routes; CAS gate prevents duplicate registrations on the same process.",
+    "[SKIP CONDITIONS] (1) --no-autostart in args -> call TryUnregisterChatStartup(keyName) and return. Lets users opt out without manually editing the registry. (2) Console.IsInputRedirected || Console.IsOutputRedirected -> non-interactive launch (scripted, piped); registering would silently auto-launch on every login which is hostile. (3) WKAPPBOT_CHAT_FROM_STARTUP=1 -> we ARE the previous startup launching itself; do not re-write.",
+    "[REGISTER PATH] BuildChatStartupCommand assembles the cmd /c launcher. TryRegisterChatStartup opens HKCU Run subkey writable, compares existing value -> outcomes: set (new key created), updated (value changed), already-set (no-op silent). 'set' and 'updated' write a [CHAT:AUTOSTART] line to stderr; 'already-set' is silent to avoid noise on every chat launch.",
+    "[UNREGISTER PATH] TryUnregisterChatStartup deletes the value if present. Reasons logged: not-present (already absent), removed (deleted ok), failed (registry permission etc). All routed via stderr [CHAT:AUTOSTART] so users see the result of --no-autostart.",
+    "[SAFETY] Outer try/catch wraps the entire entry function -- any registry hiccup (locked hive, permission, transient failure) is swallowed silently. Auto-startup is convenience, not a critical path; chat MUST start regardless. No throws, no blocking.",
+    "[INTERACTION WITH BANNER + GEOMETRY] Order at chat entry: (1) PrintCallerHostBranding, (2) EnsureChatAutoStartupRegistration, (3) PrintWelcomeBanner, (4) RestoreParentWindowGeo, (5) prompt. Auto-startup registration happens early so even if the banner or geometry probe crashes the registry entry is already updated.",
+    "[AUDIT 2026-06-03] source_refs broken: empty source_refs file entries."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot chat",
+      "expect": "[CHAT:AUTOSTART] registered (set) key=WKAppBot_Chat_<hash> or already-set silent on second run",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot chat --no-autostart",
+      "expect": "[CHAT:AUTOSTART] removed startup entry",
+      "prompt": null
+    },
+    {
+      "cmd": "echo q | wkappbot chat",
+      "expect": "no [CHAT:AUTOSTART] line (piped, registration skipped)",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "wkchat",
+    "chat",
+    "auto-startup",
+    "HKCU-Run",
+    "registry",
+    "WKAPPBOT_CHAT_FROM_STARTUP",
+    "no-autostart",
+    "per-cwd",
+    "cwd-hash",
+    "Interlocked-CAS",
+    "persistence"
+  ],
+  "source_refs": [
+    {
+      "file": "",
+      "line": 32,
+      "pattern": "EnsureChatAutoStartupRegistration",
+      "note": null
+    },
+    {
+      "file": "",
+      "line": 57,
+      "pattern": "WKAPPBOT_CHAT_FROM_STARTUP",
+      "note": null
+    },
+    {
+      "file": "",
+      "line": 19,
+      "pattern": "ChatStartupRunSubkey",
+      "note": null
+    }
+  ],
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-05T00:00:00",
+  "updated": "2026-06-02T19:49:16.9291001Z",
+  "version": "1.1"
+}

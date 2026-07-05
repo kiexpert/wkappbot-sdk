@@ -1,0 +1,45 @@
+{
+  "id": "skill-readability-optimization-and-healing",
+  "app": "wkappbot-core",
+  "title": "AI Skill Readability Optimization and Continuous Healing",
+  "title_ko": null,
+  "desc": "Guiding principles and procedures to optimize wkappbot skills for AI parser readability, context token efficiency, and continuous self-improvement (healing) loops.",
+  "steps": [
+    "T1 CORE (Decision Rules): Skills must prioritize AI readability by using clear headers, short sentences, and explicit index-aligned mappings. Always write in English to minimize token overhead. Prioritize structural clarity over verbose explanations.",
+    "T2 HOWTO (Procedure): When authoring/updating skills, use 'wkappbot skill contribute' or 'wkappbot skill edit'. Keep lists of requirements and expectations logically matched in 1-to-1 sequential order. Explicitly specify command flags and expected values. Perform nightly/regular audits via 'wkappbot skill audit' to prune stale and duplicate references.",
+    "T3 REF (Best Practices): In 2026-06-09 incident, CLI requirement-expectation disconnection caused potential parsing confusion for lower-tier models. Solved by proposing CLI pairing layout and documenting that AI agents parse JSON representation where object bindings remain explicit."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read skill-readability-optimization-and-healing",
+      "expect": "skill-readability-optimization-and-healing",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill list",
+      "expect": "skill",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill audit",
+      "expect": "audit",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "skill",
+    "readability",
+    "ai",
+    "optimization",
+    "healing",
+    "standard",
+    "english-only"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-09T06:37:25.2846518Z",
+  "updated": "2026-06-09T06:37:25.2846643Z",
+  "version": "1.0"
+}

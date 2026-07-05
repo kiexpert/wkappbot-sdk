@@ -1,0 +1,32 @@
+{
+  "id": "nlrc-evidence-webbot",
+  "app": "wkappbot-webbot",
+  "title": "NLRC Evidence Webbot",
+  "title_ko": null,
+  "desc": "Capture NLRC case pages, mail evidence, attachments, and UTF-8 conversions with WKAppBot.",
+  "steps": [
+    "Open the NLRC index page, not the raw list.do endpoint.",
+    "Fill the case number input and keep cmitCd=00, agtYn=N, pageIndex=1, and recordCountPerPage=10.",
+    "Trigger the search button or its AJAX handler; do not use direct GET navigation.",
+    "Save the rendered DOM with web html and the rendered text with web read.",
+    "Record mail thread bodies, attachment names, sizes, and download links in Markdown.",
+    "Store every artifact as UTF-8 and convert each document type before saving summaries or Markdown snapshots.",
+    "Maintainer sync (2026-05-01): HQ copy is authoritative."
+  ],
+  "requirements": null,
+  "primary_cmd": null,
+  "tags": [
+    "nlrc",
+    "webbot",
+    "evidence",
+    "mail",
+    "ajax",
+    "cdp"
+  ],
+  "source_refs": [],
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-19T20:34:28.9011487Z",
+  "updated": "2026-05-01T05:00:37.5867312Z",
+  "version": "1.2"
+}

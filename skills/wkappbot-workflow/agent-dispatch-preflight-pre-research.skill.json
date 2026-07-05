@@ -1,0 +1,43 @@
+{
+  "id": "agent-dispatch-preflight-pre-research",
+  "app": "wkappbot-workflow",
+  "title": "Agent dispatch preflight: ROOT pre-research pattern",
+  "title_ko": null,
+  "desc": "T3 addendum to agent-dispatch-preflight: when delegating to Haiku a task requiring dependency discovery across a codebase, ROOT should do the exploratory grep-work FIRST and hand exact file:line locations in the brief, narrowing Haiku's job from discover-plus-build to just assemble-plus-run.",
+  "steps": [
+    "ROOT PRE-RESEARCH PATTERN (2026-07-05, user-named): when a cheap-tier delegation needs to call or dot-source functions scattered across an unfamiliar codebase, do NOT hand Haiku a bare goal and let it discover the dependency graph itself -- Haiku is weak at open-ended exploration and prone to giving up or confabulating a wrong location. Instead, ROOT (or Sonnet acting as ROOT) runs the exploratory Grep/Read work FIRST (fast for a pro-tier model, cheap in tool calls), records the EXACT file and approximate line number for each dependency, and includes those coordinates directly in the Haiku brief. This converts Haiku's task from open-ended discovery plus assembly plus execution into a narrow assemble-plus-run task, which matches Haiku's actual strength (following precise instructions) rather than its weakness (open-ended judgment).@@WORKED EXAMPLE (2026-07-05, wkhippo-studied-fastpath proto): ROOT needed a self-test that dot-sources three real canonical functions (Get-WkActiveSessionJsonl, Get-WkSlug, Get-WkLastCompactionTs) scattered across three different files (wkharness-common-nudge.ps1, wkharness-common-utils.ps1, wkharness-common-skillscore.ps1), each with its own partial dependency chain (Get-WkActiveSessionJsonl needs Get-WkSlug; both depend on an optional unset  variable that fails open safely). ROOT traced all three locations plus their safe-to-ignore optional dependencies via Grep in under 10 tool calls, then handed the EXACT file names, approximate line numbers, and a note on which guarded blocks are safe to leave unresolved, directly in the Haiku brief. Haiku's job became just: dot-source these three files in this order, call the real function, compare against the proto's fast path, run it for real, report the raw output.@@WHEN TO USE: any delegation where success depends on correctly locating and ordering multiple real dependencies before the actual comparison/test logic can run. WHEN NOT NEEDED: a self-contained task with no cross-file dependency discovery (plain algorithmic fix, single-file edit) -- ROOT pre-research adds no value there, just brief it directly. Cross: agent-dispatch-preflight (the cheap-tier delegation spec this extends), splitter-feature-discovery-plus-delegation-distribution-for-token-frugal-bug-analysis (a sibling token-frugal delegation pattern), claude-code-agent-tier-routing (chores go to Haiku, judgment stays with ROOT -- the dependency-discovery grep IS the judgment-adjacent chore ROOT should not delegate down).",
+    "BRIEF LENGTH MUST MATCH TARGET MODEL'S PARSING CAPABILITY (user directive 2026-07-05, discovered via a Haiku deferred-verification failure -- see haiku-reflection step 10). A long, dense brief -- dependency traces, multi-paragraph Approach, a wall of Constraints -- risks BURYING the single most critical instruction (e.g. 'actually run the test and paste real output') where a cheap-tier model's weaker instruction-prioritization drops it. This is DIFFERENT from the existing CHEAP-TIER DELEGATION SPEC (agent-dispatch-preflight, which covers exact-commands/anti-confab/prove-artifact/narrow-scope as CONTENT requirements) -- this is a FORM requirement: write simply, clearly, and decisively, calibrated to the target model's tier. RULE: the SINGLE most important instruction in a cheap-tier brief (usually the prove-the-artifact / actually-run-it clause) MUST be its OWN short, isolated, unmissable line -- ideally the LAST line before Exit, in imperative mood, not buried inside a longer paragraph of Approach or Constraints prose. For Opus/Sonnet (pro tier), longer nuanced prose is fine since they parse and prioritize well; for Haiku/codex-mini/Flash (cheap tier), prefer short imperative bullet points over dense paragraphs, and isolate the ONE non-negotiable instruction so it cannot be skimmed past. Cross: haiku-reflection step 10 (the incident that surfaced this), agent-dispatch-preflight (the content-side CHEAP-TIER DELEGATION SPEC this complements on the form side)."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read agent-dispatch-preflight-pre-research",
+      "expect": "ROOT PRE-RESEARCH PATTERN",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read agent-dispatch-preflight-pre-research",
+      "expect": "WORKED EXAMPLE",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read agent-dispatch-preflight-pre-research",
+      "expect": "WHEN TO USE",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "agent",
+    "delegation",
+    "haiku",
+    "pre-research",
+    "dependency",
+    "pattern"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-07-05T05:50:35.3758093Z",
+  "updated": "2026-07-05T06:03:32.4500409Z",
+  "version": "1.2"
+}

@@ -1,0 +1,47 @@
+{
+  "id": "screensaver-close-command-ref",
+  "app": "wkappbot-core",
+  "title": "screensaver close: dated bug history + internals",
+  "title_ko": null,
+  "desc": "T3 reference for screensaver-close-command: dated bug fixes, detection principle, and the pixel-check snippet",
+  "steps": [
+    "2026-05-20: Pass 3 fixed -- WKAPPBOT_WORKER=1 processes have empty cmd-line, so use HWND class name (HwndWrapper star ScreenSaver star) as primary detection. byWindow=True kills even empty-cmd processes.",
+    "2026-05-20: WKAPPBOT_NO_SCREENSAVER=1 now disables Eye initial screensaver spawn, idle respawn, and standalone screensaver launch; screensaver close remains available for wiping stale fullscreen overlays.",
+    "Pass 6 (2026-05-20): Progman stuck on secondary monitor -- SHELLDLL_DefView.Left less than -100 means Win11 multi-monitor race, primary has no WorkerW. Fix: kill explorer, wait 1500ms, restart explorer.",
+    "BUG FIX 2026-05-20 (c562c3ce4): Pass 2/4/5 now skip explorer.exe (Progman, WorkerW, Shell_TrayWnd). Previously Pass 2 wiped Progman because it spans both monitors and avgY=0, moving Progman off-screen and destroying the desktop.",
+    "TODO: Screensaver topmost not maintained during lifecycle -- needs periodic re-topmost every ~1s while visible.",
+    "DAMAGE 2026-05-20: Pass 2 WipeWindow accidentally moved Progman, ChatGPT Chrome, Edge browser off-screen because brightness sampling returns 0 for windows that do not support PrintWindow. Fix: exclusion list for consent.exe, chrome, msedge, non-wkappbot apps unless confirmed black; never SetWindowPos to off-screen without verifying the target is actually a screensaver/overlay window.",
+    "PROTECTION: WipeBlockingOverlays 30s loop sends WM_CLOSE only to known blocker processes (NVIDIA Overlay, nvsphelper64, nvcontainer, TextInputHost). All other large windows are hidden only, not closed. Fix committed 2026-05-27.",
+    "ROOT CAUSE 2026-05-27: WipeBlockingOverlays had a size-check for non-known-blockers but still fell through to moving the window off-screen and hiding it, shrinking Edge every 30s. Fix: if not a known blocker, return true immediately. SS:WIPE logs go to stderr, not captured in eye.diag log.",
+    "DETECTION PRINCIPLE (2026-06-03): false positive is always more dangerous than false negative. Closing an innocent window causes real damage; missing a real black overlay just means a slightly longer black screen. When uncertain, do NOTHING. Only act on perfect certainty via exact RGB(0,0,0) pixel check, not brightness average or topmost or size heuristics.",
+    "BUG HISTORY 2026-06-04: a screensaver instance found alive off-screen after a full user session -- WM_CLOSE was sent but not processed, screensaver survived the wipe. Fix target: ensure WM_CLOSE receipt confirmation or process kill fallback.",
+    "RECURRENCE FIX 2026-06-04: the WipeBlockingOverlays protection guard was lost during refactoring twice. Prevention: split the lifecycle file when it exceeds 400 lines, register a harness:skill lock, add inline skill-read comments near the trusted-process checks.",
+    "EDGE ICONIFY BUG 2026-06-05: root cause was a null process name when GetProcessById throws for a permission-denied elevated Edge process; fixed by treating null as trusted. Commit ffb224110.",
+    "PIXEL CHECK SNIPPET: after wkappbot screensaver close, verify (0,0) is not black -- create a 1x1 Bitmap, Graphics.FromImage, CopyFromScreen(0,0,0,0,new Size(1,1)), Dispose, then GetPixel(0,0) and print R/G/B. If still black: scan and remove loop, do not stop until bright -- UAC consent.exe taskkill loop, or Z-scan top 20 windows for other fullscreen topmost blockers."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read screensaver-close-command-ref",
+      "expect": "DETECTION PRINCIPLE",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read screensaver-close-command-ref",
+      "expect": "PIXEL CHECK",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read screensaver-close-command-ref",
+      "expect": "ROOT CAUSE",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-07-03T05:42:12.942482Z",
+  "updated": "2026-07-03T05:42:12.9424999Z",
+  "version": "1.0"
+}

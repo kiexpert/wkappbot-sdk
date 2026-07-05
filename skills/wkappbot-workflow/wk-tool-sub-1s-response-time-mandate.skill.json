@@ -1,0 +1,57 @@
+{
+  "id": "wk-tool-sub-1s-response-time-mandate",
+  "app": "wkappbot-workflow",
+  "title": "Every important wk tool must respond under 1s -- standing repo optimization mandate",
+  "title_ko": null,
+  "desc": "STANDING repo main task (user 2026-06-18): any important wk* tool whose response time exceeds 1s is a mandatory optimization target, optimized until under 1s, reported each step. Root cause = the ~1.5-2s powershell.exe startup floor; fix by avoiding per-call PS spawn.",
+  "steps": [
+    "MANDATE (user 2026-06-18, STANDING repo MAIN task): every important wk* tool's user-perceived response time MUST be < 1s. Any tool measured > 1s = MANDATORY optimization target until it drops under 1s. Report at each step. This is ongoing repo work in CLAUDE.md.",
+    "ROOT CAUSE (measured 2026-06-18): wk* tools run .cmd/.sh -> powershell.exe -> .ps1. Windows PS5.1 cold startup alone = ~1.5-2s. EVERY pure-PS tool sits at this floor regardless of its own logic. Baseline: wkagent-name 2470ms, wktasklist 1880ms, wknews 1618ms, wkpace 2370ms. Fast outliers prove sub-1s possible: wkfind 195ms, wkkill 9ms. Floor is UNFIXABLE inside PowerShell.",
+    "FIX CLASSES (strongest first): (a) AVOID PS startup -- reimplement in Python+ctypes or compiled exe (<300ms target vs 2900ms baseline). (b) RESULT-CACHE deterministic tools (session-keyed file cache: cold-scan once, warm ~150ms). (c) PERSISTENT daemon over a pipe (no per-call spawn). (d) FIX pathological work-cost (--help/-h MUST NEVER do real work, cap session scans, bound log scans).",
+    "MEASURE PROTOCOL: wrap SAFE read-only invocation (--help or no-op filter) in Stopwatch. Record COLD + WARM, flag >1000ms. NEVER benchmark mutating calls. Re-measure after EACH optimization before declaring done.",
+    "WHY: harness hot path -- 1.5s floor x every hook call = dominant latency user repeatedly flagged. Cross: wkagent-name-python-prototype, wktasklist-cached-process-snapshot, willkim-tool-harness-independence-install-location, harness-pace-guard.",
+    "CODEX CONPTY EXCEPTION: wk-codex-pty-test/wkstdpty.exe intentionally ~12-24s (spawns codex for /status -- anomaly-only escalation, run only when codex_balance.json stale). Sub-1s mandate applies to DISPLAY layer (wkpace-codex reads cache). ConPTY is the rare refresh behind it. Shape = guard-feeding-cache-confirm-before-block.",
+    "NAVIGATION: how-to (measure protocol, fix classes, heart-v2 bypass, conpty details) -> wkappbot skill read wk-tool-sub-1s-response-time-mandate-howto. Historical (skill-read slowness, 2-PS-startup bug, wkwrap dot-source + revert) -> wkappbot skill read wk-tool-sub-1s-response-time-mandate-ref.",
+    "Codex pace uses a fast valid-cache path and forces one provider rate-limit refresh only for stale/invalid data or immediately before a blocking decision, then re-queries before deny.",
+    "DEAD-CODE DUPLICATE TRAP (2026-07-01): the [harness:slow] threshold check (1000ms Block) exists as near-identical copies in AT LEAST 4 files: wkharness.ps1 (the ACTUAL live top-level PreToolUse entry point), wkharness-claude-main.ps1, wkharness-heart.ps1, and wkharness-heart-v2.ps1 doesn't have it but is the live singlewrite/knowledge-op decision engine. Editing the family-main files (wkharness-claude-main.ps1, wkharness-heart.ps1) did NOT change live behavior -- a real user-reported [harness:slow] block still fired with the pre-edit message text, proving those two are dead/legacy duplicates for this check. The REAL fix has to land in wkharness.ps1 itself (around its own $script:_harnessSw Stop/threshold block near the end of the file, before 'exit 0'). LESSON: when a Block message text does not change after an edit, do NOT assume the edit failed silently -- check whether ANOTHER copy of the same code is the one actually executing (grep the exact message string across ALL tools/*.ps1, not just the file you assumed was canonical)."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read wk-tool-sub-1s-response-time-mandate",
+      "expect": "MANDATE",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wk-tool-sub-1s-response-time-mandate",
+      "expect": "ROOT CAUSE",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wk-tool-sub-1s-response-time-mandate",
+      "expect": "FIX CLASSES",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "performance",
+    "response-time",
+    "sub-1s",
+    "powershell-startup",
+    "optimization",
+    "standing-task",
+    "repo-main-work",
+    "wktool",
+    "daemon",
+    "cache",
+    "python",
+    "latency",
+    "harness-hot-path"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-18T02:05:09.6908829Z",
+  "updated": "2026-07-01T12:25:29.8132788Z",
+  "version": "1.17"
+}

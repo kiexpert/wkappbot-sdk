@@ -1,0 +1,48 @@
+{
+  "id": "nfrunlite-reconnect-popup-dismiss",
+  "app": "wkappbot-core",
+  "title": "nfrunlite reconnect popup dismiss via a11y click window-relative coords",
+  "title_ko": null,
+  "desc": "Untitled #32770 reconnect popup in nfrunlite: a11y invoke fails (treated as blocker). BM_CLICK fails (UIPI). Solution: EnumChildWindows -\u003E Button, GetWindowRect -\u003E window-relative coords (subtract popup rect!) -\u003E wkappbot a11y click \u003Cgrap\u003E --x cx_rel --y cy_rel. win-click is DEPRECATED (prints suggest\u002Bexits 1). Bug: passing raw screen coords without subtracting popup origin causes off-target clicks when popup not at (0,0).",
+  "steps": [
+    "Detect: scan #32770 windows with Static child containing reconnect text (no window title)",
+    "Find OK button: EnumChildWindows for cls=Button text in DISMISS_TEXTS",
+    "Get WINDOW-RELATIVE coords: GetWindowRect(btn_hwnd) center MINUS GetWindowRect(popup_hwnd).left/top",
+    "Dismiss: wkappbot a11y click \u003Cgrap\u003E --x cx_rel --y cy_rel  (window-relative coords, NOT absolute screen coords). win-click is DEPRECATED -- it now only prints a [WIN-CLICK:SUGGEST] a11y click line and exits 1. The suggested grap will include the popup (proc:nfrunlite \u002B #32770 cls) and target Button node; pass --x/--y for the relative offset within the popup.",
+    "Retry: 60s daemon thread; verified fix in auto_dismiss_hts_popups.py commit 2f2b2e64",
+    "Maintainer sync (2026-05-01): HQ copy is authoritative.",
+    "(2026-05-02) Migration: replace \u0027wkappbot --sudo win-click hwnd:popup cx_rel cy_rel\u0027 with \u0027wkappbot a11y click \u003Cgrap\u003E --x cx_rel --y cy_rel\u0027. Existing requirements below still reference win-click for historical context -- the legacy command now prints \u0027[WIN-CLICK:SUGGEST] a11y click \u0022\u003Cgrap\u003E\u0022\u0027 and exits 1, so the suggest line is paste-ready. auto_dismiss_hts_popups.py should be updated to call a11y click directly."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot --sudo win-click hwnd:0x002B0CEE 1326 937",
+      "expect": "FocuslessClick",
+      "prompt": null
+    },
+    {
+      "cmd": "python scripts/auto_dismiss_hts_popups.py --watch",
+      "expect": "reconnect-watcher started",
+      "prompt": null
+    },
+    {
+      "cmd": "python scripts/auto_dismiss_hts_popups.py --watch",
+      "expect": "reconnect dismissed",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "nfrunlite",
+    "reconnect",
+    "popup",
+    "win-click",
+    "elevated",
+    "UIPI"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-25T23:53:42.2589559Z",
+  "updated": "2026-05-02T12:11:44.7287793Z",
+  "version": "1.11"
+}

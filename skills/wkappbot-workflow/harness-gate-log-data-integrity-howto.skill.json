@@ -1,0 +1,45 @@
+{
+  "id": "harness-gate-log-data-integrity-howto",
+  "app": "wkappbot-workflow",
+  "title": "Harness Gate Log Data Integrity: How-To Recipes",
+  "title_ko": null,
+  "desc": "Usage recipes for two silent gate-data bugs: ConvertTo-Json depth fix, log-source fix, live verification.",
+  "steps": [
+    "FIX A: add -Depth 10 to ConvertTo-Json that serializes tool_use/message.content (default depth=2 collapses to System.Collections.Hashtable).@@FIX B: point Get-WkActive*Log at harness-written jsonl not native cli log.@@FIX C: pass -Family into Initialize-WkGeminiSession so IsGemini=true when Family=gemini/agy.@@VERIFY: grep the written jsonl for a known token before trusting the gate.@@DIAGNOSIS: check gate INPUT DATA first before blaming agent conduct.@@See also: harness-gate-log-data-integrity (T1 core)"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read harness-gate-log-data-integrity-howto",
+      "expect": "FIX A",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read harness-gate-log-data-integrity-howto",
+      "expect": "FIX B",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read harness-gate-log-data-integrity-howto",
+      "expect": "VERIFY",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "harness",
+    "gate",
+    "log",
+    "depth",
+    "fix",
+    "howto",
+    "gemini",
+    "serialization",
+    "recipe"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-26T07:16:47.1866005Z",
+  "updated": "2026-06-26T07:16:47.1866135Z",
+  "version": "1.0"
+}

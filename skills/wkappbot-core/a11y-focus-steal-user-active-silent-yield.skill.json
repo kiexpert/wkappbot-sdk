@@ -1,0 +1,79 @@
+{
+  "id": "a11y-focus-steal-user-active-silent-yield",
+  "app": "wkappbot-core",
+  "title": "a11y focus-steal: user-active silent yield in RestoreFocusWithRetryAsync",
+  "title_ko": null,
+  "desc": "When RestoreFocusWithRetryAsync is fighting a focus steal (Chrome/Electron) but user is actively typing (<1.5s idle), treat it as an intentional user switch and bail out silently -- no more ForceForegroundWindow loop, no AutoBugReport noise.",
+  "steps": [
+    "MECHANISM: Sentinel retries ForceForegroundWindow up to 5s (150ms x 33 attempts); checks NativeMethods.GetUserIdleMs() inside the loop",
+    "BAIL: if idle < 1500ms (user typing/clicking) sets userBailed=true and breaks -- no IME restore, no cursor restore, no bug report",
+    "RATIONALE: the user foreground choice wins; only true involuntary steals (idle >= 1500ms) get reported",
+    "COVERAGE: applies to all a11y invoke/find/inspect/windows/hack paths AND the ask gpt/claude/gemini/triad CDP attach flows (ChromeLauncher -> CDP attach used to steal focus via UIA hwnd attach / SetForegroundWindow)",
+    "NAVIGATION: usage-context detail + full dated verification-test log -> wkappbot skill read a11y-focus-steal-user-active-silent-yield-howto. Exact retry/idle-threshold mechanics + shared-threshold cross-ref -> wkappbot skill read a11y-focus-steal-user-active-silent-yield-ref.",
+    "LIVE CASE 2026-07-02 FIXED: commit 09ab7d3f5 added a post-recovery verification check to FocusStealSentinel (ReadinessBridges.FocusStealSentinel.cs ~line 200-207, after the existing restore calls, before the AutoBugReport call). After a 50ms settle delay, checks whether the outer/inner focus actually landed back on _prevFg/_prevFocusCtl -- if recovered, logs '[FOCUS-STEAL:{phase}] recovery OK -- no report' to Console.Error and returns early WITHOUT calling AutoBugReport; only a still-failed recovery falls through to the existing AutoBugReport call, unchanged. The user-active silent-yield guard (lines 113-130) was left untouched as required. This should eliminate the 5 idle-hour successful-recovery noise items from the suggest backlog going forward."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot a11y find {proc:nfrunlite} --depth 3",
+      "expect": "Edit children listed",
+      "prompt": "WM_GETTEXT fast path already in A11yReadBrowserFirst (line 662). Type readback after WM_CHAR added commit 86ba3fb0."
+    },
+    {
+      "cmd": "wkappbot a11y read hwnd:0x21bc0",
+      "expect": "value in output (nfrunlite elevated Edit)",
+      "prompt": "WM_GETTEXT fast path already in A11yReadBrowserFirst (line 662). Type readback after WM_CHAR added commit 86ba3fb0."
+    },
+    {
+      "cmd": "wkappbot a11y type hwnd:0x21ad8 1",
+      "expect": "OK",
+      "prompt": "WM_GETTEXT fast path already in A11yReadBrowserFirst (line 662). Type readback after WM_CHAR added commit 86ba3fb0."
+    },
+    {
+      "cmd": "wkappbot a11y read hwnd:0x21ad8",
+      "expect": "returns rendered text after type",
+      "prompt": "WM_GETTEXT readback after WM_CHAR type added (A11yActions.Type.cs, 86ba3fb0). Read path WM_GETTEXT already in A11yReadBrowserFirst:662."
+    },
+    {
+      "cmd": "wkappbot a11y read",
+      "expect": "no FOCUS-STEAL end during action",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot a11y find",
+      "expect": "sentinel skips legitimate focus changes",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot a11y inspect",
+      "expect": "no FOCUS-STEAL false positive",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot a11y windows",
+      "expect": "sentinel ignores intentional focus",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": "wkappbot a11y find {proc:nfrunlite} --depth 3",
+  "tags": [
+    "a11y",
+    "focus-steal",
+    "user-active",
+    "sentinel",
+    "bailout",
+    "focusless-first"
+  ],
+  "source_refs": [
+    {
+      "file": "csharp/src/WKAppBot.CLI/Commands/AskCommands.Focus.cs",
+      "line": null,
+      "pattern": "userBailed",
+      "note": null
+    }
+  ],
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-19T07:19:05.2885677Z",
+  "updated": "2026-07-02T07:47:03.4152811Z",
+  "version": "1.18"
+}

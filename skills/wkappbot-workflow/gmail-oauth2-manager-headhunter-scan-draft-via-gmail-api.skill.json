@@ -1,0 +1,48 @@
+{
+  "id": "gmail-oauth2-manager-headhunter-scan-draft-via-gmail-api",
+  "app": "wkappbot-workflow",
+  "title": "Gmail OAuth2 Manager: headhunter scan \u002B draft via Gmail API",
+  "title_ko": null,
+  "desc": "gmail_manager.py: OAuth2-based Gmail inbox monitor for headhunter detection, auto-draft, and send. Reads creds from D:\\GitHub\\.env central secrets. No IMAP app password needed -- uses refresh_token flow.",
+  "steps": [
+    "Setup: python resume/scripts/gmail_manager.py setup -- auto-reads GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN, GMAIL_EMAIL from D:\\GitHub\\.env",
+    "OAuth2 token refresh: POST https://oauth2.googleapis.com/token with grant_type=refresh_token. Returns short-lived access_token. No user interaction needed.",
+    "Gmail API: Bearer token header. List unread: GET /gmail/v1/users/me/messages?q=is:unread in:inbox maxResults=20. Fetch body: ?format=full. Body is base64url-encoded in payload parts.",
+    "Headhunter detection: keyword match on subject\u002Bsender (recruiter, headhunter, position offer, etc). Generates Korean reply draft. Creates Gmail draft via POST /gmail/v1/users/me/drafts.",
+    "Send saved draft: POST /gmail/v1/users/me/drafts/{id}/send. Fallback: POST /gmail/v1/users/me/messages/send with raw RFC822 base64url body.",
+    "Notify via .wkappbot/pending_prompts/prompt_NOW_{guid}.json for Eye delivery to Claude session.",
+    "Commands: check (scan\u002Bdraft\u002Bnotify), preview (list unread subjects), list (show pending drafts), send \u003Cmsg_id\u003E"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot a11y find *Chrome*",
+      "expect": "chrome",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read headhunter-mail-manager",
+      "expect": "IMAP",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot a11y screenshot *Chrome*",
+      "expect": "SAVED",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "gmail",
+    "oauth2",
+    "headhunter",
+    "draft",
+    "api",
+    "personal-docs"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-01T14:30:40.6680551Z",
+  "updated": "2026-05-01T14:30:40.6680644Z",
+  "version": "1.0"
+}

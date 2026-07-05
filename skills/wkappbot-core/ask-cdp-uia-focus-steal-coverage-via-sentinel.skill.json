@@ -1,0 +1,44 @@
+{
+  "id": "ask-cdp-uia-focus-steal-coverage-via-sentinel",
+  "app": "wkappbot-core",
+  "title": "ask-*/triad CDP focus-steal coverage via sentinel user-active yield",
+  "title_ko": null,
+  "desc": "ask gpt / ask claude / ask gemini / ask triad all route through ChromeLauncher + CDP attach which used to steal foreground focus (UIA hwnd attach, SetForegroundWindow). Combined mitigations this session: AppBotPipe allowlist for Minimized Chrome launch, RestoreFocusWithRetryAsync user-active silent yield, VisionWorker sentinel Checkpoint bracket for CDP tab activation.",
+  "steps": [
+    "ASK PATHS: ask gpt = ChromeLauncher spawn minimized -> CDP port attach -> editor target -> send prompt. ask claude = same as gpt + claude.ai target + CoWork dismiss before send. ask gemini = same Chrome CDP + Gemini copyright dialog dismiss. ask triad = parallel fan-out to gpt+claude+gemini, each with its own focus-steal sentinel",
+    "SILENT YIELD: sentinel bails silently if user-idle <1.5s mid-retry -- prevents fighting an intentional user focus switch",
+    "CHECKPOINT BRACKET: VisionWorker CheckpointFocus bracket catches theft at the CDP-call seam, not only at end of pipeline",
+    "SEND PATH: default send uses SendPromptFocuslessAsync first so minimized/hidden Chrome can still receive Enter without tripping the input-readiness watchdog; the old focusful path is fallback only for editors that truly require OS focus",
+    "CLEAR EDITOR: ClearEditorAsync prefers DOM.focus + Ctrl+A/Backspace before falling back to Runtime.evaluate, keeping prompt cleanup off the 10s JS timeout path",
+    "NAVIGATION: CDP transient guard detail + verification test log + session-reuse policy -> wkappbot skill read ask-cdp-uia-focus-steal-coverage-via-sentinel-howto. Dated source_refs drift audit (ChromeLauncher/AppBotPipe refactors) -> wkappbot skill read ask-cdp-uia-focus-steal-coverage-via-sentinel-ref."
+  ],
+  "requirements": null,
+  "primary_cmd": null,
+  "tags": [
+    "ask",
+    "cdp",
+    "uia",
+    "focus-steal",
+    "sentinel",
+    "chrome"
+  ],
+  "source_refs": [
+    {
+      "file": "csharp/src/WKAppBot.CLI/Commands/AskCommands.Focus.cs",
+      "line": null,
+      "pattern": "userBailed",
+      "note": null
+    },
+    {
+      "file": "csharp/src/WKAppBot.WebBot/ChromeLauncher.cs",
+      "line": null,
+      "pattern": "AppBotPipe.Start",
+      "note": null
+    }
+  ],
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-19T07:53:04.33337Z",
+  "updated": "2026-07-02T07:25:50.1191346Z",
+  "version": "1.23"
+}

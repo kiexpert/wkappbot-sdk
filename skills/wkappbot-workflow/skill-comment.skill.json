@@ -1,0 +1,43 @@
+{
+  "id": "skill-comment",
+  "app": "wkappbot-workflow",
+  "title": "Skill Commenting",
+  "title_ko": null,
+  "desc": "Add persistent notes and context to automation skills via the sidecar jsonl storage.",
+  "steps": [
+    "wkappbot skill comment <id> '<text>'",
+    "Read skill with 'skill read <id>' to see comments section",
+    "Useful for tagging known failures or temporary workarounds per skill"
+  ],
+  "comments": null,
+  "requirements": [
+    {
+      "cmd": "wkappbot skill comment on-load 'test'",
+      "expect": "Comment added",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read on-load",
+      "expect": "Comment:",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read on-load",
+      "expect": "test",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "skill",
+    "comment",
+    "workflow",
+    "operator"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-10T06:35:08.7959977Z",
+  "updated": "2026-06-10T06:35:08.796008Z",
+  "version": "1.0"
+}

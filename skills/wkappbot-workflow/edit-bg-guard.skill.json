@@ -1,0 +1,38 @@
+{
+  "id": "edit-bg-guard",
+  "app": "wkappbot-workflow",
+  "title": "edit-bg-guard: file edits must be sequential",
+  "title_ko": null,
+  "desc": "Blocks wkedit or Edit/Write/Update when run_in_background=true. File edits must run sequentially to avoid race conditions.",
+  "steps": [
+    "SAFETY: Catches wkedit.sh/exe/cmd running in background (isBg) or Edit/Write/Update with run_in_background=true. Background file edits race each other and corrupt files.",
+    "SOLUTION: Remove run_in_background=true from the Edit/Write call. All file edits must be sequential. For wkedit, call it in a foreground Bash/PowerShell command.",
+    "PREVENTION: Never set run_in_background=true on Edit, Write, Update tools. Never chain wkedit.sh in a background Bash command. Sequential edits only -- they are fast enough."
+  ],
+  "comments": null,
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read edit-bg-guard",
+      "expect": "file edits must be sequential",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wkharness-guards",
+      "expect": "GUARD CLUSTER",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read harness-active-model-scoping",
+      "expect": "P6",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-11T07:30:33.0072113Z",
+  "updated": "2026-06-11T07:30:33.0072213Z",
+  "version": "1.0"
+}

@@ -1,0 +1,40 @@
+{
+  "id": "license-pending-invite-detect-and-guide-user-to-accept",
+  "app": "wkappbot-sdk",
+  "title": "License pending invite: detect and guide user to accept",
+  "title_ko": null,
+  "desc": "When GitHub collaborator invite is pending (not yet accepted), GET /repos/invitations returns permission=none -- indistinguishable from never-invited. Fix: check invitations endpoint before falling back to Free tier. UX: show Eye callout \u002B numbered console guide so paying users are not silently downgraded.",
+  "steps": [
+    "1. Call GET /repos/{owner}/{repo}/invitations after permission=none check",
+    "Eye callout message: activation-pending users must NOT see silent Free tier -- always show numbered guide with github.com/invitations URL",
+    "Implementation deferred to license-auth sprint: wire GET /repos/invitations check into LicenseChecker before Free-tier fallback branch",
+    "After permission=none: call GET /repos/invitations, match invitee, show numbered guide: 1) check email invite 2) go github.com/invitations 3) accept WKAppBot repo 4) rerun wkappbot",
+    "Root cause: spec step 22 assumes permission reflects immediately after invite, but only activates after acceptance. indistinguishable from never-invited until accepted. Better UX than silent Free downgrade.",
+    "Business plan draft onboarding document: Customer who paid and gets invite but not yet accepted gets Free tier -- document in onboarding that invite must be accepted before license activates."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot license check",
+      "expect": "shows activation-pending message when invite not yet accepted",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot license check",
+      "expect": "shows Free tier only when no pending invite exists",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot license check",
+      "expect": "numbered guide includes github.com/invitations URL",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-28T17:29:21.2431978Z",
+  "updated": "2026-04-28T17:31:25.8356443Z",
+  "version": "1.5"
+}

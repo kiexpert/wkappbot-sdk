@@ -1,0 +1,47 @@
+{
+  "id": "placement-port-pid-filter",
+  "app": "wkappbot-sdk",
+  "title": "CDP placement port-to-PID filter (TryGetListeningPid byte-swap)",
+  "title_ko": null,
+  "desc": "Byte-swap trap in TryGetListeningPid and how to verify. Read before modifying MyCdpContext.Placement.cs port resolution code.",
+  "steps": [
+    "CONTEXT: TryGetListeningPid in MyCdpContext.Placement.cs resolves CDP port -> owner PID via GetExtendedTcpTable(TCP_TABLE_OWNER_PID_LISTENER=4). Pins Chrome placement to WKAppBot Chrome.",
+    "BYTE-SWAP TRAP: dwLocalPort is big-endian 16-bit in low 2 bytes of 32-bit DWORD. IPAddress.NetworkToHostOrder(int) reverses ALL 32 bits -- port 9300 (0x5424) becomes 0x24540000 then &0xFFFF=0. Port NEVER matches. Filter falls back to startedAt-DESC, picks wrong Chrome. BUG ts=2026-05-26.",
+    "CORRECT swap (sdk 2c45ec56): int localPort = ((localPortBe & 0xFF) << 8) ",
+    " ((localPortBe >> 8) & 0xFF); -- swaps only the low 2 bytes. 0x5424 -> 0x2454 = 9300.",
+    "SKILL REFERENCE comment to place above TryGetListeningPid: // wkappbot skill read placement-port-pid-filter"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot cdp open https://example.com 2>&1 | grep PLACEMENT:STEP2",
+      "expect": "PLACEMENT:STEP2",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read placement-port-pid-filter 2>&1 | grep byte-swap",
+      "expect": "byte-swap",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill search placement port pid 2>&1 | grep placement-port-pid-filter",
+      "expect": "placement-port-pid-filter",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "placement",
+    "chrome",
+    "cdp",
+    "byte-swap",
+    "port",
+    "pid",
+    "bug-prevention"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-26T02:29:24.273433Z",
+  "updated": "2026-05-26T02:29:24.273444Z",
+  "version": "1.0"
+}

@@ -1,0 +1,29 @@
+{
+  "id": "mcp-standard-for-desktop-and-browser-automation-integration-patterns",
+  "app": "wkappbot-core",
+  "title": "[Talon / OSA-MCP / Mirroir / Lilith-zero] MCP Desktop+Browser Automation — integration patterns",
+  "title_ko": null,
+  "desc": "ARCHIVED: moved to mcp-automation-patterns",
+  "steps": [
+    "MCP ECOSYSTEM 2026: Talon (browser+computer-use), OculOS (desktop), OSA-MCP (macOS scripting), Mirroir (iPhone), Lilith-zero (security middleware) -- all expose automation via MCP. WKAppBot mcp command is well-positioned to be the Windows automation MCP server.",
+    "wkappbot_cli MCP tool: argv array maps all wkappbot commands including a11y, win-click, windows, ask. Use from Claude Desktop: {mcpServers:{wkappbot:{command:'wkappbot',args:['mcp']}}}",
+    "a11y via MCP: wkappbot_cli ['a11y','find','*Button*'] or wkappbot_cli ['a11y','click','{proc:notepad}#OK']",
+    "win-click via MCP: wkappbot_cli ['win-click','{proc:nfrunlite}','200','300'] -- elevated targets routed via admin Eye proxy"
+  ],
+  "requirements": null,
+  "primary_cmd": null,
+  "tags": [
+    "mcp",
+    "standard",
+    "browser",
+    "automation",
+    "integration",
+    "tool-use"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-22T10:14:55.0866685Z",
+  "updated": "2026-05-31T07:49:50.7365779Z",
+  "version": "1.5"
+}

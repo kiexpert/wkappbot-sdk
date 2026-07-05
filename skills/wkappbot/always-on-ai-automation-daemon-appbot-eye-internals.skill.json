@@ -1,0 +1,48 @@
+{
+  "id": "always-on-ai-automation-daemon-appbot-eye-internals",
+  "app": "wkappbot",
+  "title": "Always-On AI Automation Daemon -- AppBot Eye Internals",
+  "title_ko": null,
+  "desc": "Eye = always-on overlay + Slack daemon + MCP broker in one process. FSW hybrid dirty-check: event flags (~0ms) + 1s FileInfo safety net. MCP workers isolated via DETACHED_PROCESS (ConPTY LPC deadlock prevention). Hot-swap: detects core.new.exe stamp -> defers if admin pipe busy -> skips same failed stamp -> spawns new Eye. Admin proxy: named pipe wkappbot_elevated, amber border when admin-capable.",
+  "steps": [
+    "Eye = always-on overlay + Slack daemon + MCP broker (one process). FSW dirty-check: event ~0ms + 1s FileInfo safety net. Never kill Eye directly -- kills active sessions.",
+    "MCP workers run in DETACHED_PROCESS (ConPTY LPC deadlock prevention). Hot-swap: watches core.new.exe stamp, defers if admin pipe busy, skips same failed stamp, spawns new Eye.",
+    "Admin-capable mode: amber border, proxies via wkappbot_elevated named pipe. NEVER mix with normal Eye tick channel wkappbot_eye_ipc.",
+    "REFLEX: plain wkbuild.cmd does NOT hot-swap a running Eye (no .new.exe marker by design) -- use wktest-promote.sh to observe a C# change live via the bare wkappbot command, or wkappbot-core <args> directly to bypass Eye for fast dev iteration.",
+    "next:always-on-ai-automation-daemon-appbot-eye-internals-ref for OOM Guardian, spawn-storm breaker, hot-swap stamp detail, dated Eye-window/encoding/stderr-routing investigations."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot eye tick",
+      "expect": "ctx",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read always-on-ai-automation-daemon-appbot-eye-internals",
+      "expect": "Eye",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot file grep wkappbot_elevated csharp/src/WKAppBot.CLI",
+      "expect": "wkappbot_elevated",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "eye",
+    "mcp",
+    "hotswap",
+    "architecture",
+    "admin",
+    "daemon",
+    "fsw",
+    "project"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-07T04:53:02.2511472Z",
+  "updated": "2026-07-04T08:11:19.182881Z",
+  "version": "1.19"
+}

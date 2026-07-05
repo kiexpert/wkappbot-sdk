@@ -1,0 +1,39 @@
+{
+  "id": "speak-bg-interrupt-via-x-esc-caller-exit",
+  "app": "wkappbot-core",
+  "title": "speak --bg: interrupt via X / ESC / caller-exit",
+  "title_ko": null,
+  "desc": "speak --bg now supports mid-playback stop: X button on karaoke overlay, ESC key, Alt-F4, or --caller-pid process exit. stopSignal replaces Thread.Sleep so any trigger immediately cuts audio. --bg prints launched pid=N for scripting.",
+  "steps": [
+    "speak --bg: spawns child process and prints \u0027[SPEAK] launched pid=N caller=M\u0027 for scripting/grep",
+    "SpeakOverlayWindow: X button (closeBtn, top-right, Focusable=false) signals stop immediately",
+    "ESC key and window close (Alt-F4/Closing) also trigger RequestStop -- all paths are idempotent",
+    "stopSignal (ManualResetEventSlim) replaces Thread.Sleep: stopSignal.Wait(totalMs) \u002B player.Stop() cuts audio",
+    "caller-exit watch: --caller-pid \u003Cpid\u003E starts 500ms timer; when caller process exits, TTS stops automatically"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot speak \u0027test\u0027 --bg | grep -c launched",
+      "expect": "1",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill list | grep -c speak",
+      "expect": "1",
+      "prompt": null
+    },
+    {
+      "cmd": "grep -c RequestStop D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/SpeakCommand.cs",
+      "expect": "1",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-30T18:22:45.9373376Z",
+  "updated": "2026-04-30T18:22:54.1906882Z",
+  "version": "1.5"
+}

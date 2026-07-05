@@ -1,0 +1,52 @@
+{
+  "id": "wk-ai-tools-recovery",
+  "app": "wkappbot-workflow",
+  "title": "wk AI Tools Recovery",
+  "title_ko": null,
+  "desc": "Recovery notes for wrappers, cache files, and smoke tests.",
+  "steps": [
+    "Wrapper locations are D:/GitHub/WKAppBot/bin/wkclaude.ps1, wkgemini.sh, and wkcodex.cmd",
+    "Session cache wk_agent_best_model.json stores the last successful auto model",
+    "Failure cache wk_agent_model_sessions slash alias dot json stores status, reason, first_line, first_token_ms, last_ok, last_fail, and cooldown_until",
+    "If cache looks stale or wrong, delete temp session files and rerun a short smoke test",
+    "If wrapper paths change, update routing notes first and retest the shortest path end to end"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read wk-ai-tools-recovery",
+      "expect": "returns wrapper and cache recovery notes",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill search wk-ai-tools",
+      "expect": "finds the routing index",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill install --app wkappbot-workflow --force",
+      "expect": "publishes the recovery skill",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "wk",
+    "ai",
+    "recovery",
+    "cache",
+    "session",
+    "fallback",
+    "rebuild",
+    "wrapper",
+    "codex",
+    "gemini",
+    "claude",
+    "gpt"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-01T10:33:58.0977521Z",
+  "updated": "2026-06-01T10:33:58.0977608Z",
+  "version": "1.0"
+}

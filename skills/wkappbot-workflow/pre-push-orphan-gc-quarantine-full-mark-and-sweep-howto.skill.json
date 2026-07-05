@@ -1,0 +1,41 @@
+{
+  "id": "pre-push-orphan-gc-quarantine-full-mark-and-sweep-howto",
+  "app": "wkappbot-workflow",
+  "title": "Pre-Push Orphan GC Quarantine (full mark-and-sweep) howto",
+  "title_ko": null,
+  "desc": "T2 howto for the pre-push orphan GC-quarantine guard: edge extraction per language, bounded-3-hop BFS algorithm, over-mark bias, sweep+notify impl, dry-run rollout, build flow.",
+  "steps": [
+    "EDGE EXTRACTION per extension: ps1 = dot-source lines + Import-Module + -File args; cs = csproj Compile Include + project membership; py = import and from; sh = source and dot; js and ts = import and require; generic = path-like string literals. Output a directed file-to-file graph.",
+    "ALGORITHM: BFS or DFS from the root set; visited-set for cycle safety (A to B to A); depth cap about 3 hops (bounded, NOT full fixpoint -- recoverable so approximate is fine).",
+    "OVER-MARK BIAS in code: when a token MIGHT be a path or reference, ADD the edge. Prefer keeping a file over quarantining it. Never under-mark.",
+    "SWEEP impl: for each unmarked file, Move-Item to .tmp/unused-DATE/ preserving relative path; create the dated dir; skip .git and existing .tmp; MOVE not delete.",
+    "NOTIFY impl: write one friendly stderr block listing moved files + the .tmp/unused-DATE/ recovery path; then exit 0 (never block the push).",
+    "ROLLOUT: implement a -DryRun switch that LISTS candidates and moves nothing; ship dry-run first, calibrate on real repos, flip to live-move only after the candidate list is verified accurate.",
+    "BUILD FLOW: haiku prototypes in a -proto sandbox; sonnet architects and implements; ROOT verifies synthetic + live + static then merges and wires the pre-push hook."
+  ],
+  "requirements": [
+    {
+      "cmd": "dry-run on a repo with an orphan file",
+      "expect": "orphan listed, nothing moved",
+      "prompt": null
+    },
+    {
+      "cmd": "Move-Item path",
+      "expect": "file under .tmp/unused-DATE/ preserving relative path",
+      "prompt": null
+    },
+    {
+      "cmd": "guard end",
+      "expect": "exit 0 (never blocks push)",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-19T05:27:47.3015007Z",
+  "updated": "2026-06-19T05:27:47.3015096Z",
+  "version": "1.0"
+}

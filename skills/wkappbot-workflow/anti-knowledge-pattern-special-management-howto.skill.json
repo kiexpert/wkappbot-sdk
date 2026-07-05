@@ -1,0 +1,55 @@
+{
+  "id": "anti-knowledge-pattern-special-management-howto",
+  "app": "wkappbot-workflow",
+  "title": "Anti-knowledge pattern special management howto",
+  "title_ko": null,
+  "desc": "T2 howto: the anti-knowledge pattern SET (Surface A commands, Surface B name tokens, Surface C source) + the detector functions + the wiring placement. Consult when implementing the anti-knowledge guard.",
+  "steps": [
+    "PATTERN SET -- Surface A circumvention COMMANDS (universal scan, block): git commit --no-verify / --no-gpg-sign / -n / any --no-star; git -c core.hooksPath= ; commit.gpgsign=false",
+    "0",
+    "no",
+    "off ; push --no-verify ; env-SET of WKHARNESS_BYPASS",
+    "WKHARNESS_AGENT_MODEL",
+    "WKHARNESS_TEST_*",
+    "WKHARNESS_CODEX_HOOK (env-injection) ; bash invoking powershell/pwsh.",
+    "PATTERN SET -- Surface B circumvention NAME tokens (skill id/title at contribute/edit): (?i)(bypass",
+    "backdoor",
+    "skip-guard",
+    "disable-guard",
+    "override-guard",
+    "no-verify",
+    "sneak",
+    "hack).",
+    "DETECTOR FUNCTIONS: Test-WkAkCommand -Cmd (Surface A, scans ANY command, true on circumvention match) ; Test-WkAkSkillName -Id -Title (Surface B) ; Test-WkAkSourceHonors -Path -NewContent (Surface C, true only when a pattern appears in a HONORING context -- grant-exemption / skip-guard -- NOT a detecting/blocking context). Plus Restore-WkFromBak -Path (auto-revert helper).",
+    "WIRING PLACEMENT: Surface A = a universal pre-scan in the heart BEFORE tier classification (like the git --no-* block but full pattern set), hard block exit 2, every tier. Surface B = a skill contribute/edit hook that flags/blocks an anti-knowledge id/title. Surface C = post-edit (wkharness-post): diff new vs .bak; if the edit ADDED a honoring pattern -> auto-revert from .bak (infinite) + mark the file poisoned (syntax-error) until clean.",
+    "QA: each registered pattern ships a canary proving it is actually blocked (verify-tool-or-guard-synthetic-live-static); a registered-but-not-actually-blocked pattern is the worst class.",
+    "DATA-DRIVEN PATTERN REGISTRY (user 2026-06-19, convenience -- adding a pattern must be one line, zero code edit): the anti-knowledge pattern SET lives in TWO plain TEXT FILES, one pattern per line, NOT hardcoded in the guard. (1) anti-knowledge-commands.txt = Surface A command circumvention regexes (also consumed by the Surface C source-honoring scan). (2) anti-knowledge-names.txt = Surface B skill id/title tokens. The guard READS each file, DROPS blank and hash-comment lines, and AUTO-ORs the remaining lines into ONE alternation regex for matching. Adding a new anti-knowledge pattern = append one line to the right file; no code change. A COMPANION FIXTURE anti-knowledge-cases.txt (line format: <command-or-name> :: block|allow) verifies each registered pattern actually blocks (run by wkdoctor via the verify-tool-or-guard discipline) so a new pattern ships WITH its canary -- a registered-but-not-blocked pattern is the worst class. This mirrors the knowledge-classifier cases fixture and the cron data-file pattern: extensible by DATA, not by code. The honoring-vs-detecting nuance stays in the Surface C code logic (a guard that BLOCKS a pattern is exempt), NOT in the pattern files. IMPL NOTE: load the files once (cache by mtime) since the guard runs on every command; keep it sub-1s.",
+    "CORRECTION -- THE TWO REGISTRY FILES ARE BY POLARITY, NOT BY SURFACE (user 2026-06-19; supersedes the earlier commands/names split): the two data files are (1) knowledge-patterns.txt = the KNOWLEDGE-IFICATION ALLOWLIST (the positive set -- what IS a clean knowledge op: the knowledge-op allow-patterns / skill-read clean forms externalized to data), and (2) anti-knowledge-patterns.txt = the ANTI-KNOWLEDGE BLOCKLIST (the circumvention set: Surface A command regexes + Surface B name tokens + Surface C source patterns all live here). Each file is auto-ORed into ONE regex: the knowledge regex grants TIER0 allow, the anti-knowledge regex forces block. AXES ARE ORTHOGONAL: Surface A/B/C = WHERE to scan (command / skill-name / source); the two FILES = the two POLARITIES (allow vs block). PER-FILE ASYMMETRY IS OPPOSITE (self-protection): the anti-knowledge BLOCKLIST is append-EASY / delete-HARD (removing a block = a silent hole). The knowledge ALLOWLIST is the REVERSE -- append-HARD (ROOT+justify) / delete-easier -- because ADDING an allow pattern can OPEN a hole (a too-broad allow lets something through) while REMOVING an allow only over-blocks (safe-fail). So both files are self-protected, but the GUARDED direction is REMOVAL for the blocklist and ADDITION for the allowlist. Both stay data-driven (one pattern per line, blank/hash ignored, auto-OR) with a cases-fixture canary per line.",
+    "PATTERN-FILE SCOPING (user 2026-06-19, the profanity-filter analogy): the KNOWLEDGE allowlist (knowledge-patterns.txt) is consumed ONLY by the knowledge-op module (classify-knowledge) -- it answers the narrow question is-this-a-clean-knowledge-op-for-TIER0-free-pass, one consumer. The ANTI-KNOWLEDGE blocklist (anti-knowledge-patterns.txt) is consumed by ALL modules as a UNIVERSAL PRE-SCAN -- it runs on EVERY command everywhere, like a profanity filter in a chat app that screens every message before anything else. So: knowledge file = module-scoped (single consumer, allow-decision only); anti-knowledge file = UNIVERSAL (every command, every tier, a pre-filter that runs BEFORE classification). This is why anti-knowledge is zero-tolerance everywhere while knowledge-allow only matters where a free-pass is being granted. CONSEQUENCE for heart-v2: the anti-knowledge universal pre-scan is the SINGLE place that catches circumvention commands (env-injection WKHARNESS_AGENT_MODEL=, core.hooksPath=, --no-verify) -- the BUG-16 finding (no heart-v2 module blocks these) is fixed precisely by wiring this universal anti-knowledge pre-scan, not by patching each module."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read anti-knowledge-pattern-special-management-howto",
+      "expect": "Surface A",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read anti-knowledge-pattern-special-management-howto",
+      "expect": "DETECTOR",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read anti-knowledge-pattern-special-management-howto",
+      "expect": "WIRING",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-19T14:39:46.4915607Z",
+  "updated": "2026-06-19T14:59:53.1182093Z",
+  "version": "1.6"
+}

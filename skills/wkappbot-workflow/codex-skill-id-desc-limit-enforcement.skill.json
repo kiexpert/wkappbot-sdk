@@ -1,0 +1,47 @@
+{
+  "id": "codex-skill-id-desc-limit-enforcement",
+  "app": "wkappbot-workflow",
+  "title": "Codex skill id desc hard-limit enforce at export layer only",
+  "title_ko": null,
+  "desc": "Codex silently SKIPS any skill whose exported id over 64 or desc over 1024 chars. Enforce at the .codex export layer only (SkillCommand.AiExport.cs), NEVER on the internal contribute/edit save -- that broke persistence (2026-06-07). Resolution is prefix-64 tolerant; existing long ids never renamed.",
+  "steps": [
+    "Codex SKIPS any exported skill with id over 64 or desc over 1024 chars -- silent, no error.",
+    "ENFORCE AT EXPORT LAYER ONLY (AiExport.cs on skill read). NEVER gate the internal save -- 2026-06-07 EnsureCodexUniqueId+CodexDescError in contribute made skills print Created but never write to disk; reverted.",
+    "id over 64 export: id=first60+dash+3char-hash; tail tokens to exported tags. desc over 1024: full desc to body section 0 with pointer wkappbot skill read id --if-newer (commit 11f6940ec).",
+    "Resolution matches on first-64-chars so truncated refs still resolve; never rename existing ids (links survive).",
+    "Storage: contribute writes {cwd}/skills (git-tracked); skill install copies to HQ; live catalog reads HQ."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read codex-skill-id-desc-limit-enforcement",
+      "expect": "export",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read skill-contribute-edit",
+      "expect": "English",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wkappbot-build-verify-workflow",
+      "expect": "build",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "skill",
+    "codex",
+    "limit",
+    "export",
+    "prefix64",
+    "persistence",
+    "t1"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-07T10:48:28.3841491Z",
+  "updated": "2026-06-07T10:48:28.384157Z",
+  "version": "1.0"
+}

@@ -1,0 +1,42 @@
+{
+  "id": "wkdoctor-sdk-environment-health-check-howto",
+  "app": "wkappbot-sdk",
+  "title": "wkdoctor SDK Health Check HOW-TO",
+  "title_ko": null,
+  "desc": "T2 howto tier of wkdoctor-sdk-environment-health-check. Plugin architecture, how to add a new check, location, setup-check flow.",
+  "steps": [
+    "LOCATION: bin/wkdoctor.ps1 (thin orchestrator) + bin/wkdoctor.cmd in SDK repo. Check logic lives in bin/wkappbot.hq/doctor/NN-name.ps1 plugins.",
+    "ARCHITECTURE: orchestrator dot-sources each NN-*.ps1 plugin in order; plugins call Add-Check and Emit from orchestrator scope. NO wkappbot subprocess calls (avoids Eye IPC stall) -- use PE VersionInfo + Get-Process + file APIs only.",
+    "HOW TO ADD A CHECK: create bin/wkappbot.hq/doctor/NN-yourcheck.ps1; inside call Add-Check '<name>' '<ok",
+    "warn",
+    "fail>' '<detail>' AND Emit '<status>' '<name>' '<detail>'. Never throw (wrap in try/catch). Top-level return exits only that plugin (dot-source), safe. Copy 50-codex-symlink.ps1 or 06-defender-exclusions.ps1 as templates.",
+    "AUTO-REPAIR PATTERN: a plugin may fix what it finds (like 50-codex-symlink and 06-defender). For admin-required repairs: check IsInRole Administrator; if admin run the fix; if not, Start-Process powershell -Verb RunAs with a self-contained repair script (one UAC prompt), report warn + 're-run wkdoctor to verify'.",
+    "SETUP CHECK: run wkdoctor after fresh clone + setup.ps1 to verify environment. exit 0 = all pass, exit 1 = any fail. -Json for machine-readable (ConvertFrom-Json).",
+    "T1 core: wkdoctor-sdk-environment-health-check. T3 ref (full check list + history): wkdoctor-sdk-environment-health-check-ref."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read wkdoctor-sdk-environment-health-check-howto",
+      "expect": "ARCHITECTURE",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wkdoctor-sdk-environment-health-check-howto",
+      "expect": "HOW TO ADD A CHECK",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wkdoctor-sdk-environment-health-check-howto",
+      "expect": "AUTO-REPAIR",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-02T11:38:24.8509366Z",
+  "updated": "2026-06-02T11:38:24.8509454Z",
+  "version": "1.0"
+}

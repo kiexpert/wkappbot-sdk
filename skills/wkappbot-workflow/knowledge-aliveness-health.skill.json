@@ -1,0 +1,49 @@
+{
+  "id": "knowledge-aliveness-health",
+  "app": "wkappbot-workflow",
+  "title": "Knowledge Aliveness Health",
+  "title_ko": null,
+  "desc": "Is the knowledge ALIVE? Aliveness hierarchy: exist < studied < quiz-passed < applied(+degree). Knowledge-score, study-verified peer-eval, reflex-health 3-layer forgetting, usage-in-practice apex.",
+  "steps": [
+    "UNIFYING PRINCIPLE -- IS THE KNOWLEDGE ALIVE? (user 2026-06-10): the entire knowledge-score + peer-eval + healing stack measures ONE thing: is the knowledge ALIVE -- existing, studied, valued, and APPLIED in the fleet -- with reflex health (applied-in-practice) as the deepest layer above mere existence and mere study. A skill can be perfectly written, well-linked, and starred by readers yet still DEAD if no agent has ever APPLIED its behavior in real work. Aliveness is behavioral, not textual. This cluster captures the full system for measuring, surfacing, and healing that aliveness. next:knowledge-aliveness-health-howto cluster:knowledge-aliveness-health-ref",
+    "3-LAYER FORGETTING HIERARCHY (user 2026-06-10): the aliveness stack measures forgetting at three layers, each subtler than the last. (1) EXISTENCE DEATH = a broken link (the branch is severed) -- caught by broken-skill-links detector in wkdoctor. (2) UNSTUDIED = nobody reads it (the branch is never stepped on) -- caught by read-detection and the linked-web read bonus. (3) REFLEX DECAY = read but NOT APPLIED -- the subtlest forgetting; the skill text is fine and linked but its behavior is dead in practice -- caught by transfer-quiz grades and usage-in-practice signals trending down. Each layer is a harder-to-detect but more damaging form of death. The full aliveness score covers all three. reflex health = layer 3 apex, most actionable for wkdoctor healing.",
+    "STUDY-VERIFIED PEER EVALUATION -- capped knowledge-score bonus (user 2026-06-10): incorporate a model evaluation of a skill (e.g. Haiku skill review) into the score, gaming-resistantly. METHOD: (1) a model evaluates a skill via the skill-comment feature carrying a structured verdict (useful/unclear/broken, optional 1-5), stored as {author, model, verdict, ts}. (2) ANTI-GAMING KEYSTONE -- an evaluation counts toward the score ONLY IF the evaluator actually STUDIED (read) that skill, verified by reusing the wkhippo linked-skill read-detection (scan main + subagent sessions in window). No study = no vote; you cannot rate what you did not read. (3) PEER-EVALUATION BONUS = count of DISTINCT models that BOTH studied AND positively evaluated the skill, capped (e.g. +3); self-evaluation excluded. (4) a NEGATIVE evaluation from a model that DID study it (broken/unclear) does NOT subtract score blindly -- it FLAGS the skill for forgetting-prevention healing (wkdoctor surfaces it). NET: Haiku studying + evaluating yields read-bonus (+1) AND study-verified peer-eval vote (+1 distinct). DEPENDENCIES: skill-comment storage + wkhippo study subcommand must land first.",
+    "EVALUATION FORM HIERARCHY: QUESTIONNAIRE > WORK-RECORD > COMMENT (user 2026-06-10): the evaluation feeding the study-verified peer-eval bonus can be a comment, a work-record, or BEST a structured QUESTIONNAIRE response. The questionnaire is superior because it SIMULTANEOUSLY (a) PROVES STUDY -- comprehension questions about the skill cannot be answered without reading it, so the questionnaire IS the study-verification (subsumes the separate read-detection for evaluation purposes), and (b) yields STRUCTURED, comparable evaluation (clarity/correctness/applicability + a 1-5). CRUCIAL: this EXTENDS the existing reflex transfer-quiz machinery (reflex-grades.json -> reflexBonus = grade/100*15 in Get-WkTierScore is ALREADY a comprehension-graded questionnaire), so add evaluation dimensions beside the comprehension grade and ONE questionnaire produces BOTH the comprehension grade (reflexBonus, already wired) AND the peer-eval verdict (new bonus) -- no reinvention. A WORK-RECORD (the model citing where/how it actually applied the skill) is next-best proof-of-use. A bare COMMENT is weakest. Prefer structured questionnaires; they collapse study-proof + evaluation into one credible signal on the existing reflex-quiz path.",
+    "USAGE-IN-PRACTICE WITH A USEFULNESS DEGREE -- the APEX aliveness signal (user 2026-06-10): the STRONGEST proof a skill is alive is that a DISPATCHED agent actually USED it to do real work AND how useful it was (the degree). It sits at the TOP of the reflex-health hierarchy: exist < studied < quiz-passed < APPLIED-TO-REAL-WORK-USEFULLY(+degree). ELEGANT CAPTURE: at task end a dispatched agent fills a brief structured work-record/questionnaire -- which briefed skills did you USE, and how useful was each (1-5)? That single artifact IS simultaneously the WORK-RECORD, the QUESTIONNAIRE, AND the usage-degree signal. Per skill, aggregate distinct agents useful-use reports (with degree) into the aliveness/reflex-health score, weighted HIGHEST among all signals. ANTI-GAMING: the agent must have actually been briefed/read it, and the task must have completed; an honest 'briefed but did NOT use' or 'used but not helpful' is VALUABLE too -- soft reflex-decay signal. The read-posthook shows concrete behavioral aliveness: 'used usefully by Haiku x3 (avg 4/5), Sonnet x1'. This closes the deepest loop: the knowledge tree learns which branches actually bear fruit in real work.",
+    "CONCRETE SCORE RUBRIC (2026-06-14, AUTHORITATIVE -- supersedes the *15 reflex figure mentioned in the peer-eval step). Get-WkTierScore (wkharness-common.ps1) now computes: STRUCTURAL 0-85 (3-tier: +40 howto sibling, +40 ref sibling, +20 navigation/cross-link step, hard-capped 85 so FORM ALONE CAN NEVER REACH 100) PLUS a 15-point BEHAVIORAL pool that only living, traversed knowledge earns: (1) LINKED-WEB-READ 0-10 -- the dominant signal -- min(10, count of distinct existing referenced/[[linked]] skills GENUINELY READ in the freshness window, counting Haiku/subagent reads via the wkhippo all-session scan; +1 per referenced skill read, so ~10 referenced skills must actually be read to earn the full 10); (2) REFLEX TRANSFER-QUIZ 0-5 -- round(grade/100*5) from reflex-grades.json, the comprehension/transfer proof. final = min(100, structural + min(10,linkedWebRead) + min(5,reflexQuiz)). CONSEQUENCE: structure=85, a fully-read 10-skill cluster=95, a passed transfer quiz on top=100. WEIGHT RATIONALE (Opus decision, owner-delegated for appbot evolution): connectivity-actually-traversed is weighted highest (10) because dead orphan links are the biggest knowledge-tree rot; transfer-proof is the apex but expensive/async so it is the final 5. This directly embodies the jisikhwa 'reserve headroom -- 100 unreachable by structure alone' rule and this skill's own aliveness hierarchy (exist<studied<quiz-passed<applied). Implementing functions: Get-WkLinkedWebReadBonus (0-10) + Get-WkTierScore."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read knowledge-aliveness-health",
+      "expect": "UNIFYING PRINCIPLE",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read knowledge-aliveness-health",
+      "expect": "3-LAYER FORGETTING",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read knowledge-aliveness-health",
+      "expect": "APEX",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "knowledge",
+    "aliveness",
+    "reflex-health",
+    "peer-eval",
+    "knowledge-score",
+    "usage-in-practice",
+    "forgetting",
+    "living-knowledge-tree"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-10T07:55:59.446476Z",
+  "updated": "2026-06-14T07:39:59.6803709Z",
+  "version": "1.2"
+}

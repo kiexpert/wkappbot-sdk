@@ -1,0 +1,39 @@
+{
+  "id": "orchestrate-sectors-parallel-while-knowledgeifying-ref",
+  "app": "wkappbot-workflow",
+  "title": "Orchestrate Parallel Sectors -- Dated Incidents Ref",
+  "title_ko": null,
+  "desc": "T3 ref: dated incidents, calibration lessons, sortie proofs for the parallel-sector orchestration pattern.",
+  "steps": [
+    "TIER RULE (2026-06-12): skill-ops sectors (authoring/enhancing skill content) go to a PRO-grade executor (Opus or Sonnet) or the orchestrator itself -- NEVER Haiku or Flash, which fabricate and drop skill content. See skill-contribute-edit and haiku-task-fabrication-detection.",
+    "FAMILY DIVERSIFICATION (user 2026-06-12): for parallel sectors, actively favor recently-strengthened OTHER-FAMILY executors (GPT/wkgpt, Gemini/wkgemini, Codex codex-mini/wkcodex, Groq, Cerebras, triad) on execution/analysis/refactor/error-fixing sectors -- pace-exempt, saves Claude budget. Keep skill-content authoring on Claude PRO.",
+    "EXPECTED-RESULT PRE-REGISTRATION (2026-06-22): while parallel delegations run, pre-write the EXPECTED RESULT for each dispatched agent BEFORE it returns. Return-time becomes a CHECK against the stated expectation -- any delta beyond expectation flags a silent drop, and you REVERT.",
+    "SORTIE PROOF (2026-06-23): in a 4-sector read-only sortie, the pre-registered-expected check caught 3 of 4 cheap specs wrong -- mis-attributed a signal, grepped the WRONG REPO, guessed the wrong layer. ALWAYS verify a cheap finding against source AND confirm WHICH REPO emits the symptom.",
+    "PUSH-WORKFLOW for a shared main that diverges: stash unstaged churn -> git pull --rebase origin main -> git push -> git stash pop."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read orchestrate-sectors-parallel-while-knowledgeifying-ref",
+      "expect": "shows TIER RULE",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read orchestrate-sectors-parallel-while-knowledgeifying-ref",
+      "expect": "shows SORTIE PROOF",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read orchestrate-sectors-parallel-while-knowledgeifying-ref",
+      "expect": "shows PUSH-WORKFLOW",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-07-04T11:57:48.7920594Z",
+  "updated": "2026-07-04T11:57:48.792073Z",
+  "version": "1.0"
+}

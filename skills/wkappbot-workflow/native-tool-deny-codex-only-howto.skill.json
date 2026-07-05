@@ -1,0 +1,51 @@
+{
+  "id": "native-tool-deny-codex-only-howto",
+  "app": "wkappbot-workflow",
+  "title": "native-tool-deny-codex-only-howto",
+  "title_ko": null,
+  "desc": "Howto tier: how to deny Codex native Edit and Write correctly -- config.toml PreToolUse DenyNativeTool matchers plus Claude-named cmd wrappers, the Claude-settings anti-pattern to avoid, guard order (pace and opus-budget before spec-gate), the over-target allow-list, and rules-MD post-review-not-deny.",
+  "steps": [
+    "CORRECT CODEX IMPL (see codex-tool-wrappers): block Codex native tools via config.toml PreToolUse hooks with matchers apply_patch, write_file, create_file, read_file running DenyNativeTool.ps1 exit 2, plus AGENTS.md forbidden-native rules, plus Claude-named cmd wrappers Edit.cmd and Write.cmd that pipe Claude-format JSON to wkharness. This routes Codex through the same guards without touching Claude permissions.",
+    "ANTI-PATTERN never do this: adding Edit and Write to a repo .claude settings permissions.deny disables Claude Code own Edit and Write for the whole repo, for every model including Opus. Cheap models then report permission needed and flail to bypass paths such as fake git commits, raw PowerShell writes, or launching VS Code, then stall asking the user. Deny-as-routing backfires on same-family Claude models.",
+    "GUARD ORDER IMPL: check pace and opus-budget BEFORE spec-gate and agent-brief-guard in wkharness-guards.ps1. If spec-gate runs first it only asks the model to add a SPEC block, the model complies, and the over-budget Opus spawn proceeds, breaking the budget. The pace check must be cached and cheap so it short-circuits early.",
+    "OVER-TARGET ALLOW-LIST is Haiku Agent plus Codex or wkcodex plus wkappbot and git only. The harness never spawns Opus itself; a cheap model must not satisfy spec-gate in a way that spawns Opus while over-target. An emergency kill-switch harness:block on Agent Opus spawns lives in the global rules MD. To edit non-exempt files over-target use wkappbot file edit (pace-sanctioned) or wkcodex; do not MD-safe past the pace guard.",
+    "RULES-MD equals POST-REVIEW NOT DENY: a rules-MD change (Edit or Write of it, a Bash command naming it, or its mtime within about 30 seconds) fires a NON-blocking Opus review in wkharness-post.ps1 (disable with WKHARNESS_CLAUDEMD_REVIEW set to 0). NEVER deny-intercept rules-MD edits to route them; cheap models read a deny as tool-disabled and flail. Review after, never block.",
+    "DENY-NATIVE-CONFIG detail: config.toml hooks fire only in interactive TUI mode, not codex exec. The catch-all rule (wkharness.ps1) handles shell_command in exec mode. See codex-tool-wrappers for the full wrapper set and install flow."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read native-tool-deny-codex-only-howto",
+      "expect": "CORRECT CODEX IMPL",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read native-tool-deny-codex-only-howto",
+      "expect": "ANTI-PATTERN",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read native-tool-deny-codex-only-howto",
+      "expect": "GUARD ORDER",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "codex",
+    "harness",
+    "deny",
+    "pace-guard",
+    "spec-gate",
+    "opus-budget",
+    "guard-order",
+    "wrappers",
+    "howto",
+    "settings"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-07-03T16:53:52.6547537Z",
+  "updated": "2026-07-03T16:53:52.6547631Z",
+  "version": "1.0"
+}

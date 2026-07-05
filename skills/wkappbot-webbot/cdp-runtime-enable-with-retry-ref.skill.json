@@ -1,0 +1,37 @@
+{
+  "id": "cdp-runtime-enable-with-retry-ref",
+  "app": "wkappbot-webbot",
+  "title": "CDP Runtime Enable With Retry T3 Reference",
+  "title_ko": null,
+  "desc": "T3 ref. BeginAttachmentLock wrap history, pipe-break token integration.",
+  "steps": [
+    "v7.5.8 fix (commit 0cf4bc8ae): BeginAttachmentLockAsync + CompleteAttachmentLockAsync wrap around EnableRuntimeWithRetry. Catches any exception (including timeout), gracefully releases lock, fresh socket state on next ConnectAsync.",
+    "PipeBreakToken AsyncLocal: EnableRuntimeWithRetry checks PipeBreakToken.Value before each delay. If Eye pipe dead -> cancel immediately, don't wait full backoff. Defined in CdpClient.InputGuard.cs.",
+    "BeginAttachmentLock graceful Complete added to mirror existing: CdpClient.Core.cs catch block adds try{await CompleteAttachmentLockAsync(...)}catch{} pattern (also v7.5.6, commit 62c3e17fe)."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read cdp-runtime-enable-with-retry-ref",
+      "expect": "T3",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read cdp-runtime-enable-with-retry",
+      "expect": "T1",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read cdp-evalasync-retry-policy",
+      "expect": "retry policy",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-31T12:50:15.1130433Z",
+  "updated": "2026-05-31T12:50:15.1130526Z",
+  "version": "1.0"
+}

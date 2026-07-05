@@ -1,0 +1,47 @@
+{
+  "id": "wkpace-codex",
+  "app": "wkappbot-workflow",
+  "title": "wkpace-codex: codex pace display launcher",
+  "title_ko": null,
+  "desc": "Repo-root pace-exempt launcher (./wkpace-codex.cmd) for tools/wkpace-codex.ps1 -- shows the Codex 5h percent + Weekly-limit bar (percent left + reset) by wrapping Get-WkCodexPaceInfo. Runs even at pace-95 (wk-prefixed). -RefreshCli forces a ConPTY /status re-scrape (currently blocked: missing wkcodex-status-pty.cs). KNOWN GAP: the display ignores design#2 anomaly flags.",
+  "steps": [
+    "WHAT: ./wkpace-codex.cmd (repo root) launches tools/wkpace-codex.ps1, which calls Get-WkCodexPaceInfo and prints two lines -- Codex 5h: X% / target, and Weekly limit: [bar] X% left (resets ...). Reads codex_pace.json + ~/.codex/logs_2.sqlite. It is a wk-prefixed repo-root WillKim tool so it is PACE-EXEMPT and runs directly even at pace-95 (the wk-launcher escape: write logic via wkedit, run via ./wk-tool).",
+    "USAGE: ./wkpace-codex.cmd (plain fast display, 1-min cache); ./wkpace-codex.cmd -RefreshCli (force a fresh ConPTY /status re-scrape via wk-codex-pty-test.cmd -- CURRENTLY BLOCKED until the wkcodex-status-pty.cs ConPTY helper is reconstructed, harness-codex-pace-guard-ref step 10); -Quiet (suppress output, return object only).",
+    "KNOWN GAP (TODO connect): Write-WkPaceCodex builds its own display from $pace fields and IGNORES design#2 $pace.weeklyAnomalyDetected / fiveHourAnomalyDetected -- so on the 2M-overflow anomaly (remainingPct null + usedPct>100) it shows Weekly limit 0% left instead of the honest limit UNVERIFIED. FIX: in Write-WkPaceCodex, when $pace.weeklyAnomalyDetected is true, print a UNVERIFIED line instead of the bar; mirror for 5h. This CONNECTS design#2 (which only set the flag in Get-WkCodexPaceInfo) to the user-facing display.",
+    "DESIGN: separated from the shared wkpace so Codex refresh/display logic stays isolated; codex_pace.json is the writable sync product (the dashboard balance snapshot may be read-only under Codex sandbox ACLs).",
+    "CONTEXT: the data-source blocker is the missing ConPTY .cs (harness-codex-pace-guard-ref steps 6-11); codex itself is a node-launcher to a Rust binary with OAuth2 auth in ~/.codex/auth.json and NO non-interactive usage CLI, so /status TUI capture is the only live remainingPct source. Cross: harness-codex-pace-guard, harness-codex-pace-guard-howto, verify-tool-or-guard-synthetic-live-static, wk-tool-sub-1s-response-time-mandate.",
+    "CONTRACT: wkstdpty is a shared PTY bridge for any interactive CLI; do not hardcode Codex paths, prompts, model names, or status semantics into the bridge. Family-specific behavior belongs in the caller and the consuming pace/display skill."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read wkpace-codex",
+      "expect": "launcher",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read harness-codex-pace-guard",
+      "expect": "SAFETY",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wk-tool-sub-1s-response-time-mandate",
+      "expect": "sub-1s",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "wk-tool",
+    "codex",
+    "pace",
+    "display",
+    "launcher",
+    "wkpace"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-29T17:33:16.7224161Z",
+  "updated": "2026-07-01T08:29:04.5649976Z",
+  "version": "1.1"
+}

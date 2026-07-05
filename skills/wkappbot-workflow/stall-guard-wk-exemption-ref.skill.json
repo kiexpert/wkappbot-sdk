@@ -1,0 +1,37 @@
+{
+  "id": "stall-guard-wk-exemption-ref",
+  "app": "wkappbot-workflow",
+  "title": "Stall-guard wk-exemption (ref)",
+  "title_ko": null,
+  "desc": "Incidents and history behind the stall-guard / pace wk-exemption: the 4-copy hyphen drift and the launcher Catch-22.",
+  "steps": [
+    "INCIDENT 2026-06-23: the wk-exemption inline regex used wk-followed-by-word-chars-only (no hyphen) in FOUR guard copies -- Test-WkPaceVerdict in wkharness-guards-pace.ps1, the wk-only-gate in wkharness-guards-shell.ps1 (twice, identical if/else branches), and wkharness-guards-gemini.ps1. A hyphenated ./wk-cdp.cmd launcher was wrongly pace/wk-only BLOCKED even though bare wkappbot/wkedit passed. guards-pace fixed in commit d7a3ddba; guards-shell and guards-gemini pending.",
+    "ROOT-CAUSE CLASS: duplicate exemption lists that drift. A shared Test-WkPaceExempt exists but the gates inline their own copy, so each drifts independently. NO-BANDAID fix: route all copies through the one shared function.",
+    "RELATED: the delegation-launcher Catch-22 (a launcher command itself getting stall-counted) was fixed via the heart-v2 launcher exemption; the stall window resets on a successful delegation."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read stall-guard-wk-exemption-ref",
+      "expect": "INCIDENT",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read stall-guard-wk-exemption-ref",
+      "expect": "ROOT-CAUSE CLASS",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read stall-guard-wk-exemption-ref",
+      "expect": "RELATED",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-23T16:50:44.8235343Z",
+  "updated": "2026-06-23T16:50:44.8235434Z",
+  "version": "1.0"
+}

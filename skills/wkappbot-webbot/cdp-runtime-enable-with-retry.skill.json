@@ -1,0 +1,46 @@
+{
+  "id": "cdp-runtime-enable-with-retry",
+  "app": "wkappbot-webbot",
+  "title": "CDP Runtime.enable with retry",
+  "title_ko": null,
+  "desc": "Runtime.enable + Page.enable + DOM.enable can fail on first call. EnableRuntimeWithRetry: 4 total attempts (0..maxRetries=3), exponential backoff 500ms??000ms??000ms. Final failure throws TimeoutException.",
+  "steps": [
+    "attempt <= maxRetries (default 3) ??4 total tries",
+    "delay = 500 * (1 << attempt): 500ms, 1000ms, 2000ms",
+    "Only retries on TimeoutException (not other errors)",
+    "Throw TimeoutException after all attempts exhausted",
+    "[AUDIT 2026-05-29] EnableRuntimeWithRetry signature drifted in CdpClient.cs. Method exists but pattern with exact default-arg signature 'EnableRuntimeWithRetry(int maxRetries = 3, int baseDelayMs = 500)' no longer matches. Refresh refs on next re-contribute to point to actual current signature.",
+    "Verified 2026-06-02: ev-runtime-enable-attempt0-grace.sh (resolve ts=2026-06-02T03:13:18.0576912Z)",
+    "[AUDIT 2026-06-03] source_refs broken: stale EnableRuntimeWithRetry/backoff patterns in CdpClient.cs.",
+    "[AUDIT 2026-06-04] CdpClient.cs refactored -- 'EnableRuntimeWithRetry(int maxRetries=3,...)' signature and 'baseDelayMs * (1<<attempt)' backoff literal patterns drifted; method may have been renamed or extracted to partial.",
+    "[AUDIT 2026-06-05] CdpClient.cs: 'EnableRuntimeWithRetry(int maxRetries...' signature + 'baseDelayMs * (1 << attempt)' anchors drifted (method body refactored). File exists. Pattern drift only -- behavior unchanged per skill description."
+  ],
+  "requirements": null,
+  "primary_cmd": null,
+  "tags": [
+    "cdp",
+    "runtime",
+    "stability",
+    "retry",
+    "project"
+  ],
+  "source_refs": [
+    {
+      "file": "csharp/src/WKAppBot.WebBot/CdpClient.cs",
+      "line": 268,
+      "pattern": "EnableRuntimeWithRetry(int maxRetries = 3, int baseDelayMs = 500)",
+      "note": null
+    },
+    {
+      "file": "csharp/src/WKAppBot.WebBot/CdpClient.cs",
+      "line": 283,
+      "pattern": "baseDelayMs * (1 << attempt)",
+      "note": null
+    }
+  ],
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-06T17:01:53.8614476Z",
+  "updated": "2026-06-04T19:51:17.4063789Z",
+  "version": "1.9"
+}

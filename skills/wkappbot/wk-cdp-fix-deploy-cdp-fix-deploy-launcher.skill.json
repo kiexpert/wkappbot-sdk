@@ -1,0 +1,38 @@
+{
+  "id": "wk-cdp-fix-deploy-cdp-fix-deploy-launcher",
+  "app": "wkappbot",
+  "title": "wk-cdp-fix-deploy CDP fix deploy launcher",
+  "title_ko": null,
+  "desc": "Repo-root wk-* launcher that deploys two CDP fixes for WKAppBot: commits EyeCmdPipeServer.Dispatch.cs fix(eye) (wktasklist exempt-allowlist) then ChromeLauncher.LaunchArgs.cs fix(cdp) (--remote-allow-origins=* for Chrome 149 CDP WebSocket from stash@{4}), pushes origin/main, monitors CI cdp-smoke.yml in kiexpert/wkappbot-sdk up to 20 min, resolves both suggests on green. Mapping skill so the wk-tool first-use nudge resolves; invoke via ./wk-cdp-fix-deploy.cmd (repo root, not on PATH so bare name fails).",
+  "steps": [
+    "INVOKE via the relative path ./wk-cdp-fix-deploy.cmd from repo root D:/GitHub/WKAppBot -- the bare name is NOT on PATH (exit 127); the path form is wk-prefixed so it stays pace-exempt.",
+    "It commits Dispatch.cs (fix(eye) wktasklist allowlist) and LaunchArgs.cs (fix(cdp) --remote-allow-origins=* extracted from git stash@{4}), pushes, then polls CI cdp-smoke.yml in kiexpert/wkappbot-sdk for 20 minutes (Poll N/20, 60s each).",
+    "On CI green it resolves suggest 2026-06-24T00:04:01 (wktasklist exempt) and 1782393412 (chrome-remote-allow-origins) with --commit HASH --class CdpClient. Those resolves omit --i-completed-script/--skill so they may be rejected by the resolve guards -- expected, report rejection verbatim.",
+    "Runs ~20 min in the CI poll loop; launch in background."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read wk-cdp-fix-deploy",
+      "expect": "CDP fix deploy launcher",
+      "prompt": null
+    },
+    {
+      "cmd": "git stash list",
+      "expect": "stash@{4} skill-cache-3 pre-opus-delegation",
+      "prompt": null
+    },
+    {
+      "cmd": "gh run list --repo kiexpert/wkappbot-sdk --workflow cdp-smoke.yml --limit 3",
+      "expect": "cdp-smoke run status rows",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-25T19:50:54.7454081Z",
+  "updated": "2026-06-25T19:50:54.7454183Z",
+  "version": "1.0"
+}

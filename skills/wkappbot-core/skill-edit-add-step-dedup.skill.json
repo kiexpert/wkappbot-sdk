@@ -1,0 +1,38 @@
+{
+  "id": "skill-edit-add-step-dedup",
+  "app": "wkappbot-core",
+  "title": "skill edit --add-step dedup behavior",
+  "title_ko": null,
+  "desc": "wkappbot skill edit --add-step skips identical content; prevents accidental duplicate steps when same string is added twice",
+  "steps": [
+    "Run wkappbot skill edit <id> --add-step 'TEXT' to append a new step",
+    "If TEXT is already present (case-sensitive Ordinal compare), the command prints '[SKILL] add-step skipped: identical step already exists at position N' and does not duplicate",
+    "Use --step N --content X if you want to overwrite a specific step rather than append",
+    "Verified 2026-05-08: SkillCommand.Edit.cs FindIndex StringComparison.Ordinal dedup path active (commit 2073ffd0)"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill edit dummy --add-step test",
+      "expect": "add-step",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read skill-edit-add-step-dedup",
+      "expect": "add-step",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill list",
+      "expect": "skill-edit-add-step-dedup",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-08T13:05:01.9040803Z",
+  "updated": "2026-05-08T13:05:01.9040898Z",
+  "version": "1.0"
+}

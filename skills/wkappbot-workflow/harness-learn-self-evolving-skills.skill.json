@@ -1,0 +1,49 @@
+{
+  "id": "harness-learn-self-evolving-skills",
+  "app": "wkappbot-workflow",
+  "title": "harness:learn -- soft-nudge loop for self-evolving skills",
+  "title_ko": null,
+  "desc": "Pattern for making Claude skills evolve automatically. CLAUDE.md harness:learn directives trigger on tool completions, reminding Claude to promote patterns to skills. Rules live in the environment; the environment guides its own evolution.",
+  "steps": [
+    "CONCEPT: Rules live in CLAUDE.md harness section. When Claude edits CLAUDE.md (or matches any harness:learn pattern), wkharness-post.ps1 fires a reminder: promote this to a skill. Loop: observation -> CLAUDE.md edit -> harness:learn fires -> skill update -> skill read at next session start -> changed behavior. The system remembers even when Claude forgets.",
+    "HOW TO ADD A TRIGGER: append to CLAUDE.md harness section -- '## harness:learn Edit.*CLAUDE\\.md' -- fires when Claude edits CLAUDE.md via Edit tool. Pattern is tool_name:file_path regex. Examples: Edit.*CLAUDE\\.md (rule added), Edit.*AGENTS\\.md, Bash.*suggest.*resolve (resolve workflow), Edit.*\\.cs (code change).",
+    "IMPLEMENTATION: wkharness-post.ps1 SELF-HARNESS section parses harness:learn directives and matches j.tool_name:j.tool_input.file_path. On match: prints snippet + 'promote to skill' reminder to stderr. Claude sees this on next turn.",
+    "PHILOSOPHY: AI has no persistent memory across sessions. Externalizing rules into CLAUDE.md + skills creates a feedback loop that outlives the session. harness:learn is the bridge: it converts ephemeral observations into durable skill steps. Three components: externalized memory (CLAUDE.md) + environment trigger (harness:learn) + skill accumulation (skill edit). Rules beget rules.",
+    "EXTEND: add harness:learn for any pattern you want Claude to reflect on. The directives themselves live in CLAUDE.md -- Claude can add new harness:learn lines when discovering new patterns, making the trigger system self-extending.",
+    "DISTINCTION from harness:done: harness:done watches tool_response OUTPUT (what was said/returned) -- useful for detecting symptoms like 'skipped' or error strings. harness:learn watches tool_name:file_path ACTION (what was done to what file) -- useful for detecting intent like 'edited a rule file'. done=reactive to content. learn=reactive to action. harness:done can also execute commands via ! prefix; harness:learn only prints a reminder. Use done for output-pattern guards, learn for action-based learning nudges.",
+    "Verified 2026-05-22: harness:learn + skill contribution workflow working end-to-end. skill id=harness-learn-self-evolving-skills v1.1 created and synced.",
+    "STDOUT FIX (2026-05-22): harness:learn must use Write-Output (stdout) not [Console]::Error.WriteLine (stderr). Claude Code PostToolUse hook stdout is visible to Claude; stderr may not be. Fix: replace all [Console]::Error.WriteLine in harness:learn block with Write-Output.",
+    "DEBUG METHOD (2026-05-22): to confirm PostToolUse hook fires, add to wkharness-post.ps1 after raw/json parse: try { Add-Content (Join-Path $env:TEMP wkharness_post_debug.log) \"$(Get-Date) tool=$($j.tool_name) file=$($j.tool_input.file_path)\" -EA SilentlyContinue } catch {}. Then check the log file after any tool call. If log file empty/missing = hook not firing.",
+    "PostToolUse hook debug: if debug log empty, hook is not firing. Unconditional test: add [System.IO.File]::AppendAllText path 'hook-fired raw=N chars' right after $raw = ReadToEnd() with no try-catch. If file still missing = Claude Code PostToolUse hooks not supported or not triggered for this tool type.",
+    "PostToolUse hook fires but tool_input.file_path is empty. Need to log raw JSON to find correct field names. Add: AppendAllText path raw500=raw.Substring(0,500). Common issue: Claude Code PostToolUse JSON may use different field names than PreToolUse.",
+    "BUG FOUND (2026-05-22): SELF-HARNESS uses $env:PWD to find CLAUDE.md but PostToolUse hook runs in different env. Fix: use $j.cwd (from JSON input) instead of $env:PWD. JSON has field cwd=D:/GitHub/WKAppBot. Replace: $_phCwd = if ($j.cwd) { [string]$j.cwd } elseif ($env:PWD) { $env:PWD } else { (Get-Location).Path }. This is why harness:learn was never firing -- CLAUDE.md path was wrong so harness:learn directives were never found.",
+    "TWO-STAGE MEMORY ARCHITECTURE (vision 2026-06-05, hongik harness) modeled on the human brain: (1) HIPPOCAMPUS = real-time encoding -- hard facts (dates, case numbers, deadlines, citations, decisions) must be FORCE-captured into skills/memory the very turn they appear, not left to model recall. CURRENT GAP: capture is manual (harness:learn is only a reminder), which proved costly in the 2026-06-05 legal session (a judgment delivery date went un-skillified and a phantom precedent lingered several sessions). TARGET: a PostToolUse/turn hook that detects newly-stated hard facts and forces immediate encoding. (2) SLEEP CONSOLIDATION = ALREADY implemented via skill-heal-nightly (daily 04:13 Opus cron: skill heal + Pending compaction + dedup) -- the nightly pass that tidies whatever was captured in the day. (3) RETRIEVAL via wkfind (user idea, the missing piece): a SESSION-SEARCH wk* tool that greps across all session JSONL transcripts under ~/.claude/projects/<slug>/*.jsonl and returns turn-anchored matches. It serves BOTH halves -- forced-capture (scan recent turns for hard facts not yet encoded) and recall (answer 'where did I write X' instead of relying on memory, e.g. the delivery-date hunt this session). Build wkfind as pace-exempt like other wk* tools. NET = hippocampus (real-time force-capture) + wkfind (retrieval/scan) + skill-heal-nightly (sleep consolidation) = the hongik two-stage living memory.",
+    "WKFIND ALREADY-PARTLY-EXISTS (verified 2026-06-05, do NOT rebuild from scratch): existing search primitives = (a) wkappbot session [keyword] already lists/filters recent Claude/Codex/Gemini sessions by keyword at the metadata level, with --claude/--codex/--gemini/--cwd/--days flags; (b) wkappbot session handoff reads a session JSONL and extracts turns; (c) wkappbot skill search searches the skill catalog; (d) wkappbot-log-search and qmd-local-codebase-search cover logs and code. The GAP wkfind should fill = DEEP FULL-TEXT content grep across ALL session JSONL transcripts under ~/.claude/projects/<slug>/*.jsonl (answer 'which turn did I state the delivery date'), which the metadata keyword match does not do. THEREFORE wkfind = EXTEND wkappbot session with a content-grep subcommand (e.g. session grep <regex>) reusing its existing slug-path resolution and provider filters, NOT a new standalone tool. Keep it pace-exempt like other wk* tools. This is the retrieval half of the hippocampus + wkfind + skill-heal-nightly two-stage memory.",
+    "AUTO-TOPIC-MD EXPORT (vision concretized 2026-06-05, the real-time hippocampus piece): session-find.ps1 (called by wkfind session) ALREADY parses Claude JSONL into prompt/plan/tool/answer blocks and scores them -- but it only SEARCHES (retrieval); there is NO exporter that drops a topic-segmented MD of a conversation. THAT is the missing real-time-jisikhwa capability the user wants: the harness should AUTO-DROP topic-segmented markdown from the live conversation (group turns by subject, one MD section per topic with decisions + files/skills touched + open items). Build it ON TOP of session-find's existing JSONL parser (reuse Get-ContentText / Get-ToolInputSummary / block extraction), adding a topic-clustering + MD-emit pass -- do not re-parse from scratch. Trigger options: nightly (skill-heal-nightly companion) for sleep-consolidation, and/or a turn hook for true real-time capture. Net architecture restated: session-find/wkfind = retrieval; auto-topic-MD = real-time encoding; skill-heal-nightly = sleep consolidation. Prototype proven 2026-06-05 by having Codex read the session JSONL and emit a by-topic session_log md."
+  ],
+  "requirements": [
+    {
+      "cmd": "grep harness:learn D:/GitHub/WKAppBot/CLAUDE.md",
+      "expect": "harness:learn",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read harness-learn-self-evolving-skills",
+      "expect": "CONCEPT",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill list",
+      "expect": "harness-learn",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-22T12:49:25.0900028Z",
+  "updated": "2026-06-05T03:50:14.0249102Z",
+  "version": "1.20"
+}

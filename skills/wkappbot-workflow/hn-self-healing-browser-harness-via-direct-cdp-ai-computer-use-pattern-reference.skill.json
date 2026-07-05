@@ -1,0 +1,40 @@
+{
+  "id": "hn-self-healing-browser-harness-via-direct-cdp-ai-computer-use-pattern-reference",
+  "app": "wkappbot-workflow",
+  "title": "[HN] Self-healing browser harness via direct CDP \u2014 AI computer-use pattern reference",
+  "title_ko": null,
+  "desc": "Borrow self-healing CDP reconnect patterns for WKAppBot CdpClient to handle Chrome restarts without losing prompt-pump singleton.",
+  "steps": [
+    "SOURCE: Self-healing browser harness -- https://github.com/browser-use/browser-harness (score=5)",
+    "ACTION: Call EnsureConnectedAsync in catch blocks after CDP op failures to auto-reconnect after Chrome restart.",
+    "VERIFY: CdpClient.SelfHealing.cs exists at csharp/src/WKAppBot.WebBot/CdpClient.SelfHealing.cs with EnsureConnectedAsync and RestoreTrackedPumpsAsync. Build and publish to confirm v6.0.97\u002B.",
+    "Verified 2026-04-22: test-cdp-selfheal.sh (resolve ts=2026-04-22T10:51:39)",
+    "2026-05-06 UPDATE: Latest AI-NEWS duplicate points to lahfir/agent-desktop, a native Rust desktop automation CLI using OS accessibility trees, deterministic element refs, progressive skeleton traversal, structured JSON errors, and AX-first actions. Treat it as a broader desktop automation competitor/pattern source, not only browser CDP self-healing.",
+    "2026-05-06 BROWSER-HARNESS TITLE VARIANT: Show HN: Browser Harness - Gives LLM freedom to complete any browser task. Treat as duplicate/variant of browser-use/browser-harness self-healing CDP pattern; keep dedupe before filing separate AI-NEWS suggests."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot suggest show 2026-05-06T02:05:43",
+      "expect": "agent-desktop",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot suggest show 2026-05-06T02:04:57",
+      "expect": "browser-harness",
+      "prompt": null
+    },
+    {
+      "cmd": "Get-Content skills\\wkappbot-workflow\\hn-self-healing-browser-harness-via-direct-cdp-ai-computer-use-pattern-reference.skill.json",
+      "expect": "lahfir/agent-desktop",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-22T11:39:48.2875646Z",
+  "updated": "2026-05-06T02:44:03.7050554Z",
+  "version": "1.6"
+}

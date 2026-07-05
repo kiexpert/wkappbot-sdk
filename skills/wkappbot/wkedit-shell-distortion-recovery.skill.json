@@ -1,0 +1,50 @@
+{
+  "id": "wkedit-shell-distortion-recovery",
+  "app": "wkappbot",
+  "title": "wkedit shell distortion recovery",
+  "title_ko": null,
+  "desc": "3rd retry in wkedit.sh: recover original args from parent cmdline when shell distortion causes old_string not found",
+  "steps": [
+    "CONCEPT: 3rd retry after 2-level auto-retry (--replace-all + --old-file). When shell pipe layers distort backslashes/quotes/regex before reaching wkappbot, recover original cmdline from parent process.",
+    "WHEN-NEEDED: bash -c distortion, pipe escaping, MSYS2 path conversion. Symptoms: --regex fails with correct pattern; literal match fails despite visible text. Gap after existing 2 retries.",
+    "STEP 1 detect parent shell: check /proc/$PPID/cmdline (Linux procfs). If absent (MSYS2/git-bash on Windows typically lacks it), fall back to WMI: powershell.exe -NoProfile -Command \"(Get-CimInstance Win32_Process -Filter 'ProcessId=$PPID').CommandLine\"",
+    "STEP 2 extract original args: parse CommandLine for bash -c argument. Use python3 shlex.split() to recover token list. Find wkappbot/file/edit tokens, extract positional old/new string args.",
+    "STEP 3 compare+retry: if recovered_old != received_old -> distortion confirmed. Write recovered_old to tmpfile, retry with --old-file tmpfile.",
+    "CONSTRAINTS: (a) MSYS2 git-bash lacks /proc -> WMI only path on Windows. (b) WMI ~200ms overhead. (c) Eye/MCP pipe path: PPID=wkappbot-core.exe not bash -> inapplicable. (d) python3 shlex may not perfectly reconstruct all quoting styles. (e) Only useful for interactive terminal callers, not Eye.",
+    "IMPLEMENTATION SKETCH: _distortion_recover() added in wkedit.sh after existing _do_edit() 2nd retry. Calls WMI or /proc, runs python3 inline to parse shlex, diffs recovered vs received, retries with --old-file if different.",
+    "STATUS: DRAFT. Not implemented. Requires WMI reliability testing on MSYS2+Windows 11 before proceeding. Test script: wkedit_test_distortion.sh",
+    "RELATED: wkedit.sh _do_edit() lines 60-120 (2-level retry); wkappbot skill read wkedit (base skill)",
+    "BACKSLASH-PATH STRIPPING 2026-07-05: passing the TARGET file path to 'wkappbot file edit --old-file X --new-file Y <target>' as a Windows backslash absolute path (D:\\GitHub\\WKAppBot\\bin\\wktest-smoke.sh) gets silently mangled -- all single backslashes are stripped, producing an unfindable path like D:GitHubWKAppBotbinwktest-smoke.sh and a 'not found' failure with NO indication the path itself was corrupted. FIX: always pass the target path (and --old-file/--new-file paths) with FORWARD slashes (D:/GitHub/WKAppBot/bin/wktest-smoke.sh) -- this round-trips correctly through the CLI relay every time. This is distinct from the already-documented backslash-in-FILE-CONTENT mangling (use --old-file/--new-file instead of inline args) -- this is backslash-in-the-PATH-ARGUMENT-ITSELF, a separate failure mode with a separate fix."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot file edit 'hello\\nworld' 'hi' test.txt",
+      "expect": "[file edit] 1 replacement (DRAFT: distortion recovery auto-retries with recovered original arg)",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot file edit --old-file /tmp/old.txt --new-file /tmp/new.txt test.txt",
+      "expect": "[file edit] 1 replacement (--old-file bypasses distortion entirely -- preferred path)",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wkedit-shell-distortion-recovery",
+      "expect": "STEP 1 detect parent shell",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "wkedit",
+    "shell",
+    "distortion",
+    "recovery",
+    "draft"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-25T05:29:57.074757Z",
+  "updated": "2026-07-05T08:08:48.3163069Z",
+  "version": "1.2"
+}

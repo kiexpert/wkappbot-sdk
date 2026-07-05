@@ -1,0 +1,35 @@
+{
+  "id": "idle-mung-conpty-autoprompt",
+  "app": "wkappbot-sdk",
+  "title": "Idle-mung: ConPTY auto-prompt for hippocampus idle consolidation (waking-rest replay)",
+  "title_ko": null,
+  "desc": "When a session is idle past 1 minute, an installer-provisioned ConPTY host writes a mung prompt into the AI stdin (focus-less, IME-free) to trigger a lightweight consolidation replay -- the brain waking-rest (default-mode) memory organizing: the missing middle between the daytime transcript sponge and the nightly skill-heal sleep.",
+  "steps": [
+    "HIPPOCAMPUS MEMORY CYCLE this completes: DAY SPONGE = the session JSONL transcript (raw rapid encoding; no time to organize while focused on work). SLEEP = skill-heal-nightly (organizes the sponge into skills). The MISSING MIDDLE = IDLE consolidation (the brain default-mode network replays and organizes during waking rest, not only sleep). Idle-mung adds that middle. @@TRIGGER: when the session is idle past 1 minute (the AI finished and is waiting), fire ONE mung consolidation. @@MECHANISM (robust, focus-independent): a ConPTY HOST -- a transparent pseudo-terminal proxy that spawns claude inside a ConPTY and passes I/O through to the real terminal -- monitors the OUTPUT pipe (no bytes for 60s means idle) and writes the mung prompt to the INPUT pipe, reaching the AI stdin directly with zero window targeting, zero focus theft, zero IME issues. FALLBACK for a session not launched through the host: focus-less window keystroke injection via WKAppBot a11y input (fragile; depends on the right hwnd, focus, IME). @@MUNG IS A REGISTERED SHORTCUT (like the gg and jisikhwa shortcuts): on-load recognizes mung and runs the idle-consolidation routine -- a LIGHTWEIGHT digest only (recent transcript unfinished items, recurring patterns, and the blast-radius or impact-scope of recent changes), pre-organizing for the nightly heal. Register it explicitly so the bare-keyword rule does not route it to a skill search. @@AUTO-PROMPTING FAMILY: idle-mung is the harness prompting the AI with no human, joining CronCreate (scheduled), PostToolUse reminders (injected), ScheduleWakeup (self-scheduled), and the agent-bulletin (force-fed). The environment talks to the AI so it self-directs. @@INSTALLER AUTO-INSTALLS IT (per harness-installer-owns-all-setup): install.ps1 wraps the claude launcher to go through the idle host and registers the mung shortcut, so one install gives guards plus git hooks plus hub redirect plus a living idle-consolidating hippocampus. @@FIVE GUARDS (or it causes harm): (1) fire ONCE per idle period, never repeat while idle continues (anti-loop); (2) never fire mid-response, only when truly waiting; (3) the digest must be CHEAP, seeds of organizing only, heavy consolidation stays in the nightly heal; (4) RESPECT PACE, skip mung when over budget so the auto-prompt does not burn tokens; (5) target the correct ConPTY pipe or hwnd or it types mung into the wrong window."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read idle-mung-conpty-autoprompt",
+      "expect": "the idle trigger, ConPTY host, mung shortcut, and 5 guards",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read hippocampus-living-memory",
+      "expect": "the sponge recall sleep cycle this completes",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read harness-installer-owns-all-setup",
+      "expect": "the installer that auto-provisions the idle host",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-05T15:22:09.7381858Z",
+  "updated": "2026-06-05T15:22:09.7381945Z",
+  "version": "1.0"
+}

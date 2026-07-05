@@ -1,0 +1,47 @@
+{
+  "id": "claude-kill-guard-hook",
+  "app": "wkappbot-workflow",
+  "title": "claude-kill-guard-hook",
+  "title_ko": null,
+  "desc": "Claude Code PreToolUse hook: block PowerShell Stop-Process targeting wkappbot processes; companion audit-log traces all tool calls",
+  "steps": [
+    "WHAT IT BLOCKS: Stop-Process or Kill-Process (PowerShell) targeting wkappbot-core|wkchat|wkappbot.exe|wka11y. taskkill is excluded -- wkappbot handles it via its own popup shim.",
+    "3 DETECTION LAYERS: (1) Name-based: cmd matches wkappbot process name directly -> instant block. (2) PID-based: Stop-Process -Id <N> -> runtime Get-Process -Id lookup, block if the PID belongs to a wkappbot process. (3) Bypass pattern: cmd contains wkappbot name AND Stop-Process -Id anywhere -> block immediately without lookup.",
+    "SCRIPT: C:/Users/kiexp/.claude/hooks/kill-guard.ps1. Returns {continue:false, stopReason} to Claude Code. No output = allow.",
+    "HOOK ORDER MATTERS: kill-guard is the FIRST hook in PreToolUse array (matcher=PowerShell, synchronous). audit-log.ps1 is THIRD (no matcher, async). When kill-guard returns continue:false, Claude Code halts -- audit-log never runs. Blocked commands do NOT appear in ai-audit.log.",
+    "GOTCHA - $pid IS RESERVED: PowerShell built-in variable. Using foreach ($pid in ...) throws WriteError. Use $p or $pidVal instead.",
+    "GOTCHA - INNER STRING MATCH: kill-guard reads the raw command string. If Claude embeds wkappbot-core + Stop-Process in a test payload string variable, the outer command itself gets blocked too. Tested and confirmed via system-reminder PreToolUse:PowerShell hook stopped continuation.",
+    "AUDIT GAP: to log blocked attempts, either (a) move audit-log before kill-guard in the array, or (b) add logging inside kill-guard.ps1 before the exit. Trade-off: (a) logs before block, so kill attempt is recorded but also executed if audit-log somehow fails.",
+    "SETTINGS: ~/.claude/settings.json PreToolUse array order: [1] kill-guard matcher=PowerShell timeout=5, [2] skill-search-reminder matcher=Bash|Glob|Grep, [3] audit-log no-matcher async.",
+    "ACTIVATE: /hooks menu or session restart to reload settings watcher.",
+    "RIQUA [taskkill popup]: wkappbot taskkill /IM wkappbot-core.exe is documented as showing a callout popup for protected processes, but in practice no popup appears. Actual behavior: classify-only + exit 1 for non-force invocations. --force <pids> is the only actual kill path. The claim 'taskkill handled by wkappbot popup shim' in this skill is UNVERIFIED -- treat taskkill the same as Stop-Process until confirmed.",
+    "CORRECTION: popup mechanism is wkappbot a11y kill (not taskkill). a11y kill routes through the callout system and shows a popup for protected processes. wkappbot taskkill is classify-only by default (exit 1, no kill, no popup). The kill-guard should still block Stop-Process -- a11y kill already has its own guard built in.",
+    "ACCURATE taskkill behavior: wkappbot taskkill /IM <name> = classify-only + exit 1, NEVER kills. Kill requires explicit --force <pid1,pid2,...>. PROTECTED PIDs survive even if included in --force. So taskkill alone cannot kill wkappbot processes -- no popup, no kill, just a warning list. kill-guard blocks Stop-Process as the only remaining direct-kill vector.",
+    "RIQUA [--force on PROTECTED]: classify output says 'DO NOT include in --force' but actual behavior when PROTECTED PID is passed to --force is unverified without source review. May silently skip, may kill anyway, may error. Check TaskkillCompatCommand.cs before relying on PROTECTED as a hard guarantee."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill search kill guard",
+      "expect": "claude-kill-guard-hook",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill search audit log",
+      "expect": "audit",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read claude-kill-guard-hook",
+      "expect": "TARGET",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-09T03:36:49.8325179Z",
+  "updated": "2026-05-09T06:42:45.7514787Z",
+  "version": "1.9"
+}

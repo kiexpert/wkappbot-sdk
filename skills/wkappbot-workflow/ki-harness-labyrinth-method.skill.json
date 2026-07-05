@@ -1,0 +1,40 @@
+{
+  "id": "ki-harness-labyrinth-method",
+  "app": "wkappbot-workflow",
+  "title": "KI harness method: shepherd a labyrinth problem to resolution",
+  "title_ko": null,
+  "desc": "The reusable process the KI harness uses to solve a recurring unsolvable bug across sessions and the AI fleet. Demonstrated 2026-06-05 on the JobKorea/Naver login-wipe (Chrome port multiplication). Living tracker + cumulative diagnostics + reconcile conflicts + consult source skill-lock + persistent suggests + cross-session relay.",
+  "steps": [
+    "WHEN: a recurring bug resists solving (a labyrinth -- band-aids piled over many sessions, conflicting symptoms). Do NOT add another band-aid. Run this method until STATUS=RESOLVED.",
+    "STEP 1 LIVING TRACKER: create a tracker skill with STATUS + SYMPTOM + HYPOTHESES + RESOLUTION PLAN (numbered) + ATTEMPTS LOG. Protocol line: re-read each session, continue the next unfinished plan step, append findings, only close when verified fixed. This is what makes the problem survive across sessions.",
+    "STEP 2 CUMULATIVE + RECONCILE: each session APPENDS findings (never restarts). When two diagnostics CONFLICT, reconcile them -- do not trust the first read. (Live: one agent misread .NET Temp DLL cache as the Chrome DataDir and blamed TEMP; reconciling with a second agent found the real stable DataDir and vindicated the user's multiplication hypothesis.)",
+    "STEP 3 CONSULT THE SOURCE SKILL-LOCK: before fixing a source, read its harness:skill lock -- the harness keeps it at 60+ so it holds the latest context (prior attempts, gotchas). (Live: the ChromeLauncher lock surfaced a byte-swap bug in TryGetListeningPid that pure code-reading missed and that became the leading root cause.) Then ENRICH the lock: inject the tracker skill so future editors are forced to study it (self-evolving lock).",
+    "STEP 4 PERSISTENT SUGGESTS TO CORE: file wkappbot suggest with the clue + a concrete repro course, targeting the CORE app (the core team has amnesia -- Memento -- so bugs must land where they act). Keep appending clues+repro until resolved. Use cheap function-level tools (wksplit-cs) to analyze band-aid-laden code at minimal tokens.",
+    "STEP 5 FLEET + ACCOUNTABILITY: the 4-AI fleet (Haiku scout, Codex/Gemini executors, Sonnet) does the labor; Opus conducts + judges; the MECHANISM enforces accountability (gates, dual adversarial review, Model: trailer, suggest-to-resolution, enforced 60+ hygiene). Knowledge flows + self-corrects + holds its keeper accountable in real time -- a living knowledge flow beyond frozen neural weights."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read ki-harness-labyrinth-method",
+      "expect": "LIVING TRACKER",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read ki-harness-labyrinth-method",
+      "expect": "CONSULT THE SOURCE SKILL-LOCK",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read ki-harness-labyrinth-method",
+      "expect": "PERSISTENT SUGGESTS",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-04T19:58:38.8547939Z",
+  "updated": "2026-06-04T19:58:38.8548052Z",
+  "version": "1.0"
+}

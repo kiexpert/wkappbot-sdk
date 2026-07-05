@@ -1,0 +1,54 @@
+{
+  "id": "verify-live-harness-file-kih-is-body",
+  "app": "wkappbot-workflow",
+  "title": "Verify the LIVE harness file first (wkappbot-kih is the body) -- reference case",
+  "title_ko": null,
+  "desc": "Reference case 2026-06-05: an Opus session burned time/tokens diagnosing harness bugs on a STALE personal-docs guards.ps1 while the live harness had moved to wkappbot-kih (sourced via the symlink hub). Lesson: resolve the hub symlink to find the live file; never assume the CWD repo tools/ harness is live.",
+  "steps": [
+    "REFERENCE CASE (2026-06-05): an Opus session burned significant time and tokens diagnosing harness bugs (A-2: the busy-fleet read-only exemption looked present in source but never worked live; wkhippo recall kept being busy-fleet-blocked) by reading and analysing D:/GitHub/personal-docs/tools/wkharness-guards.ps1 -- which was a STALE DEAD COPY. The harness body had been MOVED to wkappbot-kih. The whole mystery (source has the exemption, live ignores it) dissolved instantly the moment we realised the live file was NOT the one being read.",
+    "MECHANISM: the live PreToolUse hook is D:/GitHub/wkharness.ps1, a SYMLINK HUB. It resolves its own symlink (Get-Item LinkType then Target) into a canonical path, takes the canonical DIRECTORY, and dot-sources canonicalDir/wkharness-guards.ps1 (plus common/status/post). So the LIVE guards equal wherever the hub symlink points = wkappbot-kih/tools, NOT the current-working-directory repo tools/. A repo can hold a tools/wkharness-guards.ps1 that is a dead leftover.",
+    "LESSON and HOW TO FIND LIVE: before diagnosing or editing ANY harness code, VERIFY which file is live. (a) Resolve the hub symlink: Get-Item D:/GitHub/wkharness.ps1 and read its Target. (b) Hooks: grep ~/.claude/settings.json for the hook -File paths (e.g. nightly-schedule-guard.ps1 lived at wkappbot-sdk/.claude/). (c) Default truth: the harness body is wkappbot-kih. Do NOT assume the CWD repo tools/wkharness-*.ps1 is live -- it may be a stale duplicate. The personal-docs harness copies were git-removed 2026-06-05 to end this confusion (recoverable via revert).",
+    "GENERAL PRINCIPLE: a moved or extracted component that leaves DEAD DUPLICATE source across repos is a recurring trap -- you edit or diagnose the copy while the original runs. Always recall and verify the CANONICAL location first (which file does the live process actually load). Pairs with the wkappbot-kih extraction and the cross-repo CLAUDE.md resolution issues. When two repos hold the same source file, find which one the running process loads BEFORE touching either.",
+    "MIGRATION TO THE HONGIK KI HARNESS (the Hongik Knowledge-Intelligence Harness = wkappbot-kih, user-named 2026-06-05): the user directed migrating EVERYTHING into wkappbot-kih. PHASED PLAN (verify-then-remove, learned the hard way after a premature removal broke the live harness this session): Phase 1 = make kih/tools a COMPLETE self-contained harness (port or merge every wkharness-*, guard, cp949, and wrappers file from the still-live personal-docs/tools; merge the Agent.ps1 --model auto build from personal-docs commit 3701864 onto kih path-relativized Agent.ps1 commit ae5f365; remove all personal-docs path refs; wkharness-status.ps1 -Test must be GREEN) -- ADDITIVE, does not touch the live hub symlink. Phase 2 = repoint hub symlink D:/GitHub/wkharness.ps1 to kih. Phase 3 = verify kih live and green from a fresh session. Phase 4 = git rm the personal-docs harness ONLY after verification. STATUS 2026-06-05: Phase 1 dispatched to Codex but the first attempt hit the wkcodex skill-update lock (recent Edit/git not recorded) -- recording this clears the lock. Retrying Phase 1.",
+    "AGENT-SPAWN REFERENCE (verify-then-remove gotcha, hit TWICE 2026-06-05). Before deleting a loose hub harness file like D:/GitHub/wkharness.ps1, checking ONLY the settings.json PreToolUse hook is NOT enough. Agent.cmd and Agent.ps1 invoke that SAME literal path for the CHILD agent harness self-check at spawn time. So deleting it makes EVERY delegation fail with: 'The argument D:\\GitHub\\wkharness.ps1 to the -File parameter does not exist' and '[Agent.ps1] blocked by harness (rc=-196608)'. The file was LOAD-BEARING, not an orphan. RULE: never DELETE a hub harness path other code invokes by literal; recreate it as a thin REDIRECT SHIM that re-execs the kih entry with stdin and args forwarded: pipe the script input to powershell -File <kih wkharness.ps1> then exit LASTEXITCODE. VERIFY-THEN-REMOVE must enumerate ALL references first (settings.json hook AND the Agent spawn path AND any wkcodex symlink), and a clean post-delete -Test can still PASS while delegation is silently broken (because -Test does not spawn child agents through that path). Prefer redirect over delete."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read verify-live-harness-file-kih-is-body",
+      "expect": "symlink hub",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read verify-live-harness-file-kih-is-body",
+      "expect": "wkappbot-kih",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read verify-live-harness-file-kih-is-body",
+      "expect": "stale",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "harness",
+    "kih",
+    "홍익지지하",
+    "홍익지지하세",
+    "홍익",
+    "지식지능하네스",
+    "hongik-ki-harness",
+    "migration",
+    "symlink",
+    "live-file",
+    "reference-case",
+    "cross-repo",
+    "wkharness"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-05T08:00:27.2843286Z",
+  "updated": "2026-06-05T13:50:38.1473749Z",
+  "version": "1.4"
+}

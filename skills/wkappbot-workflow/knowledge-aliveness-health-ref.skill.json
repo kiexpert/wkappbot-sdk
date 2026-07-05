@@ -1,0 +1,49 @@
+{
+  "id": "knowledge-aliveness-health-ref",
+  "app": "wkappbot-workflow",
+  "title": "Knowledge Aliveness Health Ref",
+  "title_ko": null,
+  "desc": "Dependency chain, anti-gaming details, dated rationale, open questions, and cross-links for the aliveness health cluster.",
+  "steps": [
+    "DEPENDENCY CHAIN (implementation order, user 2026-06-10): these systems must land in this order or each depends on the prior. (1) FOUNDATION -- skill-comment storage (wkhippo or equivalent): structured {author, model, verdict, ts} per skill, queryable by skill-id. (2) WKHIPPO STUDY-DETECTION subcommand: scan session JSONL for evidence a given model actually read a given skill. These two unlock peer-eval. (3) Get-WkTierScore linked-web bonus (cheapest, can land first: just session-JSONL scan for cross-skill reads). (4) Peer-eval bonus wired into Get-WkTierScore (needs (1)+(2)). (5) Reflex-grades.json questionnaire extension (adds verdict fields to existing structure -- no breaking change). (6) wkharness-post.ps1 PostToolUse skill-READ display (needs (4) for rollup; can degrade to score-only if (4) not ready). (7) Agent end-of-task work-record questionnaire hook in wkharness-post.ps1 AgentEnd (needs (5)). Without (1)+(2), only the linked-web bonus and reflex-quiz extension can land; the peer-eval display gracefully degrades.",
+    "ANTI-GAMING DETAILS (user 2026-06-10): (A) STUDY-GATE: an evaluation counts ONLY if the evaluator's session JSONL contains evidence of reading the target skill. This is the KEYSTONE -- without it, any agent can 5-star any skill for kicks. (B) SELF-EXCLUSION: the skill author's own evaluations do not count toward their skill's peer-eval score. Author = the model/session that most recently edited the skill (stored in skill metadata). (C) CAP: distinct-model-count capped (e.g. +3 for peer-eval, +5 for linked-web). No score inflation from many shallow evaluations. (D) NEGATIVE VERDICT: a confirmed-study NEGATIVE verdict does not subtract from score; it triggers a healing flag in wkdoctor (broken/unclear surfaced to memory-physician). This avoids adversarial score-tanking while preserving the quality signal. (E) USAGE-IN-PRACTICE ANTI-GAMING: the agent must have been briefed the skill AND the task must have completed; questionnaire submitted before task completes is rejected. An honest 'briefed but did NOT use' is accepted and is a soft reflex-decay signal -- it discourages gaming via false positive-use claims.",
+    "DATED RATIONALE (user 2026-06-10 full-day design session): knowledge-score v1 was content-only (length, links, tags, versions). Observation: a perfectly written skill can go unused and unknown -- content quality does not equal behavioral aliveness. The three extensions (linked-web bonus, study-verified peer-eval, usage-in-practice degree) each address a different layer of the forgetting hierarchy. The QUESTIONNAIRE-as-unified-artifact idea (one form = comprehension grade + peer-eval verdict + usage-degree) arose from noticing that reflex transfer-quiz (already in Get-WkTierScore) is structurally identical to what we need for peer-eval -- extend do not reinvent. The read-posthook display was explicitly chosen as a NON-blocking nudge (one line, fail-open) because heavy post-hooks have historically caused stall-guard false positives and user friction. The apex usage-in-practice signal (with degree) was added last, as the capstone, because 'used usefully 3 times by Haiku' is the most actionable proof-of-life signal for wkdoctor healing decisions.",
+    "OPEN QUESTIONS AND KNOWN GAPS (user 2026-06-10): (1) wkhippo study-detection: does it currently scan subagent session files, or only the main session JSONL? Subagent reads must count. (2) skill-comment storage: not yet confirmed deployed to wkappbot-workflow family; may need skill-contribute flag or separate command. (3) reflex-grades.json: currently keyed by skill-id only; adding verdict dimensions requires either a schema migration or a separate verdict-store file. Schema migration must be backward-compatible (missing fields = old entry, not error). (4) agent end-of-task questionnaire: timing is tricky -- if harness exits before the agent's final response, the questionnaire may be missed. Consider: store questionnaire response in a file first, then flush to skill-comment + reflex-grades on next run. (5) ROLL-BACK plan: all new signals are additive (bonus, not multiplier); removing them sets score back to content-only baseline. No destructive migration.",
+    "CROSS-LINKS AND CLUSTER MEMBERSHIP (user 2026-06-10): this cluster (knowledge-aliveness-health, knowledge-aliveness-health-howto, knowledge-aliveness-health-ref) is a sibling of the guard exemption ladder cluster (harness-guard-exemption-ladder-spec, -howto, -ref). The guard ladder spec carries a pointer: 'knowledge-aliveness-health is a sibling cluster for the full aliveness model -- see knowledge-aliveness-health'. Related skills: wkharness-guards (guard implementation), wkdoctor-system-physician (healing/surfacing broken/decaying skills), knowledge-ification-procedure-jisikhwa (knowledge capture process), skill-3tier-lazy-arch (tier architecture). The aliveness model feeds INTO wkdoctor memory-physician duty: decaying-reflex skills surface alongside broken links for re-teaching. The aliveness cluster does NOT own the wkdoctor healing procedure -- it provides the SIGNALS; wkdoctor owns the RESPONSE."
+  ],
+  "comments": null,
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read knowledge-aliveness-health",
+      "expect": "UNIFYING PRINCIPLE",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read knowledge-aliveness-health-ref",
+      "expect": "DEPENDENCY CHAIN",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read knowledge-aliveness-health-ref",
+      "expect": "ANTI-GAMING",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "knowledge",
+    "aliveness",
+    "ref",
+    "dependency",
+    "anti-gaming",
+    "rationale",
+    "cross-links",
+    "wkdoctor"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-10T07:57:56.6564148Z",
+  "updated": "2026-06-10T07:57:56.6564242Z",
+  "version": "1.0"
+}

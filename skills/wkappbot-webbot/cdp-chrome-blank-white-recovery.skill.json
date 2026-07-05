@@ -1,0 +1,53 @@
+{
+  "id": "cdp-chrome-blank-white-recovery",
+  "app": "wkappbot-webbot",
+  "title": "Chrome blank/white page detection and recovery",
+  "title_ko": null,
+  "desc": "Chrome renders completely white/blank -- rendering give-up state. Detect via BLANK state in ask poll, recover by closing tab and reopening.",
+  "steps": [
+    "DETECTION: AskCommands.ChatGpt.SendWait.cs polls page state. When state=='BLANK' for 20+ iterations (or 3+ after 30s), it sets blankPageCount>=blankLimit and aborts with '[ASK] Page unresponsive -> aborting poll'. No auto-recovery, no suggest filed.",
+    "SYMPTOM: Chrome window shows completely white/blank. CDP eval returns 'BLANK'. ask gpt/gemini times out silently.",
+    "ROOT CAUSE: Chrome renderer process died or entered unrecoverable state. Tab shows blank white page. GetAwaiter loop exits with null response.",
+    "RECOVERY PROCEDURE: (1) wkappbot cdp close {grap} -- close the blank tab. (2) wkappbot cdp open https://chatgpt.com -- reopen fresh tab. (3) Verify: wkappbot ask gpt --new-session --sync --timeout 30s ping. (4) If still blank: wkappbot --sudo eye restart -- full Chrome hot-swap.",
+    "CURRENT BUG: blankPageCount>=blankLimit just breaks loop. Should: (a) file BUG-AUTO suggest, (b) close blank tab, (c) cdp open to relaunch, (d) retry ask. Fix needed in AskCommands.ChatGpt.SendWait.cs and AskCommands.Gemini.cs BLANK state handler.",
+    "AUTO-DETECT via cdp-mon: powershell -File D:/GitHub/WKAppBot/bin/wkcdpmon.ps1 -- shows LAT=BLANK when tab is unresponsive. CRIT flag triggers when Chrome blank detected.",
+    "WHISPER-RING IMPACT: WhisperStudy reaches Tier 4 (give-up) when BLANK persists across all retries. Eye watchdog sees process alive but rendering dead -- no auto-recovery. Fix: WhisperStudy should signal Eye when all tiers exhausted so Eye can force-restart Chrome."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot cdp close {proc:'chrome',cdp:9980}",
+      "expect": "[CDP:CLOSE]",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot cdp open https://chatgpt.com",
+      "expect": "OK",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot ask gpt --new-session --sync --timeout 30s ping",
+      "expect": "pong",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "chrome",
+    "blank",
+    "white",
+    "render",
+    "fail",
+    "recovery",
+    "tab",
+    "restart",
+    "CDP",
+    "ask",
+    "BLANK"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-21T10:48:33.6314761Z",
+  "updated": "2026-05-21T10:48:33.6314866Z",
+  "version": "1.0"
+}

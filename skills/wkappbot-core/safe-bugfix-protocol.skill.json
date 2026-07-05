@@ -1,0 +1,54 @@
+{
+  "id": "safe-bugfix-protocol",
+  "app": "wkappbot-core",
+  "title": "Safe Bug Fix Protocol -- before touching any working code",
+  "title_ko": null,
+  "desc": "Checklist to prevent regression cascades. Read before fixing any BUG-AUTO or suggest. Core rule: understand WHY code exists before removing it.",
+  "steps": [
+    "RULE 0 \u2014 WHY before HOW: before touching ANY line of working code, read its comments and understand WHY it exists. If a comment says \u0027mixed-DPI drift fix\u0027, that IS the spec. Deleting code to make an error go away is NOT a fix.",
+    "REPRODUCE FIRST: trigger the actual bug behavior before writing any fix. BUG-AUTO reports may be false positives (e.g. verification using wrong DPI scale). If you cannot reproduce it manually, do not change production code.",
+    "MINIMAL SURGERY: change only the specific line causing the problem. If snap() fires with wrong timing \u2192 add delay. Do NOT remove snap entirely. If evidence check runs in --confirm path \u2192 add goto label. Do NOT restructure the whole method.",
+    "TEST = RUN THE ACTUAL FEATURE: build success is NOT enough. Eye DPI fix \u2192 actually move Eye window across monitors and observe. Suggest resolve fix \u2192 actually run wkappbot-core.exe suggest resolve and read the output. No exceptions.",
+    "RESOLVE ONLY AFTER VERIFIED: never close a suggest before step 4 passes. If you cannot test the feature (no HTS open, no secondary monitor), say so explicitly instead of claiming success.",
+    "BUG-AUTO TRIAGE: check if actual=intended*(monitorDPI/96) before assuming drift is real. Check if error disappears after Eye restart (stale binary). Check if it is cross-channel false positive before filing or fixing. Most BUG-AUTO Eye DPI drift reports in 2026-04-30 were caused by snap removal, not a real bug.",
+    "WPF DPI CONTENT SCALING: SetProcessDpiAwareness(2) alone is NOT enough for WPF content to rescale on monitor boundary. WPF reads app.manifest at startup to set its rendering DPI mode. Without \u003CdpiAwareness\u003EPerMonitorV2\u003C/dpiAwareness\u003E in app.manifest, WPF uses system DPI for layout until WM_DPICHANGED fires (visible transient wrong-scale glitch). Fix: add dpiAwareness \u002B dpiAware to app.manifest windowsSettings. This is a separate concern from snap position correction (AnimateMoveTo).",
+    "WPF DPI CONTENT SCALING: SetProcessDpiAwareness(2) alone is NOT enough for WPF content to rescale on monitor boundary. WPF reads app.manifest at startup to set its rendering DPI mode. Without \u003CdpiAwareness\u003EPerMonitorV2\u003C/dpiAwareness\u003E in app.manifest, WPF uses system DPI for layout until WM_DPICHANGED fires (visible transient wrong-scale glitch). Fix: add dpiAwareness \u002B dpiAware to app.manifest windowsSettings. This is a separate concern from snap position correction (AnimateMoveTo).",
+    "NEVER touch app.manifest dpiAwareness for Eye DPI fixes. PerMonitorV2 manifest changes WPF coordinate semantics globally -- Window.Left/Top units change, hover detection breaks, window sizing changes, hundreds of coord-dependent paths break. SetProcessDpiAwareness(2) in code is sufficient. The Eye snap formula uses Window.Left as physical pixels (system-DPI app); do NOT multiply by GetDpiForWindow() -- that double-scales when system DPI=96.",
+    "NEVER touch app.manifest dpiAwareness for Eye DPI fixes. PerMonitorV2 manifest changes WPF coordinate semantics globally -- Window.Left/Top units change, hover detection breaks, window sizing changes, hundreds of coord-dependent paths break. SetProcessDpiAwareness(2) in code is sufficient. The Eye snap formula uses Window.Left as physical pixels (system-DPI app); do NOT multiply by GetDpiForWindow() -- that double-scales when system DPI=96.",
+    "NEVER add parallel DetectBlocker calls alongside the existing readiness.Probe() flow. InputReadiness.Probe() already runs DetectBlocker when SkipBlockerCheck=false. Extend probeReport.ActiveBlocker handling instead. Duplicate calls waste time and create inconsistent output.",
+    "NEVER add parallel DetectBlocker calls alongside the existing readiness.Probe() flow. InputReadiness.Probe() already runs DetectBlocker when SkipBlockerCheck=false. Extend probeReport.ActiveBlocker handling instead. Duplicate calls waste time and create inconsistent output.",
+    "ScreenCoords (ScreenCoords.cs) is the ONLY approved class for WPF\u2194physical pixel conversions. Methods: PhysicalToLogical(physX, physY, hwnd) uses per-monitor DPI; PhysicalToLogicalSystemDpi(physX, physY) uses system DPI for WPF Window.Left/Top; LogicalToPhysical(logX, logY, logW, logH, dpiScale) converts WPF logical to screen pixels. Rule: NEVER use GetDpiForSystem() directly for coordinate math -- always go through ScreenCoords. Multi-monitor: use _liveDpiScale (computed by CalcCalloutGeometry for that monitor) when converting callout window bounds. If a LogicalToPhysical overload is missing, ADD it to ScreenCoords rather than doing inline math.",
+    "ScreenCoords (ScreenCoords.cs) is the ONLY approved class for WPF\u2194physical pixel conversions. Methods: PhysicalToLogical(physX, physY, hwnd) uses per-monitor DPI; PhysicalToLogicalSystemDpi(physX, physY) uses system DPI for WPF Window.Left/Top; LogicalToPhysical(logX, logY, logW, logH, dpiScale) converts WPF logical to screen pixels. Rule: NEVER use GetDpiForSystem() directly for coordinate math -- always go through ScreenCoords. Multi-monitor: use _liveDpiScale (computed by CalcCalloutGeometry for that monitor) when converting callout window bounds. If a LogicalToPhysical overload is missing, ADD it to ScreenCoords rather than doing inline math."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read safe-bugfix-protocol",
+      "expect": "WHY",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot suggest list",
+      "expect": "(any)",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot --version",
+      "expect": "v6",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "protocol",
+    "safety",
+    "bugfix",
+    "checklist",
+    "regression-prevention"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-30T07:05:13.4679688Z",
+  "updated": "2026-05-02T17:18:48.2028585Z",
+  "version": "1.20"
+}

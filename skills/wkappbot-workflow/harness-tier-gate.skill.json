@@ -1,0 +1,45 @@
+{
+  "id": "harness-tier-gate",
+  "app": "wkappbot-workflow",
+  "title": "harness: tier-gate (tiered skill required before Agent dispatch)",
+  "title_ko": null,
+  "desc": "Blocks Agent dispatch when a recently-edited skill has a tier score below 60. Forces 3-tier splitting before delegating.",
+  "steps": [
+    "SAFETY: Fires before Agent dispatch when the last skill you edited has a tier score below 60/100. A low-score skill is a monolithic blob -- it forces the delegated agent to read many steps to find one relevant paragraph, wasting tokens and increasing mis-application risk.",
+    "SOLUTION: Split the low-score skill into 3-tier form: T1 core skill + T2 -howto + T3 -ref. Run 'wkappbot skill read skill-migration-3tier' for the split procedure. After splitting, the tier score rises and the gate clears.",
+    "PREVENTION: Write skills in 3-tier form from the start. T1 = core safety/solution/prevention (5-8 steps). T2 = howto with examples. T3 = edge cases and history. Each tier should be independently readable in under 30 seconds."
+  ],
+  "comments": null,
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read harness-tier-gate",
+      "expect": "tiered skill required",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read skill-migration-3tier",
+      "expect": "3-tier split procedure",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read harness-active-model-scoping",
+      "expect": "P6",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "harness",
+    "gate",
+    "skill",
+    "tier",
+    "quality",
+    "3tier"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-11T08:10:06.0738285Z",
+  "updated": "2026-06-11T08:10:06.0738366Z",
+  "version": "1.0"
+}

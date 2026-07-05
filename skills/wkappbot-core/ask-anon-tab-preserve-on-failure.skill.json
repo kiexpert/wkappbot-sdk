@@ -1,0 +1,53 @@
+{
+  "id": "ask-anon-tab-preserve-on-failure",
+  "app": "wkappbot-core",
+  "title": "Ask anon AI tab: preserve on failure",
+  "title_ko": null,
+  "desc": "AskCommands.ChatGpt and AskCommands.Claude must gate cdp.TryCloseAnonymousTabAsync() on ok=true. On ask failure (ok=false), the anonymous AI tab MUST stay open so the user can log in or inspect the failed page. Gemini's AskCommands.Gemini.cs uses inverted convention (if (!ok)) for a different reason and is intentionally untouched.",
+  "steps": [
+    "Gate TryCloseAnonymousTabAsync on ok=true in AskCommands.ChatGpt.cs and AskCommands.Claude.cs.",
+    "Never close the anon tab when ok=false -- user is mid-login or the page failed (TAB:ANON-CLOSE death-spiral fix: suggest 2026-05-18T04:28:01).",
+    "AskCommands.Gemini.cs keeps its 'if (!ok)' close-on-failure convention (anon tab IS the failure tab); do not normalize across files.",
+    "Verified 2026-05-18: ev-tab-anon-close-failure-preserves-tab.sh (resolve ts=2026-05-18T04:28:01)"
+  ],
+  "requirements": [
+    {
+      "cmd": "grep 'if (ok) try { cdp.TryCloseAnonymousTabAsync' csharp/src/WKAppBot.CLI/Commands/AskCommands.ChatGpt.cs",
+      "expect": "match",
+      "prompt": null
+    },
+    {
+      "cmd": "grep 'if (ok) try { cdp.TryCloseAnonymousTabAsync' csharp/src/WKAppBot.CLI/Commands/AskCommands.Claude.cs",
+      "expect": "match",
+      "prompt": null
+    },
+    {
+      "cmd": "grep 'if (!ok)' csharp/src/WKAppBot.CLI/Commands/AskCommands.Gemini.cs",
+      "expect": "match",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot ask gpt --sync --timeout 20s ping",
+      "expect": "pong",
+      "prompt": "fixed: AskCommands.ChatGpt/Claude.cs now skip TryCloseAnonymousTabAsync on ok=false so user can log in / inspect failed tab; behavioral commit 243888ccc, keyword-coupling commit 6bd4c0aa2"
+    },
+    {
+      "cmd": "wkappbot eye tick",
+      "expect": "ChatGPT tab open",
+      "prompt": "fixed: AskCommands.ChatGpt/Claude.cs now skip TryCloseAnonymousTabAsync on ok=false so user can log in / inspect failed tab; behavioral commit 243888ccc, keyword-coupling commit 6bd4c0aa2"
+    }
+  ],
+  "primary_cmd": "wkappbot ask gpt --sync --timeout 20s ping",
+  "tags": [
+    "ask",
+    "cdp",
+    "chrome",
+    "anon-tab"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-18T05:46:55.3520341Z",
+  "updated": "2026-05-18T05:55:58.3006523Z",
+  "version": "1.2"
+}

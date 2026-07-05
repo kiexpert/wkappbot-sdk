@@ -1,0 +1,32 @@
+{
+  "id": "claude-proxy-context-limit-auto-handoff-to-gemini-agent",
+  "app": "wkappbot-workflow",
+  "title": "claude-proxy: Context Limit Auto-Handoff to Gemini Agent",
+  "desc": "When Claude hits context limit, claude-proxy intercepts the error and hands off to wkappbot agent gemini --new-session with CLAUDE.md \u002B MEMORY.md \u002B original prompt. Subsequent prompts relay via --interrupt. Claude Code sees no error.",
+  "steps": [
+    "Setup: wkappbot claude-proxy --inject-context (runs on port 7788). Set ANTHROPIC_BASE_URL=http://localhost:7788 in ~/.claude/settings.json. Restart Claude Code.",
+    "Normal operation: proxy is transparent glass \u2014 all requests pass through to Anthropic unchanged.",
+    "Context limit hit: proxy intercepts context_window_exceeded error. Reads CLAUDE.md \u002B MEMORY.md. Extracts original user prompt from the failed request.",
+    "Handoff: proxy spawns wkappbot agent gemini --new-session with combined context: CLAUDE.md \u002B MEMORY.md \u002B original prompt. Returns Gemini response as fake SSE to Claude Code.",
+    "Relay mode: proxy enters Gemini relay mode. Subsequent Claude Code prompts are forwarded as --interrupt to the running Gemini agent session.",
+    "Weekly API limit (all Anthropic models blocked): proxy catches overload/rate-limit errors too and routes to Gemini agent same way.",
+    "Claude Code UX: no error shown. Sees normal assistant response. Seamless switch from Claude to Gemini mid-session.",
+    "Manual trigger: wkappbot agent gemini --new-session $(cat ~/.claude/CLAUDE.md memory/MEMORY.md) \u002B prompt. Use when approaching limit proactively."
+  ],
+  "tags": [
+    "claude-proxy",
+    "handoff",
+    "context-limit",
+    "gemini",
+    "agent",
+    "proxy",
+    "session-recovery",
+    "operator"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-09T14:45:49.6179373Z",
+  "updated": "2026-04-09T14:45:49.6179734Z",
+  "version": "1.0"
+}

@@ -1,0 +1,42 @@
+{
+  "id": "grap-howto",
+  "app": "wkappbot-workflow",
+  "title": "GRAP HowTo: window patterns, UIA scope chain, find output (T2)",
+  "title_ko": null,
+  "desc": "T2 howto for grap. Practical window-pattern matching, UIA scope-chain drill, win32-child slash, and a11y-find output format. Deep grammar in grap-ref, core concept in grap.",
+  "steps": [
+    "[WINDOW PATTERNS] before the hash addresses the top-level window: substring 'ChatGPT' (contains, case-insensitive), wildcard '*Notepad*' (star=any), OR with a semicolon between two patterns, JSON5 AND like {title:'Claude',proc:'chrome'}, HWND direct {hwnd:0x010B084A} (instant, session-scoped), regex via the regex- prefix.",
+    "[SCOPE CHAIN] after the hash drills the UIA subtree one level per segment: '*App*#*Button*' finds a Button under App, nested '#Panel#OK', a bare trailing hash drills to the keyboard-focused element. Depth up to 25. Match Name first then AutomationId (both substring). Container-first (Pane/Group preferred over Button/Edit).",
+    "[WIN32 CHILD] a slash drills Win32 child windows for MFC/legacy fragmented-UIA apps: 'Parent/Child' (GetChildren pattern), 'Parent/Child#UiaScope' (win32 then UIA), 'Window/' trailing slash focus-tunnels. Stop-early: a child path may stop at ANY intermediate hwnd when the container itself is the target.",
+    "[FIND OUTPUT] a11y find prints a FOCUS section and a TARGET section, each a paste-ready double-quoted grap, then the re-run command line, then [OK] Nms verify on the next line. Titles go to stderr. Multiple matches show TARGETS N then one block each.",
+    "[NODE TAG AS SCOPE] node labels become scope segments: a Button named Confirm becomes #*Confirm*, a Button with AutomationId OK becomes #OK.",
+    "[COMPACT GRAP RULE] stored graps use browser {hwnd,pid,proc,domain}, MFC/legacy {hwnd,pid,proc,cls} (cls essential), modern {hwnd,pid,proc}. Never store title or url (volatile).",
+    "[CMD FIELD] {proc:name,cmd:substring} filters by command-line not just process name, so {proc:'wkappbot-core',cmd:'eye'} finds only the Eye daemon.",
+    "See also grap (T1 core) and grap-ref (T3 deep grammar). next-grap-ref cluster-grap"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot a11y find --help",
+      "expect": "shows find usage",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot a11y inspect --help",
+      "expect": "shows inspect usage",
+      "prompt": null
+    },
+    {
+      "cmd": "proposed: grap window-pattern resolution",
+      "expect": "substring/wildcard/json5/hwnd all resolve a window",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-23T12:28:31.2677773Z",
+  "updated": "2026-06-23T12:28:31.2677994Z",
+  "version": "1.0"
+}

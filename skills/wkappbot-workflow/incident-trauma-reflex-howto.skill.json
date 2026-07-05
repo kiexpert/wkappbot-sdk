@@ -1,0 +1,46 @@
+{
+  "id": "incident-trauma-reflex-howto",
+  "app": "wkappbot-workflow",
+  "title": "Incident to Trauma-Grade Reflex (T2 howto)",
+  "title_ko": null,
+  "desc": "T2 howto: the 2-layer procedure for turning a fixed incident into a trauma-grade reflex -- capture knowledge in a wkappbot skill, then wire a CLAUDE.md Emergency Reflexes row, then verify. Includes the skill contribute --requirement gotcha.",
+  "steps": [
+    "LAYER 1 (knowledge): after confirming+fixing, run 'wkappbot skill edit <relevant-skill> --add-step \"<symptom>: root cause + fix commit + detection + verify\"' (English only). Use the emergency/domain skill as home (e.g. wkdr-emergency-doctor-... for storms).",
+    "LAYER 2 (reflex): edit the repo CLAUDE.md '⚡ Emergency Reflexes' table -- add a row 'symptom | immediate action NOW (e.g. ! wkdr nuke) | skill-id'. The action must be runnable in one shot, no investigation.",
+    "POSTERITY: the knowledge MUST sit in a wkappbot SKILL (cross-repo, inherited via skill read/search); the CLAUDE.md row is only a fast local pointer to it.",
+    "VERIFY: re-trigger or simulate the symptom and confirm the reflex action resolves it; otherwise the reflex is unproven.",
+    "CONTRIBUTE GOTCHA: 'wkappbot skill contribute' REQUIRES --requirement (>=1 'cmd => expected') ALONGSIDE --app/--id/--title/--desc/--step. Omitting --requirement saves a draft + exits 1 with a vague 'missing fields' message (the missing field IS --requirement). Re-run WITH --requirement -> it loads the draft and creates. (Not a draft-only bug; just a poor error message.)"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read incident-trauma-reflex-howto",
+      "expect": "LAYER 1",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read incident-trauma-reflex-howto",
+      "expect": "CONTRIBUTE GOTCHA",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill list",
+      "expect": "active",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "incident",
+    "reflex",
+    "howto",
+    "knowledge-ification",
+    "emergency",
+    "t2"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-07T18:16:30.4993272Z",
+  "updated": "2026-06-07T18:16:30.4993352Z",
+  "version": "1.0"
+}

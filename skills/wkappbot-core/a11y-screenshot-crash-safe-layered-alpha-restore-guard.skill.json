@@ -1,0 +1,46 @@
+{
+  "id": "a11y-screenshot-crash-safe-layered-alpha-restore-guard",
+  "app": "wkappbot-core",
+  "title": "a11y screenshot: crash-safe layered alpha restore guard",
+  "title_ko": null,
+  "desc": "Crash-safe restore of layered window alpha during a11y screenshot suppression -- prevents windows staying invisible after taskkill/AccessViolation/SIGKILL of the screenshot process",
+  "steps": [
+    "PROBLEM SuppressBlockingWindows in ScreenshotCommand.cs sets WS_EX_LAYERED + alpha=0 on every window above the capture rect; expects RestoreBlockingWindows to restore at end. External kill bypasses finally -- window stays invisible. ",
+    " FIX ScreenshotCommand.AlphaRecovery.cs adds AlphaRecord(hwnd,prevStyle,prevAlpha) which writes to %TEMP%/wkappbot-screenshot/alpha-pending-{pid}.jsonl BEFORE SetLayeredWindowAttributes(0,0,LWA_ALPHA). ",
+    " HOOKS Console.CancelKeyPress + AppDomain.ProcessExit + AppDomain.UnhandledException registered on first AlphaRecord() call. ",
+    " RECOVERY RecoverOrphanedAlpha() runs in Program.Dispatch.Run() at every wkappbot startup; scans alpha-pending-*.jsonl, restores files whose PID is dead. ",
+    " INVARIANT persist BEFORE alpha=0; recovery is idempotent. ",
+    " ENTRY POINTS AlphaRecord, AlphaClearPending, RecoverOrphanedAlpha in csharp/src/WKAppBot.CLI/Commands.Private/ScreenshotCommand.AlphaRecovery.cs",
+    "PROBLEM: SuppressBlockingWindows in csharp/src/WKAppBot.CLI/Commands.Private/ScreenshotCommand.cs sets WS_EX_LAYERED + alpha=0 on every window above the capture rect; RestoreBlockingWindows in the matching finally puts it back. External kill (taskkill /F, OS AccessViolation, SIGKILL) bypasses the finally so windows stay invisible at alpha=0 -- user has to admin-PowerShell SetLayeredWindowAttributes back to 255.",
+    "PERSIST: ScreenshotCommand.AlphaRecovery.cs (new file) provides AlphaRecord(hwnd,prevStyle,prevAlpha) -- appends one JSONL line {hwnd,prevStyle,prevAlpha} to %TEMP%/wkappbot-screenshot/alpha-pending-{pid}.jsonl. SuppressBlockingWindows MUST call AlphaRecord BEFORE SetLayeredWindowAttributes(0,0,LWA_ALPHA) -- a kill in that 1-call gap is the only race we cannot self-cover.",
+    "GRACEFUL HOOKS: First AlphaRecord() call also registers Console.CancelKeyPress + AppDomain.CurrentDomain.ProcessExit + AppDomain.CurrentDomain.UnhandledException; each handler reads the per-PID pending file and restores. Covers Ctrl-C, normal exit, .NET unhandled exception.",
+    "STARTUP RECOVERY: Program.Dispatch.cs Run() calls RecoverOrphanedAlpha() once before dispatch. RecoverOrphanedAlpha enumerates %TEMP%/wkappbot-screenshot/alpha-pending-*.jsonl, parses PID from filename, skips if PID is alive (file owner still running), otherwise restores each recorded window and deletes the file. This is the SIGKILL/AccessViolation/power-loss safety net -- the next wkappbot invocation heals what the dead one left behind.",
+    "CLEAR ON SUCCESS: RestoreBlockingWindows tail calls AlphaClearPending() which deletes %TEMP%/wkappbot-screenshot/alpha-pending-{pid}.jsonl. A clean run leaves no residue. Recovery is idempotent (re-applying a saved alpha to an already-restored window is a no-op), so a redundant restore from both in-process AND startup-scan is harmless.",
+    "EVIDENCE: D:/GitHub/WKAppBot/.wkappbot/evidence-alpha-restore.ps1 verifies (1) AlphaRecord, RecoverOrphanedAlpha, AlphaClearPending defined; (2) AlphaRecord wired in Suppress; (3) AlphaClearPending wired in Restore; (4) RecoverOrphanedAlpha wired in Run; (5) all 3 exit hooks present; (6) built binary newer than source."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot file grep AlphaRecord D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands.Private/ScreenshotCommand.AlphaRecovery.cs",
+      "expect": "AlphaRecord defined",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot file grep AlphaRecord D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands.Private/ScreenshotCommand.cs",
+      "expect": "AlphaRecord wired in Suppress",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot file grep RecoverOrphanedAlpha D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Program.Dispatch.cs",
+      "expect": "RecoverOrphanedAlpha wired in startup",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-08T15:06:37.7897783Z",
+  "updated": "2026-05-08T15:07:23.9976437Z",
+  "version": "1.12"
+}

@@ -1,0 +1,44 @@
+{
+  "id": "pulsestep-force-mode-ring-trail",
+  "app": "wkappbot-core",
+  "title": "PulseStep force mode ring trail for elevation prompts",
+  "title_ko": null,
+  "desc": "PulseStep.Line() and Finish() always emit to stderr regardless of WKAPPBOT_PROFILE flag. Ring trail keeps last 20 lines for UAC context.",
+  "steps": [
+    "PulseStep.Line() calls Emit(force=true) -- bypasses WKAPPBOT_PROFILE=1 check and 100ms threshold. Always prints to stderr.",
+    "Ring trail: last 20 emitted lines stored in LinkedList with lock. GetRecentTrail(n) returns newest-last slice for UAC/elevation context.",
+    "Usage: PulseStep.Init sets up session keyed by CallerMemberName. Mark() records checkpoint. Done() prints total. Line() forces output."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot eye tick",
+      "expect": "eye alive",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read pulsestep-force-mode-ring-trail",
+      "expect": "pulse",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot file grep PulseStep.Line csharp/src",
+      "expect": "PulseStep",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "developer",
+    "project",
+    "debugging",
+    "pulse",
+    "stepprofiler",
+    "tracing"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-16T08:42:42.005189Z",
+  "updated": "2026-05-04T07:54:21.4945441Z",
+  "version": "1.3"
+}

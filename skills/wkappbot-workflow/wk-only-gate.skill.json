@@ -1,0 +1,38 @@
+{
+  "id": "wk-only-gate",
+  "app": "wkappbot-workflow",
+  "title": "wk-only-gate: over pace target, wk-tools only",
+  "title_ko": null,
+  "desc": "Blocks non-wk commands when Claude token pace exceeds target. Only wkappbot/git/gh/Agent.cmd/codex prefixed commands are allowed.",
+  "steps": [
+    "SAFETY: Fires when Claude weekly total or Sonnet pace exceeds target AND the command does not start with a wk-prefix (wkappbot, wkjobs, wkask, etc.), git, gh, Agent.cmd, or codex. Prevents burning expensive tokens on mechanical work.",
+    "SOLUTION: Prefix any command with a wk-tool: use 'wkappbot ...', 'git ...', 'gh ...', 'Agent.cmd ...', or 'wkcodex.sh ...'. These are exempt because they are cheap/delegating operations. OR delegate the entire task via Agent.cmd --model haiku.",
+    "PREVENTION: When pace is over target, use wk-prefix tools only. Delegate heavy work to cheap agents. Running 'wkappbot skill read ...' is always free (TIER0)."
+  ],
+  "comments": null,
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read wk-only-gate",
+      "expect": "over target",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wkharness-guards",
+      "expect": "GUARD CLUSTER",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read harness-active-model-scoping",
+      "expect": "P6",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-11T07:30:46.6002096Z",
+  "updated": "2026-06-11T07:30:46.6002183Z",
+  "version": "1.0"
+}

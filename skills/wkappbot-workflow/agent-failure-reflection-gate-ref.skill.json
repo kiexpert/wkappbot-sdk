@@ -1,0 +1,43 @@
+{
+  "id": "agent-failure-reflection-gate-ref",
+  "app": "wkappbot-workflow",
+  "title": "agent-failure-reflection-gate ref",
+  "title_ko": null,
+  "desc": "Incident history and dated lessons for agent-failure-reflection-gate. Read agent-failure-reflection-gate for the design/spec and agent-failure-reflection-gate-howto for implementation mechanics; this is the historical record.",
+  "steps": [
+    "BUILD STATUS 2026-06-30: initial proto at .tmp/agent-failure-reflection-gate-proto.ps1 (Test-WkRecentAgentFailure + Test-WkRecentReflectionEdit + Get-WkAgentFailureGateVerdict + 5-case synthetic self-test), Haiku-built, ROOT-verified and merged into the PreToolUse Agent-dispatch gate after synthetic PASS. Twin: cheap-commit-todo-gate.",
+    "RECURSIVE NOTE: the original detection proto was itself built by a Haiku subagent -- Haiku prototyped its own mission-failure detector; once merged, that logic catches the next Haiku failure.",
+    "DUAL BENEFIT (user insight 2026-06-30): (1) the model reflection skill gets the recurrence-prevention reflex recorded; (2) ROOT, by being FORCED to author it, naturally learns what to watch out for when using that model, becoming a better delegator over time.",
+    "BUG 2026-07-03: the model-reflection map regressed to a single haiku entry during incremental file-by-file construction of the split module and was never restored to its full 10-entry form before a self-test run, silently mis-routing codex/sonnet/gemini/etc through the wrong fallback path. Caught by the self-test itself (5/8 -> 8/8 after fix), not by code review. Lesson: when building a file incrementally via many small edit calls, re-verify the FULL final state of any data structure that was only partially populated in an early chunk, not just that each individual edit applied cleanly.",
+    "BUG 2026-07-03: the standalone self-test initially threw Get-WkActiveSessionJsonl not recognized because that function lives in a sibling dot-sourced file not loaded during standalone execution of the module alone. Fixed by pointing the WKHARNESS_TEST_REC_JSONL override at a nonexistent fixture path instead of null, so the override branch is always taken during self-test and the real (undefined-when-standalone) function is never called.",
+    "DESIGN BUG 2026-07-03: the original NeedsCreate/NeedsRead two-flag design was unreachable in practice -- once ROOT creates a suggested skill, the very NEXT verdict call re-resolves it via the loose keyword search and silently switches to the mapped-skill branch (which checks for an EDIT, not a READ), so NeedsRead never actually fired in the self-test until the test itself was corrected to expect this. Fixed by unifying into a single NeedsCreate flag; the record-check now accepts either an edit or a fresh contribute.",
+    "FALSE PREMISE INCIDENT 2026-07-03: assumed (based on a passing user remark) that agy could run on top of Claude Opus/Sonnet/Haiku (agy-opus, agy-sonnet, agy-haiku) and built defensive code plus a placeholder agy-opus-reflection skill for this. User asked to verify via the real agy CLI/config -- confirmed agy runs EXCLUSIVELY on Google's Gemini model family (~/.gemini/antigravity-cli/settings.json), never a Claude backend. The placeholder skill was corrected in place (not deleted -- skill delete only removes the project-local copy, not an already-HQ-synced one) with a clear FALSE PREMISE notice. Lesson: verify a tool's actual supported-model list via its real CLI/config BEFORE writing code or skills for an assumed model combination, even when the assumption came from the user in passing -- a passing remark is not the same as a verified fact.",
+    "MAP CORRECTION 2026-07-03: removed the hardcoded agy -> agy-root-reflection map entry. Bare agy never occurs as a real model-failure string in practice -- every real agy session has a specific Gemini backend attached and would report a compound name like agy-gemini-flash or agy-gemini-3.1-pro, never bare agy alone. The loose keyword search fallback already resolves a bare agy correctly (if it ever did occur) via the starts-with-key precision rule, making the hardcoded entry both dead code and misleading (it implied bare agy was a valid standalone model identity). The agy-root-reflection SKILL itself was kept (not deleted) -- its content is legitimate agy-family-level compliance/on-load material, independent of which Gemini backend is running.",
+    "CRITICAL BUG 2026-07-03 (found via user question about Agent.cmd --model auto): the reflection-lookup direction was BACKWARDS for real production data. A real subagent transcript records the FULL model id (e.g. claude-haiku-4-5-20251001), never a short alias like haiku -- verified by reading actual agent-*.jsonl files in this session. The original design either exact-matched a short hardcoded key against the raw string, or checked whether a SKILL FILENAME contained the raw model string as a substring -- neither direction can ever match a full id against a short skill name like haiku-reflection. This meant the gate had NEVER correctly resolved a real haiku/sonnet/opus/codex failure in production, always falling into the unmapped-create path despite passing every self-test (because the self-tests used short simplified names like haiku instead of real full ids -- a classic tested-the-wrong-data-shape trap). FIX: reversed the match direction entirely. Get-WkAfgAllReflectionCandidates builds one unified table of (Key, SkillId) pairs from both the hardcoded aliases and every real installed reflection skill filename; Get-WkAfgReflectionSkillId then checks whether the RAW model string CONTAINS a candidate Key as a substring, picking the LONGEST matching Key as most specific. This also cleanly absorbs the earlier gemini-pro vs agy-gemini-pro precision fix without a separate starts-with rule. Self-test rewritten to use real full model ids (claude-haiku-4-5-20251001, claude-opus-4-8, claude-sonnet-5) instead of short aliases; re-verified 8/8 PASS live. Lesson: when a self-test's fixture data does not match the real production data SHAPE (not just the values), a 100% pass rate proves nothing about production correctness -- always source test fixtures from an actual sample of real data at least once."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read agent-failure-reflection-gate-ref",
+      "expect": "FALSE PREMISE",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read agent-failure-reflection-gate-ref",
+      "expect": "MAP CORRECTION",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read agent-failure-reflection-gate-ref",
+      "expect": "BUILD STATUS",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-07-03T06:49:24.5684448Z",
+  "updated": "2026-07-03T07:14:31.4105862Z",
+  "version": "1.1"
+}

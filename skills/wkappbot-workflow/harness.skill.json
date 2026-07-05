@@ -1,0 +1,35 @@
+{
+  "id": "harness",
+  "app": "wkappbot-workflow",
+  "title": "Harness Rising Pattern Reflex",
+  "title_ko": null,
+  "desc": "Reflex for handling [harness] trigger rising patterns.",
+  "steps": [
+    "When you trigger [harness] and today-count exceeds 7d-avg: read the guard's skill (wkappbot skill read harness), identify what changed, and pick a different approach to avoid further budget burn."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read harness",
+      "expect": "Harness Rising Pattern Reflex",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill search harness",
+      "expect": "harness",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill list",
+      "expect": "harness",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-13T13:07:04.860029Z",
+  "updated": "2026-06-13T13:07:04.8600384Z",
+  "version": "1.0"
+}

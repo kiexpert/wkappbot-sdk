@@ -1,0 +1,45 @@
+{
+  "id": "ask-cdp-uia-focus-steal-coverage-via-sentinel-ref",
+  "app": "wkappbot-workflow",
+  "title": "ask CDP/UIA focus-steal sentinel: source-ref drift audit (ref)",
+  "title_ko": null,
+  "desc": "T3 reference for ask-cdp-uia-focus-steal-coverage-via-sentinel. Dated audit trail of source_refs drifting as ChromeLauncher/AppBotPipe got refactored into partials -- read this before trusting a cached file:line ref in the core skill.",
+  "steps": [
+    "AUDIT 2026-06-04: AppBotPipe.Start ref broken -- ChromeLauncher.cs refactored, AppBotPipe.Start removed. Ref should point to ChromeLauncher.LaunchAsync or equivalent",
+    "AUDIT 2026-06-04 correction: ChromeLauncher.cs split into partials; the AppBotPipe.Start pattern moved. AskCommands.Focus.cs userBailed anchor stable at line 218",
+    "AUDIT 2026-06-06: PATTERN-NOT-FOUND -- AppBotPipe.Start moved from ChromeLauncher.cs to Shared/AppBotPipe.cs. Check AppBotPipe.cs before editing Chrome launch + sentinel interaction code",
+    "LESSON: this file has drifted source_refs at least 3 times across refactors -- always grep-verify the ref target before relying on a cached file:line in the core skill, do not assume it is current."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read ask-cdp-uia-focus-steal-coverage-via-sentinel-ref",
+      "expect": "AUDIT 2026-06-04",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read ask-cdp-uia-focus-steal-coverage-via-sentinel-ref",
+      "expect": "AUDIT 2026-06-06",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read ask-cdp-uia-focus-steal-coverage-via-sentinel-ref",
+      "expect": "LESSON",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "ask",
+    "cdp",
+    "focus-steal",
+    "ref",
+    "audit",
+    "refactor"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-07-02T07:25:32.6308074Z",
+  "updated": "2026-07-02T07:25:32.6308206Z",
+  "version": "1.0"
+}

@@ -1,0 +1,90 @@
+{
+  "id": "grap-target",
+  "app": "wkappbot",
+  "title": "grap-target",
+  "title_ko": null,
+  "desc": "Shell-safe output contract for a11y find. Use when you need a paste-ready grap target that survives shell copy/paste, re-run verification, and code-review/debug workflows. Keep # FOCUS for the currently focused leaf path when interaction side effects matter, and keep # TARGET as the primary hwnd:0x... token with high-signal context for both Claude and Codex. Favor minimal operator options such as verify, review, and dry-run only when they improve safety or ambiguity.",
+  "steps": [
+    "Treat a11y find as a contract for both humans and Codex: the output must be paste-ready, shell-safe, and verifiable.",
+    "Emit one shared # FOCUS line when the focused leaf may affect interaction, including modal/error popups; keep it as a full grap string in quotes.",
+    "Emit one # TARGET block per match; use {..} with hwnd first, then pid/proc, then the matching field/snippet, and quote the full grap expression so it can be pasted as one argument.",
+    "Include the matching field/snippet in a compact {match:...} section when it helps explain why this target was selected.",
+    "[v6.2+ SCORE OUTPUT] # TARGET line in find output now followed by [OK] Nms score={field:score,...} -- score for every addressable field (domain/proc/cls/title), 0..1 = pattern_literal_chars / field_value_chars. 1.00 = exact match OR un-specified candidate ready to paste into grap. <1.00 = wildcard match (less specific). Example: score={domain:1.00,proc:0.86,cls:0.54,title:0.22} tells you domain is the tightest handle, title is noisy. Use to tighten grap: any 1.00 field not yet in your grap is a precision candidate.",
+    "[v6.2+ PERF CONTRACT] find output [OK] Nms line target under 3s for most discovery calls (was 50s in v6.1). Electron (VS Code, Chrome_WidgetWin_1 + non-Chromium proc) and MFC/Afx windows (Heroes4, nkrunlite) skip UIA discovery traversal. Read-only actions use FastExit path (no TeeWriter/eye tick). When emitting target grap, remember this contract: slow find = something regressed.",
+    "PARENT CHAIN FIELDS (2026-05-18): cmd:'' forces full untruncated command line in output (commit 32958069e). ppid:N matches processes whose direct parent PID is N (e.g. {proc:'bash',ppid:180692}). ppids:[N1,N2,...] matches processes whose parent chain contains ANY listed PID -- useful for finding all bash shells under your Claude Code session: {proc:'bash',ppids:[MY_CLAUDE_PID]}. ppids:N is a single-element-list alias. ppids:'' is OUTPUT MODE: no parent-chain filter, but every match renders a one-line 'ancestors: PID(name) -> PID(name) -> ...' chain (walk up to 16 hops via GetParentProcessId; unknown names show as ?). Use ppids:'' to discover process lineage.",
+    "USAGE VERIFIED (2026-05-18): ppids:[N] filter -- {proc:'bash',ppids:[4084]} correctly matches bash whose direct parent is PID 4084. ppids:'' output -- {proc:'bash',ppids:''} prints 'ancestors: 173860(bash) -> 4084(?)' chain. ppids:N scalar -- same as ppids:[N]. NOTE: wkappbot windows only finds processes that are visible in PROC-mode scan; claude.exe child bash shells with no top-level window appear in ppids:'' output but are NOT enumerated by wkappbot windows without an explicit pid: match -- separate issue. Verified in v7.3.51.",
+    "[AUDIT 2026-05-29] Source line refs drifted after CallerHwnd/A11yActions refactor. Patterns still resolve at new line numbers per audit output (A11yCommand.cs:806/137/114, InspectionCommands.cs:311, WindowFinder.cs:506/1511). A11yActions.Output.cs no longer contains literal '## FOCUS' header -- focus emission was moved into BuildTargetGrapWithFocusPath helper. Re-contribute refs in next major skill update.",
+    "[AUDIT 2026-06-03] source_refs broken: stale pattern ##",
+    "[AUDIT 2026-06-04] A11yActions.Output.cs line drift: '## FOCUS' pattern moved; A11yCommand.cs verified at lines 137/804, foreground host/vscode-app/Focus Hot-Chain anchors stable.",
+    "[AUDIT 2026-06-05] A11yActions.Output.cs line drift: '## FOCUS' anchor moved (IME doc comment now at line 15). Stable anchors A11yCommand.cs BuildTargetGrapWithFocusPath/# TARGET still resolve. No file deleted -- pattern drift only.",
+    "[AUDIT 2026-06-06] PATTERN-NOT-FOUND: '## FOCUS' in A11yActions.Output.cs -- line drift after IME/Output refactor; stable anchors (A11yCommand.cs:804 TARGET, WindowFinder.cs:506 foreground host) intact",
+    "[AUDIT 2026-06-06] PATTERN-NOT-FOUND: '## FOCUS' moved out of A11yActions.Output.cs (line 15 now shows IME field comments). Verify current location before editing A11yActions.Output.cs."
+  ],
+  "requirements": null,
+  "primary_cmd": null,
+  "tags": [
+    "grap",
+    "find",
+    "target",
+    "window",
+    "bash",
+    "focus",
+    "shell-safe",
+    "verify",
+    "codex",
+    "code-review",
+    "review",
+    "dry-run",
+    "operator",
+    "project"
+  ],
+  "source_refs": [
+    {
+      "file": "csharp/src/WKAppBot.CLI/Commands/A11yActions.Output.cs",
+      "line": 15,
+      "pattern": "## FOCUS",
+      "note": null
+    },
+    {
+      "file": "csharp/src/WKAppBot.CLI/Commands/A11yCommand.cs",
+      "line": 569,
+      "pattern": "# TARGET",
+      "note": null
+    },
+    {
+      "file": "csharp/src/WKAppBot.CLI/Commands/A11yCommand.cs",
+      "line": 44,
+      "pattern": "BuildTargetGrapWithFocusPath",
+      "note": null
+    },
+    {
+      "file": "csharp/src/WKAppBot.CLI/Commands/InspectionCommands.cs",
+      "line": 140,
+      "pattern": "UiaLocator.QuickSearch",
+      "note": null
+    },
+    {
+      "file": "csharp/src/WKAppBot.Win32/Window/WindowFinder.cs",
+      "line": 292,
+      "pattern": "foreground host",
+      "note": null
+    },
+    {
+      "file": "csharp/src/WKAppBot.Win32/Window/WindowFinder.cs",
+      "line": 1168,
+      "pattern": "vscode-app",
+      "note": null
+    },
+    {
+      "file": "csharp/src/WKAppBot.CLI/Commands/A11yCommand.cs",
+      "line": 23,
+      "pattern": "Focus Hot-Chain",
+      "note": null
+    }
+  ],
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-08T07:01:01.1192756Z",
+  "updated": "2026-06-05T20:02:07.8026358Z",
+  "version": "1.45"
+}

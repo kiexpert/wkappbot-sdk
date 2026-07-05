@@ -1,0 +1,60 @@
+{
+  "id": "knowledge-op-approval-logic-2-consume-from-front",
+  "app": "wkappbot-workflow",
+  "title": "Knowledge-op approval-logic 2.0: never mix knowledge + normal commands (consume-from-front)",
+  "title_ko": null,
+  "desc": "TIER0 knowledge-op classifier law + the 2026-06-18 smuggle-hole incident. An AI must run skill commands CLEAN and ALONE (or chain only with other skill ops); mixing a normal command into a skill line is blocked for education -- 'mixing jinxes it'. Standalone, data-driven-QA'd, sub-ms classifier.",
+  "steps": [
+    "PRINCIPLE (user 2026-06-18, 'mixing jinxes it / seokkeo-sseumyeon bujeong-tanda'): NEVER mix a knowledge-ification command (wkappbot skill read/search/list/edit/contribute/news) with a normal command in ONE shell line. Run the skill command CLEAN and ALONE, OR chain ONLY with other skill ops -- multi-skill chains are ENCOURAGED (they save server round-trip / token cost). Mixing a normal command into a skill line/chain is BLOCKED unconditionally for education, NO fallback. CLEAN = no pipe, no >redirect, no command-substitution $()/backtick, no $var, no absolute path, no .exe/.cmd extension; stderr (2> / 2>&1 / 2>/dev/null) is the only allowed extra.",
+    "APPROVAL-LOGIC 2.0 = CONSUME-FROM-FRONT: a line that invokes a skill verb has ENTERED the knowledge pattern. Walk its segments (the chain separator ;/&&/",
+    "",
+    " is PART of the pattern, quote-aware so separators inside a quoted arg are values) and CONSUME each clean canonical skill statement. Once INSIDE the pattern, ANY non-consumable segment (an unclean skill attempt OR a smuggled normal command) -> BLOCK immediately, no fallback to TIER2. A line with NO skill verb -> 'deny' (a plain command the normal guards evaluate). Pure verdict API Get-WkKnowledgeOpVerdict -> allow",
+    "deny",
+    "block (NEVER calls Block; the guard maps the verdict).",
+    "SECURITY INCIDENT 2026-06-18: the OLD inline classifier split the chain but SKIPPED non-skill segments (continue) and returned $true, so 'wkappbot skill read x && <anything>' and even 'ls -la ; wkappbot skill read x' got the TIER0 free pass = pace/stall/wk-only EVASION. Confirmed live with a Block-stub harness running the real function body. Emergency one-line fix (continue -> return $false) then full extraction.",
+    "FRAGILITY ROOT CAUSE + LESSON: the classifier was tangled in the guard AND its git/skill patterns were set by a DIFFERENT file (wkharness-common-tier.ps1) at load time. In PowerShell, 'x' -match $null/'' is MATCH-ALL, so if that file is not loaded the matcher silently classifies EVERYTHING as a knowledge-op (fail-OPEN). FIX: the classifier is now a STANDALONE module (wkharness-knowledge-classifier.ps1) that defines its OWN patterns and is testable in isolation. RULE: a security classifier must own its patterns + be self-contained.",
+    "DATA-DRIVEN QA + SPEED GATE: verification is a FIXTURE text file of good/bad command-line samples (wkharness-knowledge-classifier-cases.txt) + a runner (Verify-WkKnowledgeClassifier.ps1) that asserts every verdict AND a SUB-MS per-call speed gate (the classifier runs on EVERY tool call; measured 0.16 ms/call). wkdoctor wires the runner as a check item so regressions are caught. ALSO a VERIFY-YOUR-OWN-TEST reflex: when a security test shows EVERYTHING identical (all deny-cases returned true incl 'ls -la'), suspect the TEST harness first (missing dep -> empty pattern -> match-all), confirm a single helper in isolation BEFORE claiming a hole -- this session nearly reported a false 'everything free-passes' bug. Cross: harness-guard-exemption-ladder-spec, verify-tool-or-guard-synthetic-live-static, harness-gate-log-data-integrity, incident-trauma-reflex.",
+    "FALSE-POSITIVE ON WKCODEX HEREDOC BRIEF 2026-07-05: agent-brief-guard requires 3+ literal 'wkappbot skill read <id>' lines in a wkcodex.sh/Agent.cmd prompt heredoc, but knowledge-op guard scans the SAME raw payload text and blocks it as 'mixing a knowledge command with normal commands' when those skill-read lines are joined with semicolons (wkappbot skill read A ; wkappbot skill read B) followed by ordinary task prose in the same heredoc -- even though the payload is FILE/PROMPT CONTENT for another tool, not a command chain to execute. Both guards fire on raw text pattern-matching with no awareness that the text is heredoc content, not a literal shell command. FIX: put each 'wkappbot skill read <id>' reference on its OWN separate line (newline-separated, not semicolon-joined) inside the heredoc -- satisfies agent-brief-guard's line-count check without matching knowledge-op's chained-command pattern."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read knowledge-op-approval-logic-2-consume-from-front",
+      "expect": "CONSUME-FROM-FRONT",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read knowledge-op-approval-logic-2-consume-from-front",
+      "expect": "NEVER mix",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read knowledge-op-approval-logic-2-consume-from-front",
+      "expect": "SPEED GATE",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "tier0",
+    "knowledge-op",
+    "classifier",
+    "consume-from-front",
+    "approval-logic",
+    "security",
+    "smuggle",
+    "pace-evasion",
+    "clean-canonical",
+    "no-mixing",
+    "standalone-module",
+    "data-driven-qa",
+    "speed-gate",
+    "reflex",
+    "incident"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-18T02:53:50.1690417Z",
+  "updated": "2026-07-05T08:09:27.1041677Z",
+  "version": "1.1"
+}

@@ -1,0 +1,40 @@
+{
+  "id": "gate-two-tier-verify-before-block-t1",
+  "app": "wkappbot-workflow",
+  "title": "Gate Two-Tier Verify Before Block (T1)",
+  "title_ko": null,
+  "desc": "T1 core: two-tier verify-before-block for harness gates with indexer timing uncertainty. T1 quick then T2 stronger before confirmed block. Implementation -> gate-two-tier-verify-howto; history -> gate-two-tier-verify-ref.",
+  "steps": [
+    "WHY: harness gates querying an indexer (wkhippo studied-index, JSONL scanner) have TIMING GAPS. Compaction boundaries advance between tool calls, making same-session reads appear stale. Result: false-blocks on compliant sessions. The two-tier pattern prevents this. PATTERN: T1 quick with Since=MAX(session.CreationTime, recentCompaction) and -LimitPaths to current session JSONL. If T1 finds all required ids then COMPLIANT. If T1 misses go to T2 stronger with no -Since and same -LimitPaths. If T2 finds then COMPLIANT plus log gate-name-indexer-timing-gap to stderr. If both miss then confirmed block. SCOPE: -LimitPaths to current session JSONL gives implicit 1-day search limit. Never run unbounded all-session index search. FAMILY-AWARE: compaction markers differ per family. Since computation must branch on modelFam (Claude vs Codex vs Gemini vs Agy). FAIL-SAFE: when Get-WkStudiedFromIndex unavailable fall through to Get-WkSessionSkillReadIds same-turn fallback. Never fail-closed when scanner absent. NAVIGATION: implementation code and param combinations in gate-two-tier-verify-howto; origin session and design history in gate-two-tier-verify-ref."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read gate-two-tier-verify",
+      "expect": "PATTERN: T1 quick with Since",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read gate-two-tier-verify",
+      "expect": "SCOPE: -LimitPaths to current session",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read gate-two-tier-verify",
+      "expect": "FAIL-SAFE: when Get-WkStudiedFromIndex unavailable",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read gate-two-tier-verify-before-block-t1",
+      "expect": "WHY: harness gates with indexer timing uncertainty MUST use two-tier verify-before-block",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-26T16:39:57.0120845Z",
+  "updated": "2026-06-26T16:41:16.4014268Z",
+  "version": "1.2"
+}

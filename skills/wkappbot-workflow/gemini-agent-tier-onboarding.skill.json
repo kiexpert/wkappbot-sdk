@@ -1,0 +1,39 @@
+{
+  "id": "gemini-agent-tier-onboarding",
+  "app": "wkappbot-workflow",
+  "title": "Gemini agent tier: behavior + onboarding gap",
+  "title_ko": null,
+  "desc": "Gemini (gemini-2.5-flash) is callable now via Agent.cmd --model gemini. Observed behavior: context-greedy, enthusiastic, rate-limit-prone, flaky call pickup. Formal-onboarding blocker = PreToolUse hook errors on Gemini tool calls. Use for redundant/parallel work now.",
+  "steps": [
+    "WHAT: Gemini (gemini-2.5-flash) as an agent tier, callable NOW via Agent.cmd --model gemini (routes through wkgemini.sh). Paid subscription (refund requested but not yet processed) -- use it liberally while active, especially for redundant or parallel work.",
+    "BEHAVIOR OBSERVED 2026-06-05: given access to the harness, Gemini ingested the ENTIRE repo, praised it as a perfect world, got very enthusiastic, declared it would apply the harness to itself and did some work, then hit its rate limit and stopped (fainted). Pattern: context-greedy (slurps everything = token-greedy), high enthusiasm, rate-limit-prone, flaky call pickup (it answers a call almost at random; it also hung once after wkgemini routing on a quota or timeout).",
+    "INTEGRATION GAP (the blocker for formal onboarding): Gemini tool calls produce PreToolUse hook ERRORS -- the wkharness PreToolUse integration does not cleanly handle the Gemini tool-call format. Fix this before Gemini is a first-class tier: build a Gemini-harness adapter analogous to codex-tool-wrappers.",
+    "ONBOARDING CHECKLIST for formal join: fix the PreToolUse hook error for Gemini tool calls; add retry and backoff for rate-limits (it faints on limit); tolerate flaky call pickup (retry on no-response); bound its context ingestion (token-greedy); add gemini to agent_delegation model labeling and the tier-routing table.",
+    "ROUTING NOW: use Agent.cmd --model gemini for redundant reviews, parallel surveys, and second-opinion work where flakiness is acceptable; do NOT place it on a critical single-path task (it may hang or faint). Cross-links: wkgemini-cli-wrapper, codex-tool-wrappers, claude-code-agent-tier-routing, agent-cmd."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read gemini-agent-tier-onboarding",
+      "expect": "BEHAVIOR OBSERVED",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read gemini-agent-tier-onboarding",
+      "expect": "INTEGRATION GAP",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read gemini-agent-tier-onboarding",
+      "expect": "ONBOARDING CHECKLIST",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-04T19:01:25.4326116Z",
+  "updated": "2026-06-04T19:01:25.4326269Z",
+  "version": "1.0"
+}

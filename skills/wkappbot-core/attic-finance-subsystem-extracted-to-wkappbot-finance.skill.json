@@ -1,0 +1,40 @@
+{
+  "id": "attic-finance-subsystem-extracted-to-wkappbot-finance",
+  "app": "wkappbot-core",
+  "title": "Attic: finance subsystem extracted to wkappbot-finance",
+  "title_ko": null,
+  "desc": "kiwoom/telegram/stock-scan CLI commands were moved OUT of wkappbot-core into the separate wkappbot-finance project (2026-06-10 core diet, hybrid approach). Core retains ONLY the Kiwoom Named-Pipe proxy plumbing needed by the com command.",
+  "steps": [
+    "WHERE: D:\\GitHub\\wkappbot-finance (standalone repo, commit 963ab9d). Commands ported: KiwoomCommands.cs, StockScanCommands.cs, TelegramCommands.cs + AtticContext.cs shim. ",
+    " CORE RETAINED: Commands/ComCommands.KiwoomProxy.cs holds EnsureProxy/IsPipeAvailable/KiwoomStartCommand/GetKiwoomProxyPid/SendPipeRequest/ReadExact/FormatResult/ForwardOutput + KiwoomPipeRequest/Response -- because com call kiwoom still uses the pipe RPC. ",
+    " NO LINK-BACK: core dispatch cases removed (Program.Dispatch.cs); AppBotEyeTick filter + AppBotProgramInfra known-set scrubbed; CommandHelp.Entries.Slack.cs has MOVED stubs for kiwoom/telegram/stock-scan to suppress BUG-AUTO + give discoverability. ",
+    " BUILD finance: dotnet build the WKAppBot.Finance.csproj (ProjectRefs: WKAppBot.Win32/WebBot/Shared/Abstractions, NOT WKAppBot.CLI). ",
+    " core extract commit: aefc72b9b (-1254 LOC net)."
+  ],
+  "comments": null,
+  "requirements": [
+    {
+      "cmd": "wkappbot kiwoom --help",
+      "expect": "MOVED to the wkappbot-finance",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot com ls",
+      "expect": "kiwoom",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot stock-scan --help",
+      "expect": "MOVED",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-10T11:26:29.087114Z",
+  "updated": "2026-06-10T11:26:29.0871225Z",
+  "version": "1.0"
+}

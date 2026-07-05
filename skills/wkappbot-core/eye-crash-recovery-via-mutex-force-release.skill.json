@@ -1,0 +1,57 @@
+{
+  "id": "eye-crash-recovery-via-mutex-force-release",
+  "app": "wkappbot-core",
+  "title": "Eye crash recovery via mutex force-release",
+  "title_ko": null,
+  "desc": "When Eye crashes and cannot restart due to AbandonedMutexException, force-release the 3 named mutexes via PowerShell .NET API, then restart Eye. Eye revival also auto-clears zombie Chrome processes it owned.",
+  "steps": [
+    "DIAGNOSE STEP 1 \u2014 Symptom: wkappbot consoles dead, cdp/a11y commands hang. Check: tail D:/GitHub/WKAppBot/bin/wkappbot.hq/logs/eye-guardian.log | look for last tick timestamp. If stale \u003E60s, Eye\u002BGuardian are both dead.",
+    "DIAGNOSE STEP 2 \u2014 Confirm AbandonedMutex: tail latest eye.pid=*.log (sort by mtime). Look for \u0027AbandonedMutexException\u0027. This means Eye held the mutex when it crashed and never released it \u2014 new Eye cannot start.",
+    "DIAGNOSE STEP 3 \u2014 Confirm mutex still locked: PowerShell OpenMutex test. foreach name in (Global\\WKAppBotEyeAlive, Global\\WKAppBotEyeGuardian, Global\\WKAppBotEyeSpawn): h=OpenMutex(0x100000,false,name); err=GetLastError(). FOUND=alive, err=2=released, err=5=held-no-access.",
+    "DIAGNOSE STEP 4 \u2014 Find mutex names WITHOUT source: grep -n Mutex D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/AppBotEyeCommands.cs -\u003E line 437: EyeAliveMutexName=Global\\WKAppBotEyeAlive, line 479: EyeGuardian, line 732: EyeSpawn. If source unavailable: strings binary won\u0027t work (.NET single-file publish) but OpenMutex trial-and-error works.",
+    "FIX STEP 1 \u2014 Force-release all 3 Eye mutexes via PowerShell .NET: Add-Type MutexKiller { ReleaseMutex: Mutex.OpenExisting(name).ReleaseMutex(); Close() }. Returns: released=ok, closed-only=released but unsynchronized (still ok), not-found=already clear. Run for EyeAlive\u002BGuardian\u002BSpawn.",
+    "FIX STEP 2 \u2014 Restart Eye: wkappbot-core.exe eye. Wait 3-5s. Verify: tail logs/eye.pid=NEWEST.log for EYE_TICK or EYE_LOOP entries. Verify mutex: OpenMutex(Global\\WKAppBotEyeAlive) =\u003E FOUND means Eye is alive.",
+    "FIX STEP 3 \u2014 Console auto-recovery: wkappbot consoles reconnect automatically once Eye IPC pipe restarts. Eye holds WKAppBotEyeAlive mutex for its ENTIRE lifetime. Eye death = pipe death = console death. Eye revival = pipe revival = consoles reconnect.",
+    "CHROME ZOMBIE \u2014 When Eye dies, it abandons handles to Chrome child processes. These become zombies (Task Manager shows them, TerminateProcess returns ACCESS_DENIED). Fix: revive Eye first \u2014 Eye cleanup releases its Chrome handles automatically. If still stuck: wkappbot-core.exe taskkill --force \u003Cpid1,pid2,...\u003E OR SeDebugPrivilege TerminateProcess via wkfix.ps1 -Kill \u003Cpid\u003E.",
+    "CHROME ZOMBIE ROOT CAUSE \u2014 Eye mutex AbandonedMutex blocks Guardian from spawning new Eye. Guardian sees \u0027already running (mutex not acquired in 3s)\u0027 and gives up. Solution: force-release mutex first, THEN restart Eye. Order matters.",
+    "HANDLE SCANNER \u2014 wkfix.ps1 -ScanHandles \u003Cpid\u003E: uses NtQuerySystemInformation(0x40=SystemExtendedHandleInformation), 16-byte header (NumberOfHandles\u002BReserved), stride=40 bytes per entry (SHX struct: Object\u002BPID\u002BHandle\u002BAccess\u002BBT\u002BTypeIdx\u002BAttrs\u002BRsv), DuplicateHandle to current process, NtQueryObject(1=ObjectNameInformation) with UNICODE_STRING at nb\u002B0(len)\u002Bnb\u002B16(data). Filter by name substring.",
+    "NUKE PATTERN \u2014 wkfix.ps1 -Nuke \u003Cpid\u003E: enumerate all handles of target pid, DuplicateHandle with MUTEX_ALL_ACCESS(0x1F0001), call Win32 ReleaseMutex(dup) \u2014 succeeds only for Mutant type, skip others \u2014 then CloseHandle(dup), finally TerminateProcess with SeDebugPrivilege. One command to drain all mutexes \u002B kill.",
+    "CHROME SINGLETON \u2014 Chrome uses a named kernel object: \\BaseNamedObjects\\!device!harddiskvolume3!program files!google!chrome!application (path with backslash replaced by !, drive letter via QueryDosDevice C: -\u003E \\Device\\HarddiskVolume3). NOT a Mutex (OpenMutex returns err=6=wrong type). NOT a FileMapping (same). TypeIdx=21 in this Windows version. Cannot be released by Mutex.OpenExisting. Kill Chrome process instead.",
+    "SHORTCUT \u2014 wkfix.ps1 at D:/GitHub/WKAppBot/bin/wkfix.ps1: -EyeStatus (check mutex state), -Eye (release\u002Brestart), -Chrome (SeDebugPrivilege kill all debug-port chromes), -Nuke \u003Cpid\u003E (drain mutexes\u002Bkill), -Mutex \u003Cname\u003E (single release), -All (Eye\u002BChrome full reset). No reboot needed if mutex force-release succeeds.",
+    "ROOT CAUSE SUMMARY \u2014 Three bugs filed as suggests 2026-05-07: (1) AbandonedMutex on crash: Eye should use try/finally to release mutex. (2) Guardian has no watchdog: if Guardian dies, Eye never restarts. (3) Eye not elevated: lacks SeDebugPrivilege so cannot kill/reap zombie Chrome children, causing zombie accumulation.",
+    "FIND-OWNER PATTERN: zombie PID TerminateProcess fails -\u003E do NOT hardcode Eye as culprit. Real owner = Win32_Process.ParentProcessId. Any wkappbot tool (wkchat, wkappbot-core, Eye, agents) could hold the handle.",
+    "FIND-OWNER FIX: wkfix.ps1 -FindOwner zombie_pid -\u003E get PPID via WMI -\u003E Nuke(ppid): drain mutexes \u002B TerminateProcess(SeDebugPrivilege) -\u003E parent death releases child handles -\u003E zombie gone. No full system handle scan needed.",
+    "FIND-OWNER FIX: wkfix.ps1 -FindOwner zombie_pid -\u003E get PPID via WMI -\u003E Nuke(ppid): drain mutexes \u002B TerminateProcess(SeDebugPrivilege) -\u003E parent death releases child handles -\u003E zombie gone. No full system handle scan needed.",
+    "STRONGER THAN TASK MANAGER: wkfix.ps1 -Nuke drains Mutant handles before kill. -FindOwner closes handles held by OTHER processes (DUPLICATE_CLOSE_SOURCE). Task Manager cannot do either. Suggest filed 2026-05-07: wkappbot taskkill should auto-walk ParentProcessId on TerminateProcess failure.",
+    "STRONGER THAN TASK MANAGER: wkfix.ps1 -Nuke drains Mutant handles before kill. -FindOwner closes handles held by OTHER processes (DUPLICATE_CLOSE_SOURCE). Task Manager cannot do either. Suggest filed 2026-05-07: wkappbot taskkill should auto-walk ParentProcessId on TerminateProcess failure.",
+    "SELF-COMPLETING LOOP: FindOwner(zombie_chrome) -\u003E Nuke(PPID) -\u003E PPID releases chrome handle -\u003E chrome vanishes -\u003E search done. No recursion, no direct chrome kill needed. If chrome already gone before Nuke completes, that is also success.",
+    "SELF-COMPLETING LOOP: FindOwner(zombie_chrome) -\u003E Nuke(PPID) -\u003E PPID releases chrome handle -\u003E chrome vanishes -\u003E search done. No recursion, no direct chrome kill needed. If chrome already gone before Nuke completes, that is also success.",
+    "CHROME KILL ORDER: (1) Direct KillPid first \u2014 if killed, re-query and continue. (2) Only if kill fails (ACCESS_DENIED/zombie) -\u003E Nuke(PPID). Nuke is fallback, not default. Re-query Chrome list every iteration \u2014 one PPID nuke may wipe multiple chromes at once.",
+    "CHROME KILL ORDER: (1) Direct KillPid first \u2014 if killed, re-query and continue. (2) Only if kill fails (ACCESS_DENIED/zombie) -\u003E Nuke(PPID). Nuke is fallback, not default. Re-query Chrome list every iteration \u2014 one PPID nuke may wipe multiple chromes at once."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot eye status",
+      "expect": "running",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot a11y windows",
+      "expect": "no error",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read web-command-cheatsheet",
+      "expect": "contains grap",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-07T13:06:12.768044Z",
+  "updated": "2026-05-07T13:50:08.1071688Z",
+  "version": "1.11"
+}

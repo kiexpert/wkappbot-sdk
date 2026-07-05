@@ -1,0 +1,50 @@
+{
+  "id": "schedule-command-cheatsheet",
+  "app": "wkappbot",
+  "title": "schedule -- Prompt Scheduler Cheatsheet (add/list/remove/pending)",
+  "title_ko": null,
+  "desc": "Full reference for wkappbot schedule: one-shot/recurring/limit-reset JSON schedules \u002B file-based pending_prompts. Two-layer scheduler system.",
+  "steps": [
+    "TWO LAYERS: (1) schedule add/list/remove \u2192 JSON ScheduleManager file (global, schtasks-backed). (2) schedule pending list/delete \u2192 .wkappbot/pending_prompts/ files per CWD (filename-encoded, zero-memory). Layer 1 = system/global triggers; Layer 2 = project-scoped recurring prompts.",
+    "ADD ONE-SHOT: wkappbot schedule add --at HH:mm --prompt \u0027text\u0027  |  --at 30m (relative)  |  --at 2026-05-01T09:00 (ISO). Registers Windows schtasks entry -- survives Eye kill/restart.",
+    "ADD RECURRING: schedule add --every 20m --prompt \u0027text\u0027 [--max-runs N] [--expires HH:mm]. --every-day HH:mm for fixed daily. --on-limit-reset fires on Claude rate-limit reset. --cmd \u0027python script.py\u0027 (bash/python auto-resolved on Windows). --prompt-file ./path.md reads prompt from file.",
+    "LIST/REMOVE/CLEAR (Layer 1): schedule list -- id, status (pending/done/failed/expired), next time, interval, run count. schedule remove \u003Cid\u003E. schedule clear [--pending]. schedule exec \u003Cid\u003E -- manual trigger (called by schtasks).",
+    "PENDING LIST (Layer 2): wkappbot schedule pending list [--cwd \u003Cpath\u003E]. Shows: next trigger local time \u002B rep/tod/days params \u002B filename. Default cwd = current dir. No cwd arg needed if already in project root.",
+    "PENDING DELETE (Layer 2): schedule pending delete \u003Cpattern\u003E [--cwd \u003Cpath\u003E]. Pattern = substring OR glob (* ?). --all removes everything. THE ONLY WAY to cancel infinite rep= (no cnt=) schedules. Ex: schedule pending delete quant20m --cwd D:/GitHub/WkAutoQuant",
+    "FILENAME SCHEMA (Layer 2): prompt_{utcYYYYMMDDHHMMSS|NOW}_{label}[,rep=Nh|Nm|Ns][,cnt=N][,tod=HHMM-HHMM][,days=weekdays|weekends|mon-fri|1-5|mon,wed,fri].json. tod\u002Bdays = local-time window gate. Outside window: skip delivery \u002B silent reschedule. See: file-as-scheduler-pending-prompts-pattern",
+    "EXAMPLES: schedule add --every-day 09:00 --prompt TEXT | schedule add --on-limit-reset --prompt TEXT | schedule add --every 30m --max-runs 5 --prompt TEXT | schedule pending delete --all --cwd D:/GitHub/WkAutoQuant | KR market file: prompt_NOW_quant,rep=20m,tod=0900-1530,days=weekdays.json",
+    "SCHEDULE INJECTION LESSONS (2026-05-01, commits d386cd01 \u002B fb8861e5): (1) TargetHwnd stored at schedule-add time is the correct primary target. EnumerateAllTerminalWindows picks the WRONG Claude session when multiple project Eyes run simultaneously. Fix: always add storedHwnd as FIRST candidate before cache/enumerate. (2) TargetHwnd is a string? in ScheduleItem (JSON hex string, e.g. \u00272B083E\u0027), NOT IntPtr -- must parse via long.TryParse(hex, NumberStyles.HexNumber) then new IntPtr(val). (3) My fix was silently removed by a subsequent code restructure (3c527b48). When injection code is refactored, verify TargetHwnd-first logic survives. (4) JSONL-verify strategy (multi-candidate with 5s verify) is correct for fallback but TargetHwnd must come BEFORE cache and enumerate to be useful.",
+    "WINDOWS TERMINAL TAB TARGETING (2026-05-02 discovery): Each WT tab has its OWN top-level CASCADIA_HOSTING_WINDOW_CLASS hwnd -- NOT shared. Example: 0x2B083E=\u0027Claude Code wkappbot-sdk\u0027, 0x3044E=\u0027PowerShell\u0027, 0x131E8C=\u0027WkAutoQuant\u0027. Confirmed via EnumWindows: 5 separate CASCADIA windows all pid=16132 (same WT process). Gemini said \u0027tabs have no hwnd\u0027 -- WRONG. Each tab IS its own CASCADIA window. KEY: GetForegroundWindow() returns the EXACT tab hwnd when user types from that WT tab. So at schedule-add time, fg=CASCADIA of the registering tab = correct TargetHwnd. CWD-BASED DYNAMIC LOOKUP: wkappbot a11y find {cwd:\u0027D:/GitHub/project\u0027,hwnd:\u0027\u0027} returns the subordinate PseudoConsoleWindow (child of the correct CASCADIA tab). From that PseudoConsoleWindow, walk up to find the parent CASCADIA = correct tab hwnd. This enables CWD-based dynamic targeting at execution time -- no stale TargetHwnd needed. CHAIN: find({cwd:\u0027...\u0027}) -\u003E PseudoConsoleWindow -\u003E GetParent(CASCADIA) -\u003E SetForeground -\u003E inject. grap hwnd:\u0027\u0027 field forces hwnd to appear in find output -- otherwise hwnd is hidden."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot schedule list",
+      "expect": "(any)",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot schedule pending list",
+      "expect": "PENDING|No pending",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot schedule add --help",
+      "expect": "add",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "schedule",
+    "cheatsheet",
+    "pending-prompts",
+    "recurring",
+    "operator"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-30T05:06:52.1844341Z",
+  "updated": "2026-05-01T15:21:26.4469656Z",
+  "version": "1.18"
+}

@@ -1,0 +1,44 @@
+{
+  "id": "ask-cdp-uia-focus-steal-coverage-via-sentinel-howto",
+  "app": "wkappbot-workflow",
+  "title": "ask CDP/UIA focus-steal sentinel: CDP transient guard + verification (howto)",
+  "title_ko": null,
+  "desc": "T2 howto for ask-cdp-uia-focus-steal-coverage-via-sentinel. CDP transient guard detail and the dated verification test run for the ask gpt/claude/gemini/triad focus-steal sentinel coverage.",
+  "steps": [
+    "CDP TRANSIENT GUARD: applied 2026-04-30 (commit 47c43baf) -- suppresses focus-steal BUG-AUTOs that are caused by normal UIA/CDP interaction (attach/detach transients), not a real involuntary steal",
+    "VERIFIED: 2026-04-19 experience/tests/session/test-session-fix-verify-20260419.sh (resolve ts=2026-04-17T09:21:08)",
+    "READINESS FAILURE PATTERN: when ask logs show Chrome minimized before tab action, InputReadiness.Probe() blocked on input-cdp, and No response detected -- treat as a UI/input readiness failure rather than a model failure; retry with a fresh tab/session or a different delegation path after restoring focus",
+    "SESSION REUSE POLICY: prefer reusing the existing ask session by default; reserve --new-session for stale, contaminated, or broken sessions because unnecessary fresh sessions create noise and fragment continuity."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read ask-cdp-uia-focus-steal-coverage-via-sentinel-howto",
+      "expect": "CDP TRANSIENT GUARD",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read ask-cdp-uia-focus-steal-coverage-via-sentinel-howto",
+      "expect": "READINESS FAILURE PATTERN",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read ask-cdp-uia-focus-steal-coverage-via-sentinel-howto",
+      "expect": "SESSION REUSE POLICY",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "ask",
+    "cdp",
+    "focus-steal",
+    "howto",
+    "verify"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-07-02T07:25:13.4344619Z",
+  "updated": "2026-07-02T07:25:13.4344789Z",
+  "version": "1.0"
+}

@@ -1,0 +1,38 @@
+{
+  "id": "agent-leak-guard",
+  "app": "wkappbot-workflow",
+  "title": "agent-leak-guard: zombie agent procs must be cleaned first",
+  "title_ko": null,
+  "desc": "Blocks Agent dispatch or Agent.cmd when zombie wkappbot/codex/claude processes are detected. Forces cleanup before new delegation.",
+  "steps": [
+    "SAFETY: Fires when 'wkjobs -Leaks' finds processes older than 30 minutes that are still running (zombie agents from prior sessions). Dispatching new agents when zombies are alive causes resource exhaustion and IPC timeouts.",
+    "SOLUTION: Kill the zombie processes first: 'wkappbot taskkill /IM wkappbot-core.exe' (shows classification), then 'wkappbot taskkill --force <pid,...>' for confirmed zombies. After cleanup, retry the Agent dispatch.",
+    "PREVENTION: Check for zombie processes before each major delegation session with 'wkjobs -Leaks'. The guard fires with a 30-minute age threshold -- processes older than that with no output are zombies. The 95% RAM watchdog provides backup protection."
+  ],
+  "comments": null,
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read agent-leak-guard",
+      "expect": "zombie agent procs exist",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wkappbot-taskkill-usage",
+      "expect": "taskkill routing",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read harness-active-model-scoping",
+      "expect": "P6",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-11T07:33:25.5844328Z",
+  "updated": "2026-06-11T07:33:25.5844433Z",
+  "version": "1.0"
+}

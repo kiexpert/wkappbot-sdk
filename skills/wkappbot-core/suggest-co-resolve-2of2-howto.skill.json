@@ -1,0 +1,44 @@
+{
+  "id": "suggest-co-resolve-2of2-howto",
+  "app": "wkappbot-core",
+  "title": "Suggest Co-Resolve 2-of-2: Usage Recipes",
+  "title_ko": null,
+  "desc": "Step-by-step recipes for the 2-of-2 co-resolve flow.",
+  "steps": [
+    "1st PARTY RESOLVE: wkappbot suggest resolve TS note results in HALF state with evidence stored.@@SUGGESTER CHECK: wkappbot suggest check TS runs evidence script and requirements. PASS offers confirm; FAIL blocks.@@MANUAL 2nd CONFIRM: wkappbot suggest check TS --confirm auto-confirms after PASS only.@@HISTORY: written to both hq and project history jsonl files.@@DGWCS LIMITATION: resolve --confirm on DGWCS entries returns No suggestion found (known bug #19).@@See also: suggest-co-resolve-2of2 (T1 core)"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read suggest-co-resolve-2of2-howto",
+      "expect": "1st PARTY",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read suggest-co-resolve-2of2-howto",
+      "expect": "SUGGESTER CHECK",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read suggest-co-resolve-2of2-howto",
+      "expect": "MANUAL",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "suggest",
+    "co-resolve",
+    "2of2",
+    "confirm",
+    "check",
+    "resolve",
+    "howto",
+    "recipe"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-26T07:18:13.0358257Z",
+  "updated": "2026-06-26T07:18:13.0358372Z",
+  "version": "1.0"
+}

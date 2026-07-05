@@ -1,0 +1,48 @@
+{
+  "id": "wkappbot-workflow-appbot-shared-reflection",
+  "app": "wkappbot-workflow",
+  "title": "AppBot Shared Reflection",
+  "title_ko": null,
+  "desc": "Shared AppBot reflection skill for recurring machine fixes, cross-intelligence lessons, and durable knowledge promotion.",
+  "steps": [
+    "Trigger this skill only for lessons that genuinely apply across multiple families, such as hook routing, binary health checks, encoding boundaries, or shared guard behavior.",
+    "Capture four facts: symptom, root cause class, fix, and proof. Keep the note short, factual, and reusable.",
+    "Keep the rule model-neutral and family-neutral. Do not mention a single model as the owner unless the lesson truly affects all families.",
+    "Prefer the shared skill for cross-family invariants only. Put family-specific workarounds in the family skill instead.",
+    "If the lesson can be expressed as a generic prevention rule, write that rule. If it depends on one model's quirks, do not put it here.",
+    "2026-06-14 lesson: route selection and health checks must be validated from the real executable path and the active family, not from a shared guess about identity.",
+    "2026-06-14 lesson: an exit 1 from a hook usually means a guard chain. Separate the failing layer before labeling the whole harness broken."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read on-load",
+      "expect": "records family-aware mandatory reflex gating",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read codex-cli-wkappbot-usage",
+      "expect": "records direct codex.exe smoke tests and wkagent-name identity checks",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read gpt-mini-reflection",
+      "expect": "keeps guard-chain lessons model-specific instead of shared by accident",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "appbot",
+    "reflection",
+    "incident",
+    "recurrence",
+    "shared",
+    "model-neutral"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-14T06:49:34.4101265Z",
+  "updated": "2026-06-14T06:53:37.0622664Z",
+  "version": "1.2"
+}

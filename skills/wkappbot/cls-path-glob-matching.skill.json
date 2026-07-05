@@ -1,0 +1,37 @@
+{
+  "id": "cls-path-glob-matching",
+  "app": "wkappbot",
+  "title": "cls glob-path: ancestor search and depth patterns",
+  "desc": "cls ancestor path glob matching for a11y find",
+  "steps": [
+    "cls:\u0027X\u0027 finds X AND all descendants",
+    "cls:\u0027A/B\u0027 path matching, each segment substring",
+    "cls:\u0027**/B\u0027 any depth",
+    "cls:\u0027A/**\u0027 all children"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot a11y find \u0022{cls:\u0027_NKHeroMainClass\u0027}\u0022",
+      "expect": "finds children",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot a11y find \u0022{cls:\u0027**/Dialog*\u0027}\u0022",
+      "expect": "any depth dialogs",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot file grep \u0027MatchClassPath\u0027 --path csharp/src/WKAppBot.Win32/Window/WindowFinder.cs",
+      "expect": "match",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-24T13:46:17.128875Z",
+  "updated": "2026-04-24T13:46:17.1288838Z",
+  "version": "1.0"
+}

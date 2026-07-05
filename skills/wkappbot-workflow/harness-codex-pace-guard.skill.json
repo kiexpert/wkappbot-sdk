@@ -1,0 +1,46 @@
+{
+  "id": "harness-codex-pace-guard",
+  "app": "wkappbot-workflow",
+  "title": "harness: codex-pace-guard (Codex over weekly threshold)",
+  "title_ko": null,
+  "desc": "Blocks codex exec when Codex token usage exceeds the weekly threshold. Redirects to Haiku or waits for reset.",
+  "steps": [
+    "SAFETY: Fires when Codex weekly token usage exceeds the configured block threshold (read from codex_measured_limit.json, default 3M tokens). Prevents runaway Codex spend when the budget is exhausted.",
+    "SOLUTION: switch to --model haiku for the immediate task, OR wait for the weekly reset (Thursday 18:00 KST). Haiku covers most read/survey/search tasks Codex handles.",
+    "PREVENTION: monitor Codex pace via wkdoctor (per-family pace dashboard). At ~80 percent of the weekly budget switch non-critical tasks to Haiku; the 95 percent circuit breaker speaks an alert before the hard block.",
+    "CURRENT STATE + KNOWN BUG (2026-06-29): the weekly percent can read GARBAGE (e.g. 344 percent, limit=2M) because codex_balance.json source=sqlite-auto carries USED tokens only -- no remainingPct and no limit -- so the hardcoded 2M fallback overflows. The data-driven fix (dynLimitM back-calc + anomaly-triggered CLI re-scrape via the wkstdpty /status writer + the display-honesty UNVERIFIED diff) lives in harness-codex-pace-guard-howto; the dated root-cause and the live blockers (missing ConPTY .cs, dangling codex.exe symlink) live in harness-codex-pace-guard-ref. Do NOT confabulate a limit number -- use the dashboard remainingPct or the observed faint-point, both real data.",
+    "NAVIGATION: build recipes, the dynLimitM formula, the remainingPct-vs-usedPct parsing semantic, and the 7-change display diff -> wkappbot skill read harness-codex-pace-guard-howto. Dated incidents, forensics, and blockers -> wkappbot skill read harness-codex-pace-guard-ref. Both are part of this cluster. Cross: harness-active-model-scoping, guard-feeding-cache-confirm-before-block, wk-tool-sub-1s-response-time-mandate."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read harness-codex-pace-guard",
+      "expect": "Codex over threshold",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wkharness-guards",
+      "expect": "GUARD CLUSTER",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read harness-active-model-scoping",
+      "expect": "P6",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "harness",
+    "gate",
+    "codex",
+    "pace",
+    "budget",
+    "quota"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-11T08:09:52.0140416Z",
+  "updated": "2026-06-29T14:43:33.7664527Z",
+  "version": "1.19"
+}

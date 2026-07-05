@@ -1,0 +1,44 @@
+{
+  "id": "a11y-focus-tier-chain-howto",
+  "app": "wkappbot-workflow",
+  "title": "a11y focus tier chain: implementation detail (howto)",
+  "title_ko": null,
+  "desc": "T2 howto for a11y-focus-tier-chain. Overlay guard, source files, focusless-first principle detail, and full common-pitfalls examples for the SmartSetWindowOrder / focus-tier chain.",
+  "steps": [
+    "OVERLAY GUARD + SOURCE FILES",
+    "SuppressFullscreenOpaqueOverlays [A11yCommand.WindowActions.cs]: pre-check on every a11y command. Samples 5 pixels (center + 4 quadrant centers) on every visible window >= 80% work area. avg brightness < 80/765 -> force alpha=0 (WS_EX_LAYERED) OR SW_MINIMIZE (non-layered). Same HWND suppressed >= 4 times -> kill the process. Logs [OVERLAY-GUARD] to stderr. Handles NVIDIA GeForce Overlay, TextInputHost, and any unknown black fullscreen overlays. SOURCE FILES: A11yCommand.WindowActions.cs (SmartSetWindowOrder, PlaceRootBehindForeground, A11yFocus, SuppressFullscreenOpaqueOverlays), A11yActions.Focus.cs (A11yFocusElement, FindRootWindow, TryCdpFocus), A11yCommand.cs:1907 (write action pre-focus injection, 10 actions)",
+    "FOCUSLESS-FIRST PRINCIPLE: UIA Invoke/SetValue/Toggle/Select/Scroll are inherently focusless -- no window activation needed. SendInput and WM_CHAR (some) require keyboard focus. SmartSetWindowOrder (Z-order) is separate from keyboard focus -- correct Z-order (rank 2) is possible without keyboard focus. The focus tier chain (Tier 0-3) sets keyboard focus on the element; SmartSetWindowOrder ensures the window is visible. Both are focusless from the USER perspective -- the user active window (rank 1) is never disrupted",
+    "COMMON PITFALLS (full): DO NOT use SetForegroundWindow -- steals keyboard focus, triggers WM_ACTIVATE, disrupts user. DO NOT use BringWindowToTop on root windows -- use PlaceRootBehindForeground instead. DO NOT skip topmost strip -- if WS_EX_TOPMOST is set, rank-2 placement has no effect. DO NOT assume GetParent equals owner -- popup/dialog owners use GW_OWNER (GetWindow), not GetParent. DO NOT skip iconic check inside SmartSetWindowOrder -- child BringWindowToTop on a minimized parent creates a ghost MDI entry with no visible surface. DO always pass SWP_NOACTIVATE with SetWindowPos Z-order changes. DO call SmartSetWindowOrder before element focus tiers (Tier -1 in A11yFocusElement)."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read a11y-focus-tier-chain-howto",
+      "expect": "OVERLAY GUARD",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read a11y-focus-tier-chain-howto",
+      "expect": "FOCUSLESS-FIRST",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read a11y-focus-tier-chain-howto",
+      "expect": "COMMON PITFALLS",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "a11y",
+    "focus",
+    "howto",
+    "overlay",
+    "pitfalls"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-07-02T07:22:42.2385961Z",
+  "updated": "2026-07-02T07:22:42.2386111Z",
+  "version": "1.0"
+}

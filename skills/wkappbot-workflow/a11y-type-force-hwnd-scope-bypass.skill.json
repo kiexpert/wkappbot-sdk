@@ -1,0 +1,24 @@
+{
+  "id": "a11y-type-force-hwnd-scope-bypass",
+  "app": "wkappbot-workflow",
+  "title": "A11y Type: --force Bypasses Disabled Gate; hwnd: Skips Scope Guard",
+  "title_ko": null,
+  "desc": "When hwnd: is in the grap, CheckMissingScope is skipped. When --force is passed, ReadinessContext.Force=true bypasses IsEnabled/IsVisible/ReadOnly gates in ActionReadiness for both Win32 and CDP paths.",
+  "steps": [
+    "hwnd: in grap (e.g. {proc:\u0027app\u0027,hwnd:0x1234}) bypasses CheckMissingScope. Regex \u0027hwnd\\s*[:=]\\s*0x[0-9A-Fa-f]\u002B\u0027 early-returns the scope guard. This allows direct WM_CHAR injection to a specific hwnd without needing a #scope ancestor.",
+    "--force flag sets ReadinessContext.Force=true. In ActionReadiness.cs (Win32) and CdpActionReadiness.cs (CDP), the IsEnabled/IsVisible/ReadOnly blocking checks are wrapped with \u0027!ctx.Force\u0027. The warning message hints \u0027--force to override\u0027 when the element is disabled.",
+    "Use case: HTS/Heroes4 controls that report IsEnabled=False but accept WM_CHAR input. Use: \u0027wkappbot --sudo a11y type {proc:\u0022nfrunlite\u0022,hwnd:0xABCD} text --force\u0027. Both guards are now bypassed.",
+    "Verified 2026-04-21: test-a11y-type-force-hwnd.sh (resolve ts=2026-04-21T17:55)",
+    "Elevated #32770 PIN Edit fix (2026-05-01): 3 root causes resolved -- (1) IsAncestorWindow in A11yCommand\u002BActionReadiness prevents parent-window-as-blocker abort; (2) SetFocus(pinEditHwnd) targets specific Edit control before SendKeys; (3) VerifyEditCharsEntered via WM_GETTEXTLENGTH confirms chars landed \u002B pre-clears before retry. Use --sudo for elevated dialogs.",
+    "Elevated #32770 PIN Edit fix (2026-05-01): 3 root causes resolved -- (1) IsAncestorWindow in A11yCommand\u002BActionReadiness prevents parent-window-as-blocker abort; (2) SetFocus(pinEditHwnd) targets specific Edit control before SendKeys; (3) VerifyEditCharsEntered via WM_GETTEXTLENGTH confirms chars landed \u002B pre-clears before retry. Use --sudo for elevated dialogs."
+  ],
+  "requirements": null,
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-21T18:38:26.0956441Z",
+  "updated": "2026-05-02T05:28:59.782819Z",
+  "version": "1.6"
+}

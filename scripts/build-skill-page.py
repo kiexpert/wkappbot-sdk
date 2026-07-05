@@ -43,11 +43,15 @@ EXCLUDED_APPS = (
     "senior",
     "unemployment",
     "youtube-trader",
+    "wkappbot-kih",
+    "wkappbot-test",
 )
 
 SENSITIVE_PATTERNS = (
     re.compile(r"\b[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}\b"),
     re.compile(r"\b\d{8,}\b"),
+    re.compile(r"\b01[0-9]-?\d{3,4}-?\d{4}\b"),
+    re.compile(r"(?i)\bpin\b[^\n]{0,20}\b\d{4,7}\b"),
     re.compile(r"\b(?=[A-Za-z0-9+/_=-]{32,}\b)(?=[A-Za-z0-9+/_=-]*[A-Z])(?=[A-Za-z0-9+/_=-]*\d)[A-Za-z0-9+/_=-]+\b"),
 )
 

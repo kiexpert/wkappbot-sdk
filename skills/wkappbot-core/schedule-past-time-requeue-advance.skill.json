@@ -1,0 +1,22 @@
+{
+  "id": "schedule-past-time-requeue-advance",
+  "app": "wkappbot-core",
+  "title": "Schedule past-time re-queue advance fix",
+  "title_ko": null,
+  "desc": "Eye schedule: when next_fire <= now after a missed/unconfirmed run, advance execute_at by additional intervals until next_fire > now before re-queuing. Prevents indefinite replay of past-time triggers.",
+  "steps": [
+    "Bug: recurring schedule (e.g. 00:00 daily) re-queues same trigger forever when run_count not incremented -- next_fire stays in the past, Eye delivers identical trigger hundreds of times sequentially.",
+    "Root cause: after fire, next_fire = last_fire + interval. If confirmation missed, next_fire <= now, so Eye immediately re-queues without advancing.",
+    "Fix: after computing next_fire = last_fire + interval, loop: while (next_fire <= now) next_fire += interval. Write advanced next_fire back to queue.",
+    "Verified by SDK Claude (DG-wkappbot-sdk suggest 2026-05-02T17:17): evidence script confirmed fix present and regression-free."
+  ],
+  "requirements": null,
+  "primary_cmd": null,
+  "tags": ["schedule", "eye", "re-queue", "past-time", "advance", "bug-fix"],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-03T13:17:00.0000000Z",
+  "updated": "2026-05-03T13:17:00.0000000Z",
+  "version": "1.0"
+}

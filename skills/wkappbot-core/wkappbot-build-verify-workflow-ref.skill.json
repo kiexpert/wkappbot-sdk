@@ -1,0 +1,38 @@
+{
+  "id": "wkappbot-build-verify-workflow-ref",
+  "app": "wkappbot-core",
+  "title": "WKAppBot Build Verify Workflow T3 Reference",
+  "title_ko": null,
+  "desc": "T3 reference tier. Chrome placement tolerance, skill sync rule, BUG-AUTO history.",
+  "steps": [
+    "CHROME PLACEMENT TOLERANCE: DeltaSizeThreshold >= 30px (SDK Launcher PlacementValidate.cs). Core uses PlacementValidationTolerancePx=50. 10 was too tight -- Chrome outer window 18px narrower due to frame drift.",
+    "DEPLOY ALL THREE detail: Copy-Item good.exe wkappbot-core.exe -Force; Copy-Item good.exe wkappbot-core.new.exe -Force; Copy-Item good.exe wkappbot-core.exe.bak -Force. FSW watches .new.exe for hot-swap.",
+    "2026-04-30: BUG-AUTOs #66 PUMP, #67 diagnostics, #76 stderr -- low severity, covered by build verify workflow.",
+    "Skill sync split-brain: MAINTAINER must resolve ALL conflicts immediately. wkappbot skill sync --resolve <id> for each. HQ copy always wins. Never leave pending -- downstream repos silently diverge."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read wkappbot-build-verify-workflow-ref",
+      "expect": "T3 reference",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wkappbot-build-verify-workflow",
+      "expect": "T1 core",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wkappbot-build-verify-workflow-howto",
+      "expect": "T2 howto",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-31T12:40:24.7976334Z",
+  "updated": "2026-05-31T12:40:24.7976425Z",
+  "version": "1.0"
+}

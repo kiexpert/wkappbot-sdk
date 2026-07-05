@@ -1,0 +1,45 @@
+{
+  "id": "file-command-cheatsheet-howto",
+  "app": "wkappbot-workflow",
+  "title": "file cheatsheet how-to",
+  "title_ko": null,
+  "desc": "T2 usage recipes for wkappbot file tools: read/write/edit, glob, grep, batch edits.",
+  "steps": [
+    "READ WRITE EDIT: wkappbot file read PATH; wkappbot file write PATH with content; wkappbot file edit auto-creates a .bak backup and is encoding-safe (use it instead of sed or awk for multi-file or CP949-risky edits).",
+    "GLOB: wkappbot file glob MUST use the double-star slash prefix to recurse; without it only the top directory matches.",
+    "GREP: wkappbot file grep with a regex and a path searches in-process; it is the robust fallback when the built-in Grep fails under load (see the ref tier).",
+    "BATCH MULTI-FILE: prefer wkappbot file edit or wkedit for atomic multi-file edits; never use python or sed for batch source edits because of CRLF and encoding corruption."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read file-command-cheatsheet-howto",
+      "expect": "file tool recipes",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read file-command-cheatsheet",
+      "expect": "file tool core",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill search file grep",
+      "expect": "file cheatsheet cluster",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "file",
+    "howto",
+    "edit",
+    "glob",
+    "grep",
+    "wkappbot"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-03T22:16:36.4328111Z",
+  "updated": "2026-06-03T22:16:36.4328318Z",
+  "version": "1.0"
+}

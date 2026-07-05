@@ -1,0 +1,21 @@
+{
+  "id": "hn-ui-automata-windows-desktop-automation-for-ai-agents-ai-computer-use-pattern-reference",
+  "app": "wkappbot-workflow",
+  "title": "[HN] UI Automata \u2013 Windows Desktop Automation for AI Agents \u2014 AI computer-use pattern reference",
+  "desc": "Compare UIA traversal and fallback strategy against WKAppBot\u0027s 5-tier element search to identify gaps or borrowable patterns. Source: https://automata.visioncortex.org/blog/introducing-ui-automata/ (score=5, auto-generated from ai-news-briefing 2026-04-23 11:24)",
+  "steps": [
+    "SOURCE: UI Automata \u2013 Windows Desktop Automation for AI Agents -- https://automata.visioncortex.org/blog/introducing-ui-automata/"
+  ],
+  "tags": [
+    "ai-news",
+    "computer-use",
+    "auto-skill",
+    "hn"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-22T22:10:32.7586712Z",
+  "updated": "2026-04-23T02:24:30.3751303Z",
+  "version": "1.2"
+}

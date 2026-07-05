@@ -1,0 +1,23 @@
+{
+  "id": "a11y-click-react-fiber-cdp-trusted-fallback",
+  "app": "wkappbot-core",
+  "title": "A11y Click: React Fiber \u002B CDP Trusted Click Fallback for Chrome SPAs",
+  "title_ko": null,
+  "desc": "Chrome React SPA buttons expose UIA Invoke but fire no trusted event. Fallback chain: LegacyIA -\u003E WM_LBUTTON -\u003E TryCdpTrustedClick (Input.dispatchMouseEvent) -\u003E TryReactFiberClickAsync (__reactProps.onClick direct call). Deployed commit a575bece.",
+  "steps": [
+    "CLI click tier order in A11yActions.Click.cs: (1) LegacyIA.DoDefaultAction() focusless, (2) WM_LBUTTON to element hwnd, (3) TryElectronSurfaceClick() WM_LBUTTON to Chrome_RenderWidgetHostHWND, (4) TryCdpTrustedClick() Input.dispatchMouseEvent isTrusted=true, (5) TryReactFiberClickAsync() __reactProps.onClick JS call.",
+    "TryCdpTrustedClick() verifies success via pixel-diff check (\u003E2% change = ok). If click verified, returns immediately. TryReactFiberClickAsync() calls __reactFiber.memoizedProps.onClick for React-controlled buttons where isTrusted enforcement blocks CDP dispatchMouseEvent.",
+    "Known gap: Scenario/ActionExecutor path does NOT include CDP or React fiber tiers -- only UIA Invoke \u002B element-rect SendInput. If Invoke silently succeeds on React buttons (S_OK but no DOM event), the action returns prematurely. Full fix pending; CLI path already handles this.",
+    "Verified 2026-04-22: test-a11y-find-click-react-fiber-fallback.sh (resolve ts=2026-04-21T10:46)",
+    "2026-04-30: invoke action now uses AutoApproveYield=true -- bypasses user-active callout for focusless InvokePattern operations (commit c3c48225)"
+  ],
+  "requirements": null,
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-22T03:14:23.3634447Z",
+  "updated": "2026-04-30T16:42:54.3274262Z",
+  "version": "1.5"
+}

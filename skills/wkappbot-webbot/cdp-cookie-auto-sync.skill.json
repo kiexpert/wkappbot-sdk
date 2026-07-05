@@ -1,0 +1,62 @@
+{
+  "id": "cdp-cookie-auto-sync",
+  "app": "wkappbot-webbot",
+  "title": "CDP auto cookie save/restore per domain",
+  "title_ko": null,
+  "desc": "CDP auto cookie save/restore per domain -- transparent login session persistence across cdp open/navigate",
+  "steps": [
+    "AUTO-SAVE: After every cdp open and cdp navigate, cookies for that domain are automatically saved to {DataDir}/cookies/{domain}.cookie.txt (JSON CDP cookie objects). No manual command needed.",
+    "AUTO-LOAD (1st tier): Before any navigation, if {domain}.cookie.txt exists, calls Network.setCookies to inject cookies into Chrome session -- page loads with cookies already set.",
+    "AUTO-VERIFY (2nd tier): After navigation, compares actual cookie count vs saved. If >= 80% present, session is healthy -- no action.",
+    "AUTO-RELOAD (3rd tier): If cookie count < 80% of saved (deficit), re-injects from file (Network.setCookies) AND reloads page (NavigateAsync). Survives page-initiated cookie clears.",
+    "MANUAL SAVE: wkappbot cdp cookies save [--domain HOST] {proc:'chrome',cdp:PORT} -- explicit save to file.",
+    "MANUAL LOAD: wkappbot cdp cookies load [--domain HOST] {proc:'chrome',cdp:PORT} -- explicit restore from file.",
+    "FILE LOCATION: {DataDir}/cookies/{domain}.cookie.txt e.g. bin/wkappbot.hq/cookies/chatgpt.com.cookie.txt. One file per domain.",
+    "SILENT: All auto ops non-fatal. Errors on stderr as [COOKIES:AUTO]. Never blocks caller.",
+    "DOMAIN DETECTION: Extracted from URL via Uri.Host. Falls back to cdp.GetUrlAsync() if URL unknown.",
+    "USE CASE: Login sessions for ChatGPT, Gemini, Naver etc. survive cdp open calls without manual cookie setup.",
+    "FILE PATH: CookieFilePath(domain) helper returns Path.Combine(DataDir, 'cookies', domain + '.cookie.txt') -- all cookie files live in {DataDir}/cookies/ subfolder, not DataDir root",
+    "FILE LOCATION (corrected): {WkHq.GetHqDir()}/chrome-profiles/cookies/{domain}.cookie.txt e.g. D:/GitHub/WKAppBot/bin/wkappbot.hq/chrome-profiles/cookies/nid.naver.com.cookie.txt. DataDir is now stable via WkHq.GetHqDir() (Process.MainModule path) -- no longer volatile Temp dir.",
+    "AUTO-SAVE FULL FLOW: (1) Network.getAllCookies -> all cookies with full metadata incl HttpOnly. (2) MergeJsCookies: Runtime.evaluate('document.cookie') -> parse k=v pairs -> update CDP cookie values with latest JS values -> add JS-only non-HttpOnly cookies. (3) Group ALL cookies by domain. (4) Save each domain group to chrome-profiles/cookies/{domain}.cookie.txt. Log: [COOKIES:AUTO] Saved N across M domains + [COOKIES:JS] N keys merged.",
+    "AUTO-LOAD FULL FLOW: (1) CookieFilePath(domain) -> read JSON. (2) NormalizeCookiesForInject: SameSite=None -> secure=true, remove session/size fields. (3) 404-staging: navigate to scheme://host/__wk_stage__ + sleep 400ms to establish correct HTTPS domain context for CHIPS/SameSite. (4) Network.setCookies. Log: [COOKIES:AUTO] Loaded N cookie(s) for domain.",
+    "SAVE SCOPE: ALL cookies in Chrome profile are saved (not filtered by current domain). Network.getAllCookies returns entire profile cookie DB. Each domain gets its own file. Ad tracker cookies are saved too -- no filter, because filtering causes bugs (cannot predict which domains OAuth needs).",
+    "NORMALIZE: NormalizeCookiesForInject strips session=true and size fields before setCookies. Forces secure=true when sameSite=None to meet Chrome SameSite=None+Secure requirement. Applied in AutoCookieLoad, AutoCookieVerifyAndReload, WebCookiesLoad.",
+    "MAIN-PAGE STAGING UPGRADE (design): Replace 404-staging (/__wk_stage__ + sleep 400ms) in AutoCookieLoad with main-page staging. NEW FLOW: (1) cdp open scheme://host/ -> new lightweight tab on domain main page (no login required, establishes correct HTTPS+CHIPS domain context). (2) WaitForLoadAsync (Page.loadEventFired) instead of sleep 400ms -- reliable, not time-based. (3) Network.setCookies with NormalizeCookiesForInject array. (4) Caller then cdp navigate to actual target URL. WHY BETTER: (a) Main page guaranteed to load without redirect (unlike 404 which may redirect to /login on some sites). (b) WaitForLoad vs sleep 400ms = reliable domain context establishment. (c) New tab via cdp open bypasses stalled existing tabs naturally. (d) Consistent with 404-staging goals but more robust. IMPLEMENTATION: WebCookiesCommand.cs AutoCookieLoad -- replace NavigateAsync(__wk_stage__)+Delay(400) with NavigateAsync(/)+WaitForLoadAsync(). Add fallback: if main page redirects to login (detect by URL change != host/), fall back to 404-staging. CdpClient.WaitForLoadAsync already exists (Page.loadEventFired subscriber pattern)."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot cdp cookies save",
+      "expect": "[COOKIES:SAVE]",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot cdp cookies load",
+      "expect": "[COOKIES:LOAD]",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot cdp open https://chatgpt.com",
+      "expect": "[COOKIES:AUTO]",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "cdp",
+    "cookie",
+    "save",
+    "load",
+    "auto",
+    "domain",
+    "session",
+    "login",
+    "restore",
+    "sync"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-21T05:19:45.9518443Z",
+  "updated": "2026-05-23T12:46:30.0732679Z",
+  "version": "1.8"
+}

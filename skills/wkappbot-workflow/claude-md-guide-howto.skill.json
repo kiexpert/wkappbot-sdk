@@ -1,0 +1,39 @@
+{
+  "id": "claude-md-guide-howto",
+  "app": "wkappbot-workflow",
+  "title": "CLAUDE.md how-to: edit, bootstrap, triage",
+  "title_ko": null,
+  "desc": "How-to tier for claude-md-guide: editing, project bootstrap, business-hours triage",
+  "steps": [
+    "BUSINESS-HOURS TRIAGE ORDER: 1=EMERGENCY ACTION 2=PROBLEM SOLVING 3=RECURRENCE PREVENTION. Step 3 mandatory. next:claude-md-guide"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read claude-md-guide-howto",
+      "expect": "HOW TO EDIT",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read claude-md-guide-howto",
+      "expect": "SHARED MARKDOWN",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read claude-md-guide-howto",
+      "expect": "BUSINESS-HOURS",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "claude-md",
+    "guide",
+    "howto"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-07-01T13:00:51.3487569Z",
+  "updated": "2026-07-01T13:00:51.3829872Z",
+  "version": "1.1"
+}

@@ -1,0 +1,40 @@
+{
+  "id": "adb-android-automation-was-intentionally-stripped-from-main-docs-still-stale",
+  "app": "wkappbot-workflow",
+  "title": "ADB Android automation was intentionally stripped from main, docs still stale",
+  "title_ko": null,
+  "desc": "root cause + restoration scope for suggest ts=2026-07-01T12:07:05/12:06:35 (adb:// routing appears broken)",
+  "steps": [
+    "ROOT CAUSE CONFIRMED 2026-07-05: commit d4efb8198 (2026-04-21, 'chore: strip Vision/Android core IP for public release', co-authored with Claude Opus 4.7) deleted the ENTIRE WKAppBot.Android + WKAppBot.Vision projects from main (14663 lines: AdbClient.cs, AdbGrapRouter.cs, AdbDeviceRegistry.cs, AdbExperienceDb.cs, AndroidA11yTree.cs, AdbActionReadiness.cs + A11yAdbActions.cs/.Helpers.cs/.Interact.cs (3 files) + all Vision/OCR analyzer + hack-command overlay + chart analysis files). VisionStubs.cs (327 lines) was added as a compile-only stub.",
+    "DOCS NEVER UPDATED: grap.skill.json, McpDescriptions.cs, CommandHelp.Entries.A11y.cs, AgentsPolicy.cs/agent-policy.txt all still advertise adb:// as a working Android automation route -- this is what makes it LOOK like a routing bug rather than a stripped feature. AppBotProgramInfra.cs:155 has a leftover adb:// string-parsing stub but it is ONLY used for log-folder naming, not actual routing.",
+    "USER CONFIRMED 2026-07-05: this feature WAS fully implemented and should still work -- the strip commit's target was likely meant for a public-release sync only, not main, so restoring it on main is probably correct, but the blast radius is large enough (2 whole projects, VisionStubs.cs removal, re-merging Program.cs/A11yCommand.cs/FileToolCommands.Glob.cs which were ALSO modified in the same strip commit) that explicit go-ahead + a dedicated restoration pass is needed before touching code.",
+    "RESTORE PROCEDURE (when authorized): git show d4efb8198^:<path> for each of the 14 deleted files + the pre-strip versions of Program.cs/A11yCommand.cs/FileToolCommands.Glob.cs/WKAppBot.CLI.csproj/WKAppBot.sln, restore WKAppBot.Android.csproj + WKAppBot.Vision.csproj, remove VisionStubs.cs, verify full solution build, smoke-test adb:// routing with a real connected device before closing the suggest.",
+    "RESTORATION IN PROGRESS 2026-07-05 (user authorized full restore): 33 deleted files checked out from d4efb8198^ via git checkout <commit> -- <paths> (efficient, no per-file manual copy needed). CRITICAL CORRECTION mid-restore: a LATER commit 4784e1bc7 (2026-07-02, Sonnet WIP) had ALREADY partially restored 5 OCR-focused files (SimpleOcrAnalyzer.cs, OcrSegmentCache.cs, OcrCorrectionDb.cs, VisionCache.cs, VisionCacheEntry.cs, WKAppBot.Vision.csproj) with a NEWER/different approach -- my initial blind checkout from d4efb8198^ clobbered that newer work with the OLD pre-strip version; caught it via git status showing M instead of A and git log showing the WIP commit, reverted via git checkout HEAD -- <those 6 files> before it could compound. LESSON: before bulk-restoring N deleted files from a historical commit, check git log for EACH file first (not just the ones that show as fully missing) -- a file can look deleted-since-strip in one diff view while actually having been PARTIALLY re-created by a later, different commit. WKAppBot.sln required manual line-by-line re-insertion (not blind file replace) since 4 unrelated plugin projects were added to it after the strip. Program.Dispatch.cs's disabled dispatch comments were fully cleaned up by a later refactor (no comment markers survived) -- had to re-add scan/snapshot/form-dump/chart-analyze/tooltip-probe/analyze-hack as fresh active entries after confirming their target methods exist in the restored command files.",
+    "BUILD ITERATION 2026-07-05: after adding all missing ProjectReferences (CLI->Vision, CLI->Android) and shared-file Compile-Includes (Android.csproj was missing AppBotPipe.SpawnGuard.cs and ProjectRoot.cs, added after the strip commit's original Android.csproj snapshot), the remaining errors were all in FileToolCommands.Glob.cs -- SimpleOcrAnalyzer type not found despite the correct ProjectReference being present. ROOT CAUSE: C# requires an explicit 'using WKAppBot.Vision;' statement even with a valid project reference -- the reference alone does not implicitly bring types into scope. This file's using-block predates the Vision restore and never had this using line. General lesson for this restoration: a missing ProjectReference and a missing using-directive produce the IDENTICAL CS0246 error message, so when a type-not-found error persists after confirming the project reference is correct, check the file's own using statements next before assuming the reference addition failed."
+  ],
+  "requirements": [
+    {
+      "cmd": "git log --oneline main -- csharp/src/WKAppBot.CLI/Commands/A11yAdbActions.cs",
+      "expect": "shows d4efb8198 as the removal commit",
+      "prompt": null
+    },
+    {
+      "cmd": "git show --stat d4efb8198",
+      "expect": "shows WKAppBot.Android and WKAppBot.Vision projects deleted",
+      "prompt": null
+    },
+    {
+      "cmd": "proposed: after restore, wkappbot a11y find 'adb://*'",
+      "expect": "lists at least one connected device",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-07-05T04:42:32.9476357Z",
+  "updated": "2026-07-05T05:49:37.2672112Z",
+  "version": "1.3"
+}

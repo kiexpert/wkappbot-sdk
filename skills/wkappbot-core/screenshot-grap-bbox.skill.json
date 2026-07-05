@@ -1,0 +1,55 @@
+{
+  "id": "screenshot-grap-bbox",
+  "app": "wkappbot-core",
+  "title": "screenshot: smart multi-grap compositing with painter\u0027s algorithm",
+  "desc": "Per-target PrintWindow\u002BCopyFromScreen compositing, back-to-front Z-order, transparency mask outside targets. Ambiguous grap shows merged ranked find output. Grap required -- token-efficient auto-crop.",
+  "steps": [
+    "Grap args required (no-args = usage \u002B exit 1). Auto-crops to exact target regions.",
+    "Each grap resolved via WindowFinder: MUST match EXACTLY 1 window. If ANY grap ambiguous (2\u002B matches): merged ranked output across ALL graps, sorted by Coverage*0.6 \u002B (1/(1\u002BzHops))*0.4, BEST/AMB tags with [grap:...] label, exit 2.",
+    "Phase 1 per target: TryPrintWindowOnly(PW_RENDERFULLCONTENT) -- focusless, works even if occluded by other windows",
+    "Phase 2 GPU-blank targets only: SuppressBlockingWindows alpha=0 (30ms settle), CaptureScreenRegion per target, restore. Root ancestors of child targets never suppressed.",
+    "Phase 3 compositing: OrderTargetsBackToFront via GW_HWNDPREV hop count (painter\u0027s algorithm) -\u003E DrawImage back-to-front into union bbox",
+    "Masking: pixels outside ALL target rects -\u003E 0x00000000 (BGRA all zero, fully transparent)",
+    "a11y screenshot multi-node: grap resolves UIA elements (BoundingRectangle), groups by root window, processes windows front-to-back. Per window: suppress all windows above (SetLayeredWindowAttributes alpha=0, 30ms settle), PrintWindow/CaptureScreenRegion, crop to element BoundingRectangle, restore alpha. Composite all crops back-to-front into union bbox. Mask pixels outside ALL target rects. Falls back to full window if BoundingRectangle unavailable."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot screenshot \u0027*exact-title*\u0027 --out f.png",
+      "expect": "# SCREENSHOT path=f.png rect=L,T,R,B exit=0",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot screenshot \u0027*grap1*\u0027 \u0027*grap2*\u0027",
+      "expect": "composites both back-to-front, pixels outside rects = 0x00000000 transparent",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot screenshot \u0027*ambiguous*\u0027",
+      "expect": "exit 2, BEST/AMB ranked list sorted by Coverage*0.6\u002BzScore*0.4 with [grap:...] tags",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot screenshot \u0027*gpu-window*\u0027",
+      "expect": "non-target blocking windows suppressed alpha=0 before CaptureScreenRegion, restored after",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot screenshot \u0027*child-a*\u0027 \u0027*child-b*\u0027 (different root windows)",
+      "expect": "GA_ROOT ancestors not suppressed, Z-order preserved",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot screenshot (no args)",
+      "expect": "usage printed exit 1 -- full screen forbidden (token noise)",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-26T15:10:34.3085419Z",
+  "updated": "2026-04-28T05:06:49.8772342Z",
+  "version": "1.6"
+}

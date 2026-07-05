@@ -1,0 +1,28 @@
+{
+  "id": "wkchat-window-geometry-persistence",
+  "app": "wkappbot-core",
+  "title": "wkchat window geometry: save on change + exit + restore on init + shortcut update",
+  "desc": "wkchat must restore terminal window to last-used position/size on startup, save geometry on every move/resize and on exit, and optionally write geometry back into the .lnk shortcut that launched wkappbot.",
+  "steps": [
+    "[REQUIREMENTS] (1) Restore on init: ChatCommand entry -> LoadParentWindowGeo + SetWindowPos before shell. (2) Save on change: SetWinEventHook(EVENT_SYSTEM_MOVESIZEEND) on parent WT HWND -> immediate debounced SaveParentWindowGeo. (3) Save on exit: AppDomain.ProcessExit + Console.CancelKeyPress handler -> SaveParentWindowGeo. (4) Shortcut update (bonus): after save, find the .lnk that launched wkappbot-core.exe via IShellLink COM and write geometry into StartupInfo.",
+    "[EXISTING INFRA] SaveConsoleGeo/LoadConsoleGeo/SaveParentWindowGeo/LoadParentWindowGeo all exist in AppBotEyeCommands.cs:264-370. Eye saves parent geo every 30s (AppBotEyeGlobalMode.cs:1788). Missing: chat init restore, on-change hook (replace 30s poll), exit handler, shortcut write.",
+    "[IMPL PLAN] (1) ChatCommand.cs:22 add TryRestoreTerminalGeometry(LoadParentWindowGeo + SetWindowPos). (2) AppBotEyeGlobalMode.cs: add SetWinEventHook(EVENT_SYSTEM_MOVESIZEEND=0x800B) callback -> SaveParentWindowGeo, keep 30s poll as fallback. (3) Register exit handler at ChatCommand startup. (4) DPI: mirror AppBotEyeCommands.cs:317 ScreenCoords.LogicalToPhysical on restore.",
+    "[SHORTCUT UPDATE] IShellLink COM (Shell32): find .lnk targeting wkappbot-core.exe via Desktop+StartMenu search. Read IShellLink, cast to IShellLinkW, update window style to SW_SHOWNORMAL, IPersistFile.Save. Note: .lnk does not store arbitrary window rect -- store in separate geo JSON instead.",
+    "[DPI MANDATORY] Any code touching SetWindowPos/GetWindowRect/ScreenCoords/LogicalToPhysical MUST be implemented by Opus agent per CLAUDE.md DPI rule. Dispatch: Agent(model:'opus', prompt:'Implement TryRestoreTerminalGeometry in ChatCommand.cs using LoadParentWindowGeo + ScreenCoords.LogicalToPhysical + SetWindowPos, mirroring save side at AppBotEyeCommands.cs:317. Add EVENT_SYSTEM_MOVESIZEEND hook in AppBotEyeGlobalMode.cs to replace 30s poll save. Add ProcessExit+CancelKeyPress handler.')."
+  ],
+  "requirements": [
+    { "cmd": "wkappbot eye tick", "expect": "console_geometry or parent_window_geo present in runtime/", "prompt": null }
+  ],
+  "primary_cmd": null,
+  "tags": ["window-geometry","wkchat","chat","restore","persistence","shortcut","lnk","WM_MOVE","WM_SIZE","exit-handler","DPI","SetWinEventHook"],
+  "source_refs": [
+    { "file": "csharp/src/WKAppBot.CLI/Commands/ChatCommand.cs", "line": 22, "pattern": "ChatCommand" },
+    { "file": "csharp/src/WKAppBot.CLI/Commands/AppBotEyeCommands.cs", "line": 264, "pattern": "SaveConsoleGeo" },
+    { "file": "csharp/src/WKAppBot.CLI/Commands/AppBotEyeGlobalMode.cs", "line": 1788, "pattern": "SaveParentWindowGeo" }
+  ],
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-05T16:11:00.000000Z",
+  "updated": "2026-05-05T16:11:00.000000Z",
+  "version": "1.0"
+}

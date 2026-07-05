@@ -1,0 +1,53 @@
+{
+  "id": "harness-robustness-user-dist-appbot-absent",
+  "app": "wkappbot-workflow",
+  "title": "Harness robustness: work under user-distribution and appbot-absent",
+  "title_ko": null,
+  "desc": "The KI harness (wkharness*.ps1 + sdk .claude guards) must function when user-distributed AND when the wkappbot binary is absent/quarantined. Guards FAIL-OPEN (never hard-block all shell when unable to verify) and verify state via FILES not by spawning the binary. Tracks the 2026-06-07 robustness sweep.",
+  "steps": [
+    "GOAL: harness works under user-distribution AND when wkappbot.exe is absent. No guard may hard-block all Bash/PowerShell, and no guard may depend on SPAWNING the binary.",
+    "ROOT BUG (disabled everything): wkharness.ps1 called Initialize-WkGeminiSession but never dot-sourced wkharness-gemini.ps1 -> every tool call threw -> top-level catch fail-OPEN exit 0 -> the source-edit catch-all/skill-lock NEVER ran. Fixed by adding the dot-source (kih 2fd78f8). Diagnosed by feeding a probe Write JSON to wkharness.ps1.",
+    "PATTERN A fail-open: soft gates (onload, nightly-schedule) WARN+allow, never deny-all, when they cannot verify. PATTERN B binary-independent: verify via FILES (id.skill.json existence, JSONL scan) not by spawning wkappbot.exe. PATTERN C load-order: every dot-sourced fn must load before it is called or a missing load fail-opens the whole harness.",
+    "FIXES 2026-06-07 (kih local commits): gemini dot-source; onload-gate fail-open + any-prefix on-load match; nightly deny->warn; brief-guard skill-ref via file-existence not spawn; Test-WkSkillExists fail-open; busy-fleet exempts .md edits; kih harness:skill pattern powershell/**/ -> tools/wkharness.*ps1 (#f); catch-all SUGGESTION derives real parent dir not ext-hint (#h, 12aaf24); Opus stall 7->9; removed dead Get-WkGeminiStallTier; gemini onload fail-open. sdk wkdoctor -Build pushed.",
+    "VERIFICATION: harness now BLOCKS an unregistered-source Edit/Write (proven: my own Edit returned RC=2 no-skill-rule) AND survives binary-absent; all edited ps1 parse 0 errors.",
+    "NOTE: wkappbot-kih has NO git remote (local-only) -- commits are local but durable. Cluster: codex-skill-id-desc-limit-enforcement (the skill-catalog persistence incident from the same session).",
+    "HARNESS PATTERN-ANCHORING (user 2026-06-07, the ROOT of this session false-positive cascade): every harness block/warn/safe regex MUST anchor to the COMMAND -- the actual executable and args at the START of the tool input -- and MUST NOT match arbitrary text in the MIDDLE of the payload. A mid-content match is a BUG. CONCRETE false-positives this session: (1) the bash-invokes-PS block fired on an Agent.cmd whose heredoc PROMPT merely MENTIONED both shell words; (2) the redirect-to-source block fired on a literal angle-bracket-plus-source-extension substring inside prose (a placeholder angle bracket immediately followed by a dot-ps1); (3) the cd-to-repo-root guard matched only one path form. FIX PRINCIPLE: anchor patterns to the command-open marker plus the executable token; for shell-STRUCTURE detections (one shell invoking another, a redirect to a source file) match the actual OPERATOR or INVOCATION, never a mere word occurrence anywhere in the body. A heredoc body, a quoted argument, or a skill prompt is PAYLOAD not command and must never trip a command-structure guard. The wk-tool-nudge correctly anchors to the command FIRST token; the existing mid-content block rules should be migrated to the same start-anchored discipline.",
+    "ANCHOR EXCEPTION (user 2026-06-07, refines the anchoring rule): mid-content matching is legitimate for EXACTLY ONE guard -- the skill-study-lock (harness:skill). That guard intentionally matches the edited FILE PATH wherever it appears in an Edit/Write/wkedit command, because the path is mid-content by nature (the path-only pattern matched against the normalized edited-file path). EVERY OTHER guard -- block/warn/safe that detects command STRUCTURE such as one shell invoking another, a redirect to a source file, a cd into a repo root, or a forbidden flag -- MUST be start-anchored to the command-open marker plus the executable token; a mid-content match in those is a BUG (it fires on payload: heredoc bodies, quoted args, skill prompts). NET RULE: skill-lock = path-anywhere (correct by design); all command-structure guards = command-start-anchored (mid-content match = bug to fix).",
+    "SYMLINK/SHIM DEBT CLEANUP (2026-06-08 TODO, MECHANICAL -- no Opus needed). The D:/GitHub/*.ps1 shim layer (wkharness.ps1, wkcodex.ps1, Agent.ps1, etc.) that redirects to the canonical wkappbot-kih/tools or personal-docs/tools has accreted and drifts; nobody can tell which shim points where. CONFIRMED BROKEN: D:/GitHub/wkcodex.ps1 is MISSING, so wkcodex.sh dies with CommandNotFoundException (suggest 2026-06-08T06:21:10) -- raw codex CLI is fine, only the wrapper shim is gone. CLEANUP RECIPE: (1) inventory every D:/GitHub/*.ps1 shim and its intended canonical target; (2) detect missing, dangling, or dual-canonical ones; (3) consolidate to ONE idempotent install step so session-init recreates ALL shims (not just some) from a single canonical dir; (4) verify each wk wrapper resolves end to end. Delegate to codex or a fresh non-Opus session. See wrapper-harness-integration.",
+    "INSTALL = IDEMPOTENT SINGLE SOURCE OF TRUTH FOR ALL HARNESS TOOLS (2026-06-08 user directive, expands the shim-cleanup recipe). wkappbot-kih install.ps1 currently auto-generates ONLY the wkharness.ps1 redirect shim, so wkcodex.ps1 (empty 0B), wkclaude.ps1 (missing) and Agent.ps1 (missing) drift and break all codex/agent delegation. FIX: install.ps1 must OVERWRITE and REGENERATE on EVERY run EVERY important harness tool, not just one -- all D:/GitHub redirect shims (wkharness, wkcodex, wkclaude, Agent.ps1) pointing to the kih canonical, PLUS the critical bin wrappers (wkjobs, wktasklist, wkkill, wkdr, wkcdp-mon, wkedit, wkhippo and the rest) and the Agent.cmd Agent.ps1 resolution repointed to kih. Idempotent overwrite means the WHOLE harness self-heals on every install and can never drift to a partial or broken state again. SEQUENCE: run the install.ps1 enhancement AFTER the Agent.cmd repoint lands, to avoid a concurrent-harness-edit race (concurrent harness edits are what caused this outage in the first place)."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read harness-robustness-user-dist-appbot-absent",
+      "expect": "fail-open",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read claude-md-harness-rules",
+      "expect": "harness",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wkharness-guards",
+      "expect": "guard",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "harness",
+    "robustness",
+    "fail-open",
+    "binary-independent",
+    "user-distribution",
+    "t1",
+    "sweep",
+    "2026-06-07"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-07T10:49:19.8433656Z",
+  "updated": "2026-06-08T06:57:12.8787434Z",
+  "version": "1.8"
+}

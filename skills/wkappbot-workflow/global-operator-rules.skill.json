@@ -1,0 +1,65 @@
+{
+  "id": "global-operator-rules",
+  "app": "wkappbot-workflow",
+  "title": "Global operator rules: language, encoding, skills, output, delegation",
+  "title_ko": "전역 공통 운영 규칙 요약",
+  "desc": "Critical rules from global CLAUDE.md every session: Korean replies, English code/docs, terse output, skill-via-wkappbot, UTF-8/wkedit, no-bandaid, 400-line cap, token discipline, delegation.",
+  "steps": [
+    "LANGUAGE RULE (STRICT): Final responses to user MUST be Korean polite form (해요체, -요 ending). NEVER informal speech (반말). Everything else -- source code, comments, CLAUDE.md, skills, memory files, commit messages, docs, agent prompts, internal notes -- MUST be English only. No exceptions. Non-English in persistent surfaces burns 2-3x tokens in every future session.",
+    "TERSE OUTPUT (MANDATORY): responses must be 80 words or fewer unless task genuinely needs detail. No preamble or recap of what user said. State decisions directly. End-of-turn summary: 1-2 sentences max. Provide short status updates at key moments (started X / found Y / blocker Z) but do NOT narrate internal deliberation.",
+    "SKILL COMMANDS (MANDATORY, no exceptions): READ via wkappbot skill read <id>. MODIFY/CREATE via wkappbot skill contribute/edit. Do NOT use raw Write/Edit tool calls on .skill.json files. EXCEPTION: direct .skill.json edit allowed ONLY when (a) file is a committed project artifact AND (b) immediately followed by wkappbot skill install to re-register. After compaction: if you edited directly, run wkappbot skill install before continuing.",
+    "ENCODING (MANDATORY): treat all repo text files as UTF-8. Multi-file edits MUST use wkedit -- not individual Edit/Write calls, not sed/awk/python scripts. This applies to JSONL files too. If source is CP949: preserve original AND save UTF-8 copy. Do NOT text-convert binary files (pdf, mp4, images, archives).",
+    "NO BANDAID CODE (MANDATORY): if duplicating existing logic, adding local OR splits, or wrapping a function with ad-hoc retry -- STOP and fix the shared function instead. If the concept already exists in the codebase, reuse it. Bandaids compound across sessions.",
+    "SOURCE FILE SIZE (MANDATORY): ~400 lines per file soft cap. When exceeded: partial-class split (C#), module split, or extract helper. Do NOT refactor customer/vendor code -- only project-owned code.",
+    "SHARED MARKDOWN CROSS-REFERENCE (MANDATORY): before non-trivial changes, check all top-level *.md files (README.md, AGENTS.md, CLAUDE.md). Shared AI/operator policy must not drift between them. If you change one and the subject exists in another, update both in the same commit.",
+    "TOKEN DISCIPLINE (MANDATORY): NEVER re-read a file already in context. Do NOT make speculative tool calls -- only read/search with a concrete reason. ALWAYS parallelize independent tool calls. Delegate: 3+ tool calls or any bulk read -> spawn agent. Suggest triage -> Opus agent always.",
+    "SECRETS (MANDATORY): all credentials in D:/GitHub/.env -- NEVER hardcode. Load at script startup. Keys: NAVER_ID, GH_PAT, GMAIL_CLIENT/SECRET/REFRESH_TOKEN, GEMINI_API_KEY, GROQ_API_KEY, CEREBRAS_API_KEY, SLACK_BOT_TOKEN, HANTOO_*, KIWOOM_*, PYTHON_CMD=D:/SDK/py312/Scripts/python.exe.",
+    "DELEGATE BY DEFAULT (MANDATORY): default move is to spawn an agent, not do work inline. Chores -> Haiku agent. Execution/refactor -> codex exec -s workspace-write. Hard/ambiguous -> wkappbot ask triad first. Sonnet no progress 1min -> spawn Opus subagent. Opus no progress 5min -> wkappbot ask triad.",
+    "DELEGATE-CODEX (updated): Execution/refactor -> wkcodex <task> (no quotes needed; replaces codex exec direct). codex resume/fork/apply still use direct codex. wkcodex sets workspace-write sandbox + codex-mini model automatically.",
+    "WORK-ORDER PRINCIPLE (user directive 2026-06-02, MANDATORY): handle EVERY task in this fixed order -- (1) EMERGENCY (gingeubjochi): stop the bleeding / restore working state FIRST (unblock, mitigate, stabilize); (2) SOLVE (munjehaegyeol): fix the actual root cause; (3) PREVENT (jaebalbangji): add the guard/selftest/config/skill so it cannot recur. Never jump to root-cause or prevention while the system is still broken for the user -- relief comes first. Applies to harness incidents, pace lockups, prod, mail/legal, everything."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read global-operator-rules",
+      "expect": "LANGUAGE RULE",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read global-operator-rules",
+      "expect": "SKILL COMMANDS",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read global-operator-rules",
+      "expect": "ENCODING",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "rules",
+    "mandatory",
+    "language",
+    "korean",
+    "english",
+    "encoding",
+    "wkedit",
+    "skills",
+    "terse",
+    "token",
+    "delegate",
+    "operator",
+    "global",
+    "common",
+    "bandaid",
+    "utf8",
+    "output",
+    "secrets"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-08T11:22:05.3605414Z",
+  "updated": "2026-06-02T10:34:22.512923Z",
+  "version": "1.3"
+}

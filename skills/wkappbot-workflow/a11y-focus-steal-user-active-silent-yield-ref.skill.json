@@ -1,0 +1,44 @@
+{
+  "id": "a11y-focus-steal-user-active-silent-yield-ref",
+  "app": "wkappbot-workflow",
+  "title": "a11y focus-steal user-active silent yield: mechanism ref",
+  "title_ko": null,
+  "desc": "T3 reference for a11y-focus-steal-user-active-silent-yield. Exact retry/idle-threshold mechanics inside RestoreFocusWithRetryAsync.",
+  "steps": [
+    "RETRY MECHANICS: Sentinel retries ForceForegroundWindow up to 5s (150ms x 33 attempts)",
+    "IDLE CHECK: inside the loop, checks NativeMethods.GetUserIdleMs() on every attempt",
+    "BAIL CONDITION: if idle < 1500ms (user is typing/clicking), sets userBailed=true and breaks immediately -- no IME restore, no cursor restore, no bug report",
+    "RATIONALE: on userBailed the user foreground choice wins; only true involuntary steals (idle >= 1500ms) get reported. This threshold (1500ms) is shared with the FocusStealSentinel DetectAndRecover path in ReadinessBridges.FocusStealSentinel.cs."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read a11y-focus-steal-user-active-silent-yield-ref",
+      "expect": "RETRY MECHANICS",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read a11y-focus-steal-user-active-silent-yield-ref",
+      "expect": "IDLE CHECK",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read a11y-focus-steal-user-active-silent-yield-ref",
+      "expect": "BAIL CONDITION",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "a11y",
+    "focus-steal",
+    "silent-yield",
+    "ref",
+    "mechanism"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-07-02T07:24:22.2469184Z",
+  "updated": "2026-07-02T07:24:22.2469297Z",
+  "version": "1.0"
+}

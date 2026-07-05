@@ -1,0 +1,49 @@
+{
+  "id": "source-edit-skill-lock-live-hole",
+  "app": "wkappbot-workflow",
+  "title": "Source-edit skill-lock live hole (RESOLVED): catch-all did not fire on Edit/Write",
+  "title_ko": null,
+  "desc": "BUG reproduced 2026-06-07 and RESOLVED. The source-edit catch-all skill-lock did NOT block an unregistered source file edited via the built-in Edit/Write tool -- proven by an Opus root Write of an unregistered probe.cs SUCCEEDING (expected RC 2). Root cause was NOT the matcher (the hook runs for all tools) but a fail-OPEN crash. Kept as the canonical repro + fix record.",
+  "steps": [
+    "REPRO: as an Opus root session, Write a new unregistered source file (e.g. a probe .cs). EXPECTED RC 2 catch-all block. ACTUAL (the bug): the Write succeeded -- the source-edit skill-lock was bypassed for the Edit/Write tool path. Confirmed live 2026-06-07.",
+    "NOT the matcher: settings.json PreToolUse runs wkharness.ps1 with NO matcher so it fires for Edit/Write too. The bypass was INSIDE the load chain.",
+    "ROOT CAUSE: wkharness.ps1 called Initialize-WkGeminiSession but never dot-sourced wkharness-gemini.ps1 -> every tool call threw -> the top-level catch printed an unexpected-error line and exited 0 (fail-OPEN) -> the catch-all and skill-lock NEVER ran. A single missing dot-source silently disabled ALL guards. Diagnosed by feeding a probe Write JSON to wkharness.ps1 and seeing the gemini error with no deny.",
+    "FIX: added the wkharness-gemini.ps1 dot-source before the call. VERIFIED: a real Edit of an unregistered .cs then returned RC 2 no-skill-rule, blocking even my own edit.",
+    "LESSON: a fail-open crash in a guard chain is invisible -- it does not block, it just stops protecting. Verify guards by a REAL edit that SHOULD be blocked, not by assuming silence means safe. Cross-ref harness-robustness-user-dist-appbot-absent, harness-source-edit-requires-skill-lock, harness-edit-write-skill-bypass."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read source-edit-skill-lock-live-hole",
+      "expect": "REPRO",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read harness-source-edit-requires-skill-lock",
+      "expect": "default-deny",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read harness-edit-write-skill-bypass",
+      "expect": "bypass",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "harness",
+    "skill-lock",
+    "catch-all",
+    "edit",
+    "write",
+    "bug",
+    "resolved",
+    "fail-open",
+    "t2"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-07T12:11:58.2830972Z",
+  "updated": "2026-06-07T12:11:58.2831115Z",
+  "version": "1.0"
+}

@@ -1,0 +1,53 @@
+{
+  "id": "agent-cmd-pace-exempt",
+  "app": "wkappbot-workflow",
+  "title": "agent-cmd-pace-exempt",
+  "title_ko": null,
+  "desc": "Agent.cmd blocked by pace guard: root cause in Test-WkPaceExempt, fix pattern agent-dot not agent-word-boundary, ACK gate deadlock",
+  "steps": [
+    "ROOT CAUSE: Bash(Agent.cmd ...) bypasses haiku/Agent ToolName checks in Test-WkPaceExempt (wkharness-common-classify.ps1). wk-prefix check passes wkappbot/wkcodex etc but NOT Agent.cmd -- it lacks the wk- prefix. So pace guard blocks Agent.cmd same as any other Bash call.",
+    "FIX (698339f0 2026-07-01): insert after Test-WkPrefixCommand check -- if ToolName in Bash/PS/shell_command AND Command matches agent-dot or wkcodex-or-codex -> return true. File: wkharness-common-classify.ps1 L93.",
+    "PATTERN: use agent. (with dot) NOT agent-word-boundary. Reason: word-boundary treats = as boundary so agent=foo (env-var) matches and gets false-exempted. agent. requires literal dot -- covers Agent.cmd/Agent.ps1, not agent=x. User insight 2026-07-01.",
+    "TEST: run Agent.cmd after fix. Proof = hits DIFFERENT guard (agent-brief-guard or diet-score), not pace-95. Different error = pace gate cleared.",
+    "OPEN FIX-B/C: ACK gate (wkharness-guards-pace.ps1 L529-548) deadlocks. Marker re-created with current timestamp each call -> _userReplied=false even after user replies. FIX-B: on JSON parse fail set acked=true. FIX-C: call Test-WkPaceExempt in ACK gate before Block() so Agent dispatches escape even when not acked.",
+    "MISTAKE LOG 2026-07-01: user said fix Agent.cmd -> first removed it from error message (bad commit af3a557c) instead of making it work. LESSON: fix X means make X work, not delete X. Read intent first.",
+    "Cluster: pace-95-circuit-breaker (trigger/design), wkharness-guards (full list), harness-edit-write-skill-bypass (bypass risk)",
+    "See also: pace-95-circuit-breaker (T1 trigger/design), sonnet-reflection-howto step 20-22 (mistake log), wkharness-guards (full guard list)"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read agent-cmd-pace-exempt",
+      "expect": "ROOT CAUSE",
+      "prompt": null
+    },
+    {
+      "cmd": "Agent.cmd passes pace guard",
+      "expect": "hits agent-brief-guard not pace-95",
+      "prompt": null
+    },
+    {
+      "cmd": "Command matches agent=foo",
+      "expect": "NOT exempt (env-var false positive blocked)",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "pace",
+    "agent",
+    "exemption",
+    "Test-WkPaceExempt",
+    "delegation",
+    "agent-cmd",
+    "wkcodex",
+    "codex",
+    "harness",
+    "ace"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-07-01T09:30:13.9871205Z",
+  "updated": "2026-07-01T10:08:08.1238363Z",
+  "version": "1.1"
+}

@@ -1,0 +1,44 @@
+{
+  "id": "file-command-cheatsheet-ref",
+  "app": "wkappbot-workflow",
+  "title": "file cheatsheet reference",
+  "title_ko": null,
+  "desc": "T3 gotchas for wkappbot file tools: grep starvation fallback, encoding safety, backup/undo.",
+  "steps": [
+    "GREP STARVATION FALLBACK: when the built-in Grep tool fails with uv_spawn EUNKNOWN under resource starvation (Defender RAM storm), use wkappbot file grep (in-process, no subprocess spawn, gate-exempt). Running rg directly hits the same spawn starvation. Verified 2026-06-04 finding matches in a 1400-line file while built-in Grep failed.",
+    "ENCODING: wkappbot file edit is UTF-8 and BOM and CRLF safe; after an edit a U+FFFD corruption triggers an auto Slack alert. Keep binary files (pdf, mp4, images) as-is, never text-convert.",
+    "BACKUP UNDO: wkappbot file edit writes a .bak backup automatically; undo by restoring from that backup."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read file-command-cheatsheet-ref",
+      "expect": "file tool gotchas",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read file-command-cheatsheet",
+      "expect": "file tool core",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill search grep starvation",
+      "expect": "file cheatsheet cluster",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "file",
+    "reference",
+    "grep",
+    "encoding",
+    "gotchas",
+    "wkappbot"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-03T22:16:37.1774366Z",
+  "updated": "2026-06-03T22:16:37.1774505Z",
+  "version": "1.0"
+}

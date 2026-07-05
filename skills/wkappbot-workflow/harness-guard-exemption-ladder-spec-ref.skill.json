@@ -1,0 +1,39 @@
+{
+  "id": "harness-guard-exemption-ladder-spec-ref",
+  "app": "wkappbot-workflow",
+  "title": "Harness guard exemption ladder ref (sandbox axis, gate corrections, git-track rule)",
+  "title_ko": null,
+  "desc": "Exemption ladder reference: sandbox axis corrections, capability vs authority gates, pro-grade vs sub-pro, git-tracked source boundary. Incident lessons from 2026-06-10.",
+  "steps": [
+    "SANDBOX IS NON-ROOT NOT CHEAP-ONLY (user 2026-06-10): the harness-source-edit sandbox must key on AUTHORITY, not capability. EVERYTHING except ROOT (the single live interactive session) is sandboxed to -proto/-probe/-model files, INCLUDING an Opus subagent, Sonnet subagent, GPT/Codex/mini, Haiku. The danger is NOT the model intelligence -- it is being a CONCURRENT non-authoritative actor on the LIVE harness (today chaos involved Sonnet/Opus-class agents editing the live guard). RULE: ROOT edits canonical; ANY subagent of ANY model edits ONLY sandbox files; ROOT reviews and promotes. DETECTION: a session is a subagent iff the spawn-set env marker is present (set for EVERY spawned agent regardless of model), so the existing cheap-agent check already catches Opus subagents too. RENAME Test-WkIsCheapAgentSession to Test-WkIsNonRootSession. ROOT = no env marker AND top-level interactive session. FAIL-OPEN unchanged: indeterminate rank treat as ROOT.",
+    "CORRECTION -- SANDBOX AXIS IS TWO GATES NOT ONE (user 2026-06-10): the real rule is TWO separate gates. GATE 1 = CAPABILITY: only PRO-GRADE intelligences (Opus/Sonnet/GPT-class) may touch git-MANAGED (committed/tracked) source AT ALL. SUB-PRO models (Haiku/codex-mini/gemini-flash) keep hands OFF git-managed source entirely -- they do reads/surveys/non-source tasks; sub-pro on tracked source silently drops code, mis-synthesizes. GATE 2 = AUTHORITY (concurrency safety, among the pro-grade who ARE allowed): ROOT edits CANONICAL git source; a pro-grade SUBagent edits only -proto/-probe sandbox files and ROOT reviews + promotes -- never two actors on the live canonical at once. NET: sub-pro -> no git-managed source; pro-grade subagent -> sandbox/-proto then ROOT-promote; ROOT -> canonical. SUPERSEDES the earlier over-broad note. Capability gate decides WHO; authority gate decides canonical-vs-sandbox among them. FAIL-OPEN unchanged.",
+    "CORRECTION 2 -- DO NOT BLOCK OPUS FROM CANONICAL (user 2026-06-10): prior GATE-2 over-restricted by sending even a pro-grade Opus subagent to -proto. Wrong. There is NO capability reason to bar Opus (or any pro-grade) from canonical git source. The two ORTHOGONAL rules: (1) CAPABILITY GATE -- pro-grade (Opus/Sonnet/GPT) MAY edit tracked source; sub-pro (Haiku/mini/flash) keeps hands OFF tracked source. (2) CONCURRENCY RULE -- never TWO actors editing the SAME live canonical files at the same time; this is a TIMING/coordination constraint (sequence them), NOT a capability block, applies to EVERYONE including ROOT. So: a pro-grade Opus SUBagent editing canonical is FINE when it is the sole actor; -proto/-probe exists only for (a) rare case a pro-grade delegate must work WHILE ROOT is also touching the same files, and (b) sub-pro drafts that should never land on tracked source unreviewed. NET: pro-grade => canonical allowed (subagent or ROOT), serialized; sub-pro => off tracked source. Capability gates WHO; concurrency gates WHEN.",
+    "GATE SCOPE = GIT-MANAGED SOURCE ONLY (user 2026-06-10): capability + concurrency gates apply ONLY to git-TRACKED source. Untracked/scratch files (any path, any model, any grade) are FREE -- they cannot pollute the repo or BE the live committed harness. This subsumes the -proto/-probe suffix scheme: a delegate (even sub-pro) prototypes in UNTRACKED scratch; ROOT/a pro-grade then reviews and COMMITS the real version into tracked source. IMPLEMENTATION: one question -- is the target path git-tracked? NOT tracked => allow anyone. Tracked => apply capability gate (pro-grade only) + concurrency (one actor at a time, serialized) + ROOT commits. DETECT with git ls-files --error-unmatch (exit 0 = tracked = gated). This auto-covers new files: an untracked draft is free until committed, at which point it is canonical and gated -- the promotion act (git add/commit) IS the ROOT gate. NET RULE: git-tracked source = gated (pro-grade, serialized); everything untracked = free."
+  ],
+  "comments": null,
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read harness-guard-exemption-ladder-spec",
+      "expect": "TIER0",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read harness-guard-exemption-ladder-spec-ref",
+      "expect": "GATE 1",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read harness-guard-exemption-ladder-spec-ref",
+      "expect": "CONCURRENCY RULE",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-10T05:28:04.046606Z",
+  "updated": "2026-06-10T05:37:58.0520444Z",
+  "version": "1.2"
+}

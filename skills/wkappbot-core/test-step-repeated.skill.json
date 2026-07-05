@@ -1,0 +1,36 @@
+{
+  "id": "test-step-repeated",
+  "app": "wkappbot-core",
+  "title": "Test-Step-Repeated",
+  "title_ko": null,
+  "desc": "test desc",
+  "steps": [
+    "step one",
+    "step two"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read test-step-repeated",
+      "expect": "steps",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill list",
+      "expect": "test",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill search test-step",
+      "expect": "test-step-repeated",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-23T06:54:57.4717899Z",
+  "updated": "2026-05-23T06:54:57.4718Z",
+  "version": "1.0"
+}

@@ -1,0 +1,53 @@
+{
+  "id": "harness-engineering-korean-interview",
+  "app": "wkappbot-workflow",
+  "title": "AI Harness Engineering -- Korean YouTube Interview Key Points",
+  "title_ko": null,
+  "desc": "Key insights from Korean YouTube interview: Oh My Claude Code (Heo Ye-chan) + Oh My Open Agent (Kim Yeon-gyu) on AI harness concepts, limits, model dependency, and practical guards",
+  "steps": [
+    "Harness = repeatable workflow automation bundle controlling misbehaving AI agents (saddle/whip metaphor).",
+    "Spectrum: loose (high autonomy) vs tight (strict enforcement). Mirrors creator personality and use-case.",
+    "Heo Ye-chan (Oh My Claude Code): tight guardrails, zero ambiguity before start, quant precision mandatory -- money on the line.",
+    "Kim Yeon-gyu (Oh My Open Agent): loose + best-practices first, fast MVP, tune important parts later.",
+    "Harness limits: cannot invent missing knowledge. Hard-simulation domains (embedded/IoT) restrict full automation.",
+    "Model = OS of harness: great model + great harness = ceiling high. Weak model + great harness = ceiling low.",
+    "High-IQ model paradox: more reasoning tokens -> more guardrail escape attempts. Tighter rails needed as models grow.",
+    "Harness needs update each model version -- same family, different behavior per release.",
+    "Oh My Claude Code origin: built in 2h after Anthropic blocked Claude in open agents. Day-1 GitHub stars 500+. Global viral via UK tech influencer tagging.",
+    "Oh My Open Agent: model-agnostic OpenCode base. Originated from quant research multi-agent automation pipeline.",
+    "Practical tip: system hook auto-detects AI over-commenting -> warns -> AI self-corrects. Stack guards one per recurring bad habit."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read harness-engineering-korean-interview",
+      "expect": "Harness",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill search harness interview",
+      "expect": "harness-engineering-korean-interview",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read harness-engineering-korean-interview",
+      "expect": "Oh My Claude Code",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "harness",
+    "ai-agent",
+    "claude-code",
+    "guardrail",
+    "interview",
+    "omycc",
+    "open-agent"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-18T15:46:19.1039802Z",
+  "updated": "2026-05-18T15:46:19.1039899Z",
+  "version": "1.0"
+}

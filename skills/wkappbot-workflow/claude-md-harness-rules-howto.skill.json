@@ -1,0 +1,54 @@
+{
+  "id": "claude-md-harness-rules-howto",
+  "app": "wkappbot-workflow",
+  "title": "claude-md harness rules (T2 howto): writing rules + declaring a study-lock",
+  "title_ko": null,
+  "desc": "T2 howto tier of claude-md-harness-rules. Step-by-step recipes: how to author each harness:<action> rule (safe/block/warn/done/skill), the tInput match format, body/template lines, and how to declare a harness:skill study-lock (file-path-only pattern + 3 distinct existing skill ids, usage/impl/task convention) so editing a sensitive source forces studying its skills first. Use when adding or fixing a per-repo harness rule.",
+  "steps": [
+    "RULE SYNTAX: one rule = '## harness:<action> <regex>' + optional body lines. action = safe (whitelist, skip block/warn on match) ",
+    " block (Block the call w/ message) ",
+    " warn (stderr only, no block) ",
+    " done (PostToolUse completion detector) ",
+    " skill (study-lock).",
+    "tInput MATCH FORMAT: regex matches against the string '. ToolName(cmd)' e.g. '. Bash(rm -rf x)' or '. Edit(CLAUDE.md)'. Anchor with '. Bash\\(' / '. Edit\\(' to avoid matching tool args. Keep regex simple, no lookahead.",
+    "BODY LINES: plain text = shown in the block message; a line starting with ! runs as PowerShell and its output is appended (e.g. '!wkappbot skill read wk-ai-tools').",
+    "ORDER + SCOPE: put safe BEFORE block to whitelist exceptions. Only the CWD project CLAUDE.md + the edited-file's own repo CLAUDE.md + global ~/.claude/CLAUDE.md are merged; hardcoded guards live in wkharness-guards.ps1 and OUTRANK declarative rules (a harness:safe cannot exempt the pace guard).",
+    "DECLARE A STUDY-LOCK: header '## harness:skill <FILE-PATH-REGEX>' then 3+ body lines 'wkappbot skill read <id>' (convention: Usage / Impl / Task). The pattern is FILE-PATH-ONLY (no Edit-open-paren); the guard code decides the tool. The 3 ids MUST exist in the catalog and be distinct.",
+    "SATISFY A STUDY-LOCK before editing: actually EXECUTE those 'wkappbot skill read <id>' commands THIS session (a plain-text mention does not count; agent/wkcodex reads do). Editing an unregistered source fires the catch-all which prints the exact section to add.",
+    "TEST: wkharness -Test runs the deterministic cases; add a synthetic 'does it fire' canary for any new guard (assert the verdict is block for the un-studied edit) -- structural presence is never runtime firing."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read claude-md-harness-rules-howto",
+      "expect": "RULE SYNTAX",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read claude-md-harness-rules-howto",
+      "expect": "DECLARE A STUDY-LOCK",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read claude-md-harness-rules-howto",
+      "expect": "tInput MATCH FORMAT",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "harness",
+    "claude-md",
+    "howto",
+    "t2",
+    "recipe",
+    "study-lock",
+    "safe",
+    "block"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-21T18:29:42.0214252Z",
+  "updated": "2026-06-21T18:29:42.0214344Z",
+  "version": "1.0"
+}

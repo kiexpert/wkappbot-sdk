@@ -1,0 +1,51 @@
+{
+  "id": "willkim-tool-harness-independence-install-location",
+  "app": "wkappbot-workflow",
+  "title": "WillKim tools must run harness-free; tiered fallback + canonical install location",
+  "title_ko": null,
+  "desc": "Design law for wk* WillKim tools: a tool shipped in wkappbot-sdk/bin MUST work WITHOUT the harness (standalone USER tier). wkwrap.exe symlink wiring and install location follow from this. 2026-06-18 user directive.",
+  "steps": [
+    "CORE LAW (user 2026-06-18): a WillKim tool shipped in wkappbot-sdk/bin MUST run WITHOUT the harness -- standalone USER tier. NO hard dependency on wkharness-*.ps1, harness-only env vars, or kih-repo paths. If the harness/kih repo is absent the tool must still work or degrade gracefully (e.g. echo ROOT), never crash.",
+    "TIERED-FALLBACK pattern (satisfies BOTH harness-rich and bare machines): the tool launcher tries the kih harness resolver FIRST (DEV/harness tier = full chain) if present, ELSE the sdk standalone (USER tier = same logic, no harness dep), ELSE a safe default. Proof: wkagent-name.cmd = kih tools/wkharness-agent-name.ps1 -> sdk/bin/wkagent-name.ps1 -> echo ROOT.",
+    "WKWRAP-WIRING RULE: connecting a tool to wkwrap.exe (the .cmd/.sh/.exe shim + sibling .ps1 quartet) MUST NOT introduce a harness dependency. The sibling .ps1 a wkwrap shim resolves to must itself be harness-independent OR tier-fallback, so the bare command works on a machine with NO kih harness installed. Decide wkwrap symlink-linking on this basis.",
+    "INSTALL LOCATION: standalone USER tools live in wkappbot-sdk/bin (or the tool's OWN repo root). Harness-direct-integration tools AND dev tools install into wkappbot/bin (the WillKim bin on PATH) OR their own repo root. One canonical home per tool + its shim on PATH; do not scatter copies.",
+    "WHY: the SDK ships to users who do not have the harness; a harness-coupled tool bricks for them. Harness-independence keeps the tool portable, and the tiered launcher gives harness users the richer DEV path for free. Cross: wkwrap, willkim-tool-harness-independence-install-location, harness-gate-log-data-integrity, cross-family-harness-integration.",
+    "SDK INSTALL + BARE-NAME VERIFICATION MANDATORY (user 2026-07-02, closes a verification gap live-caught this session). A user-distribution WillKim tool with ZERO harness dependency (per the CORE LAW, step 1) MUST be installed into wkappbot-sdk/bin (not left ONLY in WKAppBot/bin -- that alone is not user-distribution-complete). AND after install, verification MUST run the tool via its SHORT/BARE name (e.g. 'wksplit-md.cmd' or 'wksplit-md'), NEVER just confirm the absolute file path exists -- a file existing on disk at a PATH-listed directory does NOT prove the bare command actually resolves. LIVE GOTCHA that motivated this rule: wksplit-md.cmd was correctly deployed (hard-linked) to WKAppBot/bin and 'the file is there' was confirmed via glob, but the BARE name 'wksplit-md' (no extension) failed 'command not found' from a bash/Git-Bash shell -- bash does NOT do Windows PATHEXT auto-resolution the way PowerShell/cmd.exe do, so only 'wksplit-md.cmd' (WITH the extension) actually runs there. A glob-confirms-file-exists check would have silently missed this. VERIFICATION PROCEDURE: after any WillKim-tool install/deploy, run the BARE short-form command (with extension if calling from bash) from a directory OTHER than the tool's own source folder, and confirm real output -- not just Test-Path/glob on the target file. Cross: wksplit-md (the live incident), CORE LAW step 1, INSTALL LOCATION step 4."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read willkim-tool-harness-independence-install-location",
+      "expect": "CORE LAW",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read willkim-tool-harness-independence-install-location",
+      "expect": "TIERED-FALLBACK",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read willkim-tool-harness-independence-install-location",
+      "expect": "INSTALL LOCATION",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "willkim-tool",
+    "harness-independence",
+    "wkwrap",
+    "install-location",
+    "tiered-fallback",
+    "standalone",
+    "sdk",
+    "bin",
+    "design-law",
+    "directive"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-18T01:55:21.2137467Z",
+  "updated": "2026-07-02T10:20:43.3397324Z",
+  "version": "1.1"
+}

@@ -1,0 +1,49 @@
+{
+  "id": "skill-read-if-newer",
+  "app": "wkappbot-core",
+  "title": "skill read --if-newer: skip export if cached version is current",
+  "title_ko": null,
+  "desc": "wkappbot skill read <id> --if-newer skips re-exporting SKILL.md when cached version matches catalog. Efficient for AI agents to check updates without forcing full re-export.",
+  "steps": [
+    "USAGE: wkappbot skill read <id> --if-newer -- skips write if cached SKILL.md version >= catalog version",
+    "BEHAVIOR: cached v >= catalog => [SKILL:EXPORT] up-to-date v{ver}. cached v < catalog => normal export fires",
+    "SKILL.MD HEADER: every exported file starts with Refresh line showing --if-newer command and current version so AI always knows how to refresh",
+    "CALLER GATING: Claude parent => .claude/ paths only. Codex parent => .codex/ paths only. No cross-writes",
+    "WITHOUT FLAG: wkappbot skill read <id> always exports regardless of cache (force-refresh)",
+    "CODE: SkillCommand.AiExport.cs IsExportedSkillCurrent() parses Refresh line via regex v(\\d+\\.\\d+). SkillCommand.cs parses --if-newer at skill read handler"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read nvidia-overlay-blackscreen-kill --if-newer",
+      "expect": "up-to-date",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read on-load --if-newer",
+      "expect": "SKILL:EXPORT",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read skill-read-if-newer",
+      "expect": "Refresh",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "skill",
+    "export",
+    "if-newer",
+    "cache",
+    "version",
+    "claude",
+    "codex",
+    "refresh"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-23T16:34:39.973837Z",
+  "updated": "2026-05-23T16:34:39.9738465Z",
+  "version": "1.0"
+}

@@ -1,0 +1,33 @@
+{
+  "id": "agent-canonical-dispatch",
+  "app": "wkappbot-workflow",
+  "title": "Agent command: canonical opts + per-tier translation",
+  "title_ko": null,
+  "desc": "wkappbot agent 'task' - tier uses Claude-standard canonical flags as universal interface. All AI types (haiku/sonnet/opus/gpt/gemini/codex-mini/triad) share the same arg format. Translation layer converts to each backend. New tiers: gpt, gemini. Session persistence: .wkappbot/agents/last-{tier}.jsonl",
+  "steps": [
+    "Run agent with canonical opts: wkappbot agent 'task' - opus --max-turns 5",
+    "Check last task: wkappbot agent last",
+    "Follow up: wkappbot agent resume 'follow-up question'",
+    "New tiers: wkappbot agent 'task' - gpt OR wkappbot agent 'task' - gemini",
+    "Canonical flags: --model <id> --max-turns N --system '...' --no-agent --fresh --attach <file> --timeout N --no-wait",
+    "Verified 2026-04-21: test-agent-canonical-dispatch.cmd (resolve ts=2026-04-21T04:38)",
+    "CODEX INVOCATION (2026-05-15): Direct: codex exec --dangerously-bypass-approvals-and-sandbox -C DIR 'task'. Guarded: powershell -File D:/GitHub/wkcodex.ps1 'task' (enforces 3 skill refs, bypass, post-checks). Session ops: codex resume --last (continue), codex fork --last (branch). Windows: --dangerously-bypass MANDATORY (-s modes trigger sandbox spawn error). 3 skill reads required in task string or wkcodex blocks. Sandbox modes: read-only / workspace-write / danger-full-access (only danger-full-access works without bypass on this machine). rc=0 does NOT guarantee success -- check last 5 output lines."
+  ],
+  "requirements": null,
+  "primary_cmd": null,
+  "tags": [
+    "agent",
+    "dispatch",
+    "canonical",
+    "gpt",
+    "gemini",
+    "claude",
+    "codex"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-21T07:07:36.9146337Z",
+  "updated": "2026-05-15T15:30:21.74268Z",
+  "version": "1.3"
+}

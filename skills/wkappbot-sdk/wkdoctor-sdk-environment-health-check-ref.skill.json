@@ -1,0 +1,41 @@
+{
+  "id": "wkdoctor-sdk-environment-health-check-ref",
+  "app": "wkappbot-sdk",
+  "title": "wkdoctor SDK Health Check REF",
+  "title_ko": null,
+  "desc": "T3 reference tier of wkdoctor-sdk-environment-health-check. Full check list, robustness rationale, plugin status, symlink + defender check details.",
+  "steps": [
+    "FULL CHECK LIST (11): wkappbot.exe presence+version, wkappbot-core.exe, a11y.exe (warn), Eye tick ctx%, dotnet 8 SDK, skills catalog count, nightly-guard in settings.json, bin in PATH, .wkappbot config.json, wkappbot.hq dir, Defender dev-exclusions (06).",
+    "ROBUSTNESS: checks use file/process/PE-version APIs only -- zero wkappbot subprocess calls (avoids Eye IPC stall in subprocess context).",
+    "PLUGIN MODULES: 01-binaries, 02-runtime, 03-skills, 04-config, 05-hq, 06-defender-exclusions, 50-symlink. Orchestrator = thin dot-source loader.",
+    "SYMLINK CHECK (50): auto-detects+repairs broken VS Code extension cdx.exe symlinks. Candidates under WKAppBot/bin and wkappbot-sdk/bin. Repair source: latest openai.chatgpt extension dir, fallback sandbox-bin. Reports ok/warn/fail.",
+    "DEFENDER CHECK (06, added 2026-06-02): detects missing Defender exclusions for dev hot-folders (D:/GitHub, .claude, Temp/claude) + 6 dev procs + ScanAvgCPULoadFactor>20 -- the MsMpEng real-time scan storm (CPU spike + keyboard freeze) cause. Auto-repair: Add-MpPreference admin-direct or self-elevating UAC; Tamper-Protection caveat -> Defender GUI. Skill: defender-dev-exclusions.",
+    "HISTORY: 2026-05-25 v1.0 (10 checks). 2026-06-02 added Defender check (SDK commit 840a971a) + 3-tier split.",
+    "T1 core: wkdoctor-sdk-environment-health-check. T2 howto: wkdoctor-sdk-environment-health-check-howto."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read wkdoctor-sdk-environment-health-check-ref",
+      "expect": "FULL CHECK LIST",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wkdoctor-sdk-environment-health-check-ref",
+      "expect": "DEFENDER CHECK",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wkdoctor-sdk-environment-health-check-ref",
+      "expect": "ROBUSTNESS",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-02T11:39:26.4484262Z",
+  "updated": "2026-06-02T11:39:26.448435Z",
+  "version": "1.0"
+}

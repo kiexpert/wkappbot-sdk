@@ -1,0 +1,52 @@
+{
+  "id": "run-postcase-testing",
+  "app": "wkappbot-workflow",
+  "title": "run-postcase-testing",
+  "title_ko": null,
+  "desc": "Run-PostCase helper function for testing PostToolUse hook behavior in wkharness self-test suite.",
+  "steps": [
+    "PURPOSE: Run-PostCase is a test helper in wkharness-status.ps1 that calls wkharness-post.ps1 with a JSON payload and checks stderr output for expected patterns.",
+    "MECHANISM: Uses ProcessStartInfo to spawn powershell.exe with explicit env var control. Sets WKHARNESS_SELFTEST=empty (post hook returns early if SELFTEST=1), passes JSON via StandardInput, reads StandardError.",
+    "WHY ProcessStartInfo: direct pipe ( ",
+    " powershell ...) inside the test runner produces out.len=0 due to nested process stdin inheritance issues. ProcessStartInfo bypasses this.",
+    "PATTERN: Run-PostCase 'label' 'json' 'expectPattern' -> PASS if output matches pattern, PASS if pattern is empty string (no-trigger test).",
+    "SCOPE: only tests harness:done and harness:learn PostToolUse behavior. PreToolUse guards use Run-Case instead.",
+    "HARNESS:SKILL SELF-TEST CASES (2026-05-27): when adding Run-Case coverage for the harness:skill guard, exercise the isEditOp matrix -- Bash 'wkappbot file edit' and 'wkedit' on a registered csharp path with required skills unread expect exit 2; Read on the same path expects exit 0 (reads never blocked); Write on an unregistered .cs expects exit 2 via catch-all. Pick skill ids guaranteed unread in the test session for deterministic blocks. File lives at tools/wkharness-status.ps1 in personal-docs.",
+    "Note (2026-05-27): personal-docs CLAUDE.md has NO harness:skill patterns, so a 'registered path -> block' unit case is not feasible without adding a fixture pattern; that path is covered by live testing instead. Deterministic harness:skill self-test cases that need no fixture: Write on an unregistered .cs -> catch-all block (exit2); Read on a .cs -> allow (exit0, not an edit op). Use session_id empty-string to skip pace and reach Invoke-HarnessRules, mirroring the existing unregistered-Edit case.",
+    "Run-Case exit codes: 2=block, 0=allow, -1=any. Empty session_id reaches Invoke-HarnessRules deterministically (pace skipped). Mirror the surrounding case quoting exactly when adding coverage."
+  ],
+  "requirements": [
+    {
+      "cmd": "powershell -File D:/GitHub/wkharness.ps1 -Test",
+      "expect": "shows [harness:learn] section with PASS results",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wkharness-guards",
+      "expect": "shows self-test command and 49/51 baseline",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read on-load",
+      "expect": "explains test runner context",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "test",
+    "postcase",
+    "postooluse",
+    "harness",
+    "wkharness-status",
+    "harness-learn",
+    "harness-done",
+    "processstartinfo"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-23T04:43:08.099598Z",
+  "updated": "2026-05-26T12:04:12.74463Z",
+  "version": "1.3"
+}

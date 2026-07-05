@@ -1,0 +1,38 @@
+{
+  "id": "cdp-smoke-ci-runbook",
+  "app": "wkappbot-workflow",
+  "title": "CDP Smoke CI Runbook",
+  "title_ko": null,
+  "desc": "30-min CDP connectivity smoke CI: Chrome placement + 12-site eval validation. Failure patterns, Chrome version checklist, BUG-AUTO threshold.",
+  "steps": [
+    "Run: ./bin/cdp-verify.sh [--quick|--full] -- 12 sites, 30min full / 2min quick@@rect=(0,0,0,0) = placement fail; HttpRequestException = Chrome not up; uniform 3000ms = state-detection bug; port mismatch = sticky-port@@Chrome version: wkappbot --version vs cdp status. Pre-dates by >1 = eye restart@@>10% fail rate in 30min = BUG-AUTO with site + error + Chrome ver@@next:cdp-command-guide",
+    "ROOT CAUSE CONFIRMED LIVE (2026-07-03): wk-cdp-placement-verify.ps1's TEST-2/TEST-3 wrap the real command in 'timeout 10 wkappbot cdp <verb> 2>&1'. Under PowerShell (pwsh -File), 'timeout' resolves to Windows System32 timeout.exe, which only supports waiting N seconds or exiting on keypress -- it does NOT run a wrapped command like Unix timeout(1). Feeding it 'timeout 10 wkappbot cdp tabs' makes timeout.exe itself error with 'Default option is not allowed more than 1 time(s)' and wkappbot NEVER RUNS, so every post-attach CDP test in this script has been reporting a FALSE CRITICAL FAILURE. Verified live: running 'wkappbot cdp tabs' directly (no timeout wrapper) succeeds with real tab data and exit 0, both from Bash (where timeout is the real coreutils binary and works fine) and when the bare command is run without any wrapper in PowerShell. FIX: replace the timeout wrapper with a PowerShell-native Start-Job/Wait-Job timeout helper (Invoke-WithTimeout), never bare 'timeout N cmd' in a .ps1 on Windows. SEPARATE BUG found in the same script: Report-Pass/Report-Error increment :PassCount/:FailureCount but the script initializes / at plain script scope -- these are two different variables, so the printed SUMMARY always showed 0/0 regardless of how many PASS/ERROR lines were actually printed above it, making the final HEALTHY/DEGRADED/CRITICAL verdict meaningless. Fix: functions must increment $script:PassCount / $script:FailureCount to write into the same scope the script reads from.",
+    "PRE-COMMIT ASCII GATE INTERACTION (2026-07-03): wk-cdp-placement-verify.ps1 predates the .ps1-must-be-pure-ASCII pre-commit hook and has 7 pre-existing emoji Write-Host lines (checkmark/cross/hourglass/warning) that were never cleaned up when the gate was added, so ANY future commit touching this file -- even an unrelated one-line fix -- is blocked until every emoji in the WHOLE file is converted to ASCII tags ([PASS]/[ERROR]/[SLOW]/[WARN]/[TIME]), not just the lines actually changed. Lesson: before committing any edit to an older .ps1 file, grep -P '[^\\x00-\\x7F]' the whole file first -- a pre-commit ASCII gate scans the full file content, not just the diff, so unrelated legacy emoji become a blocking prerequisite for any fix.",
+    "REGEX BUG FIXED (2026-07-03): bin/cdp-verify.sh's off-screen placement check used grep -qE with an escaped pipe (rect=\\(0,0,0x0\\)\\|rect=\\(-) intending OR-alternation, but in POSIX ERE an escaped \\| is a LITERAL pipe character, not alternation -- so the off-screen FAIL branch could never match and always fell through to PASS regardless of actual placement. Fixed to unescaped | (real ERE alternation). Also found: this script only tests 2 sites (example.com, ietf.org) and does NOT compare Chrome's rect against caller-window coordinates at all (only checks Chrome's own rect for zero/negative) -- unlike wk-cdp-placement-verify.ps1 which does full caller-HWND delta validation. Filed as a separate suggest since the CLAUDE.md MAIN DUTY section and this skill both describe a 12-site cdp-smoke.yml CI workflow that has never actually existed in git history (.github/workflows/ has no cdp-smoke.yml)."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot cdp status",
+      "expect": "OK",
+      "prompt": null
+    },
+    {
+      "cmd": "./bin/cdp-verify.sh --quick",
+      "expect": "placement",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot --version",
+      "expect": "v7",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-26T09:11:17.0261331Z",
+  "updated": "2026-07-03T14:26:20.1952601Z",
+  "version": "1.7"
+}

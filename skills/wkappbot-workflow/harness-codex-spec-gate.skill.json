@@ -1,0 +1,44 @@
+{
+  "id": "harness-codex-spec-gate",
+  "app": "wkappbot-workflow",
+  "title": "harness: codex-spec-gate (non-mini codex needs SPEC block)",
+  "title_ko": null,
+  "desc": "Blocks codex exec (non-mini models) without a 5-item SPEC block. Prevents underspecified Codex runs that exit early or produce wrong output.",
+  "steps": [
+    "SAFETY: Fires on 'codex exec' without --model codex-mini when the command lacks 'SPEC:' plus numbered items 1-5. Non-mini Codex is expensive; underspecified prompts cause early exit with partial results or wrong output.",
+    "SOLUTION: Add a SPEC block with exactly 5 items: SPEC: 1.Goal 2.Files 3.Approach 4.Constraints 5.Exit. OR switch to --model codex-mini which is exempt from this gate (it is the default cheap model).",
+    "PREVENTION: Always write a SPEC block for non-mini Codex runs. The exit criterion (item 5) is the most important -- Codex stops when it thinks it is done, so a vague goal causes premature exit. Use wkcodex.sh for standard tasks (auto-validates and defaults to codex-mini)."
+  ],
+  "comments": null,
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read harness-codex-spec-gate",
+      "expect": "non-mini codex needs SPEC block",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wkharness-guards",
+      "expect": "GUARD CLUSTER",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read harness-active-model-scoping",
+      "expect": "P6",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "harness",
+    "gate",
+    "codex",
+    "spec",
+    "quality"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-11T08:09:47.3645037Z",
+  "updated": "2026-06-11T08:09:47.3645122Z",
+  "version": "1.0"
+}

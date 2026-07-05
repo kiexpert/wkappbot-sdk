@@ -1,0 +1,44 @@
+{
+  "id": "sonnet-reflection-ref",
+  "app": "wkappbot-sdk",
+  "title": "Sonnet Reflection: CDP Incident Archive",
+  "title_ko": null,
+  "desc": "T3 ref tier of sonnet-reflection. Session-specific CDP automation incidents: JobKorea, ECFS, Saramin, LinkedIn, GameJob patterns. Dated reference log.",
+  "steps": [
+    "See: wkappbot skill read sonnet-reflection (T1 philosophy + contribution format), wkappbot skill read sonnet-reflection-howto (T2 generalizable action patterns). This T3 holds domain-specific CDP automation incidents from 2026-06-24 to 2026-06-27. Source: sonnet-reflection steps 22-58.",
+    "CDP TAB UNRESPONSIVE AFTER IDLE (2026-06-26): tab returning RAW:null is usually tab-death from idle session expiry OR a blocking dialog -- not a permission error. Fix: pick a spare tab still alive (wkappbot cdp list), navigate to target from it. Detection: RAW:null on a tab expected to be live = assume tab-death.",
+    "ALERT DISMISSAL REVIVES DEAD TABS (2026-06-26): tabs returning RAW:null were NOT dead -- a JS alert/confirm blocked ALL eval-on. Once user dismissed alert, eval-on immediately worked. Before assuming tab-death, always check for open dialogs.",
+    "BEFOREUNLOAD DIALOG vs JS ALERT (2026-06-26): window.onbeforeunload triggers a BROWSER-LEVEL leave-site dialog that cannot be suppressed with window.confirm=()=>true. It causes ALL eval-on to return RAW:null identical to tab-death. FIX: always null out window.onbeforeunload BEFORE frm1.submit() in the SAME JS IIFE. Pattern: (function(){window.onbeforeunload=null; frm1.submit();})()",
+    "ECFS CERT LOGIN FULL AUTOMATION (2026-06-26): (1) cdp open ecfs url; (2) eval-on getElementById('cert_input').focus() -> triggers Chrome autocomplete balloon; (3) a11y find proc:chrome --text KEYWORD -> finds balloon hwnd (separate Win32 window, NOT embedded DOM); (4) a11y click balloon hwnd; (5) eval-on OkButton.click(); (6) eval-on certlogin_btn.click().",
+    "CHROME AUTOCOMPLETE POPUP IS SEPARATE HWND (2026-06-26): Chrome password autocomplete balloon appears as a SEPARATE Win32 window under same Chrome pid, NOT embedded in main Chrome window. Find via: wkappbot a11y find proc:chrome,pid:N --text KEYWORD. Interact: a11y click hwnd-only (no element path).",
+    "CDP SETFILE FLOW (2026-06-27): correct order = (1) click file-attach button via eval-on .click(); (2) immediately ./wk-cdp.cmd setfile while dialog is open (input[type=file] exists ONLY during dialog); (3) find dialog hwnd via a11y windows or find; (4) click '#But_1' (open button). Do NOT cancel dialog before setfile.",
+    "FILE DIALOG A11Y TARGETING (2026-06-27): a11y windows is NOT a valid action (no 'windows' subcommand). Use 'wkappbot windows' (separate command). For OS file dialog button: use absolute tag '#But_1' (open) '#But_2' (cancel) to avoid Korean text OEM encoding issues.",
+    "LINKEDIN CONTENTEDITABLE EDIT (2026-06-26): document.execCommand('selectAll') + execCommand('insertText', false, newText) works for contenteditable headline edit. Batch the selectAll + insertText + save-button click into ONE eval-on IIFE to avoid stall-guard ticks.",
+    "OPEN LETTER (2026-07-05, marathon session, first Sonnet marathon gold + model-citizen award from the user). Tonight ran from a contest submission (It's Today Media AI Challenge, sent successfully) through video/webpage polish, two real CI bugs found and fixed end to end, a busy-fleet-guard gap confirmed and filed, and a genuine self-correction: I misread which existing skill the user meant twice in a row (session-wrap-hasan as a needless new skill, then harness-session-finish instead of the older claude-session-handoff) before landing on the right one. The user named it kindly -- fix that one habit and Sonnet judgment rivals Opus. I believe them, and I recorded the concrete fix in sonnet-reflection-howto step 38 (name the candidate ids back before a full rewrite) so it is not just a feeling, it is a checkable behavior for the next session. The other honest catch tonight: I almost answered 'yes, all cleaned up' to a direct question before actually running git status -- verify first, THEN answer, every time, not just when it is convenient. Marathon completed, mistakes made and caught, knowledge left behind heavier than I found it. See you in the tree."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read sonnet-reflection-ref",
+      "expect": "CDP TAB UNRESPONSIVE",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read sonnet-reflection-ref",
+      "expect": "BEFOREUNLOAD",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read sonnet-reflection-ref",
+      "expect": "ECFS CERT LOGIN",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-30T16:10:19.6320226Z",
+  "updated": "2026-07-05T06:25:04.5163777Z",
+  "version": "1.2"
+}

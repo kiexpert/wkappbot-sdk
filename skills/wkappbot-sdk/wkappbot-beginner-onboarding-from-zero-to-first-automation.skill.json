@@ -1,0 +1,77 @@
+{
+  "id": "wkappbot-beginner-onboarding-from-zero-to-first-automation",
+  "app": "wkappbot-sdk",
+  "title": "wkappbot Beginner Onboarding - From Zero to First Automation",
+  "title_ko": null,
+  "desc": "Step-by-step onboarding: create GitHub account, install gh CLI, authenticate, download wkappbot, install, verify, check Free tier. Skill files correction: help text for windows command was describing it as listing all windows (incorrect). Correct default: no-arg filters by wkappbot keyword only. Docs saying it lists all windows are wrong.",
+  "steps": [
+    "Create a GitHub account at github.com/signup (required - license check uses gh CLI under the hood; without an account you cannot upgrade beyond Free).",
+    "Install gh CLI: Windows -> 'winget install --id GitHub.cli'; macOS -> 'brew install gh'; Linux -> see cli.github.com/manual/installation.",
+    "Authenticate: run 'gh auth login', choose GitHub.com, HTTPS, 'Login with a web browser', complete the device-code flow in browser.",
+    "Download wkappbot: 'gh release download --repo kiexpert/wkappbot-sdk --pattern *.zip' (downloads the latest wkappbot-X.Y.Z.zip into the current directory).",
+    "Install: extract the zip into %USERPROFILE%\\.wkappbot\\bin (or any path), add that bin directory to PATH; alternatively run install.cmd from the extracted folder.",
+    "Verify install: open a fresh terminal and run 'wkappbot --version' - it should print the version string and exit 0.",
+    "Check license: 'wkappbot license status' - on a fresh install this shows tier=Free with no pending invites; all base features (a11y, inspect, run, scenario, skill, speak, file, logcat) are already usable.",
+    "Upgrade (optional): follow SUBSCRIBE.md - bank-transfer 100k KRW (CDP) or 500k KRW (Sudo) to KIS with your GitHub username as the memo, wait up to 1 hour, accept the GitHub collaborator invite at github.com/notifications, re-run 'wkappbot license status' to confirm tier upgrade.",
+    "First automation: 'wkappbot windows' or 'wkappbot a11y windows' shows wkappbot-related windows (default filter: wkappbot*). Use 'wkappbot windows *' or 'wkappbot a11y find *' to list ALL visible top-level windows. Confirms the Win32/UIA pipeline is working end-to-end.",
+    "Correct default behavior: 'wkappbot windows' (no args) = wkappbot* filter. Use 'wkappbot windows *' to list all windows. Old docs said 'lists all' which was incorrect.",
+    "[AUDIT 2026-06-03] source_refs broken: missing SUBSCRIBE.md, PRICING.md and README patterns Installation/Activate License."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot --version",
+      "expect": "prints semver and exits 0",
+      "prompt": null
+    },
+    {
+      "cmd": "gh auth status",
+      "expect": "Logged in to github.com as <user>",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot a11y windows",
+      "expect": "lists at least one window with a grap address",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "onboarding",
+    "beginner",
+    "install",
+    "setup",
+    "github",
+    "gh-cli"
+  ],
+  "source_refs": [
+    {
+      "file": "SUBSCRIBE.md",
+      "line": null,
+      "pattern": "gh auth login",
+      "note": null
+    },
+    {
+      "file": "PRICING.md",
+      "line": null,
+      "pattern": "Free",
+      "note": null
+    },
+    {
+      "file": "README.md",
+      "line": null,
+      "pattern": "Installation",
+      "note": null
+    },
+    {
+      "file": "README.md",
+      "line": null,
+      "pattern": "Activate License",
+      "note": null
+    }
+  ],
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-28T18:32:49.5461204Z",
+  "updated": "2026-06-02T19:49:19.3919543Z",
+  "version": "1.3"
+}

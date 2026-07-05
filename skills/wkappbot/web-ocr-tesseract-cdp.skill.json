@@ -1,0 +1,39 @@
+{
+  "id": "web-ocr-tesseract-cdp",
+  "app": "wkappbot",
+  "title": "Browser-Side OCR via Tesseract.js CDP Injection (web ocr command)",
+  "title_ko": null,
+  "desc": "Run OCR entirely inside a Chrome tab using Tesseract.js injected via CDP Runtime.evaluate. No screenshot roundtrip to server -- Chrome renders and recognizes in one step. Supports element-level and full-page OCR, parallel multi-selector, Korean\u002BEnglish default.",
+  "steps": [
+    "Usage: wkappbot web ocr \u003Cgrap\u003E [--selector \u003Ccss\u003E] [--lang eng\u002Bkor]. grap identifies the Chrome tab. --selector targets a specific DOM element; omit for full page. --lang sets Tesseract language codes (default: eng\u002Bkor). Prints recognized text to stdout.",
+    "How it works: (1) CdpTesseract.EnsureLoadedAsync injects Tesseract.js from CDN (cdn.jsdelivr.net/npm/tesseract.js@5) via script tag if window.__wkTesseractReady sentinel absent. (2) Page.captureScreenshot with clip rect for element bbox (DPR-aware), or full viewport. (3) base64 PNG passed to Tesseract.recognize() in-browser. (4) result.data.text returned via Runtime.evaluate. Tesseract.js cached in tab after first load -- subsequent calls skip CDN fetch.",
+    "Parallel OCR: pass multiple --selector values or run Promise.all in JS. Browser handles concurrency natively. Example: wkappbot web run \u003Cgrap\u003E \u0022Promise.all([querySelector(\u0027.a\u0027), querySelector(\u0027.b\u0027)].map(el =\u003E Tesseract.recognize(el)))\u0022. Faster than sequential server-side OCR for multi-region tasks.",
+    "Canvas / WebGL OCR: use canvas.toDataURL(\u0027image/png\u0027) to get base64, then Tesseract.recognize(base64). Works on game UIs, chart libraries, any GPU-rendered content that would be black/blank in a screenshot from outside Chrome. Key advantage over wkappbot OCR command which captures the Win32 screen.",
+    "Limitations: (1) CDN required on first load per tab -- offline fallback NYI. (2) Background tab throttling may affect dynamic content accuracy. (3) Tesseract.js WASM loads ~10MB on first use. (4) For static text on native Win32 UI (not browser), use wkappbot a11y read or wkappbot ocr instead."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot web ocr --help",
+      "expect": "ocr",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot web --help",
+      "expect": "ocr",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read chrome-process-architecture",
+      "expect": "Browser",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-02T14:03:04.9695082Z",
+  "updated": "2026-05-02T14:03:04.9695253Z",
+  "version": "1.0"
+}

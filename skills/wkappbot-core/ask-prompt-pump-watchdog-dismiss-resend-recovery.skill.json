@@ -1,0 +1,42 @@
+{
+  "id": "ask-prompt-pump-watchdog-dismiss-resend-recovery",
+  "app": "wkappbot-core",
+  "title": "ask prompt pump: watchdog dismiss+resend recovery before BUG-AUTO",
+  "title_ko": null,
+  "desc": "AskCommands.CdpPromptPump watchdog fires when editor retains text 10s after submit -- cause is usually a promo popover (Claude CoWork, Gemini copyright) eating the click. Watchdog now runs DismissDialogAsync + SendPromptAsync re-fire before declaring stuck; only actual unrecoverable cases hit AutoRegisterBug.",
+  "steps": [
+    "Pump arms watchdog after last append",
+    "T+7s: check editor text length; if >0 editor still has content",
+    "Recovery call DismissDialogAsync -- closes CoWork promo banners, Gemini copyright dialogs, X-icon popovers",
+    "Re-fire SendPromptAsync",
+    "T+10s: recheck; if still stuck BUG-AUTO with 'recovery failed' hint",
+    "Quiet when no popover (NONE return); self-heals when popover was the blocker",
+    "Verified 2026-04-19: experience/tests/session/test-session-fix-verify-20260419.sh (resolve ts=2026-04-19T05:29)",
+    "Verified 2026-04-22: test-file-grep-pump-watchdog.sh (resolve ts=2026-04-20T06:28:51.1783280Z)",
+    "LIVE CASE 2026-07-02: ts=2026-06-16T07:36:36 -- watchdog correctly detected 4308 chars stuck in editor after 30s, ran BOTH dismiss+resend recovery attempts (AskCommands.CdpPromptPump.cs ~line 114-163), both failed to clear the editor, then logged BUG-AUTO as designed. This is the watchdog WORKING AS INTENDED (a symptom detector), not itself broken -- the real question is WHY submit never cleared the editor that day (candidates: a UI overlay/banner blocking the submit click that dismiss missed, the isSending flag never resetting, focusless Enter not reaching a ProseMirror-style editor, or Chrome throttling delaying the CDP submit signal past the 30s window). NOT YET DIAGNOSED -- needs a repro with [ASK:PUMP] console.error log capture to identify which failure mode actually fired."
+  ],
+  "requirements": null,
+  "primary_cmd": null,
+  "tags": [
+    "ask",
+    "chat",
+    "prompt-pump",
+    "watchdog",
+    "cowork",
+    "dismiss",
+    "recovery"
+  ],
+  "source_refs": [
+    {
+      "file": "csharp/src/WKAppBot.WebBot/CdpClient.AiHelpers3.cs",
+      "line": null,
+      "pattern": "DismissDialogAsync",
+      "note": null
+    }
+  ],
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-19T07:20:00.8153579Z",
+  "updated": "2026-07-02T06:56:07.1907681Z",
+  "version": "2.1"
+}

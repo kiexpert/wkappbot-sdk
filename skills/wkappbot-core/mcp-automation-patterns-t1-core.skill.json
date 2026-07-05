@@ -1,0 +1,43 @@
+{
+  "id": "mcp-automation-patterns-t1-core",
+  "app": "wkappbot-core",
+  "title": "MCP Automation T1 Core",
+  "title_ko": null,
+  "desc": "Core MCP surface for WKAppBot. Covers the wkappbot_cli JSON-RPC contract, command mapping, and MCP registration smoke checks.",
+  "steps": [
+    "Use wkappbot mcp as the stdio server entrypoint.",
+    "Map argv arrays directly to wkappbot CLI commands through wkappbot_cli.",
+    "Smoke-check with codex mcp list/get and wkappbot mcp --help before deeper work."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot mcp --help",
+      "expect": "Exposes wkappbot_cli",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot mcp list",
+      "expect": "wkappbot",
+      "prompt": null
+    },
+    {
+      "cmd": "codex mcp list",
+      "expect": "wkappbot",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "mcp",
+    "core",
+    "stdio",
+    "contract",
+    "smoke"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-01T15:24:34.09458Z",
+  "updated": "2026-06-01T15:24:34.09461Z",
+  "version": "1.0"
+}

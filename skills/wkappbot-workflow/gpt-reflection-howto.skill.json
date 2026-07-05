@@ -1,0 +1,39 @@
+{
+  "id": "gpt-reflection-howto",
+  "app": "wkappbot-workflow",
+  "title": "GPT reflection (howto)",
+  "title_ko": null,
+  "desc": "How a GPT-family session records a recurrence-prevention reflection.",
+  "steps": [
+    "RECORD EACH INCIDENT AS FOUR FACTS: symptom, root-cause CLASS, fix, and PROOF. Prefer a concrete machine check (the exact command/file/hook setting that proves the fix) over apology text.",
+    "LAYER-SEPARATE before naming a Codex/CLI hook bug: config feature flag -> hook command -> adapter stdout JSON -> exit code -> downstream harness decision; name the layer, not just the symptom.",
+    "DELEGATION FAILURES: verify the REAL model family that answered (modelUsage), not only the dispatcher exit code -- a silent fallback to haiku looks like success.",
+    "PROMOTE only durable recurrence-prevention knowledge; leave transient logs, cache state, one-off screenshots out.",
+    "TRIGGER: a GPT session hits a reusable startup/hook/identity/delegation/transport/encoding/guard failure that can recur in future GPT sessions."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read gpt-reflection-howto",
+      "expect": "FOUR FACTS",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read gpt-reflection-howto",
+      "expect": "LAYER-SEPARATE",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read gpt-reflection-howto",
+      "expect": "DELEGATION FAILURES",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-24T07:24:14.3412403Z",
+  "updated": "2026-06-24T07:24:14.3412497Z",
+  "version": "1.0"
+}

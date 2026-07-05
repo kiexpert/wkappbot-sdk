@@ -1,0 +1,38 @@
+{
+  "id": "claude-family-model-ids",
+  "app": "wkappbot-workflow",
+  "title": "Claude family model ID reference",
+  "title_ko": null,
+  "desc": "Family-level model-ID reference for the Claude family (Haiku/Sonnet/Opus/Fable tiers). Holds the CURRENT ACCURATE model-id list as the single reference other skills/code should point to instead of duplicating (and drifting from) it. Read haiku-reflection/sonnet-reflection/opus-self-reflection for per-tier behavioral lessons; this is the family-wide identity/model-id anchor. RENAMED 2026-07-03 from claude-reflection: that id ended in -reflection and collided with the agent-failure-reflection-gate reverse-containment lookup (claude-haiku-4-5-20251001 was misrouting to claude-reflection instead of haiku-reflection since claude is a longer substring than haiku) -- found by an Opus review. Never name a non-per-model skill with a -reflection suffix.",
+  "steps": [
+    "BUG: multiple existing skills hardcode STALE Claude model ids (found 2026-07-03). codex-opus-agent-delegation step 6 says opus maps to claude-opus-4-7 and sonnet maps to claude-sonnet-4-6 -- both are stale; the CURRENT models are claude-opus-4-8 (Opus 4.8) and claude-sonnet-5 (Sonnet 5).",
+    "CURRENT MODEL ID LIST (as of 2026-07-03, VERIFY AND UPDATE THIS STEP whenever a new model ships): claude-fable-5 (Fable 5), claude-opus-4-8 (Opus 4.8), claude-sonnet-5 (Sonnet 5), claude-haiku-4-5-20251001 (Haiku 4.5). Older ids that may still appear in transcripts or stale skill text: claude-opus-4-7, claude-opus-4-6, claude-sonnet-4-6 -- treat any hardcoded reference to these as a DRIFT SIGNAL.",
+    "RULE: any skill or source file that needs to reference a specific Claude model id should point HERE rather than hardcoding its own copy of the id string.",
+    "NAVIGATION: per-tier behavioral reflections live in haiku-reflection, sonnet-reflection, opus-self-reflection -- this skill is the family-wide model-identity anchor, not a behavioral log, and deliberately does NOT end in -reflection so it is never picked up by the reflection-lookup reverse-containment scan."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read claude-family-model-ids",
+      "expect": "CURRENT MODEL ID LIST",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read claude-family-model-ids",
+      "expect": "DRIFT SIGNAL",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill search claude-family-model-ids",
+      "expect": "claude-family-model-ids",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-07-03T09:23:58.615652Z",
+  "updated": "2026-07-03T09:23:58.6156601Z",
+  "version": "1.0"
+}

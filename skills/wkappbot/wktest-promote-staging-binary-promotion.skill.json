@@ -1,0 +1,38 @@
+{
+  "id": "wktest-promote-staging-binary-promotion",
+  "app": "wkappbot",
+  "title": "wktest-promote: staging binary promotion",
+  "title_ko": null,
+  "desc": "Promotes wktest-core-*.exe staging build to bin/wkappbot-core.exe after mandatory smoke gate. The ONLY sanctioned path for hot-swapping the production binary.",
+  "steps": [
+    "Run from repo root: bash bin/wktest-promote.sh",
+    "Or from Windows CMD/PS: wktest-promote.cmd",
+    "Smoke gate is MANDATORY (FORCE=1 to bypass, not recommended).",
+    "On success: wkappbot-core.exe + wkappbot-core.new.exe (Eye hot-swap trigger) are updated."
+  ],
+  "requirements": [
+    {
+      "cmd": "bash bin/wktest-promote.sh",
+      "expect": "PROMOTED",
+      "prompt": null
+    },
+    {
+      "cmd": "wktest-promote.cmd",
+      "expect": "PROMOTED",
+      "prompt": null
+    },
+    {
+      "cmd": "ls bin/wktest-core-*.exe",
+      "expect": "wktest-core",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-27T05:53:17.0615407Z",
+  "updated": "2026-06-27T05:53:17.0615516Z",
+  "version": "1.0"
+}

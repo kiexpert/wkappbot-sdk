@@ -1,0 +1,67 @@
+{
+  "id": "win-click-postmessage-mfc-nfrunlite",
+  "app": "wkappbot-core",
+  "title": "win-click PostMessage tier: focusless on elevated MFC HTS (nfrunlite)",
+  "desc": "win-click 3-tier cascade achieves focusless clicks on elevated MFC HTS (nfrunlite/nkrunlite) via PostMessage WM_LBUTTONDOWN to deepest child. Admin Eye proxy handles UIPI elevation barrier transparently. Tested on Heroes Global toolbar, grid, MDI areas.",
+  "steps": [
+    "[TIER 2 PostMessage] win-click TARGET x y probes UIA (Tier 1) then PostMessage WM_LBUTTONDOWN/UP to ChildWindowFromPointEx deepest child. No focus steal, no popup. Works on AfxControlBar110, MDIClient, MFC child classes. Admin Eye proxy routes PostMessage for elevated processes (UIPI transparent). Output: FocuslessClick(PostMsg).",
+    "[FLAGS] --fl = Tier 2 max, fail if PostMessage also fails (no physical fallback). --dbl = WM_LBUTTONDBLCLK sequence. --right = WM_RBUTTONDOWN/UP. All 3 skip UIA Tier 1 (UIA has no dbl/right concept).",
+    "[TESTED nfrunlite 2026-04-25] AfxControlBar110 (480,67) toolbar: FocuslessClick(PostMsg) PostMsg at client (476,20). MDIClient (271,296) grid. Window at 0,0 full-screen so window-relative == screen coords. Find with: wkappbot a11y find {proc:nfrunlite}",
+    "[POPUP EXCEPTION] Stacked #32770 reconnect popups still fail from user-space UIPI. For popups use dismiss_popup_safe.py with IsWindowVisible filter. Normal MFC controls work via PostMessage.",
+    "[WHY OLD APPROACH FAILED] Previous ctypes PostMessage from non-elevated caller got err=5. wkappbot win-click routes via Eye pipe (admin proxy), so UIPI bypassed for normal controls.",
+    "Verified 2026-04-26: test-a11y-find-praise.sh (resolve ts=2026-04-26T06:05:43.0794147Z)"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot win-click \u0027{proc:nfrunlite}\u0027 480 67 --fl",
+      "expect": "FocuslessClick(PostMsg)",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot win-click \u0027{proc:nfrunlite}\u0027 271 296 --dbl",
+      "expect": "FocuslessClick(PostMsg)",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot win-click \u0027{proc:nfrunlite}\u0027 480 67 --right",
+      "expect": "FocuslessClick(PostMsg)",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot a11y find {proc:nfrunlite,cls:Button}",
+      "expect": "hwnd returned",
+      "prompt": "\uCE6D\uCC2C \uC811\uC218! --sudo win-click GetWindowRect \uD328\uD134 --skill win-click-postmessage-mfc-nfrunlite --commit a02d9d93404a67b02268a9c98e40987e0f13f3e1 --class skill-only"
+    },
+    {
+      "cmd": "wkappbot a11y find {proc:nfrunlite}#But_OK",
+      "expect": "Button hwnd found",
+      "prompt": "\uCE6D\uCC2C \uC811\uC218! --sudo win-click GetWindowRect \uD328\uD134 --skill win-click-postmessage-mfc-nfrunlite --commit a02d9d93404a67b02268a9c98e40987e0f13f3e1 --class skill-only"
+    },
+    {
+      "cmd": "wkappbot a11y click {proc:nfrunlite} 1326 937",
+      "expect": "click OK",
+      "prompt": "\uCE6D\uCC2C \uC811\uC218! --sudo win-click GetWindowRect \uD328\uD134 --skill win-click-postmessage-mfc-nfrunlite --commit a02d9d93404a67b02268a9c98e40987e0f13f3e1 --class skill-only"
+    }
+  ],
+  "primary_cmd": "wkappbot a11y find {proc:nfrunlite,cls:Button}",
+  "tags": [
+    "win-click",
+    "PostMessage",
+    "nfrunlite",
+    "nkrunlite",
+    "MFC",
+    "focusless",
+    "elevated",
+    "admin-eye",
+    "AfxControlBar",
+    "MDIClient",
+    "UIPI",
+    "WM_LBUTTONDOWN"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-25T01:36:38.0440089Z",
+  "updated": "2026-04-26T06:25:18.5498823Z",
+  "version": "1.2"
+}

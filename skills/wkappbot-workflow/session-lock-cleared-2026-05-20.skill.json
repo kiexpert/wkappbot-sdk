@@ -1,0 +1,40 @@
+{
+  "id": "session-lock-cleared-2026-05-20",
+  "app": "wkappbot-workflow",
+  "title": "Session Lock Cleared 2026-05-20",
+  "title_ko": null,
+  "desc": "Temporary skill to clear stale session lock from wkappbot-sdk 03:25 session",
+  "steps": [
+    "Clear stale locks from ended sessions",
+    "Check git status for uncommitted skill edits"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read on-load",
+      "expect": "MANDATORY",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read suggest-workflow",
+      "expect": "resolve",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read naver-mail-sync-daily",
+      "expect": "naver_mail",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "lock",
+    "session",
+    "cleanup"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-19T18:26:18.3944518Z",
+  "updated": "2026-05-19T18:26:18.3944699Z",
+  "version": "1.0"
+}

@@ -1,0 +1,40 @@
+{
+  "id": "standard-appbot-window-howto",
+  "app": "wkappbot",
+  "title": "Standard AppBot Window T2 HowTo",
+  "title_ko": null,
+  "desc": "T2 domain tier. FindRectProviderHwnd, IPC __hwnd forwarding, ConPTY hidden-window rect, isBig check, downstream consumers, GAP fixes.",
+  "steps": [
+    "FindRectProviderHwnd pattern: hForRect = IsWindowVisible(hwnd) ? hwnd : GetAncestor(hwnd, GA_ROOTOWNER). Returns placement-ready CASCADIA for ConPTY hidden windows. Hidden hwnd kept for input injection identity.",
+    "ConPTY PseudoConsoleWindow: class=PseudoConsoleWindow, IsWindowVisible=false, no title, but IsWindow=true and non-zero GetWindowRect. P2 finds it (no visibility filter). GA_ROOTOWNER -> CASCADIA for rect.",
+    "isBig check: ancestors must pass GetWindowRect size >= 200x100 to avoid ConPTY tiny 16x16 rect. Skips hidden pseudo-console, lands on real terminal CASCADIA window.",
+    "IPC __hwnd: EyeCmdPipeClient.ResolveCallerTerminalHwnd() -> if hwnd!=Zero prepend __hwnd:0xHHHH to args JSON. EyeCmdPipeServer strips prefix, validates IsWindow, sets CallerHwnd AsyncLocal + ChromeLauncher.CallerHwndForPlacement static.",
+    "DOWNSTREAM CONSUMERS: TryMoveChromeToCallerAsync (placement), ChromeLauncher.CallerHwndForPlacement (static anchor), MCP worker _meta.callerHwnd, Admin Eye ElevatedEyeServer, WKAPPBOT_CALLER_HWND env var to Core subprocess.",
+    "ICONIFIED CALLER: if terminal minimized -> TryMoveChromeToCaller skips placement. Chrome stays at last valid position. Background/batch run = moving Chrome disruptive."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read standard-appbot-window-howto",
+      "expect": "T2 howto",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read standard-appbot-window",
+      "expect": "T1 core",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read standard-chrome-window",
+      "expect": "Chrome placement",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-31T12:24:02.1221937Z",
+  "updated": "2026-05-31T12:24:02.1222034Z",
+  "version": "1.0"
+}

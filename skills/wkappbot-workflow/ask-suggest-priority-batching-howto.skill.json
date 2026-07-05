@@ -1,0 +1,42 @@
+{
+  "id": "ask-suggest-priority-batching-howto",
+  "app": "wkappbot-workflow",
+  "title": "Ask Suggest Priority Batching T2 HowTo",
+  "title_ko": null,
+  "desc": "T2 domain tier. Step-by-step: batch GPT ranking, concurrent per-item queries, timeout handling, pipeline health check, Opus delegation.",
+  "steps": [
+    "wkappbot suggest list (one page). Merge duplicates: wkappbot suggest merge --all-matching PATTERN --dry-run first.",
+    "Batch rank via GPT --timeout 20s with full list. Fire-and-forget background. Continue analysis in parallel.",
+    "Per-item queries (concurrent): fire all at once with ts+title+root-cause question. STOP. Wait for responses.",
+    "STOP after firing queries. Do NOT use Claude tokens while GPT runs. Resume ONLY after responses or 20s timeout.",
+    "NO-RESPONSE: FindAllPrompts:0 in log = Chrome AI tab closed. Re-open with --new-tab. File BUG-AUTO.",
+    "After responses: brief Opus with ts+title+result+fix-path. Agent(model:opus, prompt:fix+resolve).",
+    "PIPELINE HEALTH first: wkappbot cdp ping --sync --timeout 20s. Broken = BUG-AUTO + fallback to codebase analysis.",
+    "Failure fallback: no response in 20s = continue with codebase analysis. Never block indefinitely."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read ask-suggest-priority-batching-howto",
+      "expect": "T2 domain",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read ask-suggest-priority-batching",
+      "expect": "T1 core",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot suggest list",
+      "expect": "suggests",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-31T12:04:01.2311279Z",
+  "updated": "2026-05-31T12:17:38.1867994Z",
+  "version": "1.1"
+}

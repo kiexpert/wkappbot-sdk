@@ -1,0 +1,75 @@
+{
+  "id": "recover-korean-console-after-crash-reboot",
+  "app": "wkappbot-core",
+  "title": "Recover Korean console after crash reboot",
+  "title_ko": null,
+  "desc": "When Korean/Hangul input fails only in console after system crash reboot or Kernel-Power 41, run scripts/recover-korean-console.ps1 before substantive work. It restarts TextInputHost/ctfmon and aligns PowerShell console encodings to UTF-8.",
+  "steps": [
+    "Run powershell -ExecutionPolicy Bypass -File .\\scripts\\recover-korean-console.ps1 from repo root.",
+    "If ctfmon start reports 0xc0000142 but ctfmon is already running, treat it as usually sufficient.",
+    "If the already-open console still has stale IME state, open a new Windows Terminal tab before suggesting another reboot.",
+    "For repeated crash-boot symptoms, consider disabling Windows Fast Startup separately."
+  ],
+  "requirements": [
+    {
+      "cmd": "powershell -ExecutionPolicy Bypass -File .\\scripts\\recover-korean-console.ps1",
+      "expect": "CP65001",
+      "prompt": null
+    },
+    {
+      "cmd": "powershell -ExecutionPolicy Bypass -File .\\scripts\\recover-korean-console.ps1",
+      "expect": "ctfmon.exe is running",
+      "prompt": null
+    },
+    {
+      "cmd": "powershell -ExecutionPolicy Bypass -File .\\scripts\\recover-korean-console.ps1",
+      "expect": "InputEncoding",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "korean",
+    "hangul",
+    "console",
+    "ime",
+    "ctfmon",
+    "TextInputHost",
+    "encoding",
+    "utf8",
+    "chcp",
+    "crash-reboot",
+    "kernel-power"
+  ],
+  "source_refs": [
+    {
+      "file": "scripts/recover-korean-console.ps1",
+      "line": 15,
+      "pattern": "TextInputHost",
+      "note": null
+    },
+    {
+      "file": "scripts/recover-korean-console.ps1",
+      "line": 19,
+      "pattern": "ctfmon",
+      "note": null
+    },
+    {
+      "file": "scripts/recover-korean-console.ps1",
+      "line": 42,
+      "pattern": "chcp 65001",
+      "note": null
+    },
+    {
+      "file": "scripts/recover-korean-console.ps1",
+      "line": 49,
+      "pattern": "InputEncoding",
+      "note": null
+    }
+  ],
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-05T05:51:42.6306351Z",
+  "updated": "2026-05-05T05:51:42.630644Z",
+  "version": "1.0"
+}

@@ -1,0 +1,38 @@
+{
+  "id": "eye-ipc-caller-hwnd-resolution-ref",
+  "app": "wkappbot",
+  "title": "Eye IPC Caller HWND T3 Reference",
+  "title_ko": null,
+  "desc": "T3 ref. GAP history, GA_ROOTOWNER verified chain, multi-monitor debug, iconified caller design.",
+  "steps": [
+    "GAPS HISTORY: A=Zero hwnd stale CallerHwndForPlacement (Eye should reset when prefix absent). B=Static CallerHwndForPlacement survives hot-swap. C=Integrated terminal ConPTY host is IDE (ancestor walk finds IDE not terminal panel). Most fixed by 2026-05-24.",
+    "GA_ROOTOWNER VERIFIED CHAIN (2026-05-24, commit c631b2f3): wkappbot-core(14088)->claude(16500)->..->PCW(12600 Vis=True)->GA_ROOTOWNER->CASCADIA 0x606A2. All 4 test pairs confirmed. Vis=False PCW = AllocConsole = GA_ROOT==GA_ROOTOWNER==self (useless).",
+    "Multi-monitor debug: cdp-mon.ps1 [OFF-SCREEN] label uses old sign-based check (99.9% false positive on multi-monitor). True check: wkappbot.hq/runtime/cdp-state.jsonl caller_hwnd field + MonitorFromPoint API.",
+    "Iconified caller design: minimized terminal = background/batch run = Chrome should NOT move. Optional future: WINDOWPLACEMENT.rcNormalPosition for would-be restore position. Low priority."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read eye-ipc-caller-hwnd-resolution-ref",
+      "expect": "T3",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read eye-ipc-caller-hwnd-resolution",
+      "expect": "T1",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read standard-appbot-window",
+      "expect": "detection spec",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-31T12:49:24.5272515Z",
+  "updated": "2026-05-31T12:49:24.5272607Z",
+  "version": "1.0"
+}

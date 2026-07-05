@@ -1,0 +1,39 @@
+{
+  "id": "agy-root-reflection-ref",
+  "app": "wkappbot-workflow",
+  "title": "Agy-Root Reflection (T3 ref): dated incidents and bug history",
+  "title_ko": null,
+  "desc": "Dated incident/bug history for agy-root-reflection T1 core: git pinset rules, the --output-format flag-mismatch bug, and the stream-mode stdout/stderr bug (both fixed).",
+  "steps": [
+    "GIT PINSET & HARNESS CACHING RULES: when modifying agy/gemini configs, ensure that (a) git commits are pinset-only (e.g. committing only the specific file like tools/wkharness-agy-main.ps1, never git add -A or git reset which can disrupt other active sessions), (b) permissions.allow array resets to size 1 containing only the current tool call, re-reading the settings file fresh each time, and (c) config.json in ~/.gemini/config/config.json is auto-recovered with UTF-8 No BOM at startup to prevent infinite approval popup loops.",
+    "BUG: Agent.cmd --model agy fails with a flag error, not a silent no-op (2026-07-03, live repro). wkagy.sh (invoked by AgentBackend.agy.ps1) hardcoded agy_args with an --output-format stream-json value, but the installed agy.exe does not recognize --output-format at all -- it prints an error plus its own usage/flags listing and exits immediately. Unlike the sibling codex bug (Agent.cmd --model codex silently no-ops with exit 0 and no error at all, see gpt-reflection), this failure was LOUD and immediately visible in the captured output.",
+    "FIX APPLIED 2026-07-03 for the output-format bug: wkagy.sh (tools/wrappers/wkagy.sh) no longer passes --output-format to agy.exe -- the flag was removed since the installed agy.exe does not support any output-format at all. Downstream JSON parsers fall back gracefully to printing raw text and logging a parse error instead of crashing, so usage-metadata logging degrades to unknown-model/0-tokens but the actual dispatch now runs.",
+    "BUG: wkagy.sh stream-mode routed agy replies to STDERR not stdout (Opus review finding, 2026-07-03). Since --output-format was removed, the stream_mode branch piped agy output through a python JSON-per-line parser whose except-branch printed non-JSON lines to sys.stderr -- and every line was now non-JSON, so the caller-visible reply went to stderr while stdout stayed empty. AgentBackend.agy.ps1 always passes --stream, so every Agent.cmd --model agy dispatch was affected.",
+    "RESOLVED 2026-07-03: the stream-mode stdout/stderr bug is FIXED and landed -- using the .tmp/ write-freeze exemption (wkharness-guards), wrote the corrected wkagy.sh via the built-in Write tool to a scratch path, verified with bash -n, then promoted to canonical via wkappbot file write --source-file. Confirmed live: the stream_mode branch now runs agy directly with no JSON parser step, matching the plain default path. All 3 Opus review findings from this session are now resolved: the claude-reflection collision, this stream-mode bug, and an Agent.ps1 gemini-pro doc mislabel."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read agy-root-reflection-ref",
+      "expect": "dated incidents",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read agy-root-reflection",
+      "expect": "T1 core",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot file grep output-format tools/wrappers/wkagy.sh",
+      "expect": "no match (flag removed)",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-07-03T13:24:33.7269933Z",
+  "updated": "2026-07-03T13:24:33.7270019Z",
+  "version": "1.0"
+}

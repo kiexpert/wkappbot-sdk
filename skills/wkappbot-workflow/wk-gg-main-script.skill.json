@@ -1,0 +1,41 @@
+{
+  "id": "wk-gg-main-script",
+  "app": "wkappbot-workflow",
+  "title": "wk-gg-main script automation",
+  "title_ko": null,
+  "desc": "wk-gg-main.cmd automation script architecture and how to maintain it",
+  "steps": [
+    "Step 1 - WHAT IS wk-gg-main: ./wk-gg-main.cmd is the personal-docs daily automation entry point (repo root). Calls tools/gg_main.py. Runs: mail sync (Naver+Gmail) + danger detection + wkappbot speak alerts. Pace-safe: harness:safe pattern allows it even over-target budget. Run: cd D:/GitHub/personal-docs && ./wk-gg-main.cmd",
+    "Step 2 - STEP COUNT CONTRACT: tools/gg_main.py defines STEPS list (7 items). Script parses ## gg Main Workflow in CLAUDE.md and counts numbered items. If counts differ -> speak alert + sys.exit(1). Fix: update STEPS list AND CLAUDE.md workflow together.",
+    "Step 3 - DANGER DETECTIONS currently implemented: (1) Appeal/rebuttal deadline 2026-06-19 D-check (alert D<=3, warn D<=7). (2) Hearing recording file not received (case 16591752). (3) Seoul administrative court case - Ko Soo-yeon no response. (4) NVIDIA JR2012622 elapsed days (warn 14d, 30d). (5) New legal mail today. (6) Kim Eun-ha recommended jobs not reviewed. (7) NVIDIA job application strategy Pending.",
+    "Step 4 - TO ADD NEW DANGER CHECK: open tools/gg_main.py -> detect_dangers() function -> append to alerts[] or warnings[]. speak() is called with first 2-3 items. No limit on items in list.",
+    "Step 5 - TO ADD NEW GG STEP: (1) add name to STEPS list in gg_main.py. (2) add numbered item to ## gg Main Workflow in CLAUDE.md. (3) implement function. (4) call in main(). Step count must match or script exits.",
+    "Step 6 - FILES: wk-gg-main.cmd (D:/GitHub/personal-docs/, repo root). tools/gg_main.py (logic). harness:skill registered in CLAUDE.md for both. Skills: wk-gg-main-script (this) + opengov-labor-case-status + naver-mail-sync-daily.",
+    "Step 7 - CRON: CronCreate */30 7-19 * * * runs this automation every 30min 07:00-19:00 KST. Registered in CLAUDE.md Nightly Schedules section."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill list",
+      "expect": "opengov-labor-case-status",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill list",
+      "expect": "naver-mail-sync-daily",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill list",
+      "expect": "wkharness-guards",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-28T03:55:47.7039119Z",
+  "updated": "2026-05-28T03:55:47.7039273Z",
+  "version": "1.0"
+}

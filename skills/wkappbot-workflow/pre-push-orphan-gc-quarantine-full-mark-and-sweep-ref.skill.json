@@ -1,0 +1,39 @@
+{
+  "id": "pre-push-orphan-gc-quarantine-full-mark-and-sweep-ref",
+  "app": "wkappbot-workflow",
+  "title": "Pre-Push Orphan GC Quarantine (full mark-and-sweep) ref",
+  "title_ko": null,
+  "desc": "T3 ref for the pre-push orphan GC-quarantine guard: design rationale (recoverability enables approximate mark), 3-hop bound, root-script focus + code-smell note, runtime-critical backstop, origin.",
+  "steps": [
+    "DESIGN RATIONALE (user 2026-06-19): the MOVE-not-delete recoverability is WHY the mark can be approximate -- a false quarantine is restorable from .tmp/unused-DATE/, so full fixpoint and exhaustive edge extraction are over-engineering. Simplicity wins.",
+    "3-HOP BOUND rationale: most real reference chains are shallow; 3 hops from roots covers common cases; deeper chains falsely swept are recoverable. Do not chase generic path strings to infinity.",
+    "ROOT-SCRIPT FOCUS: primarily follow edges that involve root scripts. NOTE: a root script referencing ANOTHER root script is a mild code-smell (not beautiful) -- tolerated, but a sign to flatten and clarify the root set, not to deepen the walk.",
+    "RUNTIME-CRITICAL BACKSTOP: never quarantine known-config (.gitignore, csproj, sln, LICENSE, lock files); entry-config roots + transitive mark should already cover these -- belt-and-suspenders.",
+    "ORIGIN: born 2026-06-19 from session cruft (leftover sandbox proto files, duplicate stashes) -- the AI does not clean its own garbage, so the guard enforces it at push, transparently, without blocking."
+  ],
+  "requirements": [
+    {
+      "cmd": "false quarantine",
+      "expect": "file recoverable from .tmp/unused-DATE/",
+      "prompt": null
+    },
+    {
+      "cmd": "known-config file (.gitignore)",
+      "expect": "never quarantined",
+      "prompt": null
+    },
+    {
+      "cmd": "root-to-root reference",
+      "expect": "tolerated but flagged as flatten-candidate",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-19T05:28:12.7337867Z",
+  "updated": "2026-06-19T05:28:12.7337955Z",
+  "version": "1.0"
+}

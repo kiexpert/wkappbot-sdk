@@ -1,0 +1,51 @@
+{
+  "id": "wkedit-autocorrect",
+  "app": "wkappbot-workflow",
+  "title": "wkedit.sh Auto-Correction Design",
+  "title_ko": null,
+  "desc": "Design spec for wkedit.sh failure detection + arg correction + retry. Based on live test results 2026-05-18.",
+  "steps": [
+    "PROBLEM DIAGNOSIS (live tests 2026-05-18): wkedit.sh wraps wkappbot file edit. When bash processes args before wkappbot sees them, 5 failure classes emerge: (1) matches-multiple: --replace-all missing; (2) old_string-not-found: bash ate backslashes e.g. \\ became \\; (3) invalid-regex: shell expanded $1 or ate backslash in regex; (4) args-misparse: unsupported flags like --line N caused old arg to be read as file path; (5) regex-pattern-not-found: genuine no-match -- safe final failure, no retry.",
+    "CORRECTION DECISION MATRIX: matches-multiple -> SAFE +--replace-all (warn user). old-string-not-found -> SAFE --old-file tempfile retry (identical content, bypass shell). invalid-regex -> UNSAFE (content already corrupted). args-misparse -> PARTIAL (strip unknown flags, risky). regex-not-found -> FINAL FAIL no retry.",
+    "DESIGN: single-retry in _do_edit(). Capture: err=$(wkedit.exe 2>&1); rc=$?. Parse err. Apply ONE correction only. Never chain. Always print [wkedit.sh] auto-retry: reason to stderr.",
+    "SAFETY RULES: (A) --replace-all: always warn user matches were multiple. (B) --old-file retry: note if backslash detected in arg. (C) invalid-regex: print corrupted pattern. (D) Never retry silently. (E) --dry-run flag preserved on retry.",
+    "UNANSWERED (triad unavailable): (Q1) Should --replace-all retry be opt-in via env flag WKEDIT_AUTO_REPLACE_ALL=1? (Q2) Pre-check byte count of arg vs printf to detect shell corruption before first call? (Q3) On double-fail: emit both error messages for diagnosis?",
+    "IMPL SKETCH in _do_edit(): after wkedit.exe call -- if rc!=0 then case err in matches-multiple -> args+=(--replace-all); warn; retry. old-string-not-found -> write args[0] to tmpA, args[1] to tmpB; rebuild args with --old-file tmpA --new-file tmpB; retry. esac. One retry only.",
+    "FINAL DESIGN (merged Opus+Codex): _do_edit() { local has_replace_all has_old_file has_new_file (scan args). run_once() inner fn { apply existing normalization; wkedit.exe args }. stderr=mktemp. if run_once fails: case1 matches-multiple AND !has_replace_all -> run_once +--replace-all; warn user. case2 old_string-not-found AND !has_old_file AND args[0]!='--*' AND argc>=3 -> printf args[0] to tmpA; run_once --old-file tmpA args[1] args[2:]; rm tmpA. case3 invalid-regex/regex-not-found/misparse -> cat stderr; return rc (no retry). double-fail: cat original_stderr + retry_stderr; return retry_rc. WKEDIT_NO_AUTO=1 skips all retry logic. retire _do_edit_with_retry() concept -- keep single function.",
+    "implementation delegated to Codex 2026-05-18: modifying _do_edit() in wkedit.sh to add run_once() inner fn + retry logic for matches-multiple (+--replace-all) and old_string-not-found (--old-file tempfile bypass). WKEDIT_NO_AUTO=1 opt-out. Double-fail emits both errors."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read wkedit",
+      "expect": "steps include IMPROVEMENT",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wkedit-autocorrect",
+      "expect": "PROBLEM DIAGNOSIS",
+      "prompt": null
+    },
+    {
+      "cmd": "wkedit.sh --help",
+      "expect": "usage shown",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "wkedit",
+    "autocorrect",
+    "retry",
+    "shell",
+    "escaping",
+    "design",
+    "bash",
+    "wkappbot"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-18T07:57:49.9162085Z",
+  "updated": "2026-05-18T08:05:53.5616044Z",
+  "version": "1.4"
+}

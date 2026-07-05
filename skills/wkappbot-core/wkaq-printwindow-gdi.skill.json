@@ -1,0 +1,40 @@
+{
+  "id": "wkaq-printwindow-gdi",
+  "app": "wkappbot-core",
+  "title": "PrintWindow flag=0 GDI path for legacy Win32 apps (nfrunlite/nkrunlite/Kiwoom HTS)",
+  "title_ko": null,
+  "desc": "PW_RENDERFULLCONTENT (flag=2) routes through DWM GPU compositing and returns blank for GDI apps. TryPrintWindowOnly now tries: flag=2 (DirectX) -\u003E flag=0 (GDI WM_PRINT) -\u003E BitBlt GetWindowDC. nfrunlite/nkrunlite/Kiwoom HTS captured correctly with flag=0.",
+  "steps": [
+    "BitBlt GetWindowDC is last resort for GPU-composited windows where both PrintWindow flags fail",
+    "PrintWindow flag=0: pure GDI WM_PRINT message path, works on legacy Win32 apps (nfrunlite/nkrunlite/Kiwoom HTS)",
+    "PrintWindow flag=2 (PW_RENDERFULLCONTENT): DWM GPU compositing path, DirectX/WPF only -- blank on GDI apps",
+    "TryPrintWindowOnly order: flag=2 first -\u003E blank -\u003E flag=0 -\u003E blank -\u003E BitBlt GetWindowDC",
+    "ScreenCapture.FastPath.cs: commit 9562df7b added flag=0 middle tier between flag=2 and BitBlt",
+    "Do NOT use flag=2 exclusively -- blank result on GDI apps is expected, fall through to flag=0"
+  ],
+  "requirements": [
+    {
+      "cmd": "grep -c \u0027flag=0\u0027 D:/GitHub/WKAppBot/csharp/src/WKAppBot.Win32/Input/ScreenCapture.FastPath.cs",
+      "expect": "1",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot windows list",
+      "expect": "nfrunlite",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot windows list",
+      "expect": "nkrunlite",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-30T16:44:50.1592168Z",
+  "updated": "2026-04-30T16:45:02.6237613Z",
+  "version": "1.6"
+}

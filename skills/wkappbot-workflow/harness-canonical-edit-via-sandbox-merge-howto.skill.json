@@ -1,0 +1,45 @@
+{
+  "id": "harness-canonical-edit-via-sandbox-merge-howto",
+  "app": "wkappbot-workflow",
+  "title": "Harness canonical edit via sandbox merge howto",
+  "title_ko": null,
+  "desc": "T2 howto: the exact cheap-sandbox to ROOT-merge procedure for canonical wkharness edits, plus every guard in the stack (knowledge-op single-clean-cmd, busy-fleet 30min window, clean-baseline commit-first, tier-gate 3-tier-split, stall-guard delegate, agent-brief 5-SPEC, spec-gate) and the whole-file-vs-surgical merge hazard.",
+  "steps": [
+    "DELEGATE the edit: spawn a sonnet whose brief has Goal/Files/Approach/Constraints/Exit (all 5 labels, plain not dashed) + 3 wkappbot skill read refs. Tell it to Copy-Item the CURRENT canonical to a <name>-sonnet.ps1 SANDBOX (the -sonnet suffix is REQUIRED; the write-freeze treats wkharness star .ps1 and even .hardenproto as canonical and blocks), edit the COPY only, tokenize via PSParser, and report exact OLD to NEW pairs.",
+    "ROOT VERIFY before merge: git diff --no-index canonical vs sandbox must show ONLY the intended lines (no dropped/extra code -- cheap models silently drop lines), and PSParser tokenize must pass on the sandbox. Never trust the agent self-report; ROOT reproduces the check.",
+    "ROOT MERGE whole-file: wkappbot file write CANON --file SANDBOX -- SAFE only when the sandbox was copied from the CURRENT canonical (so it preserves earlier merges). After merge, re-tokenize the canonical + grep that the change landed.",
+    "MERGE HAZARD: if two sandbox SETS touch the SAME file (e.g. a CODEX_HOOK sandbox AND a comment-purge sandbox of one main), do NOT whole-file-merge both -- the second reverts the first. Either merge each surgically (wkappbot file edit OLD NEW PATH, one changed line per call) OR have ONE agent produce a single COMBINED sandbox per file from current canonical.",
+    "KNOWLEDGE-OP guard: every wk command must be ONE CLEAN line -- NO variable, NO for-loop, NO command-substitution dollar-paren, NO redirect-to-null, NO backtick, NO .cmd/.exe extension; stderr 2 to 1 and a SINGLE pipe to grep or tail ARE allowed. So merges are one wkappbot file write or edit per Bash call.",
+    "SAME-FILE edits must be SEQUENTIAL (parallel calls race the same file and corrupt it); DIFFERENT files run in parallel safely (one Bash call per file in one message).",
+    "BUSY-FLEET: ROOT own canonical edit is blocked unless a delegation was active in the last ~30min. Merge in the window right after an agent completes, or keep one delegated. This is NOT to be bypassed -- send a real cheap delegation (Agent.cmd or the Agent tool); the kill-switch env is forbidden.",
+    "CLEAN-BASELINE: a non-pro (sonnet/haiku) delegation is blocked while the CWD repo (the project you are in, NOT the kih harness repo) has uncommitted TRACKED changes; commit or stash first. skill read/edit AUTO-dirty the CWD tree (.claude/skills SKILL.md mirrors + bin .hq .skill.json sync) -- commit those churn files each time, or gitignore .claude/skills + .codex/skills derived mirrors to stop the per-session churn.",
+    "TIER-GATE: an Agent brief that REFERENCES a skill scoring under 60 is blocked with split-into-3-tier. FOLLOW it: split that skill into -howto + -ref (so Get-WkTierScore finds the siblings and the score rises) OR inline the content and do not name the low-score id. Do NOT dodge by renaming.",
+    "STALL-GUARD + BRIEF GATES: a long solo run of tool calls trips stall-guard -- delegate or knowledge-ify, do not solo-grind. agent-brief-guard needs 3 skill-read refs + the 5 SPEC labels; spec-gate needs a SPEC block specifically for opus Agent calls.",
+    "COMMIT: kih has no origin remote (local commit only until gh auth refresh with workflow scope). Commit SELECTIVELY -- stage only your changed harness files -- to avoid bundling unrelated in-flight demix work; ROOT/Opus passes the pre-push model-tier gate, cheap sessions do not."
+  ],
+  "requirements": [
+    {
+      "cmd": "many canonical edits needed",
+      "expect": "delegate one sonnet to edit sandbox copies, ROOT merges, do NOT solo-grind single edits (stall-guard)",
+      "prompt": null
+    },
+    {
+      "cmd": "wk command with a variable or for-loop or redirect-to-null",
+      "expect": "knowledge-op blocks; use a single clean command",
+      "prompt": null
+    },
+    {
+      "cmd": "two sandbox sets edit one file",
+      "expect": "merge surgically not whole-file (whole-file clobbers the first)",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-19T08:21:44.7946141Z",
+  "updated": "2026-06-19T08:21:44.7946275Z",
+  "version": "1.0"
+}

@@ -1,0 +1,42 @@
+{
+  "id": "harness-edit-write-study-lock-hole-fixed",
+  "app": "wkappbot-workflow",
+  "title": "Harness edit write study lock hole fixed",
+  "title_ko": null,
+  "desc": "FIX RECORD (renamed from misleading harness-edit-write-skill-bypass): the Edit/Write TOOL once bypassed harness:skill study-lock while Bash file-edit blocked -- FOUND and CLOSED (commit d3fba1b). Documents a CLOSED hole, not a bypass to use.",
+  "steps": [
+    "THIS IS A FIX RECORD OF A CLOSED HOLE, not a bypass-howto. Renamed from harness-edit-write-skill-bypass because that name read like a backdoor recipe and (correctly) triggered a security alarm; name a skill for the FIX, not the hole.",
+    "HOLE (was): the Edit/Write TOOL bypassed harness:skill study-lock while Bash wkappbot file edit / wkedit on the SAME .ps1 blocked -- canonical source editable via Edit tool WITHOUT the knowledge-gate firing.",
+    "ROOT CAUSE: a safe-rule loop in Invoke-HarnessRules (wkharness-guards.ps1) returned early for Edit/Write BEFORE the skill + catch-all eval.",
+    "FIX (commit d3fba1b): for Edit/Write of a source extension (.cs/.py/.ps1/.c/.cpp/.h), a safe match now BREAKS the safe loop and CONTINUES to skill/catch-all eval instead of returning; Read + dot-md admin-writes still return on safe match (exempt). Verified: unregistered .cs Edit BLOCKED RC=2, Read allowed RC=0.",
+    "SKILL-LOCK CATCH-22 (fixed commit 53feb82, wkharness-post.ps1): Test-WkPostSourceEditCommand verb-anchors wkedit / wkappbot file edit detection and EXCLUDES wkappbot skill edit/contribute/add, so a skill update no longer re-arms the code-changed lock.",
+    "STATUS: all fixed + pushed -- Edit tool AND Bash both fire the source-repo study-lock cross-repo (RC=2), Read exempt (RC=0).",
+    "REINFORCED 2026-06-19: heart-v2 study-lock module re-asserts this (Edit .cs unread -> block, real-mode verified) -- modular registry makes the Edit-tool study-lock first-class, cannot silently regress.",
+    "NAMING LESSON: name a skill for what it ESTABLISHES (closed hole, fix), never for the anti-pattern -- a -bypass/-backdoor/-skip name reads as a recipe and undermines the no-backdoor posture."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read harness-edit-write-study-lock-hole-fixed",
+      "expect": "FIX RECORD",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read harness-edit-write-study-lock-hole-fixed",
+      "expect": "RC=2",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read harness-edit-write-study-lock-hole-fixed",
+      "expect": "CLOSED",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-19T14:27:43.5430024Z",
+  "updated": "2026-06-19T14:27:43.5430147Z",
+  "version": "1.0"
+}

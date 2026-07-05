@@ -1,0 +1,44 @@
+{
+  "id": "wk-codexbal",
+  "app": "wkappbot-workflow",
+  "title": "wk-codexbal: codex pace from session-log",
+  "title_ko": null,
+  "desc": "Repo-root pace-exempt launcher (./wk-codexbal.cmd -> tools/wk-codexbal.ps1) that writes ~/.claude/wkharness/codex_balance.json by parsing the newest ~/.codex/sessions rollout jsonl rate_limits event (primary=5h/300min, secondary=weekly/10080min, used_percent + resets_at). The clean NO-ConPTY codex pace data source.",
+  "steps": [
+    "WHAT: ./wk-codexbal.cmd finds the newest ~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl by mtime, scans backward for the last rate_limits event, parses primary (5h, window_minutes 300) + secondary (weekly, window_minutes 10080) used_percent + resets_at (unix), computes remainingPct = 100 - used_percent, and writes ~/.claude/wkharness/codex_balance.json with source=codex-session-log + weekly/fiveHour {remainingPct,resetAt,windowHours}. Read-only on codex; NO ConPTY, NO codex spawn = robust to codex npm-updates + the stdin-not-terminal ConPTY bug.",
+    "WHY: codex logs its real API rate-limit every turn into its session jsonl (harness-codex-pace-guard-howto step 9), so this is the clean data source for codex pace -- far simpler than the wkstdpty /status ConPTY drive (which stays as the general TUI-driver tool). After this writes codex_balance.json, Get-WkCodexBalanceSnapshot reads remainingPct -> PATH A active -> design#2 real values.",
+    "NOTE on the regex: the .ps1 regex matches the JSON quotes with . (dot) and uses double-quoted strings -- NO single-quotes -- because single-quotes in a wkappbot file write --text payload break the singlewrite command-decomposer (fail-closed block). Cross: harness-codex-pace-guard-howto step 9, Get-WkCodexBalanceSnapshot, wkpace-codex."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read wk-codexbal",
+      "expect": "session-log",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read harness-codex-pace-guard-howto",
+      "expect": "rate_limits",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read harness-codex-pace-guard",
+      "expect": "SAFETY",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "wk-tool",
+    "codex",
+    "pace",
+    "session-log",
+    "balance",
+    "rate-limits"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-30T03:34:45.768174Z",
+  "updated": "2026-06-30T03:34:45.7681823Z",
+  "version": "1.0"
+}

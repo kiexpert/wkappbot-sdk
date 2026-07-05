@@ -1,0 +1,59 @@
+{
+  "id": "harness-skill-guard-cross-repo",
+  "app": "wkappbot-core",
+  "title": "harness:skill-guard cross-repo CLAUDE.md lookup design",
+  "title_ko": null,
+  "desc": "Design for making harness:skill-guard check the EDITED FILE's repo-root CLAUDE.md, not just the CWD's. Enables each repo to own its own skill-guard rules that fire regardless of which Claude session triggers the edit.",
+  "steps": [
+    "ARCHITECTURE: harness:skill-guard is a NEW directive type integrated into wkharness-guards.ps1 (NOT a separate script). Extends Get-HarnessRules to parse ## harness:skill-guard section with ### glob-pattern sub-headings. Extends Invoke-HarnessRules to handle skill-guard action. Fires on Edit/Write tool calls only. Cross-repo: also check edited files own repo CLAUDE.md when file is in a different git root.",
+    "CLAUDE.md FORMAT: under ## harness:skill-guard, use ### <glob-pattern> sub-headings. Pattern format: **/foldername/filename where each segment must contain 3+ literal characters (prevents catch-all patterns). Body: wkappbot skill read <id>  # role comment lines. EXAMPLE:\n## harness:skill-guard\n\n### **/csharp/src/*MyCdpContext*\nwkappbot skill read standard-appbot-window              # usage\nwkappbot skill read standard-chrome-window             # impl\nwkappbot skill read wkfind-caller-hwnd-validation-3tier-pattern  # task\n\n### **/csharp/src/*ChromeLauncher*\nwkappbot skill read standard-appbot-window             # usage\nwkappbot skill read standard-chrome-window            # impl\nwkappbot skill read placement-port-pid-filter         # task\n\nParser: glob-to-regex conversion (**=.*, *=[^/]*, .=\\.) then match against full file path.",
+    "3-SKILL CONVENTION: each ### <glob> block MUST list 3 or more DISTINCT skill IDs (minimum 3; more is allowed). Overlapping IDs (same id listed twice) reduce distinct count and guard fails -- same as if the skill was not read. EXISTENCE CHECK: for each skill ID, if the skill does not exist in the catalog (wkappbot skill read <id> rc != 0), BLOCK immediately with \"skill-id does not exist -- fix CLAUDE.md config\". This catches typos in CLAUDE.md before they become silent misses. Roles in # comments: usage (how to use from outside), impl (how internals work), task (what to check when editing). Guard collects all IDs, deduplicates, verifies distinct >= 3, checks existence, then verifies each was read this session.",
+    "TOOL-SPECIFIC PATTERNS: ### <pattern> is always matched against $_harnessInput = \"● ToolName(body)\" (same as harness:block). Two modes: (1) GLOB -- pattern contains **: converted to regex [** -> .*, * -> [^/]*, . -> \\.] matched against backslash-normalized input. Natural for Edit/Write file paths since .* covers the prefix. Example: ### **/csharp/src/*File* matches ● Edit(D:/repo/csharp/src/File.cs). (2) REGEX -- no **: matched directly as regex against $_harnessInput. Use for tool-specific gates: ### (?i)Bash\\(.*cdp open -- any Bash cmd containing 'cdp open'. ### (?i)Agent\\(.*placement -- Agent calls mentioning placement. Auto-prepend (?i) for case-insensitive match. CLAUDE.md comment: # File: **/path/file*, Tool: ### (?i)ToolName\\(.*keyword",
+    "INTEGRATION -- Get-HarnessRules changes: match ^## harness:skill-guard section, iterate lines: ### line starts new pattern (glob-to-regex: **=.*, *=[^/]*, .=\\.), wkappbot skill read line extracts ID (strip # comment). Validate: each segment has 3+ literal chars (guard against catch-all). Store as rules with Action=skill-guard, Pattern=converted-regex, BodyLines=@(distinct-skill-ids). Invoke-HarnessRules skill-guard handler: (1) pattern match -> proceed. (2) check distinct count >= 3 -> BLOCK if not. (3) For each ID: check session JSONL via Get-WkSkillRead. If not-read-and-exists -> add to must-read list. If not-exists -> BLOCK with \"skill-id does not exist -- fix CLAUDE.md config\". (4) any must-read -> BLOCK listing missing skills. Get-WkSkillRead: lazy-loads session JSONL via StreamReader, caches in $script:_wkReadSkillCache, returns true if id found. Skill existence: spawn wkappbot.exe skill read <id> with ProcessStartInfo(RedirectInput), check rc=0.",
+    "PROBLEM: harness:skill-guard in wkharness.ps1 currently only reads the CWD CLAUDE.md. If Claude edits wkappbot-sdk/csharp/.../MyCdpContext.Placement.cs from inside a WKAppBot session, wkappbot-sdk/CLAUDE.md skill-guard rules are never checked.",
+    "DESIGN: When harness intercepts Edit/Write for file at path F, it should ALSO load skill-guard rules from F's repo root CLAUDE.md -- not just the CWD's CLAUDE.md. Walk up from F until .git dir found -> that dir is F's repo root -> read F_repo_root/CLAUDE.md -> parse harness:skill-guard section -> apply to F.",
+    "IMPLEMENTATION -- wkharness-guards.ps1 key changes: (1) Get-HarnessRules: regex match ^## harness:skill-guard section, parse ### <glob> sub-headings + wkappbot skill read <id> body lines. Extraction: split body on \"wkappbot skill read\" prefix, take first token as ID (strip trailing # comment). Validate segment literal-char count. Store Action=skill-guard rules. (2) Get-WkSkillRead([string]$id): lazy-load session JSONL via StreamReader, cache in $script:_wkReadSkillCache, return bool. (3) Invoke-HarnessRules skill-guard case: call Get-WkSkillRead per ID. If not read: validate existence by spawning wkappbot.exe skill read <id> with ProcessStartInfo(RedirectStdIn=true, RedirectStdOut=true), check ExitCode. rc!=0 -> BLOCK \"does not exist\". rc=0 but not read -> add to missing. (4) Cross-repo: after main Invoke-HarnessRules, walk edited file path to .git root; if different from CWD root, load that repos CLAUDE.md and run Invoke-HarnessRules again. (5) CLAUDE.md body lines must be full copy-paste-ready wkappbot commands -- harness splits on \"wkappbot skill read\" to extract IDs.",
+    "IMPLEMENTATION in wkharness.ps1: (1) from the edited file path, walk up to find .git directory -> this is the file's repo root. (2) If file-repo-root != CWD-repo-root, load file-repo-root/CLAUDE.md too. (3) Merge both skill-guard rule sets. (4) Apply merged rules to the file path.",
+    "FILE PATH MATCHING: The harness:skill-guard glob pattern in wkappbot-sdk/CLAUDE.md should be relative to THAT repo root, e.g. 'csharp/src/*MyCdpContext*' -- harness strips file-repo-root prefix before matching.",
+    "EXAMPLE: wkappbot-sdk/CLAUDE.md contains 'csharp/src/*MyCdpContext* -> placement-port-pid-filter standard-chrome-window'. When WKAppBot session edits that file, harness walks up from file path, finds wkappbot-sdk as repo root, loads wkappbot-sdk/CLAUDE.md, matches pattern, checks skill was read.",
+    "SKILL REFERENCE: to wire a new repo's guard, add harness:skill-guard section to that repo's CLAUDE.md -- harness auto-discovers it on any cross-repo edit.",
+    "BEHAVIOR: acts like harness:block but block is lifted when skills satisfied. Full decision tree: (1) pattern matches file path? No -> skip entirely. (2) distinct skill ID count < 3 -> BLOCK \"bad config: need 3+ distinct IDs\". (3) any skill ID does not exist in catalog -> BLOCK \"skill-id does not exist -- fix CLAUDE.md\". (4) all skills read this session -> PASS (continue, allow edit). (5) any skill not read -> BLOCK listing each missing as \"wkappbot skill read <id>  # role\". Block messages are actionable: Claude reads the listed commands, runs them, then retries the edit. Overlapping IDs fail at step 2 (distinct count drops below 3).",
+    "FINAL FORMAT (v1.17): harness:skill uses consistent ## harness:skill <pattern> directive format, same as harness:block/warn. NO separate ## harness:skill-guard section or ### sub-headings. Each rule is a standalone ## harness:skill <pattern> entry with wkappbot skill read body lines. Get-HarnessRules extends existing warn|block|done regex to warn|block|done|skill -- no new section parser needed. Invoke-HarnessRules adds 'skill' case: normalize backslash->forward-slash in input, extract IDs from BodyLines, check distinct>=3, existence via Test-WkSkillExists, session read via Get-WkSkillRead. Helper functions defined before Get-HarnessRules with script-scope caches.",
+    "v1.18 IMPL VERIFIED: wkharness-guards.ps1 harness:skill helpers (Get-WkSkillRead lazy-loads session JSONL Tail 600, Test-WkSkillExists spawns wkappbot.exe skill read with 24h temp-json cache) are inserted before Get-HarnessRules; Get-HarnessRules regex alternation extended warn|block|done -> warn|block|done|skill; Invoke-HarnessRules gains a skill case that normalizes backslash->slash, dedups BodyLine IDs, blocks when distinct<3, blocks missing-catalog IDs, and blocks unread IDs. Acts like block but passes when all listed skills are read this session.",
+    "GOTCHA when authoring the skill case via shell-delegated edits: the normInput backslash-normalization line MUST be written as -replace with a DOUBLE backslash regex pattern (\\ in PowerShell single-quoted string = two backslash chars) mapping to forward slash; round-tripping through bash/codex can collapse the double backslash to one, producing an invalid trailing-backslash regex that throws at runtime. Always verify the final byte content shows two backslashes and 12-space indentation, and run a Parser::ParseFile check for zero parse errors.",
+    "RACE NOTE: when multiple agents implement harness:skill concurrently in the same repo, the regex-alternation change (CHANGE 2) may land in HEAD via a sibling commit while the helper functions and Invoke-HarnessRules skill case (CHANGE 1 and CHANGE 3) are still missing; re-check HEAD with git show before re-applying, and add only the missing blocks to avoid duplicate/conflicting edits. Working-tree edits can be clobbered by a concurrent commit/checkout, so verify persistence with git diff immediately after each write.",
+    "SLUG BUG 2026-05-27: Get-WkSkillRead computed session-JSONL dir via (cwd -replace ':','') giving single-dash D-GitHub-WKAppBot, but Claude Code uses double-dash D--GitHub-WKAppBot (colon->dash). Dir never found -> read skills never detected -> guard ALWAYS blocked. Fix: use sessionId recursive search like model-detection. Also: editing CLAUDE.md triggers harness:learn which sets the skill-update-pending lock -- clear it by updating a skill, NOT git clean.",
+    "IMPLEMENTED + VERIFIED (2026-05-27): this design is now live in wkharness-guards.ps1. Editing a source file loads that file's git-root CLAUDE.md as the repo harness config; Resolve-HarnessTargetPath absolutizes a relative target via CWD, and Bash wkappbot file edit is covered alongside the Edit/Write tools. Verified cross-repo: Edit tool and Bash wkappbot file edit on personal-docs wkharness source both fire the source-repo study-lock (RC=2) from a different CWD; Read stays exempt (RC=0). See harness-edit-write-skill-bypass for the full fix history."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read harness-skill-guard-cross-repo 2>&1 | grep cross-repo",
+      "expect": "cross-repo",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill search harness skill guard cross repo 2>&1 | grep harness-skill-guard-cross-repo",
+      "expect": "harness-skill-guard-cross-repo",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read harness-skill-guard-cross-repo 2>&1 | grep IMPLEMENTATION",
+      "expect": "IMPLEMENTATION",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "harness",
+    "skill-guard",
+    "cross-repo",
+    "design",
+    "wkharness"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-26T02:32:53.8951916Z",
+  "updated": "2026-05-26T15:37:58.9186704Z",
+  "version": "1.24"
+}

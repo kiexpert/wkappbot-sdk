@@ -1,0 +1,36 @@
+{
+  "id": "source-splitter-untangles-bug-labyrinth",
+  "app": "wkappbot-sdk",
+  "title": "Source splitter untangles the bug labyrinth; Haiku prototypes the tool, Codex runs the split",
+  "title_ko": null,
+  "desc": "Big source files hide bugs in complexity; splitting them (C# partial classes, PowerShell dot-source modules, Python import modules) isolates each unit so a buried bug becomes findable. Haiku is excellent at PROTOTYPING the split tool but must NEVER run an actual split (it silently drops code) -- the tool self-verifies no-loss, then Codex or Opus runs production splits.",
+  "steps": [
+    "COMPLEXITY-LABYRINTH INSIGHT: a bug lost inside a monster file (e.g. wkharness-guards.ps1 at 2893 lines = 7x the 400-line soft cap) costs huge time -- this session a ONE-LINE policy fix took ~2 hours because the file was unreasonable to verify, the selftest leaked subprocess state between 209 cases, and kih-vs-personal-docs divergence had to be grepped line by line. SPLITTING IS THE SAVIOR: each guard or function in its own small module means the bug is isolated to one small file, the selftest can test per-module, and divergence between two copies is visible per-module. That is the entire point of the 400-line cap. @@PER-LANGUAGE MECHANISM (same core idea, analyze then extract cohesive units then rewire; different wiring): C# = partial classes via wksplit-cs (compiler merges); PowerShell = dot-source modules via wksplit-ps1 (extract to a .ps1 and dot-source with Join-Path PSScriptRoot, which preserves the same scope and the sequential order); Python = import modules via wksplit-py (extract to a submodule and import). @@HAIKU-PROTOTYPER PATTERN: Haiku is EXCELLENT at PROTOTYPING a brand-new tool fast and cheap (wksplit-cs and wksplit-ps1 were both born as Haiku prototypes; Haiku surfaces a working design quickly). But NEVER use Haiku to DO an actual source split -- it silently DROPS code (the SuggestCommand.Resolve split lost about 320 lines that compiled fine but broke functionality). Division of labor: Haiku PROTOTYPES the tool, the tool SELF-VERIFIES no code loss, then Codex or Opus runs the production split with verification. @@NO-LOSS SELF-VERIFY makes the tool trustworthy no matter who runs it: after a split, confirm the main file plus all modules parse with zero errors AND zero lines or tokens lost versus the original, and refuse or flag on any mismatch.",
+    "FUTURE TIER -- FUNCTION-LEVEL AUTO-SPLIT: beyond splitting a FILE into modules, the next level is decomposing a single OVER-COMPLEX FUNCTION into smaller named helper functions (automated extract-method). Harder because it needs SEMANTIC analysis: find cohesive sub-blocks inside the function body, determine which variables each sub-block reads and writes to derive that helper parameters and return value, extract each as a named helper, and replace the original block with a call -- all while preserving behavior. The same no-loss self-verify applies (parse OK plus behavior-equivalent). Build it AFTER the file-level splitters (wksplit-ps1 and wksplit-py) are proven, again as a Haiku prototype then a Codex or Opus production run."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read source-splitter-untangles-bug-labyrinth",
+      "expect": "shows the complexity-labyrinth insight and the Haiku-prototype-not-split rule",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read skill-migration-3tier",
+      "expect": "the related split-the-fat philosophy",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wkharness-guards",
+      "expect": "guards.ps1 is the 2893-line monster this insight targets",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-05T14:59:52.0319276Z",
+  "updated": "2026-06-05T15:02:06.9993569Z",
+  "version": "1.2"
+}

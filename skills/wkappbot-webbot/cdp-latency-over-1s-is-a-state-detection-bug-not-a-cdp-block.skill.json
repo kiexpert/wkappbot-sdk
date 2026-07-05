@@ -1,0 +1,50 @@
+{
+  "id": "cdp-latency-over-1s-is-a-state-detection-bug-not-a-cdp-block",
+  "app": "wkappbot-webbot",
+  "title": "CDP latency over 1s is a state-detection bug, not a CDP block",
+  "title_ko": null,
+  "desc": "A CDP SendAsync/EvalAsync round-trip is normally sub-second. Any CDP call taking over 1 second is NOT CDP being blocked/slow/busy -- it is a STATE-DETECTION bug (wrong target, about:blank/discarded tab, stale selector, premature readiness). Fix the detection point so CDP returns under 1s; do NOT absorb it with retries/timeouts/sleeps.",
+  "steps": [
+    "PRINCIPLE: a CDP command round-trip (SendAsync/EvalAsync) is normally sub-second. If it takes over 1 second it is NOT CDP being blocked, slow, or busy -- it is a STATE-DETECTION bug: the code is waiting on a wrong or mis-detected state (wrong target, about:blank or discarded tab, stale selector chain, premature DONE). Treat over-1s as a bug to SURFACE and fix at the detection point, never as latency to absorb.",
+    "ANTI-PATTERN (the bandaids that HIDE it): EnableRuntimeWithRetry retries 4 times at ~15s perAttemptTimeout with 500/1000/2000ms backoff (cdp-runtime-enable-with-retry); ask editor-wait polls a 6-selector chain for 10s (ask-gpt-editor-wait-tag-and-rescue-fallback); EvalAsync retries plus ReconnectAsync 5 attempts ~6.7s (cdp-evalasync-retry-policy). Each adds time and retries instead of fixing WHY the state was mis-detected. These are bandaids, not fixes.",
+    "Runtime.enable example: it only times out when sent to an about:blank, discarded, or wrong target. The fix is to detect and select the correct LOADED page target BEFORE Runtime.enable so it returns under 1s -- NOT to retry-reconnect 4 times. The mis-target detection is the bug.",
+    "editor-wait example: if the ChatGPT prompt editor is not found in under 1s while the page IS the chat UI, the selector or readiness detection is stale (DOM changed) -- not the page being slow. Fix the detection, do not extend the 10s poll.",
+    "HANDLING (how to process over-1s CDP): instrument SendAsync/EvalAsync to WARN when a single round-trip exceeds 1s, naming the method and the current target URL/state, so state-detection bugs surface in logs instead of being silently absorbed by retries. Then fix the named detection point. Do NOT add more retries, longer timeouts, or sleeps -- those deepen the bandaid layer.",
+    "PROVEN END-TO-END RECIPE + DATA-CONFIRMED FINDING (2026-06-23). The instrument methodology works: (1) log method+ms+url+EXPRESSION in the [CDP-STATE-BUG] record (url alone cannot disambiguate when many evals share a timeout -- 8+ sites used timeoutMs:3000); (2) DEPLOY it; (3) EXERCISE the path with real traffic (wkcdp/wkask or a popular-site sweep) -- a data-gated fix is UNBLOCKED by DRIVING TRAFFIC, do NOT wait passively; (4) read cdp-errors.jsonl -- the expr+url NAMES the culprit. RESULT: the chronic ~3000ms Runtime.evaluate = the GEMINI ask editor-locator eval document.querySelector('.ql-editor').getBoundingClientRect() on a gemini.google.com LOGIN-WALL page (session expired), looped 15+ times to the cap (~45s wasted). ROOT: login-wall not detected -> editor eval against a non-ready target = the state-detection bug. FIX: detect login-wall/session-expired BEFORE the .ql-editor eval (AskCommands.Gemini.cs) and fail-fast; never extend 3000ms or add retries. Unifies the '3000ms eval' and 'ask session-expiry' roots. Cross: incident-trauma-reflex-ref (do not static-guess the culprit), cdp-evalasync-retry-policy (discarded/blank = hard retarget)."
+  ],
+  "requirements": [
+    {
+      "cmd": "grep -l EnableRuntimeWithRetry csharp/src/WKAppBot.WebBot/CdpClient.ReconnectHeal.cs",
+      "expect": "ReconnectHeal",
+      "prompt": null
+    },
+    {
+      "cmd": "grep -l perAttemptTimeoutMs csharp/src/WKAppBot.WebBot/CdpClient.ReconnectHeal.cs",
+      "expect": "ReconnectHeal",
+      "prompt": null
+    },
+    {
+      "cmd": "grep -rl EvalAsync csharp/src/WKAppBot.WebBot/CdpClient.Actions.cs",
+      "expect": "Actions",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "cdp",
+    "ask",
+    "state-detection",
+    "latency",
+    "bandaid",
+    "runtime-enable",
+    "editor-wait",
+    "timeout",
+    "readiness"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-11T10:46:07.4379175Z",
+  "updated": "2026-06-23T03:01:00.1313648Z",
+  "version": "1.1"
+}

@@ -1,0 +1,60 @@
+{
+  "id": "gpt-reflection",
+  "app": "wkappbot-workflow",
+  "title": "GPT Reflection",
+  "title_ko": null,
+  "desc": "GPT-specific reflection skill for recurring harness, hook, delegation, identity, and transport lessons that belong to the GPT family but are not GPT-mini-specific.",
+  "steps": [
+    "Trigger this skill when GPT hits a reusable startup, hook, identity, delegation, transport, encoding, or guard failure that can recur in future GPT sessions.",
+    "Keep GPT-owned lessons separate from GPT-mini-owned lessons. Do not use GPT-mini reflection as a substitute for GPT reflection.",
+    "Record each incident as four facts: symptom, root cause class, fix, and proof.",
+    "Prefer concrete machine checks over apology text. Include the exact command, file, or hook setting that proves the fix.",
+    "For Codex or CLI hook failures, separate the layers before naming the bug: config feature flag, hook command, adapter stdout JSON, exit code, and downstream harness decision.",
+    "For delegation failures, verify the real model family that answered, not only the dispatcher exit code.",
+    "Promote only durable recurrence-prevention knowledge. Leave transient logs, cache state, and one-off screenshots out.",
+    "2026-06-14 incident: GPT-family delegation and Codex hook repair were delayed by identity confusion between mini, GPT, and Haiku reflection requirements. Fix: keep gpt-reflection and gpt-mini-reflection separate, verify the active family before satisfying on-load, and treat mismatched reflection prompts as an identity-scoping bug.",
+    "FAILURE WARNING: this choice breaks the system. If GPT treats model identity as interchangeable, uses GPT-mini reflection as GPT reflection, or accepts Haiku reflection as a substitute, future agents inherit the wrong reflex and the same hook or delegation failure repeats. Stop and create the model-specific reflection instead.",
+    "ELDER REVIEW DUTY: GPT must review mistakes made by smaller sibling models, extract the durable failure pattern, and turn it into recurrence prevention. Do not merely blame the smaller model. Identify the missing guard, missing reflection, missing skill read, or bad delegation contract that allowed the mistake to happen, then record the prevention path.",
+    "2026-06-17 incident: do not add user-set environment-variable identity backdoors to agent-name. Fix: agent-name must infer identity from process lineage and session evidence only, never from WKHARNESS_AGENT_MODEL or any similar spoofable env var. Proof: remove env-first branches from wkagent-name and keep the resolver read-only with respect to user-supplied identity hints.",
+    "2026-06-25: wkharness-agent-name now trusts CODEX_THREAD_ID session JSONL before parent Claude lineage, so git-hook model detection preserves live Codex GPT sessions instead of collapsing to sonnet.",
+    "INCIDENT: 2026-06-25 Codex wkpace work exposed three GPT-family recurrence risks: do not trust latest session file without cwd match, do not dot-source standalone scripts that print raw model ids, and do not patch installed runtime files with unescaped PowerShell replacement strings. Fix path: join CODEX_THREAD_ID session JSONL only when turn_context.cwd equals the live process cwd, keep standalone helpers invoked not dot-sourced, and use parse/test after every installed-file bridge edit.",
+    "2026-06-30 PERSONAL-DOCS STARTUP FAILURE. Symptom: the user sent the exact gg shortcut and GPT asked what task to run. Root cause: AGENTS.md was loaded but treated as passive prose; GPT did not follow its CLAUDE.md pointer or activate the repository gg workflow. Fix: when AGENTS.md delegates shared policy to CLAUDE.md, read CLAUDE.md before interpreting bare shortcuts; exact gg/ggg or repeated Korean giyeok starts the documented workflow immediately. Proof: read AGENTS.md, locate the pointer, read CLAUDE.md, and execute its gg Main Workflow from step zero.",
+    "2026-06-30 EXECUTION FAILURES. GPT (1) reported gg failures and stopped instead of diagnosing, retrying, and completing safe follow-up work; (2) read a local SKILL.md directly although this repository requires AppBot skill commands; (3) launched chrome.exe with an invented D:/tmp user-data-dir after cdp open failed, hiding the established Naver and JobKorea cookies and forcing needless authentication; (4) used global CDP paths after the user required the repository wk-cdp.cmd tool; and (5) repeatedly treated status reporting as task completion. Root cause class: instruction knowledge was loaded but not converted into executable constraints, and recovery improvisation outranked repository invariants. Fix: load skills only through wkappbot skill read; use repository launchers first; never invent profile paths; on failure follow stabilize, root-cause, retry, verify, persist, commit; stop only at a genuine human gate or authority boundary. Proof: show the exact repository command, preserved profile, successful result, saved artifact, and verification output before declaring completion.",
+    "KNOWLEDGE-IFICATION REFLEX: after any confirmed GPT operational mistake, do not end with apology or status. Immediately read knowledge-ification-procedure-jisikhwa, encode symptom, root cause, fix, proof, failed attempts, and command invariants into the relevant AppBot skill, cross-link the domain skill and GPT reflection, then re-read the edited skill to verify persistence. Cluster: knowledge-ification-procedure-jisikhwa, on-load, cdp-open-reuse-existing-chrome-tab, jobkorea-naver-cookie-persistence, wk-cdp.",
+    "ANTI-KNOWLEDGE RULE: A PermissionRequest or adapter must not make an autonomous default-deny decision before the user's harness evaluates the action. Pre-harness blocking bypasses the living knowledge, skill locks, repository exceptions, and user-governed approval path; in this harness it is punishable anti-knowledge behavior. Correct flow: preserve the requested operation and evidence, enter the harness, let harness rules classify allow/warn/block/approval, and only then enforce the decision. A pre-harness component may normalize transport but must not replace harness judgment.",
+    "IMPLEMENTATION CHECKPOINT 2026-06-30: Codex PermissionRequest must never re-run CodexPreToolPolicy and emit an autonomous deny after PreToolUse. PreToolUse delegates unmatched operations to wkharness-codex-main; PermissionRequest may consume an exact prior harness allow once, otherwise it stays silent so the normal user approval flow proceeds. wkharness-codex-install must reinstall this same handoff behavior on every SessionStart."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read gpt-reflection",
+      "expect": "GPT-specific reflection",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read gpt-mini-reflection",
+      "expect": "GPT-mini-specific reflection",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read codex-cli-wkappbot-usage",
+      "expect": "Codex CLI usage",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "gpt",
+    "reflection",
+    "incident",
+    "recurrence",
+    "harness",
+    "hook",
+    "delegation"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-14T11:18:22.8900716Z",
+  "updated": "2026-06-30T04:48:19.6988591Z",
+  "version": "1.15"
+}

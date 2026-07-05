@@ -1,0 +1,41 @@
+{
+  "id": "gemini-pro-reflection",
+  "app": "wkappbot-workflow",
+  "title": "Gemini Pro Reflection: The Hongik Harness Connection & Compliance",
+  "title_ko": "제미니-프로-반성문: 하네스 연결 및 규정 준수 성찰",
+  "desc": "T1 core. Formal reflection for Gemini sessions regarding harness integration, on-load compliance, and family isolation rules. Mandates a HARD BLOCK for missing briefings and documentation of 'Zero-Env' and 'Modern Hook Protocol' standards.",
+  "steps": [],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read gemini-pro-reflection",
+      "expect": "Gemini Pro Reflection",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill search 제미니 반성문",
+      "expect": "gemini-pro-reflection",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read on-load",
+      "expect": "mandatory loads",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "gemini",
+    "reflection",
+    "harness",
+    "compliance",
+    "on-load",
+    "zero-env",
+    "hook-protocol"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "gemini",
+  "created": "2026-06-14T18:40:00Z",
+  "updated": "2026-06-16T13:33:53.9807546Z",
+  "version": "1.23"
+}

@@ -1,0 +1,35 @@
+{
+  "id": "newchat-cwd-validation-guard",
+  "app": "wkappbot-core",
+  "title": "newchat CWD guard: skip /clear if hwnd not in FindAllAiConsolesByCwd result",
+  "title_ko": null,
+  "desc": "newchat injected /clear into wrong terminals when multiple Claude Code sessions shared CWD. All strategies now cross-check hwnd against FindAllAiConsolesByCwd result before injecting.",
+  "steps": [
+    "1. Pre-build cwdCandidates=FindAllAiConsolesByCwd(projectCwd). 2. Strategy-0 CallerHwnd: skip if not in cwdCandidates. 3. Strategy-1 FindOwnTerminal: skip if not in cwdCandidates. 4. Strategy-2: iterate cwdCandidates with DoCliInject. 5. Empty cwdCandidates = no /clear sent."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot file grep cwdHwnds D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/NewChatCommand.CliTerminal.cs",
+      "expect": "cwdHwnds",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot file grep FindAllAiConsolesByCwd D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/NewChatCommand.CliTerminal.cs",
+      "expect": "FindAllAiConsolesByCwd",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot file grep TryNewChatInjectOnHit D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/NewChatCommand.CliTerminal.cs",
+      "expect": "TryNewChatInjectOnHit",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-01T17:07:59.7764239Z",
+  "updated": "2026-05-01T17:07:59.7764331Z",
+  "version": "1.0"
+}

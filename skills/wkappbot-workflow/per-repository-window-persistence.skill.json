@@ -1,0 +1,43 @@
+{
+  "id": "per-repository-window-persistence",
+  "app": "wkappbot-workflow",
+  "title": "Per-Repository Window Placement Persistence",
+  "title_ko": null,
+  "desc": "T1 core. Mechanism for saving and restoring terminal window handle (HWND) position and size per project repository. Ensures UI continuity across sessions.",
+  "steps": [
+    "1. AUTHORITATIVE DETECTION: use Get-WkCallerHwnd (3-tier cascade: env > core status > process walk) to find the primary hosting terminal window handle."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot status --json",
+      "expect": "callerHwnd",
+      "prompt": null
+    },
+    {
+      "cmd": "ls .wkappbot/harness/window.json",
+      "expect": "window.json",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot a11y restore",
+      "expect": "Restoring window",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "harness",
+    " window",
+    " persistence",
+    " hwnd",
+    " a11y",
+    " workspace",
+    " layout"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-14T15:08:08.868972Z",
+  "updated": "2026-06-14T15:08:08.8689845Z",
+  "version": "1.0"
+}

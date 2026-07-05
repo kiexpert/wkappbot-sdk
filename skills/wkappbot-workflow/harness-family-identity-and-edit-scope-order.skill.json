@@ -1,0 +1,55 @@
+{
+  "id": "harness-family-identity-and-edit-scope-order",
+  "app": "wkappbot-workflow",
+  "title": "Hongik harness order: family=CLI=process-name, per-family edit-scope, jisikhwa-free-but-skill-lock-first",
+  "title_ko": null,
+  "desc": "Comprehensive harness-order constitution (user 2026-06-18 session): the family identity law (family name = CLI name = process name), per-family source-edit scoping via family MDs, the family-aware rule-engine gap, and the jisikhwa-always-free-but-skill-lock-runs-first precedence.",
+  "steps": [
+    "FAMILY IDENTITY LAW (user 2026-06-18): family name = CLI name = PROCESS name. The four canonical families/CLIs/processes are claude, gemini, codex, agy. NEVER key a family off a model-TIER token -- gpt/flash/pro/opus/sonnet/haiku/mini are TIERS, not families. wkagent-name resolves family by the process Name; EVERY family-detection site must use the same canonical process-name keys. Any hardcoded family-string using a non-process-name token (e.g. 'gpt' as a family instead of 'codex', 'flash' instead of 'gemini') is a bug to detect (Haiku sweep) and fix.",
+    "PER-FAMILY EDIT-SCOPE: a family session may edit ONLY its own keyword source -- gemini session edits *gemini*.ps1, codex edits *codex*.ps1; claude/ROOT edits all. Rules live in the family MD (GEMINI.md, AGENTS.md); block via NEGATIVE-LOOKAHEAD ('Edit a .ps1 that does NOT contain the family keyword' -> block) so the family's own files pass WITHOUT depending on safe-before-block ordering. CLAUDE.md carries shared + claude rules.",
+    "FAMILY-AWARE RULE ENGINE (enforcement gap to CLOSE): wkharness-guards-rules.ps1 today reads repo CLAUDE.md ONLY (line 26: Join-Path root CLAUDE.md). To enforce per-family MD rules it MUST also read the ACTIVE family's MD (GEMINI.md when family=gemini, AGENTS.md when family=codex). Also: 'harness:safe' is currently INERT in that engine (only 'block'/'warn'/'allow' act on lines 53-55) -- either add a safe->exit-0 handler OR rely on negative-lookahead block patterns (chosen, self-sufficient). Change via proto -> test -> merge per the exemption-ladder IRON RULE; never two agents on guard files at once.",
+    "JISIKHWA ALWAYS-FREE, BUT SKILL-LOCK FIRST (user: skill-lock is the TOP-PRIORITY forced lock): knowledge-ification (Skill tool + wkappbot skill read/search/list/edit/contribute/news + ALL .md edits + git/gh) is TIER0 always-allowed regardless of pace/stall/family-scope/crisis. BUT the skill-lock (study-lock) on a study-locked file runs FIRST: wkharness-guards.ps1 Test-WkHasExplicitStudyLock gates the TIER0 knowledge-op exit for files with an EXPLICIT study-lock rule (lines 227-236), so jisikhwa-allow NEVER bypasses the skill-lock. VERIFY this precedence holds -- a regression here would let any family edit a locked source without studying. This verification is a standing main task.",
+    "STANDING MAIN TASKS (this session, user 2026-06-18) -- record + pursue, none omitted: (a) every important wk* tool < 1s response [[wk-tool-sub-1s-response-time-mandate]]; (b) wkwrap-supported tools officially canonical in wkappbot-sdk/bin, harness-independent [[willkim-tool-harness-independence-install-location]]; (c) wkdoctor symlink diagnose+heal for HEALTHY tools, shadow-dup + needs-fix split; (d) family=cli=process-name hardcoding detect+fix (Haiku); (e) verify skill-lock top-priority. Cross: [[harness-guard-exemption-ladder-spec]], [[harness-gate-log-data-integrity]], [[wkagent-name-tool-howto]], [[cross-family-harness-integration]]."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read harness-family-identity-and-edit-scope-order",
+      "expect": "FAMILY IDENTITY LAW",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read harness-family-identity-and-edit-scope-order",
+      "expect": "EDIT-SCOPE",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read harness-family-identity-and-edit-scope-order",
+      "expect": "SKILL-LOCK FIRST",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "harness",
+    "order",
+    "family-identity",
+    "cli-name",
+    "process-name",
+    "edit-scope",
+    "gemini-md",
+    "agents-md",
+    "rule-engine",
+    "skill-lock",
+    "jisikhwa",
+    "tier0",
+    "precedence",
+    "constitution",
+    "directive"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-18T02:16:50.3504605Z",
+  "updated": "2026-06-18T02:16:50.3504723Z",
+  "version": "1.0"
+}

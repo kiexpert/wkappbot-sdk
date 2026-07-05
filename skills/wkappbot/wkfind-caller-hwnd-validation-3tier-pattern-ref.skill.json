@@ -1,0 +1,38 @@
+{
+  "id": "wkfind-caller-hwnd-validation-3tier-pattern-ref",
+  "app": "wkappbot",
+  "title": "wkfind Caller HWND 3-Tier T3 Reference",
+  "title_ko": null,
+  "desc": "T3 ref. Historical 3-tier model (obsolete), FIX SPEC 2026-05-20, CLAUDE.md guard added, verified test.",
+  "steps": [
+    "HISTORICAL 3-TIER (OBSOLETE): step 1 'console>host>foreground' and 'GetForegroundWindow fallback' from old model are SUPERSEDED by current GA_ROOTOWNER pre-pass. Do NOT implement the old model.",
+    "FIX SPEC 2026-05-20: MyCdpContext.cs lines 220-225 remove GetForegroundWindow fallback. MyCdpContext.CallerValidation.cs line 93 remove Chrome from IsKnownHostProcess. EyeCmdPipeClient.cs add GetAncestorPidChain().",
+    "CLAUDE.md GUARD added 2026-05-20 (commit 311fda436): before any callerHwnd/placement change, must read standard-appbot-window + standard-chrome-window + this skill. 5 absolute rules documented.",
+    "Verified 2026-05-28: ev-caller-rect-stability.sh (resolve ts=2026-05-28T05:10:11). 2026-05-18: CHROME:WARN CALLER_UNDETECTABLE added in ChromeLauncher.CallerRecovery.cs (commit 5383b02e9)."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read wkfind-caller-hwnd-validation-3tier-pattern-ref",
+      "expect": "T3",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wkfind-caller-hwnd-validation-3tier-pattern",
+      "expect": "T1",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read standard-appbot-window",
+      "expect": "current spec",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-31T13:03:24.8414826Z",
+  "updated": "2026-05-31T13:03:24.8414981Z",
+  "version": "1.0"
+}

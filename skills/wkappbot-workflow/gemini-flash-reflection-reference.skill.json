@@ -1,0 +1,35 @@
+{
+  "id": "gemini-flash-reflection-reference",
+  "app": "wkappbot-workflow",
+  "title": "Gemini Flash Reflection Reference",
+  "title_ko": null,
+  "desc": "T3 ref tier. Reference data and history for Gemini Flash AI model self-reflection. Core steps in gemini-flash-reflection; howto guide in gemini-flash-reflection-howto.",
+  "steps": [
+    "Reference data for Gemini Flash AI model self-reflection. NAVIGATION: core steps -> wkappbot skill read gemini-flash-reflection | howto guide -> wkappbot skill read gemini-flash-reflection-howto"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read gemini-flash-reflection-ref",
+      "expect": "NAVIGATION",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read gemini-flash-reflection-ref",
+      "expect": "gemini-flash-reflection",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read gemini-flash-reflection-ref",
+      "expect": "gemini-flash-reflection-howto",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-26T14:44:54.9891764Z",
+  "updated": "2026-06-26T14:44:55.1654296Z",
+  "version": "1.1"
+}

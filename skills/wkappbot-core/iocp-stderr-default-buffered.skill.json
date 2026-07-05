@@ -1,0 +1,45 @@
+{
+  "id": "iocp-stderr-default-buffered",
+  "app": "wkappbot-core",
+  "title": "Launcher IocpPipeRelay buffers stderr by default",
+  "title_ko": null,
+  "desc": "Under DETACHED_PROCESS spawn, Core stderr is BUFFERED not passthrough. Default showStderr=false -- stderr only shown on non-zero exit. Use --stderr or --sudo to enable passthrough.",
+  "steps": [
+    "ARCHITECTURE: Launcher/IocpPipeRelay.cs splits stderr -- showStderr=false by default, buffered and printed only on non-zero exit. showStderr=true prints passthrough immediately.",
+    "ENABLE PASSTHROUGH: wkappbot --stderr cmd (explicit) or wkappbot --sudo cmd (implicit in v5.14\u002B). PulseStep.Line and Console.Error invisible without passthrough.",
+    "TROUBLESHOOTING: If Console.Error.WriteLine invisible -- check --stderr flag. Exit code 0 drops buffer. Use Console.WriteLine (stdout) for always-visible output."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot eye tick",
+      "expect": "eye alive",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read iocp-stderr-default-buffered",
+      "expect": "stderr",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot file grep showStderr csharp/src/WKAppBot.Launcher/IocpPipeRelay.cs",
+      "expect": "showStderr",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "project",
+    "developer",
+    "launcher",
+    "stderr",
+    "visibility",
+    "debugging",
+    "iocp"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-16T08:42:13.505992Z",
+  "updated": "2026-05-04T07:53:46.2096755Z",
+  "version": "1.3"
+}

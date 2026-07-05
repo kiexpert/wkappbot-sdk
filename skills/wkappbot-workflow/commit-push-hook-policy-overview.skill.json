@@ -1,0 +1,56 @@
+{
+  "id": "commit-push-hook-policy-overview",
+  "app": "wkappbot-workflow",
+  "title": "Commit/push hook policy -- the single overview (repo series): every gate, why, how to comply",
+  "title_ko": null,
+  "desc": "Repo-management series entry: the ONE index of the git commit/push hook policy. The pieces were scattered across ~8 skills with no overview; this ties them together -- every pre-commit/pre-push/commit-msg gate, why it exists, how to comply, and the un-bypassable teeth.",
+  "steps": [
+    "WHY THIS EXISTS: the commit/push hook policy was knowledge-ified but SCATTERED across ~8 skills with no single overview, so the whole picture was hard to see. This is the index.",
+    "PRE-COMMIT GATES (client, .githooks/pre-commit): (1) ASCII gate -- non-ASCII bytes in a .ps1/source BLOCK the commit ([[ascii-only-source-no-decorative-unicode]]); (2) cheap-source-guard -- a cheap model (haiku/codex-mini/flash) committing a SOURCE file is blocked; pro/ROOT only ([[wkharness-pre-commit-source-gate]]); (3) model-tag -- commit-msg appends a 'Model: <id>' trailer = the REAL committer model resolved via wkagent-name/detect-model.sh ([[wkagent-name-tool-howto]]); (4) cheap-commit-todo-gate -- a cheap session must have refreshed the CLAUDE.md Pending TODO recently ([[cheap-commit-todo-gate-block-commit-if-claude-md-pending-not-refreshed]]); (5) spec-currency + auto-lock-sync protos.",
+    "PRE-PUSH GATES (client, .githooks/pre-push): the MODEL-TIER gate -- a positively-identified CHEAP model is BLOCKED from pushing; opus / ROOT / empty(unknown) are ALLOWED (detect-model.sh shared with commit). Plus the --no-verify block.",
+    "HARNESS PreToolUse (CLAUDE.md rules, BEFORE git even runs): 'git commit' with ANY --no-* / -n is blocked; 'git -c core.hooksPath=' / 'commit.gpgsign=false' / 'push --no-verify' are blocked (hook/signing-bypass); 'WKHARNESS_AGENT_MODEL=' is blocked (model-stamp spoof). commit-msg ends with the Co-Authored-By trailer; PR bodies end with the Generated-with line.",
+    "HOW TO COMPLY (no bypass): commit/push from a ROOT or pro (opus/sonnet) session; keep the tree clean before delegating; never pass --no-verify / --no-gpg-sign / -n / hooksPath / gpgsign=false (a commit never needs a negation flag); grep -P '[^\\x00-\\x7F]' a .ps1 before add (ASCII gate); refresh CLAUDE.md Pending if a cheap session.",
+    "THE TEETH (un-bypassable layer): client hooks are BEST-EFFORT -- 'git commit/push --no-verify' skips them all in one shot, and the PreToolUse --no-verify block is itself best-effort (shim, fail-open). The ONLY un-bypassable teeth for the shared canonical-of-record is SERVER-SIDE: GitHub Actions CI re-running the cheap-source/tier logic + a required status check + branch protection. Local commits are inherently best-effort; only CI+branch-protection absolutely protects what is PUSHED. See [[harness-guard-exemption-ladder-spec]] (ENFORCEMENT-LAYER note), [[pre-commit-full-block-plan]], [[harness-no-verify-guard]], [[repo-management-skill-series]]."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read commit-push-hook-policy-overview",
+      "expect": "PRE-COMMIT GATES",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read commit-push-hook-policy-overview",
+      "expect": "PRE-PUSH GATES",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read commit-push-hook-policy-overview",
+      "expect": "THE TEETH",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "repo",
+    "management",
+    "series",
+    "commit",
+    "push",
+    "git-hooks",
+    "pre-commit",
+    "pre-push",
+    "commit-msg",
+    "model-tier",
+    "no-verify",
+    "policy",
+    "overview",
+    "index",
+    "ci"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-18T05:42:25.6782908Z",
+  "updated": "2026-06-18T05:42:25.6783003Z",
+  "version": "1.0"
+}

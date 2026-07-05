@@ -1,0 +1,43 @@
+{
+  "id": "wkappbot-file-write-read-silent-no-op-through-eye-pipe-root-cause",
+  "app": "wkappbot-core",
+  "title": "wkappbot file write/read silent no-op through Eye pipe (root cause)",
+  "title_ko": null,
+  "desc": "wkappbot file write/read silently no-op through Eye pipe: success msg lost to unforwarded Console.Error + path resolves against Eye daemon's stale CWD, not caller's",
+  "steps": [
+    "SYMPTOM: wkappbot file write <path> --text X exits 0, prints nothing, target file never created. Verified via BOTH Claude Read tool AND wkappbot file read (correctly reports File not found) -- not a display bug, the write genuinely lands nowhere useful. Reproduced 2026-07-03 with 4+ different paths/extensions/flags.@@ROOT CAUSE A: FileWriteCommand success line (WKAppBot/csharp/src/WKAppBot.CLI/Commands/FileToolCommands.Glob.cs:187) writes raw Console.Error.WriteLine. Eye-pipe mode only forwards Console.Out (AppBotEyeGlobalMode.cs:481) -- Console.Error is never captured for the generic in-process Eye dispatch path that file commands use (EyeCmdPipeServer.Dispatch.cs:204-254). Every FAILURE path in FileWriteCommand correctly routes through the Eye-aware Error() helper (UsageCommand.cs:468, which special-cases RunningInEye to use Console.WriteLine instead) but the SUCCESS path bypasses Error() entirely. Introduced by commit fe1e1f30c (a 124-file bulk refactor that mechanically changed Console.WriteLine to Console.Error.WriteLine for diagnostic logs, without accounting for the already-documented Eye stdout-only forwarding).@@ROOT CAUSE B: FileWriteCommand and FileReadCommand (FileToolCommands.Grep.cs:11-71) pass the raw path argument straight into File.WriteAllBytes/File.Exists -- never resolving against the caller's actual CWD. Sibling commands FileGlobCommand/FileGrepCommand correctly call FileDefaultDir() (FileToolCommands.cs:61-62, EyeCmdPipeServer.CallerCwd.Value ?? Environment.CurrentDirectory) but write/read never adopted this pattern. A relative path therefore resolves against the long-lived Eye daemon's own process-global Environment.CurrentDirectory (fixed at Eye startup or last mutated by an unrelated concurrent Slack/MCP command -- shared global state, a latent race), not the calling repo's directory.@@FIX (not yet applied, investigation only): (1) route FileWriteCommand's success message through Error()'s RunningInEye-aware pattern, or a dedicated Eye-safe Info()/Success() helper; (2) resolve relative path via FileDefaultDir()/CallerCwd.Value in FileWriteCommand + FileReadCommand + FileEditCommand before any File.* I/O, matching FileGlobCommand/FileGrepCommand. AUDIT TODO: commit fe1e1f30c touched 124 files -- other diagnostic-only lines it converted ([GLOB], [DRY-RUN] backup ->, [PDF]) likely have the same Eye-swallowed-success-message pattern (BUG A class) elsewhere in Commands/*.cs.@@Filed as wkappbot suggest 2026-07-02T19:01:36 (the original bug report); this skill holds the full root-cause diagnosis since suggest add-requirement only accepts strict 'cmd => expected' format, not free-text notes."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot file write .tmp/probe.txt --text hello",
+      "expect": "stdout shows [FILE] write OK confirmation (currently: silent, nothing printed)",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot file read .tmp/probe.txt",
+      "expect": "hello (currently: File not found -- file was never actually created at the caller's intended path)",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot file write tools/probe-sonnet-probe.py --text hi-then-check-with-wkappbot-file-read",
+      "expect": "file exists at the exact repo-relative path the caller specified, not the Eye daemon's stale CWD",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "wkappbot-core",
+    "eye-pipe",
+    "file-write",
+    "console-error",
+    "cwd",
+    "regression",
+    "bug"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-07-03T02:46:53.6507548Z",
+  "updated": "2026-07-03T02:46:53.6847857Z",
+  "version": "1.1"
+}

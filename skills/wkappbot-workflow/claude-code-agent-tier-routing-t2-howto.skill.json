@@ -1,0 +1,51 @@
+{
+  "id": "claude-code-agent-tier-routing-t2-howto",
+  "app": "wkappbot-workflow",
+  "title": "Claude Code Agent Tier Routing (T2 howto)",
+  "title_ko": null,
+  "desc": "Execution detail for claude-code-agent-tier-routing: the exact invocation per tier (Haiku survey, Codex/Agent.cmd refactor, Sonnet inline, Opus judgment, Triad planning, Agent.cmd light/agy models), brief-guard format, and parallel non-conflicting dispatch rules.",
+  "steps": [
+    "HAIKU survey (read-only): Agent(subagent_type:'Explore', model:'haiku', run_in_background:true, prompt). Pace-EXEMPT even when root is hard-blocked. Use for grep/read/survey/git-diff verification.",
+    "CODEX / Agent.cmd refactor: wkcodex.sh for source splits and multi-file edits; Agent.cmd --model X for non-Claude models. NEVER use Haiku for code SPLITS (silent content drop).",
+    "SONNET = default inline work (no agent). OPUS = Agent(model:'opus', run_in_background:true) for judgment / architecture / catching agent flaws. TRIAD = wkappbot ask triad for planning and hard ambiguity.",
+    "Agent.cmd MODELS: --model lite (Gemini Flash Lite), --model agy (Antigravity), --model haiku/sonnet/opus. Agent.cmd has an EXTRA tier-gate the Agent tool lacks: it requires claude-code-agent-tier-routing itself to be 3-tier split (-howto + -ref) with Get-WkTierScore >= 80, else it hard-blocks ALL Agent.cmd dispatch.",
+    "BRIEF-GUARD (every Agent/Agent.cmd dispatch): include 3 wkappbot skill read references PLUS the labels Goal / Files / Approach / Constraints / Exit as EXACT words with NO parenthetical between a label and its colon.",
+    "PARALLEL NON-CONFLICTING dispatch: partition work by FILE so two agents never edit the same file; give each a UNIQUE wkbuild tag; instruct 'if build lock, wait 60s and retry once' (parallel edits are safe, parallel builds collide). next:claude-code-agent-tier-routing for the routing decision rules. cluster:claude-code-agent-tier-routing-ref for history."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read claude-code-agent-tier-routing",
+      "expect": "Haiku",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read agent-on-load",
+      "expect": "subagent",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read haiku-sandbox-problem-solving",
+      "expect": "Haiku",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "delegation",
+    "howto",
+    "agent",
+    "haiku",
+    "codex",
+    "opus",
+    "triad",
+    "agent-cmd",
+    "brief-guard",
+    "t2"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-11T17:31:49.0153047Z",
+  "updated": "2026-06-11T17:31:49.0153169Z",
+  "version": "1.0"
+}

@@ -1,0 +1,35 @@
+{
+  "id": "slack-app-token-renewal",
+  "app": "wkappbot-core",
+  "title": "Slack Socket Mode app_token renewal -- invalid_auth symptom and fix",
+  "title_ko": null,
+  "desc": "Eye Slack WebSocket drops with invalid_auth when the xapp-1 app-level token is revoked. Symptom: Eye log shows Slack reconnect failed invalid_auth, Slack=False msgs=0. Token in webhook.json must be regenerated at api.slack.com.",
+  "steps": [
+    "1. api.slack.com/apps -\u003E WKAppBot -\u003E Basic Information -\u003E App-Level Tokens. 2. Delete old token, generate new one with connections:write scope. 3. Copy xapp-1-... token. 4. Update app_token in bin/wkappbot.hq/profiles/slack_exp/webhook.json. 5. Eye auto-reconnects within 5s. Verify: EYE_LOOP shows Slack=True."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot-core.exe eye ping",
+      "expect": "pong",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot file grep app_token bin/wkappbot.hq/profiles/slack_exp/webhook.json",
+      "expect": "app_token",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot-core.exe eye status",
+      "expect": "Slack=True",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-01T16:28:11.4374653Z",
+  "updated": "2026-05-01T16:28:11.4374801Z",
+  "version": "1.0"
+}

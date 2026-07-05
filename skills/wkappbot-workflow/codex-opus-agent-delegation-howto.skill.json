@@ -1,0 +1,35 @@
+{
+  "id": "codex-opus-agent-delegation-howto",
+  "app": "wkappbot-workflow",
+  "title": "Codex to Opus Agent Delegation (T2 howto)",
+  "title_ko": null,
+  "desc": "T2 howto: step-by-step usage of Agent.cmd from Codex, including JSON format, guard requirements, and multiline prompt patterns.",
+  "steps": [
+    "USAGE: from codex, pipe JSON to Agent.cmd stdin: printf json | Agent.cmd|HOW TO PASS PROMPT: for multiline prompts, write to a temp file and pipe via stdin -- do NOT pass as a bare shell arg (cmd.exe mangling + metachar breakage; see codex-opus-agent-delegation step 14).|HOW TO SATISFY BRIEF-GUARD: prompt MUST contain 3 wkappbot skill read refs AND a 5-item SPEC block for Opus dispatches.|HOW TO CHECK RESULT: Agent.cmd streams Opus output to stdout -- read the full output, do NOT assume success from exit code alone (rc=0 + no output = silent fail).|CROSS: codex-opus-agent-delegation (T1 core), codex-opus-agent-delegation-ref (T3 history+traps)"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read codex-opus-agent-delegation-howto",
+      "expect": "T2 howto",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read codex-opus-agent-delegation",
+      "expect": "Agent.cmd",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read codex-opus-agent-delegation-ref",
+      "expect": "T3",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-25T02:46:15.094122Z",
+  "updated": "2026-06-25T02:46:15.0941316Z",
+  "version": "1.0"
+}

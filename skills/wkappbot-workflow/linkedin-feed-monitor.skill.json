@@ -1,0 +1,51 @@
+{
+  "id": "linkedin-feed-monitor",
+  "app": "wkappbot-workflow",
+  "title": "LinkedIn feed scanner: save good posts to MD \u002B Korean spike notify",
+  "title_ko": null,
+  "desc": "Scans LinkedIn feed via CDP every 2h. Detects posts by keyword relevance, saves to linkedin-feed/YYYY-MM-DD_slug.md, notifies via pending_prompts (Korean message). Deduplicates via li_seen_posts.json.",
+  "steps": [
+    "Scan: python resume/scripts/linkedin_feed_monitor.py scan (CDP port 9222 required)",
+    "List saved: python resume/scripts/linkedin_feed_monitor.py saved",
+    "Post from file: python resume/scripts/linkedin_feed_monitor.py post \u003Cfile.txt\u003E",
+    "Cron 2h: wkappbot cron add --interval 2h \u0027python D:/GitHub/personal-docs/resume/scripts/linkedin_feed_monitor.py scan\u0027 --cwd D:/GitHub/personal-docs",
+    "Keywords: AI,LLM,agent,open source,automation,WKAppBot,career,developer,startup,HTS etc.",
+    "Dedup: resume/scripts/li_seen_posts.json auto-managed. Reset by deleting file.",
+    "Output: linkedin-feed/YYYY-MM-DD_slug.md per interesting post",
+    "Notify format: Korean spike via pending_prompts listing author \u002B preview \u002B filename"
+  ],
+  "requirements": [
+    {
+      "cmd": "python resume/scripts/linkedin_feed_monitor.py saved",
+      "expect": "(No posts|2026)",
+      "prompt": null
+    },
+    {
+      "cmd": "python -c \u0022from pathlib import Path; print(\u0027ok\u0027 if Path(\u0027resume/scripts/linkedin_feed_monitor.py\u0027).exists() else \u0027no\u0027)\u0022",
+      "expect": "ok",
+      "prompt": null
+    },
+    {
+      "cmd": "curl -s http://localhost:9222/json",
+      "expect": "linkedin",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "linkedin",
+    "feed",
+    "monitor",
+    "cdp",
+    "notify",
+    "markdown",
+    "cron",
+    "korean"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-30T19:05:02.4936876Z",
+  "updated": "2026-04-30T19:05:02.4936971Z",
+  "version": "1.0"
+}

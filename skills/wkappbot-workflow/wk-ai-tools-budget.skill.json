@@ -1,0 +1,56 @@
+{
+  "id": "wk-ai-tools-budget",
+  "app": "wkappbot-workflow",
+  "title": "wk AI Tools Budget",
+  "title_ko": null,
+  "desc": "Budget rules for cheap-first auto selection and cooldown handling.",
+  "steps": [
+    "AUTO cheap-first order is flash then codex-mini then haiku then mini then sonnet",
+    "auto skips models still in cooldown and prefers the first model that returns a first line quickly",
+    "Recent failure records use a 30 minute cooldown",
+    "Success records stay cached for 30 minutes",
+    "Use the cheapest model that still satisfies the task and escalate only when needed"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read wk-ai-tools-budget",
+      "expect": "returns budget and cooldown rules",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill search wk-ai-tools",
+      "expect": "finds the routing index",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill install --app wkappbot-workflow --force",
+      "expect": "publishes the budget skill",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "wk",
+    "ai",
+    "budget",
+    "stall",
+    "pace",
+    "quota",
+    "usage",
+    "auto",
+    "codex",
+    "gpt",
+    "gemini",
+    "claude",
+    "flash",
+    "mini",
+    "haiku",
+    "sonnet"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-01T10:33:58.1111916Z",
+  "updated": "2026-06-01T10:33:58.1112004Z",
+  "version": "1.0"
+}

@@ -1,0 +1,35 @@
+{
+  "id": "harness-source-edit-requires-skill-lock-ref",
+  "app": "wkappbot-workflow",
+  "title": "Skill-lock history and incidents",
+  "title_ko": null,
+  "desc": "History and dated incidents for the source-edit skill-lock. Fail-open regression, the lock-count split-signal, deletion-protection, and jisikhwa-on-discovery. Core principle: harness-source-edit-requires-skill-lock.",
+  "steps": [
+    "REGRESSION ROOT 2026-06-07: the lock silently did NOT fire for a long stretch because wkharness-gemini.ps1 was never dot-sourced, so the harness crashed fail-OPEN on every tool call and ALL guards including this one were off. Fixed by adding the dot-source. Cross harness-edit-write-skill-bypass."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read harness-source-edit-requires-skill-lock-ref",
+      "expect": "returns history and incidents",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read harness-source-edit-requires-skill-lock",
+      "expect": "core default-deny principle",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read harness-edit-write-skill-bypass",
+      "expect": "the Edit-tool bypass class",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-07-01T07:58:36.1263832Z",
+  "updated": "2026-07-01T07:58:36.1263909Z",
+  "version": "1.0"
+}

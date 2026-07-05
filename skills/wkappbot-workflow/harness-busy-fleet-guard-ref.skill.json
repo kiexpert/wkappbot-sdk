@@ -1,0 +1,41 @@
+{
+  "id": "harness-busy-fleet-guard-ref",
+  "app": "wkappbot-workflow",
+  "title": "Busy-fleet guard: dated incidents and history",
+  "title_ko": null,
+  "desc": "T3 reference tier of harness-busy-fleet-guard. Dated incident history: the blind-spot idle bug, the wkedit-escape deadlock, the two-gates discovery, live deadlock incidents, the internal-spawn subagent regression, the graded delegation incentive design, and the parallel-sector dispatch lesson.",
+  "steps": [
+    "BLIND SPOT / BUG (user 2026-06-15): busy-fleet only fires on a direct-exec TOOL CALL, so it CANNOT catch the worst case -- ROOT sitting IDLE at a clean stopping point while remaining work exists and ZERO delegation is active. No tool call = no guard = invisible. RULE: remaining work plus no active delegation is itself a FAILURE state. FIX DIRECTION for the guard code: add a pending-work-no-dispatch check that nudges to delegate-or-declare-blocker on the next tool call. Reflex: when you catch yourself writing clean stopping point with work remaining, that is the bug -- delegate or declare.@@BUSY-FLEET BLOCKS THE wkedit ESCAPE equals ROOT-DEADLOCK (2026-06-24). The busy-fleet guard has a SECOND gate beyond direct-exec: it also blocks SOURCE EDITS done via wk-tools, so at pace-95 (Edit tool and PowerShell already pace-blocked), ROOT's only remaining escape (wkedit) is itself busy-fleet-blocked -- a genuine ROOT-deadlock. WORKAROUND: dispatch a read-only Explore Haiku to reset the busy-fleet window, then edit within the 3-min window.@@TWO-GATES DISCOVERY (2026-06-25): busy-fleet has TWO gates -- (1) the direct-exec gate, unified to a stateless dispatch-OR-completion 3min rule via Get-WkLastDelegationTs, and (2) a SEPARATE source-edit gate that was still marker/liveness-based with an inconsistent 60s window. TODO: unify gate-2 onto the same stateless signal as gate-1.@@LIVE DEADLOCK INCIDENTS (2026-06-27): gate-2 (source-edit, 60s window) blocked wkedit repeatedly even right after an agent completion (which only opens gate-1's 3min window, not gate-2). Clean-baseline also blocks read-only audit delegations on a dirty tree even though a read-only agent makes zero changes. The composed triple-deadlock: busy-fleet wants a delegation, clean-baseline blocks a cheap delegation on a dirty tree, and the only escape (stash) hides the WIP under review.@@INTERNAL-SPAWN SUBAGENT REGRESSION (2026-06-28): after the WKHARNESS_INTERNAL_SPAWN env-backdoor was eradicated, Test-WkInternalSpawn always returns false, so busy-fleet started firing INSIDE subagents too (the subagent exemption was accidentally killed along with the backdoor). FIX PATH: re-root subagent detection in the SESSION FILE (a subagents/agent-*.jsonl transcript path), never an env flag -- stateless, unspoofable, cross-family.@@GRADED DELEGATION INCENTIVE DESIGN (2026-06-29): a well-formed delegation (recognized launcher plus 3 skill-reads) CAN dispatch and gets pace/nudge/knowledge-op exemptions (Tier A), but only a CONTRACT-COMPLETE delegation (also the full 5-part SPEC) gets the bonus of clearing busy-fleet and resetting stall-guard (Tier B). This incentivizes writing a complete brief instead of a lazy one.@@PARALLEL-SECTOR DISPATCH LESSON (2026-06-29): dispatched one agent then sat idle while an independent non-conflicting sector waited -- should have fired both in ONE message. RULE: when N independent tasks exist across different files, dispatch all N agents in one message, never serially with idle gaps in between."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read harness-busy-fleet-guard-ref",
+      "expect": "BLIND SPOT",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read harness-busy-fleet-guard-ref",
+      "expect": "TWO-GATES",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read harness-busy-fleet-guard-ref",
+      "expect": "PARALLEL-SECTOR",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "busy-fleet",
+    "harness",
+    "ref",
+    "incidents",
+    "delegation"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-07-05T04:06:42.0258182Z",
+  "updated": "2026-07-05T04:06:42.0258275Z",
+  "version": "1.0"
+}

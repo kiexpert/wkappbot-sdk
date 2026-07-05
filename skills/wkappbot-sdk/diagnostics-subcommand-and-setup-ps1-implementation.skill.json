@@ -1,0 +1,37 @@
+{
+  "id": "diagnostics-subcommand-and-setup-ps1-implementation",
+  "app": "wkappbot-sdk",
+  "title": "diagnostics subcommand and setup.ps1 implementation",
+  "title_ko": null,
+  "desc": "wkappbot diagnostics dumps OS/version/PATH/Eye/license/errors. setup.ps1 idempotent first-run script for SDK customers. Both implemented 2026-04-29.",
+  "steps": [
+    "wkappbot diagnostics: shows OS, version, install path, PATH check, Eye pid, license tier, last 5 errors from errors.jsonl",
+    "BinDir resolution in setup.ps1: -BinDir param \u003E scriptRoot\\bin \u003E Get-Command wkappbot path. UTF-8 no-BOM config.json write.",
+    "errors.jsonl tail-5: streaming read last 5 lines, JSON parse with raw fallback, 240-char truncate per line for readability"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot diagnostics",
+      "expect": "Version field in output",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot diagnostics",
+      "expect": "Eye field in output",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot diag",
+      "expect": "License field in output",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-29T00:00:59.7965366Z",
+  "updated": "2026-04-29T00:01:17.2366591Z",
+  "version": "1.2"
+}

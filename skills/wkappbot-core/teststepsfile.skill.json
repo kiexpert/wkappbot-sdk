@@ -1,0 +1,39 @@
+{
+  "id": "teststepsfile",
+  "app": "wkappbot-core",
+  "title": "TestStepsFile",
+  "title_ko": null,
+  "desc": "test --steps-file",
+  "steps": [
+    "step-a",
+    "inserted-step",
+    "inserted-step",
+    "step-b",
+    "step-c"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot --version",
+      "expect": "v7",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot a11y --help",
+      "expect": "help",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot suggest list",
+      "expect": "suggest",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-23T06:54:38.2484658Z",
+  "updated": "2026-05-23T06:55:10.7376317Z",
+  "version": "1.2"
+}

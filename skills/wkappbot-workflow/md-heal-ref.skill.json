@@ -1,0 +1,44 @@
+{
+  "id": "md-heal-ref",
+  "app": "wkappbot-workflow",
+  "title": "md-heal reference: roles, token optimization, todo sync",
+  "title_ko": null,
+  "desc": "T3 reference for md-heal: the file role map (CLAUDE.md vs AGENTS.md vs README.md), token-optimization rule, and the todo-sync rule.",
+  "steps": [
+    "ROLE MAP: project CLAUDE.md is Claude-facing project guidance; AGENTS.md is for Codex and other non-Claude agents; README.md is user-facing docs. Keep each in its lane and sync only overlapping subjects.",
+    "TOKEN OPTIMIZATION: if a workflow or command chain repeats across CLAUDE.md, README.md, or AGENTS.md, keep only a short pointer in the MD and move the executable detail into a skill. One canonical home per recurring flow avoids drift and repeated session load.",
+    "TODO SYNC: any pending task list stays in the repo CLAUDE.md Pending section. After completing a task mark it done and commit immediately. Never track todos only in conversation; CLAUDE.md is the canonical source."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read md-heal-ref",
+      "expect": "role map token optimization todo sync",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read md-heal",
+      "expect": "core heal flow",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill search heal",
+      "expect": "md-heal cluster",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "md-heal",
+    "heal",
+    "reference",
+    "rolemap",
+    "token",
+    "todo"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-03T19:02:54.4874831Z",
+  "updated": "2026-06-03T19:02:54.4874951Z",
+  "version": "1.0"
+}

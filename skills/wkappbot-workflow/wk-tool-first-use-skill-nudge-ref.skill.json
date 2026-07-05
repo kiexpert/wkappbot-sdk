@@ -1,0 +1,38 @@
+{
+  "id": "wk-tool-first-use-skill-nudge-ref",
+  "app": "wkappbot-workflow",
+  "title": "wk-tool first-use nudge (ref)",
+  "title_ko": null,
+  "desc": "Incidents and the recognition-criterion behind the wk-tool to skill nudge.",
+  "steps": [
+    "RECOGNITION CRITERION (2026-06-24): the tool/guard token must be IN the skill id for a read to be CREDITED -- this single rule drives the nudge, the study-lock currency, and the studied-index credit.",
+    "INCIDENT wkhippo: hippocampus-living-memory does NOT contain 'wkhippo' literally, so recognition failed until an explicit tool-to-skill map entry was added -- the exception proving the rule (strip-wk gives 'hippo', a token-boundary prefix of 'hippocampus').",
+    "INCIDENT harness-wk-only-gate: a near-duplicate pair (wkharness-wk-only-gate registers, harness-wk-only-gate does not) deadlocked the guards-write study-lock -- fix via strip-wk normalize so wkharness-X equals harness-X, or dedup.",
+    "SAFETY: match on token boundary, never arbitrary substring (false-positives)."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read wk-tool-first-use-skill-nudge-ref",
+      "expect": "RECOGNITION CRITERION",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wk-tool-first-use-skill-nudge-ref",
+      "expect": "wkhippo",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wk-tool-first-use-skill-nudge-ref",
+      "expect": "harness-wk-only-gate",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-24T03:33:18.5712255Z",
+  "updated": "2026-06-24T03:33:18.5712359Z",
+  "version": "1.0"
+}

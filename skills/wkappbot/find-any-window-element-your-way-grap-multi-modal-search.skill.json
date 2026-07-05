@@ -1,0 +1,46 @@
+{
+  "id": "find-any-window-element-your-way-grap-multi-modal-search",
+  "app": "wkappbot",
+  "title": "Find Any Window Element Your Way -- grap Multi-Modal Search",
+  "title_ko": null,
+  "desc": "grap = glob/regex/OR/UIA-scope/JSON5 multi-field AND. Wildcards: *Button*. OR: *notepad*;*calc*. UIA scope: app#panel. Tab portal: Chrome#ChatGPT#model. JSON5: {title:'Claude',domain:'claude.ai'}. hwnd: *hwnd=001A0F2C*. adb: adb://device/*screen*#balance. Combine: *order*#account = grap inside UIA scope.",
+  "steps": [
+    "grap is a multi-modal pattern: glob wildcards (*Button*), OR via semicolon (*notepad*;*calc*), UIA scope via #panel (app#realtime-account), tab portal (Chrome#ChatGPT#model), JSON5 ({title:'Claude',domain:'claude.ai'}), and direct hwnd:0xNNN.",
+    "Combine forms with AND semantics: *order*#account means a window matching '*order*' globally then narrowed to UIA element 'account' inside it. Multi-field JSON5 acts as AND across keys (proc + domain + title).",
+    "Adb scheme adb://device/*screen*#balance routes the same syntax to an Android device tree. The 'a11y find' command prints '# TARGET hwnd:0x...' as the first line for copy-paste reuse.",
+    "OR INTERNALS + --all PATTERN (2026-05-18): ; OR uses coverage-sum ranking (same SkillCoverageScore as skill search). A window matching MORE of your ; patterns scores HIGHER -- not just first-match. Combine with --all for true fan-out: 'wkappbot a11y invoke \"A;B;C\" --all' invokes every matched button across all windows in one call. Verified: {proc:'nkrunlite'}#*[0156]*;{proc:'nkrunlite'}#*[0150]* returns 11 TARGETS. One-shot multi-popup dismiss pattern: join all target patterns with ; then invoke --all."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot a11y windows",
+      "expect": "hwnd",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot a11y find '*calc*'",
+      "expect": "TARGET",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read find-any-window-element-your-way-grap-multi-modal-search",
+      "expect": "grap",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "grap",
+    "search",
+    "pattern",
+    "uia",
+    "scope",
+    "json5",
+    "project"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-07T04:52:43.2106717Z",
+  "updated": "2026-05-18T05:34:08.0270843Z",
+  "version": "1.4"
+}

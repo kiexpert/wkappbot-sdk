@@ -1,0 +1,36 @@
+{
+  "id": "web-command-cheatsheet-ref",
+  "app": "wkappbot-workflow",
+  "title": "Web Command Cheatsheet: dated audit history",
+  "title_ko": null,
+  "desc": "T3 reference tier of web-command-cheatsheet: dated audit-log entries for source_refs drift (PrintWebTarget rename/inline history). Consult only when investigating stale source_refs or reviewing the audit trail.",
+  "steps": [
+    "[AUDIT 2026-06-03] source_refs broken: stale pattern PrintWebTarget in WebCommands.cs.",
+    "[AUDIT 2026-06-04] WebCommands.cs: 'PrintWebTarget' literal renamed/inlined during refactor -- IsGrapRequiredWebVerb/RequireGrapFirstArg/ExtractPatternLiteral/BuildTargetJson5 anchors stable."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read web-command-cheatsheet-ref",
+      "expect": "AUDIT",
+      "prompt": null
+    },
+    {
+      "cmd": "grep -n PrintWebTarget csharp/src/WKAppBot.CLI/Commands/WebCommands.cs",
+      "expect": "refactor history context",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read web-command-cheatsheet",
+      "expect": "core tier this ref supplements",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-07-03T14:45:28.9959422Z",
+  "updated": "2026-07-03T14:45:28.9959516Z",
+  "version": "1.0"
+}

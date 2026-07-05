@@ -1,0 +1,55 @@
+{
+  "id": "elevated-eye-admin-pipe-server",
+  "app": "wkappbot-core",
+  "title": "Admin Eye Pipe Server -- Self-Respawn \u002B Hot-Swap Deferral",
+  "title_ko": null,
+  "desc": "Named pipe server (wkappbot_elevated) inside admin Eye. Handles admin commands, defers hot-swap while busy, and self-respawns on binary update using own elevated token -- no UAC.",
+  "steps": [
+    "1. NamedPipeServerStreamAcl.Create AuthUser=ReadWrite Admin=FullControl",
+    "2. WaitForConnectionAsync -\u003E Task.Run HandleClient -\u003E Interlocked _activeClients counter",
+    "3. HandleClient: ReadAsync EyeProxyRequest -\u003E ExecuteCommand -\u003E WriteAsync response",
+    "4. IsBusy guard: hot-swap deferred while _activeClients \u003E 0",
+    "5. __eye_tick__ special: returns cached Eye loop state without subprocess",
+    "6. StopAcceptingAndWaitForDrain: 30s drain cap",
+    "## Self-respawn on binary update (AppBotEyeCommands.cs)",
+    "Dual FSW \uAC10\uC2DC: .new.exe \uB4F1\uC7A5(\uC870\uAE30 drain) \u002B .exe \uC9C1\uAD50\uCCB4(fast-path) \uB3D9\uC2DC",
+    ".new.exe path: IsBusy drain -\u003E .new.exe \uC18C\uBA78 \uB300\uAE30(swap \uD655\uC778) -\u003E spawn successor",
+    ".exe path: drain \uC911\uC774\uBA74 \uC790\uC5F0 \uC644\uB8CC, \uC544\uB2C8\uBA74 \uC989\uC2DC spawn",
+    "Process.Start(UseShellExecute=false, \u0027eye --elevated\u0027) -- \uBD80\uBAA8 elevated \uD1A0\uD070 \uC0C1\uC18D, UAC \uC5C6\uC74C",
+    "drainTriggered flag: \uB450 FSW \uB3D9\uC2DC \uBC1C\uD654 \uC2DC \uC911\uBCF5 spawn \uBC29\uC9C0",
+    "startup \uC2DC .new.exe \uC774\uBBF8 \uC788\uC73C\uBA74 \uC989\uC2DC drain \uC2DC\uC791",
+    "SUDO STABILITY FIX (2026-05-01, commits 4af2b2bc \u002B 4ebb597c): Root cause of 15-commit instability loop \u2014 SudoHandler.SpawnAndAwaitAdmin and LaunchElevatedEye ran as TWO SEPARATE spawn paths with no shared mutex, so concurrent --sudo callers each showed their own UAC dialog, each spawned admin Eye, and both raced to bind wkappbot_elevated_\u003Chash\u003E pipe. Every prior fix patched symptoms (cooldown timers, kill-on-cancel, infinite-poll) not the cause. Fix 1: SudoHandler collapsed into thin wrapper delegating to LaunchElevatedEye only \u2014 single mutex-protected path, 220 lines of duplicate spawn logic deleted. Fix 2: Mutex replaced with Named Semaphore (System.Threading.Semaphore) \u2014 Mutex is OS-thread-affine, ReleaseMutex from different async thread-pool thread throws ApplicationException and mutex stays held forever. Semaphore has no thread affinity. Fix 3: [ThreadStatic] _launchInProgress re-entrancy guard \u2014 same-thread re-entry now returns immediately instead of running duplicate spawn. Fix 4: proc.Kill(entireProcessTree:true) added on pipe-timeout path to prevent orphan admin Eye when UAC approved but pipe never came up."
+  ],
+  "requirements": null,
+  "primary_cmd": null,
+  "tags": [
+    "eye",
+    "admin",
+    "pipe",
+    "hot-swap",
+    "elevated",
+    "named-pipe",
+    "self-respawn",
+    "fsw",
+    "project"
+  ],
+  "source_refs": [
+    {
+      "file": "csharp/src/WKAppBot.CLI/Commands/ElevatedEyeProxy.cs",
+      "line": null,
+      "pattern": "ElevatedEyeServer",
+      "note": null
+    },
+    {
+      "file": "csharp/src/WKAppBot.CLI/Commands/AppBotEyeCommands.cs",
+      "line": null,
+      "pattern": "isElevatedArg",
+      "note": null
+    }
+  ],
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-07T06:44:24.2717424Z",
+  "updated": "2026-05-01T13:42:55.7633959Z",
+  "version": "1.5"
+}

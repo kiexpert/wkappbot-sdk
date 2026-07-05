@@ -1,0 +1,36 @@
+{
+  "id": "find-tree-grap-pitfalls",
+  "app": "wkappbot-workflow",
+  "title": "wkappbot find -- Tree Output Design & Grap Pitfalls",
+  "desc": "Hard-won lessons from implementing find tree: grap candidate scoring, Afx MFC class detection, glob char-class pitfall in PatternMatcher, hwnd fallback strategy. 2026-04-23.",
+  "steps": [
+    "[FIND-TREE-DEFAULT] wkappbot find <keyword> outputs Win32+UIA grap path tree by default (no flag).\nEach line = copy-paste ready grap. Win32 levels use \"/\". UIA suffix after \"#\". \"#\" ALWAYS present before UIA nodes.\ngrap \"title\" == \"*title*\" -- contains-match by default, \"*\" wrapping is redundant noise.\nEXAMPLE:\n  \"영웅문Global\"\n  \"영웅문Global\"/MDIClient/\"[2000] 해외주식 주문종합\"\n  \"영웅문Global\"/MDIClient/\"[2000] 해외주식 주문종합\"/AfxFrameOrView110\n  \"영웅문Global\"/MDIClient/\"[2000] 해외주식 주문종합\"/AfxFrameOrView110#Button_ok",
+    "[AFX-CLASS-GENERIC] MFC MDI auto-generated class: Afx:XXXXXXXX:b:... -- ALL MDI children share same class, useless as identifier.\nDETECT: Regex ^Afx:[0-9A-Fa-f] -> IsGenericClassName=true -> fall back to window title.\nRESULT: \"[2000] 해외주식 주문종합\" (title) shown instead of \"Afx:006A0000:b:...\" (class).\nAny class matching Afx:[HEX] prefix is MFC auto-generated, not stable.",
+    "[GRAP-CANDIDATE-SCORING] BuildTreeSegment picks most intuitive from multiple candidates.\nTitle score: 100 - min(len,40) + 40(Korean) + 10(letter) - 50(0x prefix) - 20(path separators).\nClass score: 60 - min(len,30) + 20(PascalCase) - 5(digits) - 40(colon = auto-generated).\nWINNER: Korean title > short title > PascalCase class > generic class.\nhwnd is NEVER a candidate -- changes every session.",
+    "[GLOB-PITFALL] PatternMatcher treats \"[\", \"]\" as glob char classes.\n\"[2000] 해외주식\" -- [2000] = char class {2,0}, NOT literal \"[2000]\".\nPatternMatcher.Create(\"[2000] 해외주식\").IsMatch(\"[2000] 해외주식\") returns FALSE.\nDo NOT use PatternMatcher to self-verify grap built from titles with \"[\" or \"]\".\nFIX: plain Contains: title.Contains(innerText, OrdinalIgnoreCase).\nGlob-special: \"[\", \"]\", \"*\", \"?\". Safe alt: JSON5 {proc:'nfrunlite',title:'주문종합'}.",
+    "[HWND-FALLBACK-STRATEGY] hwnd changes on every restart -- never use as primary grap.\nSTRATEGY: 1) Build candidates by score. 2) Verify with plain Contains (not PatternMatcher). 3) First passing -> emit. 4) All fail -> {proc:'name',hwnd:0x...} as VISIBLE session-scoped fallback.\nNever silently emit hwnd as stable -- {proc,hwnd} signals fragility to caller."
+  ],
+  "tags": [
+    "find",
+    "grap",
+    "tree",
+    "patternmatcher",
+    "glob",
+    "hwnd",
+    "mfc",
+    "legacy",
+    "pitfall",
+    "scoring"
+  ],
+  "source_refs": [
+    "csharp/src/WKAppBot.CLI/Commands/InspectionCommands.Tree.cs::BuildTreeSegment",
+    "csharp/src/WKAppBot.CLI/Commands/InspectionCommands.Tree.cs::GrapMatches",
+    "csharp/src/WKAppBot.CLI/Commands/InspectionCommands.Tree.cs::IsGenericClassName"
+  ],
+  "regression_script": "",
+  "author": "claude",
+  "created": "2026-04-23T04:15:56.157695",
+  "updated": "2026-04-23T04:15:56.157695",
+  "version": "1.0",
+  "updated_at": "2026-04-23T04:15:56.157695"
+}

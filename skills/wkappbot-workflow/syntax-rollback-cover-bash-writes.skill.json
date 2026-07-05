@@ -1,0 +1,44 @@
+{
+  "id": "syntax-rollback-cover-bash-writes",
+  "app": "wkappbot-workflow",
+  "title": "Syntax-rollback must cover Bash-path writes",
+  "title_ko": null,
+  "desc": "Build-plan: PreToolUse Syntax-Guard Auto-Backup only backs up write-TOOL edits, so wkedit/wkappbot-file/redirect Bash writes bypass the PostToolUse auto-rollback net; extend via shared write-target extraction. FOUNDATION = ROOT builds proto+self-test.",
+  "steps": [
+    "OWNERSHIP: this is FOUNDATION (it shapes how EVERY write is protected for every intelligence) so ROOT builds the proto and self-test itself and does NOT delegate it down (foundation-is-roots-charge-not-a-chore). The mechanical residue (running a parse check) may be delegated, the guard logic may not. Live-merge ONLY after the self-test passes both the broken-reverts AND valid-not-touched cases. Cross: harness-active-model-scoping (INTO-THE-LIVE marker on promotion), verify-tool-or-guard-synthetic-live-static, incident-trauma-reflex.",
+    "FAIL-CLOSED BLOCK CONTRACT (user 2026-06-25, security requirement): the write guard MUST BLOCK the write -- not silently allow -- in any of these 3 unsafe cases: (1) PATH-EXTRACTION FAILS for a write-capable command (cannot determine WHICH file is written, so cannot verify or back it up); (2) the resolved target is NOT an ALLOWED path (the write-location-floor policy: a non-source non-md target OUTSIDE .tmp, or an unresolvable target); (3) a PARSE ERROR occurs while decomposing the command or extracting the path (heredoc, unbalanced quotes, ambiguous nesting). Principle = fail-CLOSED: when safety cannot be determined, DENY rather than allow. CRITICAL no-false-deny CAVEAT: a write to a genuinely non-syntax-checkable ALLOWED location (wkedit on a .md, or a .tmp .txt) must NOT be blocked -- extraction returning null for a NON-write command, or for an allowed non-syntax target, is fine. The BLOCK fires ONLY when a write-capable command (a) targets a syntax/source file we cannot pin, OR (b) resolves to a disallowed path, OR (c) the parse failed. IMPLEMENTATION: pair Get-WkSyntaxCheckTargetFromCmd (extraction, self-test 8/8 PASS 2026-06-25) with the write-location-floor verdict (Test-WkWriteLocationFloor block/defer/allow) so the SAME block/defer/allow + syntax-backup all apply to Bash paths, all fail-closed. PROTO-TEST both the BLOCK cases AND the legit-ALLOW cases (a .tmp write, a .md write, a read) before any live-merge -- a fail-closed guard that false-denies a legit write is itself a bug.",
+    "EXTRACTION MUST BE VERB-AWARE AND QUOTE-AWARE -- a regex heuristic is UNSAFE (caught by reasoning 2026-06-25 before merge). The crude proto Get-WkSyntaxCheckTargetFromCmd takes the LAST whitespace-token ending in a syntax ext. That self-tests 8/8 on basic cases BUT has a FALSE-TARGET hole: for wkappbot file WRITE the path is the FIRST arg after the verb (then --text content follows), and for wkappbot file EDIT or wkedit the path is the args AFTER the OLD and NEW string args -- so if the OLD/NEW search-replace strings OR the --text CONTENT mention a path ending in a syntax ext (e.g. wkappbot file write conf.ps1 --text \"see helper.py for details\"), the last-token heuristic picks the CONTENT mention (helper.py) instead of the real target (conf.ps1). Under the FAIL-CLOSED backup-and-revert contract this is CATASTROPHIC: it would back up and later REVERT the WRONG file = data loss. THEREFORE the extractor MUST be verb-aware (write -> first arg after verb; edit/wkedit -> the non-flag args AFTER the 2 OLD/NEW strings; redirect -> token after the unescaped > ) AND quote-aware (a quoted arg with spaces is ONE token; chars inside quotes are data). DO NOT use a position-blind regex. REUSE the decompose tokenizer (the quote-aware Split-WkCommandLine already in wkharness-decompose.ps1) plus the write-location-floor Extract-WkShellWriteTargets (verb-aware) rather than reinventing -- that is the no-bandaid path. ADVERSARIAL self-tests REQUIRED before merge: (a) file write PATH --text mentions-other-ext -> target is PATH not the mention; (b) file edit OLD-mentions-ext NEW-mentions-ext PATH -> target is PATH; (c) extraction genuinely fails for a syntax-targeting write -> block (fail-closed); (d) legit .tmp/.md/read -> allow (no false-deny). The basic 8/8 is necessary but NOT sufficient; these adversarial cases are the real gate."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot file grep toolName wkharness-guards.ps1",
+      "expect": "Syntax-Guard Auto-Backup block lists only write-TOOLS not Bash or PowerShell",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read syntax-rollback-cover-bash-writes",
+      "expect": "GAP and FIX and PROTO-FIRST self-test plan",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot file read wkharness-post.ps1",
+      "expect": "PostToolUse Auto-Rollback Syntax Guard fires when the wksyntax_state file exists",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "harness",
+    "write-module",
+    "syntax-rollback",
+    "post-hook",
+    "foundation",
+    "build-plan"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-25T06:54:53.2029624Z",
+  "updated": "2026-06-25T07:45:10.5268426Z",
+  "version": "1.4"
+}

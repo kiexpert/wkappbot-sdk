@@ -1,0 +1,79 @@
+{
+  "id": "sudo-elevation-four-layers",
+  "app": "wkappbot-core",
+  "title": "--sudo option: 6-layer elevation architecture with pulse tracing (v5.14)",
+  "desc": "v6.0 pipe separation: normal Eye -> wkappbot_eye_ipc (tick IPC only), admin Eye -> wkappbot_elevated (command proxy only). Must not mix -- normal Eye intercepted elevated connections before this split. --sudo is a SESSION START trigger. Launcher checks admin Eye liveness on wkappbot_elevated; reuses existing admin Eye if alive. Core/SudoHandler owns admin spawning, waits indefinitely after UAC until admin Eye ready OR spawned process dies. Once admin path started, no user-mode fallback; proxy failure aborts. User Eye refuses --sudo with [EYE:FALLBACK] + exit 125. IsAvailable->Ping migration for liveness. Proxy stdout/stderr captured as UTF-8 (StandardOutputEncoding=UTF8). Eye evict null cmdline = admin-elevated process, skip (not evict).",
+  "steps": [
+    "v6.0 PIPE SEPARATION (CRITICAL): wkappbot_eye_ipc = normal Eye tick IPC ONLY (status/context/card broadcasts). wkappbot_elevated = admin Eye command proxy ONLY (sudo-elevated command routing). They must NEVER mix -- before split, normal Eye intercepted elevated connections causing session drift.",
+    "SEMANTIC MODEL -- --sudo is a SESSION START, not per-invocation. Once admin Eye (pipe wkappbot_elevated) is up, subsequent commands should inherit admin privilege without re-typing --sudo. Like shell sudo.",
+    "LAUNCHER: checks admin Eye liveness on wkappbot_elevated; prefers admin pipe over user pipe when admin Eye is alive. User Eye refuses --sudo with [EYE:FALLBACK] + exit 125.",
+    "CORE/SudoHandler: owns admin spawning, waits indefinitely after UAC until admin Eye ready OR spawned process dies. Once admin path started, no user-mode fallback; proxy failure aborts.",
+    "LIVENESS: IsAvailable -> Ping migration (active probe beats file existence check).",
+    "PROXY ENCODING: admin Eye subprocess stdout/stderr captured as UTF-8 (StandardOutputEncoding=UTF8 on ProcessStartInfo).",
+    "EYE EVICT RULE: null cmdline = admin-elevated process, skip (not evict). Otherwise normal Eye would kill the admin Eye it cannot inspect."
+  ],
+  "tags": [
+    "operator",
+    "project",
+    "sudo",
+    "elevation",
+    "admin",
+    "debugging",
+    "pulse",
+    "handshake",
+    "race-condition",
+    "broadcast-close",
+    "liveness-check",
+    "dll-init",
+    "v5.14.43"
+  ],
+  "source_refs": [
+    {
+      "file": "csharp/src/WKAppBot.CLI/Commands/SudoHandler.cs",
+      "line": null,
+      "pattern": "SpawnAndAwaitAdmin",
+      "note": null
+    },
+    {
+      "file": "csharp/src/WKAppBot.CLI/Commands/SudoHandler.cs",
+      "line": null,
+      "pattern": "0xC0000142u",
+      "note": null
+    },
+    {
+      "file": "csharp/src/WKAppBot.CLI/Commands/SudoHandler.cs",
+      "line": null,
+      "pattern": "proc.HasExited",
+      "note": null
+    },
+    {
+      "file": "csharp/src/WKAppBot.CLI/Commands/ElevatedEyeProxy.cs",
+      "line": null,
+      "pattern": "ElevatedEyeServer",
+      "note": null
+    },
+    {
+      "file": "csharp/src/WKAppBot.CLI/Program.cs",
+      "line": null,
+      "pattern": "Timeout.Infinite",
+      "note": null
+    },
+    {
+      "file": "csharp/src/WKAppBot.CLI/Program.cs",
+      "line": null,
+      "pattern": "SudoHandler.EnsureAdminForSudo",
+      "note": null
+    },
+    {
+      "file": "csharp/src/WKAppBot.CLI/Commands/AppBotEyeCommands.cs",
+      "line": null,
+      "pattern": "isElevatedArg",
+      "note": null
+    }
+  ],
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-16T08:14:14.9665016Z",
+  "updated": "2026-04-21T05:23:25.8010414Z",
+  "version": 2
+}

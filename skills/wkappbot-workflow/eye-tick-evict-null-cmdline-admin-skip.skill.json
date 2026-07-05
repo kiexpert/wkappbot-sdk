@@ -1,0 +1,19 @@
+{
+  "id": "eye-tick-evict-null-cmdline-admin-skip",
+  "app": "wkappbot-workflow",
+  "title": "Eye Evict: Skip Admin-Elevated Processes with Null Cmdline",
+  "desc": "When eye-evict fires, processes with null GetProcessCommandLine output are admin-elevated; skip window check before eviction to avoid false eviction of elevated processes.",
+  "steps": [
+    "When eye-evict triggers, call GetProcessCommandLine on the target process. If it returns null or empty, treat the process as admin-elevated (UAC-restricted) and skip the window check before eviction decision.",
+    "Fix deployed in commit 8b633583: guard added in EyeCommand evict path. Prevents false eviction of elevated processes (e.g., Heroes4/HTS running as admin) during Eye scan cycles.",
+    "If eye-evict causes unexpected process eviction on HTS/Heroes4, check if the process is running as administrator. Use \u0027wkappbot eye tick\u0027 to verify eye state. Null cmdline on a process = admin token; the guard skips such processes automatically.",
+    "Verified 2026-04-21: test-eye-tick-evict-null-cmdline.sh (resolve ts=2026-04-20T07:27)"
+  ],
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-21T18:29:27.445444Z",
+  "updated": "2026-04-21T18:29:45.1869177Z",
+  "version": "1.4"
+}

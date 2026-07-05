@@ -1,0 +1,38 @@
+{
+  "id": "ask-run-start-pwsh-path-resolution",
+  "app": "wkappbot-core",
+  "title": "ask run start pwsh path resolution",
+  "title_ko": null,
+  "desc": "RunStart in AskCommands.RunRegistry.cs resolves pwsh/powershell to full path before Process.Start to survive parallel-worker stripped-PATH environments",
+  "steps": [
+    "1. ResolvePwshExe(name) in ChatCommand.Resolvers.cs probes well-known PowerShell 7 install paths (Program Files, LocalAppData), falls back to Windows PowerShell 5 (System32 WindowsPowerShell v1.0), then PATH walk.",
+    "2. RunStart calls ResolvePwshExe when cmdArgv[0] is pwsh/pwsh.exe/powershell/powershell.exe after IsExternalExe branch selects exe = cmdArgv[0].",
+    "3. Bug: parallel workers (RunParallelWithFlushAsync -> RunGeminiLoopAsync -> AskGemini) failed with 'An error occurred trying to start process pwsh ... file not found' because PATH was empty/stripped.",
+    "4. Verified 2026-05-15: suggest 2026-05-14T11:07:40 resolved at commit c1fe24743."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot file grep ResolvePwshExe --path csharp/src/WKAppBot.CLI/Commands/ChatCommand.Resolvers.cs",
+      "expect": "ResolvePwshExe",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot file grep ResolvePwshExe --path csharp/src/WKAppBot.CLI/Commands/AskCommands.RunRegistry.cs",
+      "expect": "ResolvePwshExe",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot help",
+      "expect": "commands",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-15T07:13:10.4674667Z",
+  "updated": "2026-05-15T07:13:10.4674774Z",
+  "version": "1.0"
+}

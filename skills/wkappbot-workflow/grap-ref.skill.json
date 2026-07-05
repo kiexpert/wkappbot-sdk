@@ -1,0 +1,41 @@
+{
+  "id": "grap-ref",
+  "app": "wkappbot-workflow",
+  "title": "GRAP Ref: JSON5 grammar, abs-tag-path, android, MDI (T3)",
+  "title_ko": null,
+  "desc": "T3 deep reference for grap. Full JSON5 window grammar, BuildAbsoluteTagPath format, android adb pipeline, cwd/MDI child targeting, node-tag forms. Practical usage in grap-howto, core concept in grap.",
+  "steps": [
+    "[JSON5 GRAMMAR] window grap is JSON5-extended {field:value,...} all AND'd. Single-quoted strings, unquoted keys, trailing comma, hex literals OK. Fields (all optional): hwnd (instant exact), pid, proc (no .exe), domain (CDP, most stable web id), title (30-char cap), cls (Win32 class, essential for MFC), cid (control id), url (CDP). Operators: array OR {title:['A','B']}, glob in value {title:'*App*'}, regex in value {title:/App.*/}.",
+    "[ABS TAG PATH] BuildAbsoluteTagPath format is Type_aid or Type_Nth or Type, with a double-slash compressing consecutive unnamed same-type nodes. Type = first 3 chars of ControlType (Doc Gro Edi But Pan Tex Lst Tab Tre Img Lnk Win). _aid = AutomationId truncated at first dash. _Nth = sibling index fallback. Resolution: Type_aid uses ByAutomationId fast, Type_Nth sibling BFS, bare uses name BFS.",
+    "[ANDROID] the adb scheme prefix routes to the Android UIA pipeline: 'adb://Fold5/*pkg*#scope' is device then package then scope, 'adb://*pkg*#scope' auto-detects the device, 'adb://Fold5:outer/*pkg*' targets the foldable outer display.",
+    "[CWD FIELD] {cwd:'D:/path'} finds the subordinate child-process window such as the PseudoConsoleWindow of cmd inside a Windows Terminal tab. Each WT tab has its OWN top-level CASCADIA hwnd (not shared), same pid, unique hwnd. Use {cwd} at fire time for dynamic tab targeting instead of a stale hwnd.",
+    "[MDI CHILD] MDI child windows are grap segments {proc:app}#MdiChildTitle#Node. win-click is deprecated and only prints a paste-ready 'a11y click grap --x N --y N' suggestion using window-relative coords. Migrate old win-click calls to a11y click.",
+    "[NODE TAG FORMS] Button alone is type only, ButtonOK is type+AutomationId, a quoted name is type+Name, Button2Email is type+SiblingIndex+AutomationId, Group x7 is a run-length of 7 unnamed Groups. attrs carry ltwh=x,y,w,h and actions like Invoke.",
+    "See also grap (T1 core) and grap-howto (T2 practical). next-grap cluster-grap-howto. SOURCE: WindowFinder.cs BuildTargetJson5, A11yCommand.cs focusGrap."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot a11y find --help",
+      "expect": "shows find usage",
+      "prompt": null
+    },
+    {
+      "cmd": "proposed: grap JSON5 {proc,domain}",
+      "expect": "AND fields resolve one window",
+      "prompt": null
+    },
+    {
+      "cmd": "proposed: grap abs-tag-path Type_aid",
+      "expect": "resolves by AutomationId",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-23T12:29:27.600521Z",
+  "updated": "2026-06-23T12:29:27.6005339Z",
+  "version": "1.0"
+}

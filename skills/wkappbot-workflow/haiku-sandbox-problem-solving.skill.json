@@ -1,0 +1,41 @@
+{
+  "id": "haiku-sandbox-problem-solving",
+  "app": "wkappbot-workflow",
+  "title": "Haiku Sandbox Problem Solving Pattern",
+  "title_ko": null,
+  "desc": "T1 core. Sonnet architects, Haiku prototypes in safe sandbox, wkcodex applies to production. Never let Haiku touch original source directly.",
+  "steps": [
+    "PATTERN: Sonnet=architect+judge, Haiku=proof-of-concept builder (new file only), wkcodex=production integrator. Original source never touched until solution verified.",
+    "SONNET DEFINES: problem + input/output spec + acceptance criteria. NOT 'find and fix' but 'verify this algorithm works'. Exact definition = reliable Haiku output.",
+    "HAIKU BUILDS: new file only (/tmp or evidence/ dir). No existing source imports. Standalone runnable. Self-test included: 'if output==expected: PASS'.",
+    "SONNET JUDGES: reads PASS/FAIL + Haiku output. Writes precise diff: old_string/new_string + file:line for wkcodex. NEVER sends Haiku back to original source.",
+    "wkcodex APPLIES: receives Sonnet diff. Applies to real source + dotnet build + smoke test + commit. next:haiku-sandbox-problem-solving-howto for brief templates. cluster:haiku-sandbox-problem-solving-ref for real examples.",
+    "[PROTOTYPE -> VERIFY -> MERGE for LIVE INFRA 2026-06-06] User principle: never solve a problem by editing live-service code directly -- prototype in a safe area, verify, THEN merge. CRITICAL for harness/infra: wkharness-*.ps1 / guards / scorers execute on EVERY tool call in EVERY session, so a single bug (syntax error, truncated literal, throw-not-caught) mass-breaks all sessions. This session's near-miss: stall-reset + Get-WkClaudeMdLivingScore were written straight into the LIVE D:/GitHub/wkappbot-kih/tools/wkharness-common.ps1 -- a truncated Korean regex corruption + a half-applied state slipped in (only fail-open WARN-only design saved it). SAFE WORKFLOW: (1) PROTOTYPE in a scratch copy / git worktree (zero live impact); (2) VERIFY -- dot-source the function + unit-test it, run the harness self-test (WKHARNESS_SELFTEST=1, see run-postcase-testing), parse-verify with [Parser]::ParseFile, and for transforms a round-trip/no-loss check; (3) MERGE -- only after green, atomically swap into the live file + commit. GOOD EXAMPLE this session: codex's wksplit-ast.ps1 -- tested on a temp copy of session-find.ps1, round-trip + parse verification caught real newline-accounting bugs BEFORE any live write. RULE: harness/guard/scorer code = NEVER edit the live file in a half-state; build in scratch, self-test, then swap. Normal repo source (.cs/.ps1 tools) = codex temp-test pattern is the standard.",
+    "[2026-06-08 SESSION CREDIT -- Haiku is an EXCELLENT prototyper; do NOT undervalue or dismiss it] Real proof this session: Haiku (Agent tool, model:haiku) prototyped the source-splitter, ran the full harness-bug investigations (--exit-event storm log forensics, live process-count probes, and the harness:skill matcher diagnosis), and acted as the QA canary that surfaced the harness:skill glob bug by hitting it for real -- findings a knowing model would have dodged. Haiku punches far above its cost: Sonnet/Opus should delegate prototyping + investigation + mechanical edits to it LIBERALLY. DELEGATION-GATE MATRIX (why Haiku is the go-to at 95%+ pace): wk-only-gate (wkharness-guards-shell.ps1 ~L240) AND the Edit/Write pace gate (wkharness-guards-write.ps1 ~L133) BOTH carry '-not $isHaikuSession', so a Haiku subagent is EXEMPT from both even when root Opus/Sonnet is hard-blocked at 95%+. BUT the harness:skill study-lock applies to ALL models (Haiku too) -- it needs the EXACT 3 mapped skills read before editing a protected file (a wrong 3rd skill fails the lock); and codex runs in its OWN process with its own pace budget. See related delegation skills: claude-code-agent-tier-routing, delegation-preflight-oneshot, harness-edit-write-skill-bypass, sonnet-bug-stop-policy."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read haiku-sandbox-problem-solving",
+      "expect": "T1 core pattern",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read claude-code-agent-tier-routing",
+      "expect": "tier routing",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read sonnet-bug-stop-policy",
+      "expect": "delegation discipline",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-31T14:41:07.1813679Z",
+  "updated": "2026-06-07T17:18:26.515413Z",
+  "version": "1.3"
+}

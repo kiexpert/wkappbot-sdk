@@ -1,0 +1,49 @@
+{
+  "id": "harness-hardening-playbook-13-reflexes-from-the-2026-06-20-marathon",
+  "app": "wkappbot-workflow",
+  "title": "Harness hardening playbook -- 13 reflexes from the 2026-06-20 marathon",
+  "title_ko": null,
+  "desc": "Textbook for any ROOT doing harness/guard/classifier work. Each reflex was paid for with a real bug or user rebuke in the 2026-06-20 harness-hardening session. Read before touching the harness.",
+  "steps": [
+    "CARDINAL SIN -- CONFABULATION: never claim a result without reading it back. A tool banner is not proof (wkappbot file write is a NO-OP that prints a LAUNCH banner and writes nothing). After every write, read it back (grep / Test-Path / re-Read); before claiming a behavior, RUN THE TEST; never trust rc / banner / your own narrative.",
+    "FAIL = BLOCK, OPEN = BUG, but EMPTY INPUT is not a failure: a guard or decision-path failure must exit 2 (fail-closed); auxiliary failures (cache, log) may continue; but an empty or malformed input has nothing to classify, so it must ALLOW (a Mandatory param that throws on empty turned a parse-miss into a hard Block that bricked every tool call).",
+    "STALE-PROTO-BASE REVERTS YOUR WORK: a cheap agent often builds its proto on an OLD base, not current canonical. A blind cp of that proto over canonical reverts your committed fixes. ROOT diffs proto-vs-current-canonical, extracts only the functional deltas, and applies them SURGICALLY with Edit -- never blind-cp a stale-based proto.",
+    "ROOT RUNS THE REAL SUITE: cheap agents mock-pass, static-pass, or claim cannot-run-here-is-a-trace. parse-clean is not runtime-correct and an agent green is not correct (may test a mock with a shared wrong premise, or a stale assertion). ROOT must run the actual suite and read the assertions before merging; the merge decision stays with ROOT. Proven repeatedly: a PS5.1 try-as-expression bug, a stale self-test assertion, and 3 shell-read false-negatives were caught ONLY by ROOT running it.",
+    "THE USERS QUESTIONS ARE THE TEST ORACLE: nearly every silent bug is surfaced by a pointed user question (is it a glob? same pattern when installed? read+pipe really allowed? block only bad pipes?), not by the AI. Treat a user does-X-really-work as a failing test until you RUN it and prove otherwise; do not reassure.",
+    "GLOB vs REGEX in harness:skill patterns: the matcher treats a pattern containing star or question-mark as a GLOB; a real regex with dot-star or a group is mis-detected and silently matches nothing. Use glob syntax for path rules; verify with Get-WkAggregatedSkillLockRules -EditPath. Better: auto-detect regex by regex-only syntax.",
+    "IDENTITY = PROCESS LINEAGE ONLY: never a global process existence, env var, or newest-mtime. A concurrent agy session poisoned a ROOT commit because committer-resolve used a global Get-Process; a 90s mtime TTL treated a still-alive session as dead. Gate global fallbacks on a claude-host-in-the-chain flag; prefer PID liveness over arbitrary TTL.",
+    "KNOWLEDGE-OPS ARE THE GOAL -- ENCOURAGE, DO NOT BLOCK: skill read/list/search/edit/add/contribute, wkhippo read verbs, suggest, file-read must ALLOW unless a genuine bad pipe (pipe to pager truncation), smuggle (chain to a non-knowledge command), or double-quote subshell (shell-expanded). Metacharacters inside a quoted skill-edit arg are DATA.",
+    "HOOK PATHS = FORWARD SLASH (escape-immune): a backslash before a t/n in a JSON hook path decodes as a tab/newline, breaks the path, the hook fails to launch, and the runner treats a launch failure as non-blocking = fail-OPEN brick. Forward slashes cannot be mis-escaped. Fix encoding (UTF-8 console at hook entry) early -- an unreadable mojibake error wastes hours.",
+    "FIX A GUARD, DO NOT DODGE IT: when a guard mis-blocks a legitimate action, fix the guards correctness (e.g. the lineage resolver), never rename to a sandbox suffix to assume a false identity or use an env bypass. RECOVER FIRST in an emergency (run the heal), forensics after. While background agents run, never idle -- knowledge-ify.",
+    "GIT locked in-use binary recovery: a rebase/reset can be blocked by an untracked in-use binary (a loaded plugin dll: unable-to-unlink); even rebase --abort fails. Ladder: git rebase --quit (no working-tree reset), cherry-pick your commit onto the remote tip, checkout -B (same-commit, no transition), push. Prevent with a recursive gitignore glob, not just top-level.",
+    "NAV: full detail in the memory file PLAYBOOK-harness-hardening-2026-06-20. Enforced reflexes live in opus-self-reflection-ref (confabulation, fail-closed, stale-proto, ROOT-runs-suite), claude-md-harness-rules (glob-vs-regex), wkagent-name-tool-ref (lineage-only + TTL), wkdoctor-system-physician (agy bypass catch-22), incident-trauma-reflex-ref (git locked-binary). This playbook is the index and the WHY.",
+    "WRITE-LOCATION FLOOR (the litter fix): codex dumped err.txt/out.txt/test.ps1 to the repo root; the fix is a write-side floor mirroring the read floor -- non-source writes go ONLY under .tmp/, repo-root non-source is limited to wk-tool form + whitelisted docs, a bare filename blocks (specify a folder), and an unresolved output path fails-closed. Thorough output-path resolution covers redirects + --output/-o/-OutFile flags, not just the obvious target. Full spec: write-location-floor-spec-non-source-writes-go-only-under-tmp. Symmetric partner: the shell-read floor (Test-WkShellReadOnly).",
+    "AGENT CONTEXT-EXHAUSTION CONFABULATION (2026-06-20, the cardinal sin's agent-side variant): a delegated agent ran low on context and returned a result that DESCRIBED its plan (Now I will write the final proto... the key changes are...) but never actually wrote the file or ran the suite. Treating that narrative as done would have been confabulation-by-proxy. REFLEX: an agent's final message is INTENT, not proof -- after every delegation that should PRODUCE an artifact, ROOT verifies the artifact EXISTS (Glob/Test-Path) and was RUN (read the result file / re-run the suite) BEFORE trusting it. When an agent says I will X rather than X is done + here is the verified output, assume X did NOT happen. Brief deliverable-producing agents with PRIORITIZE: write the file + run it + report the count; do not spend budget describing -- act, so a context-squeezed agent still lands the artifact.",
+    "KNOWLEDGE-IFICATION (jisikhwa) REFLEX -- ALWAYS WIRED (user 2026-06-22): the moment you capture a lesson, incident, or hard-won experience -- here or anywhere -- the reflex is to KNOWLEDGE-IFY it immediately: distill into a 3-tier skill plus a trauma-grade reflex per knowledge-ification-procedure-jisikhwa, FOLD into the right EXISTING skill (not a new standalone -- specs into the existing skill, bugs as a reference note), and cross-link back. Lived experience that is not knowledge-ified DIES with the session. -> wkappbot skill read knowledge-ification-procedure-jisikhwa"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read harness-hardening-playbook",
+      "expect": "CARDINAL",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read opus-self-reflection-ref",
+      "expect": "confabulation",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read verify-tool-or-guard-synthetic-live-static",
+      "expect": "runtime",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-20T12:23:55.4099357Z",
+  "updated": "2026-06-21T18:13:36.0096282Z",
+  "version": "1.6"
+}

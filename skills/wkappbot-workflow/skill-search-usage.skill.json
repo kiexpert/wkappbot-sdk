@@ -1,0 +1,74 @@
+{
+  "id": "skill-search-usage",
+  "app": "wkappbot-workflow",
+  "title": "skill search: how to find and search skills -- usage, regex, filters, tips",
+  "title_ko": "스킬 검색 사용법 — 예시·정규식·필터·팁",
+  "desc": "How to find skills with wkappbot skill search. How to search by keyword, phrase, OR-regex (~a|b~), --app, --audience. Troubleshoot no-results. Practical examples for beginners and experienced users.",
+  "steps": [
+    "BASIC USAGE: wkappbot skill search <words...>. Type any words in any order -- even mixed with symbols. OR search by default. Results auto-sorted by match quality: phrase match (all words in order) > all words present > any word matches. Examples: wkappbot skill search cdp timeout   wkappbot skill search 세션 시작   wkappbot skill search Runtime.evaluate 실패   wkappbot skill search 어떻게 세션 복구하지",
+    "SCORING TIERS (automatic): PHRASE (all words in correct order) -> score x2.5. AND (all words somewhere, any order) -> score x1.5. OR (at least one word) -> score x1.0. You never need to think about this -- just type and the best match rises to the top. cov>2.0 = phrase match, cov>1.0 = AND match, cov<1.0 = partial OR match.",
+    "SYMBOL STRIPPING: symbols in your query are automatically stripped so 'Runtime.evaluate' searches for both 'runtime.evaluate' AND 'runtime' AND 'evaluate'. 'CDP 발생! 실패?' searches for 'cdp', '발생', '실패' etc. Original symbol-containing token is also kept as a bonus search term -- if the exact text appears in a skill, it ranks higher.",
+    "MULTI-WORD TIPS: more words = higher AND/phrase bonus for matching skills. 'cdp timeout' finds all skills with either word, but skills with BOTH rank higher. 'cdp evaluate timeout' finds all skills with any of those, skills with all three rank highest, and if 'cdp evaluate timeout' appears in that exact order -- top of the list.",
+    "FILTER BY APP: wkappbot skill search retry --app wkappbot-core   wkappbot skill search cdp --app webbot. App names: wkappbot, wkappbot-core, wkappbot-workflow, wkappbot-webbot, wkappbot-sdk, wkautoquant, invest-kr.",
+    "FILTER BY AUDIENCE: wkappbot skill search cdp --audience operator (AI instructions). wkappbot skill search suggest --audience developer (code-level). Types: operator, developer, project, user. Unclassified skills always show.",
+    "OR SEARCH with regex: wkappbot skill search ~retry|timeout|cancel~  wkappbot skill search ~suggest.*(resolve|merge|triage)~  wkappbot skill search ~(cdp|chrome).*(open|launch)~. Use ~pattern~ or re:pattern on Windows (not /pattern/ -- bash converts / to a path).",
+    "KOREAN SEARCH: wkappbot skill search 세션 시작   wkappbot skill search ㄱㄱ   wkappbot skill search 스킬 찾기. Korean in title_ko, tags, and steps is all searched. Mixing Korean and English works: wkappbot skill search cdp 크롬 열기. Korean tags score well (tag '세션' = cov 1.0 for query '세션'). Korean title_ko is filtered but may score 0 due to scoring engine limitation -- add Korean tags for reliable ranking.",
+    "READING RESULTS: format is [app] id [audience] cov=X.XX - Title. Run: wkappbot skill read <id>. Include hidden dev steps: wkappbot skill read <id> --developer.",
+    "WHEN NOTHING FOUND: (1) try fewer words -- OR still needs at least one to match somewhere. (2) try a synonym. (3) browse: wkappbot skill list wkappbot-workflow. (4) recent: wkappbot skill news. (5) regex: wkappbot skill search ~partial.*word~."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read skill-search-usage",
+      "expect": "BASIC USAGE",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill search usage",
+      "expect": "skill-search-usage",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill search howto",
+      "expect": "skill-search-usage",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "skill",
+    "search",
+    "usage",
+    "guide",
+    "howto",
+    "regex",
+    "filter",
+    "app",
+    "audience",
+    "tips",
+    "examples",
+    "keyword",
+    "find",
+    "discover",
+    "or",
+    "or-search",
+    "newbie",
+    "beginner",
+    "tutorial",
+    "lookup",
+    "query",
+    "how",
+    "what",
+    "where",
+    "narrow",
+    "exclude",
+    "스킬",
+    "찾기",
+    "검색법"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-08T11:41:16.7832769Z",
+  "updated": "2026-05-08T12:08:02.5134578Z",
+  "version": "1.11"
+}

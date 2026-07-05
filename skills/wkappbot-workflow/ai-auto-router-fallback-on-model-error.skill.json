@@ -1,0 +1,48 @@
+{
+  "id": "ai-auto-router-fallback-on-model-error",
+  "app": "wkappbot-workflow",
+  "title": "AI auto-router must fall back on model-level error",
+  "title_ko": null,
+  "desc": "Agent.cmd and the wk auto-router (--model auto) must FALL BACK to the next candidate model when the chosen model returns a MODEL-LEVEL error (rate_limit, overloaded, model-unavailable, API failure) -- never fail the whole delegation. Final fallback is a cheap always-available model (haiku, zero Claude quota). A delegation should always land on SOME model.",
+  "steps": [
+    "PROBLEM: --model auto selected a model, that model returned a MODEL-LEVEL error (rate_limit_error / overloaded / model-unavailable / transient API failure), and the dispatch FAILED instead of trying the next candidate -- the delegation was lost and the orchestrator had to retry manually.",
+    "FIX: on a model-level error, the auto-router retries the SAME task with the next candidate in the routing chain, and the FINAL fallback is the cheapest always-available model (haiku) -- so a delegation always lands on some model rather than dying.",
+    "SCOPE: fall back ONLY on model/infra errors (rate-limit, overloaded, unavailable, network). Do NOT fall back on a TASK error -- a task that ran and failed is a real result to surface, not a routing failure. Distinguish model-error from task-error before retrying.",
+    "CHAIN: route by capability first (cheap for survey, mid for synthesis, strong for judgment), then degrade on error down to haiku. Respect per-tier budgets (codex weekly, Claude weekly) when picking the next candidate.",
+    "WHERE: the Agent.cmd / wk auto-router wrapper plus the harness autoroute logic (wkharness-common). Log each fallback hop so the orchestrator can see which model actually answered."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read ai-auto-router-fallback-on-model-error",
+      "expect": "fallback",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wk-ai-tools-routing",
+      "expect": "routing",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read claude-code-agent-tier-routing",
+      "expect": "tier",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "ai",
+    "router",
+    "auto",
+    "fallback",
+    "delegation",
+    "model-error",
+    "resilience",
+    "t2"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-07T12:10:26.5840631Z",
+  "updated": "2026-06-07T12:10:26.5840724Z",
+  "version": "1.0"
+}

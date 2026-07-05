@@ -1,0 +1,51 @@
+{
+  "id": "placement-one-shot-no-multi-reposition",
+  "app": "wkappbot-webbot",
+  "title": "Placement one-shot: never re-add multi-stage reposition (DANCING guard)",
+  "title_ko": null,
+  "desc": "Chrome window placement must be a single setWindowBounds + settle + observe-only verify; never re-add the multi-stage reposition (3x aggressive retry, 5000ms poll-and-correct, tail-verify, final-reapply) that self-inflicts DANCING. Triad-verified self-inflicted bug; shipped v7.5 (2026-05-29).",
+  "steps": [
+    "RULE: SetWindowBoundsWaitStableAsync is ONE-SHOT -- SetWindowBoundsAsync once, settle 1500ms via OneShotSettleMs, single GetWindowForTargetAsync verify, log drift only, no additional setWindowBounds, fail-CLOSED with [PLACEMENT:SKIP] if apply fails.",
+    "|FORBIDDEN re-introductions (each triad-verified to self-inflict DANCING): SetWindowBoundsAggressiveAsync 3x retry burst at 500ms, 5000ms poll-and-correct loop with per-150ms drift reapply, post-stability tail-verify with extra reapply, final-reapply on timeout, per-ask TryMoveChromeToCallerAsync calling SetWindowBoundsWaitStableAsync while previous stabilization in flight.",
+    "|WHY: every extra setWindowBounds races Chrome own layout/DPI/session-restore finalize at 1-3s post-launch. N applies = N visible jumps. Pre-fix logs had CDP:BOUNDS:DRIFT, CDP:BOUNDS:TAIL-DRIFT, CDP:BOUNDS:AGGRESSIVE. Post-fix logs have ZERO of these tags.",
+    "|PRESERVE: OnPositionMismatch BUG-AUTO must still fire when observed final rect is off-screen. Caller-rect/DPI piping commits 2013a07f9 dc60fadd3 a91d26bd 3d5c75be must remain. SuppressSessionRestoreInPreferences plus --disable-features=SessionRestoreOnStartup must remain at launch.",
+    "|CALLSITES TO PROTECT: CdpClient.WindowStabilize.cs (canonical one-shot path), CdpClient.TabManagement3.cs lines 196 and 294 (single-shot use), CdpClient.Window2.cs line 177 (single-shot use), CallerPlacementResolver.cs line 348 (Z-order only -- never call setWindowBounds here).",
+    "|REGRESSION TEST: live wkappbot cdp open https://example.com --show log must contain PLACEMENT:VALIDATE preflight delta within=True exactly once and ZERO CDP:BOUNDS:DRIFT or TAIL-DRIFT or AGGRESSIVE lines.",
+    "|HISTORY: triad-verified self-inflicted, Opus fix commits 1fc25de9c (worktree) and d0886f99e (main cherry-pick), shipped v7.5 on 2026-05-29.",
+    "INCIDENT 2026-05-30 v7.5.1 (commit efd736f28 WebCommands.Part3.cs SPAWN-CASCADE GUARD): probe attach OK + Target.createTarget cancelled -> previously fell through to ChromeLauncher.LaunchAsync producing port+1 cascade and stranger-window placement; guard now returns rc=1 with explicit retry hint. Cascade visually confused users as Chrome crash + wrong-caller bug. Separate from DANCING (post-attach race) -- this is pre-attach create-target path.",
+    "GRACEFUL-CLOSE addendum (2026-05-30 v7.5.1 commit 4a304e8b0 ChromeLauncher.Kill.cs): KillChromeOnPortAsync now sends Browser.close CDP and waits up to 1500ms BEFORE proc.Kill so Chrome flushes profile (cookies/lock/session). Skips proc.Kill if HasExited. proc.Kill stays as fallback when CDP refused. Closes the user-reported tab crash on next launch -- prior dirty-profile state from raw Process.Kill was the actual root cause behind suggest ts=2026-05-29T14:39:57.",
+    "FIX 2026-06-04 (a0e201d31 v7.5.38): Root cause of DANCING confirmed -- TWO redundant placement calls were racing FinalizeCdpPlacementAsync: (1) AskCommands.Entry.Cdp.cs lines 370-393 sandbox-path manual SetWindowBoundsAsync reading GetEffectiveBounds() which fell back to legacy ExpectedBounds=(1740,20) when concurrent Eye traffic cleared CallerHwndForPlacement. (2) WebCommands.Part3.cs line 608 fire-and-forget Task.Run final placement racing every downstream command. Fix: removed sandbox-path redundant reposition + converted WebCommands.Part3 fire-and-forget to synchronous await. FinalizeCdpPlacementAsync (per-task AsyncLocal caller HWND) is now sole canonical placement for ask. WebCommands.Part3 synchronous tail is canonical for direct cdp open."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot cdp open https://example.com --show",
+      "expect": "PLACEMENT:VALIDATE within=True",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read placement-one-shot-no-multi-reposition",
+      "expect": "one-shot",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot --version",
+      "expect": "v7.5",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "placement",
+    "chrome",
+    "cdp",
+    "regression-guard",
+    "one-shot",
+    "dancing"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-29T14:38:55.8314009Z",
+  "updated": "2026-06-04T02:42:34.3560741Z",
+  "version": "1.6"
+}

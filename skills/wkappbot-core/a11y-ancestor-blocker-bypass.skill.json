@@ -1,0 +1,37 @@
+{
+  "id": "a11y-ancestor-blocker-bypass",
+  "app": "wkappbot-core",
+  "title": "a11y type/invoke: parent window falsely detected as blocker on elevated dialogs",
+  "title_ko": null,
+  "desc": "When a11y type reports blocker persists and aborts, check if the blocker IS the parent of the target. Parent windows are containers, not obstructions. Fix: use --sudo. IsAncestorWindow check fires and skips the abort.",
+  "steps": [
+    "When \u0027a11y type\u0027 aborts with \u0027blocker persists\u0027, verify that the so-called blocker window is actually the parent (ancestor) of the target \u2014 parent containers are not real obstructions and should be ignored.",
+    "Workaround: re-run the same command with --sudo. The elevated path uses IsAncestorWindow() to detect this case and skips the blocker abort automatically.",
+    "Long-term fix: walk the UIA tree and confirm blocker is an ancestor of target before bypassing; never blanket-skip blocker checks for non-ancestor overlays."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read a11y-ancestor-blocker-bypass",
+      "expect": "ancestor",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot a11y windows",
+      "expect": "FOCUS",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill list",
+      "expect": "a11y-ancestor-blocker-bypass",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-01T06:44:09.9851294Z",
+  "updated": "2026-05-04T07:33:20.9447219Z",
+  "version": "1.13"
+}

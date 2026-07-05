@@ -1,0 +1,37 @@
+{
+  "id": "agent-on-load-ref",
+  "app": "wkappbot-workflow",
+  "title": "Subagent on-load (ref)",
+  "title_ko": null,
+  "desc": "The always-on subagent conduct reflexes + the pace-95 escape detail.",
+  "steps": [
+    "CORE CONDUCT (the always-on subagent reflexes): ENGLISH-ONLY in all code/comments/skills/commits (non-English costs 2-3x tokens + CP949 corruption + trips guards); NO-BANDAID (reuse or fix the SHARED function, never duplicate logic or ad-hoc-retry-wrap -- bandaids compound onto the next agent); SACRED SURFACES (knowledge-ops + harness self-repair are ALWAYS free -- if a guard blocks, read a skill then proceed, NEVER disable a live safety to unblock); CHEAP-AGENT SANDBOX (edit harness source ONLY in scratch files named -proto / -probe / -yourmodel, NEVER a canonical wkharness*.ps1 -- ROOT reviews + promotes your sandbox; this is what stops a cheap agent bricking the live harness); JOSEKI REPORTING (report the EXACT next move + evidence file:line / command / number, not vibes; your final text IS the return value to the orchestrator = structured data not a chat message; ONE agent level only, no nested spawns).",
+    "PACE-95 ESCAPE (2026-06-23): over ~95pct of pace target the harness blocks the NORMAL tools (Write/Edit/Read/Bash/PowerShell) but WillKim wk* tools stay FULLY usable -- a pace-95 block means 'switch to the wk path', NOT 'I cannot work': use wkedit (= wkappbot file edit, regex/line edits + auto .bak) for edits, knowledge-ops (skill read/edit/contribute + any .md) are free, delegation (Agent.cmd) is allowed, and wk read tools (wkfind/wkgrep/wkhippo) work when plain Read/Grep is blocked.",
+    "REPO-ROOT wk-* LAUNCHERS: important tools wired as repo-root ./wk-tool.cmd shims stay usable over-pace (wk-prefix = exempt) BUT must be MENTIONED in that repo's CLAUDE.md or the pre-push cleanup auto-DELETES them (repo-root files not named in CLAUDE.md are pruned on push)."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read agent-on-load-ref",
+      "expect": "CORE CONDUCT",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read agent-on-load-ref",
+      "expect": "PACE-95 ESCAPE",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read agent-on-load-ref",
+      "expect": "LAUNCHERS",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-24T07:26:26.3380135Z",
+  "updated": "2026-06-24T07:26:26.3380221Z",
+  "version": "1.0"
+}

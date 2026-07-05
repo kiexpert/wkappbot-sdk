@@ -1,0 +1,44 @@
+{
+  "id": "wkwrap-important-tool-connection-doctor-reconnect",
+  "app": "wkappbot-sdk",
+  "title": "wkwrap important-tool connection doctor + reconnect",
+  "title_ko": null,
+  "desc": "How to verify and repair a wk* important tool's wkwrap wiring: the .cmd/.sh/.exe trio must match wkwrap.exe and have a sibling .ps1. Referenced by the gg Main Workflow step 4.",
+  "steps": [
+    "PURPOSE: an important wk* tool is wired through wkwrap.exe via a QUARTET -- <tool>.cmd, <tool>.sh, <tool>.exe (all three shims must be byte-identical to wkwrap.exe, the dispatcher) plus a sibling <tool>.ps1 (the real implementation). If any leg is missing, stale, or not matching wkwrap.exe, the tool breaks (wrong dispatch, dropped args, or not found on PATH). gg Main Workflow step 4 checks this quartet for important tools.@@CHECK (doctor): for each important tool, confirm (1) <tool>.cmd, <tool>.sh, <tool>.exe all EXIST in the bin dir, (2) all three are IDENTICAL to wkwrap.exe (same hash -- they are copies/links of the dispatcher), (3) a sibling <tool>.ps1 exists next to them (the implementation the dispatcher resolves). A bare <tool>.ps1 in bin/ root (without the trio) is invokable via the wkwrap sibling-fallback but is fragile + collision-prone -- prefer the full quartet.@@RECONNECT (repair): if a shim is missing or mismatched, re-copy wkwrap.exe over <tool>.cmd/.sh/.exe (or re-create the symlink) so the trio matches the dispatcher again; ensure the <tool>.ps1 implementation is present as the sibling. Re-run the doctor to confirm all four legs.@@WHEN: gg Main Workflow step 4, after any wkwrap/bin change, or when a wk tool reports not-found / wrong-dispatch. Cross: willkim-tool-harness-independence-install-location (the design law -- standalone USER tier, install location), wkwrap, wk-tool-sub-1s-response-time-mandate."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read wkwrap-important-tool-connection-doctor-reconnect",
+      "expect": "QUARTET",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read willkim-tool-harness-independence-install-location",
+      "expect": "install location",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill search wkwrap quartet doctor",
+      "expect": "wkwrap-important-tool",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "wkwrap",
+    "tool",
+    "doctor",
+    "reconnect",
+    "quartet",
+    "wk-tools",
+    "connection",
+    "gg"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-22T15:19:52.3288985Z",
+  "updated": "2026-06-22T15:19:52.3289078Z",
+  "version": "1.0"
+}

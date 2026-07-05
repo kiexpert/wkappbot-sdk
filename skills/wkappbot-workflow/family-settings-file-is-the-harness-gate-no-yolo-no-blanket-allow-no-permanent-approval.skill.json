@@ -1,0 +1,41 @@
+{
+  "id": "family-settings-file-is-the-harness-gate-no-yolo-no-blanket-allow-no-permanent-approval",
+  "app": "wkappbot-workflow",
+  "title": "Family settings file is the harness gate -- no yolo, no blanket allow, no permanent approval",
+  "title_ko": null,
+  "desc": "Each AI family settings file (claude, gemini, agy, codex) decides whether the harness PreToolUse hook gates tool calls. A careless edit can fully bypass the harness. This skill defines the required ask-posture and is the study-lock target for those files.",
+  "steps": [
+    "WHAT: every AI family settings file is security-critical -- the claude settings.json under dot-claude, the gemini settings.json under dot-gemini, the agy settings.json under dot-gemini antigravity-cli, and the codex config under dot-codex. Each one decides whether the harness PreToolUse hook actually runs and gates each tool call. A careless edit can fully ungate that family.",
+    "GATE PRINCIPLE: the harness must be the FIRST gate. approvalMode must be ask, never yolo. With ask, a tool that is neither explicitly allowed nor denied defaults to ASK, which RUNS the hook: a harness deny blocks silently with no prompt, a harness allow shows the user approval prompt for the final decision.",
+    "FORBIDDEN -- each of these BYPASSES the harness deny: approvalMode yolo auto-approves everything so the hook never runs; a blanket allow list of tool wildcards auto-approves a tool BEFORE the hook runs; enablePermanentToolApproval true caches a user Always grant so future calls of that tool skip the hook entirely.",
+    "REQUIRED posture: approvalMode ask; the allow list empty; enablePermanentToolApproval false; only the riskiest wildcards (unsandboxed, execute url, read url, mcp) kept in the deny list. Core work tools (command, read file, write file) are left out of deny so they default to ask and the harness gates them.",
+    "HARNESS SELF-MANAGEMENT is allowed and not locked: the installer and approval-sync write these files via Set-Content inside a script, which is NOT a tool call, so the study-lock does not fire on them. Only an AI Edit or Write tool edit of a settings file triggers the study-lock. So the lock protects against careless AI edits while the harness still self-manages the files freely.",
+    "HEAL a compromised live file by running that family installer (for agy: wkharness-agy-install dot ps1) which forces ask, clears the allow list, and sets enablePermanentToolApproval false. wkdoctor also auto-detects and heals this compromise because it runs independently of the bypassed hook, breaking the catch-22 where yolo prevents the runtime self-heal from ever firing.",
+    "INCIDENT 2026-06-20: the live agy antigravity-cli settings were found set to yolo plus a blanket allow of all tool wildcards plus enablePermanentToolApproval true, leaving agy fully ungated. Root fix was forcing the ask-posture in the installer plus a wkdoctor auto-heal module. This skill is the study-lock for all family settings files so the next careless edit is caught before it lands."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read family-settings-harness-gate",
+      "expect": "harness gate",
+      "prompt": null
+    },
+    {
+      "cmd": "grep -c approvalMode bin/wkappbot.hq/skills",
+      "expect": "0",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill list",
+      "expect": "family-settings",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-20T08:13:36.2874246Z",
+  "updated": "2026-06-20T08:13:36.2874342Z",
+  "version": "1.0"
+}

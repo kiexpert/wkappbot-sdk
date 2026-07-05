@@ -1,0 +1,35 @@
+{
+  "id": "wkfind-ps1-investigation-tool",
+  "app": "wkappbot-workflow",
+  "title": "wkfind.ps1 Investigation Tool",
+  "title_ko": null,
+  "desc": "Mandatory first step for every bug/regression diagnosis. Scans logs, errors.jsonl, suggest history with keyword + time-scope. DPI compensation built-in for multi-monitor pixel coord bugs.",
+  "steps": [
+    "FIRST STEP for every bug/regression: wkfind.ps1 keyword [--day|--week|--month] -- scans logs + errors.jsonl + suggest history@@Time-scope ALWAYS: --day (24h default), --week (7d), --month (30d). Start narrow, widen only if nothing found@@DPI compensation: wkfind adjusts pixel coordinates for multi-monitor/scaling configs automatically -- do NOT pre-scale coords before passing@@Output: sorted by recency, deduplicated. Top match = start of investigation, not end@@next:errors-jsonl-triage cluster:wkfind-investigation-tool-ref"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkfind.ps1 --help",
+      "expect": "day",
+      "prompt": null
+    },
+    {
+      "cmd": "wkfind.ps1 cdp --day",
+      "expect": "results",
+      "prompt": null
+    },
+    {
+      "cmd": "wkfind.ps1 placement --week",
+      "expect": "results",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-26T09:11:44.5284935Z",
+  "updated": "2026-06-26T09:11:44.6704635Z",
+  "version": "1.1"
+}

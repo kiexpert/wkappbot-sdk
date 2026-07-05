@@ -1,0 +1,39 @@
+{
+  "id": "proc-path-glob-matching",
+  "app": "wkappbot",
+  "title": "proc field proc-tree path matching -- parent process chain patterns",
+  "desc": "proc:\u0027X/Y\u0027 finds windows whose process X was launched by Y. proc:\u0027**/Y\u0027 finds all processes in Y\u0027s launch tree. Stops at shell/system boundary (explorer, svchost, dwm etc.).",
+  "steps": [
+    "Simple proc:\u0027nkrunlite\u0027 unchanged -- own process only (fast path)",
+    "proc:\u0027nkrunlite/wkappbot-core\u0027 -- nkrunlite launched by wkappbot-core",
+    "proc:\u0027**/wkappbot-core\u0027 -- all processes in wkappbot-core\u0027s launch tree",
+    "Stop list: explorer/svchost/dwm/services/lsass stops walk (avoids matching everything)",
+    "Score shows proc path: proc:\u0027Code\u0027:1.00 (explorer stripped). GetProcPath depth=2 for display",
+    "Same MatchClassPath glob engine as cls path: ** zero-or-more segments, * single segment, each segment substring"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot a11y find \u0022{proc:\u0027nkrunlite\u0027}\u0022",
+      "expect": "finds nkrunlite windows",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot a11y find \u0022{proc:\u0027**/wkappbot-core\u0027}\u0022",
+      "expect": "finds all wkappbot-core child procs",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot file grep \u0027GetProcPath\u0027 --path csharp/src/WKAppBot.Win32/Window/WindowFinder.cs",
+      "expect": "match",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-24T13:54:30.4472665Z",
+  "updated": "2026-04-24T13:54:30.4472755Z",
+  "version": "1.0"
+}

@@ -1,0 +1,49 @@
+{
+  "id": "session-2026-06-07-git-contribute-split-gotchas",
+  "app": "wkappbot-workflow",
+  "title": "Session gotchas 2026-06-07: PIPESTATUS push-mask, contribute rules, split-lost",
+  "title_ko": null,
+  "desc": "Hard-won gotchas from the 2026-06-07 marathon: a piped git push masks its real exit code, skill contribute needs 3 requirements and rejects Korean desc, a created skill is invisible until installed to HQ, an uncommitted giant-source split was lost, and a tracked-binary commit broke push with HTTP 500.",
+  "steps": [
+    "PIPESTATUS PUSH-MASK: piping git push into tail reports the PIPE exit code (tail = 0), masking a real push failure. It hid TWO failed pushes this session (HTTP 500 oversized pack, and non-fast-forward). Always read the dollar-PIPESTATUS index 0, or run git unpiped, to see the true rc.",
+    "CONTRIBUTE NEEDS 3 REQUIREMENTS: wkappbot skill contribute requires three --requirement cmd-arrow-expected entries or it saves to a draft and exits 1 -- which looks exactly like the skill vanishing. Provide 3.",
+    "CONTRIBUTE REJECTS KOREAN DESC: any Korean in --desc trips the encoding-risk check and the contribute fails (English-only rule). Keep title/desc/steps/tags ASCII.",
+    "SKILL STORAGE PATH: contribute writes to the current-cwd skills folder (project, git-tracked); wkappbot skill install copies project to HQ; Eye sync propagates. A created-but-not-installed skill is INVISIBLE to the live catalog and to skill edit -- so install then git-commit for durability. This is why session skills seemed to vanish.",
+    "GIANT-SOURCE SPLIT LOST: wkharness-guards.ps1 (about 2074 lines) and wkharness-status.ps1 (about 1636) are still monolithic; an earlier seven-module split that was done but left UNCOMMITTED (no-commit-by-request) was LOST. Commit a split immediately or it evaporates.",
+    "TRACKED-BINARY PUSH BREAK: a prior add-all swept bin/_deploytest (14489 files incl chrome-profile binaries) into a commit, making the push pack too big for the server (HTTP 500). Binaries were not leaked (push failed). Fix: filter-repo de-bloat + gitignore. Never git-track data or binaries. Anchoring-law false-positives: see harness-robustness-user-dist-appbot-absent."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read session-2026-06-07-git-contribute-split-gotchas",
+      "expect": "PIPESTATUS",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read skill-contribute-edit",
+      "expect": "English",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read harness-robustness-user-dist-appbot-absent",
+      "expect": "fail-open",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "git",
+    "pipestatus",
+    "contribute",
+    "skill-storage",
+    "split",
+    "gotcha",
+    "lessons",
+    "t2"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-07T12:12:43.9581877Z",
+  "updated": "2026-06-07T12:12:43.9582118Z",
+  "version": "1.0"
+}

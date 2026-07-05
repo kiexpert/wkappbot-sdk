@@ -1,0 +1,46 @@
+{
+  "id": "post-compaction-recovery",
+  "app": "wkappbot-core",
+  "title": "Post-Compaction Recovery",
+  "title_ko": null,
+  "desc": "Recovery checklist after compaction or session reset; re-load recent state, logs, and active drafting context.",
+  "steps": [
+    "Re-read MEMORY.md and recent git commits.",
+    "Check active draft folders and open deadlines.",
+    "Verify current Chrome/CDP state if browser work is involved.",
+    "Re-load the specific task checklist before continuing.",
+    "Use this as the first read after a compacted or resumed session."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read post-compaction-recovery",
+      "expect": "ID     : post-compaction-recovery",
+      "prompt": null
+    },
+    {
+      "cmd": "git log --oneline -5",
+      "expect": "shows recent commits",
+      "prompt": null
+    },
+    {
+      "cmd": "curl -s http://localhost:9222/json",
+      "expect": "returns JSON",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "compaction",
+    "recovery",
+    "session",
+    "context-loss",
+    "checklist",
+    "global"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-06T08:17:46.7416712Z",
+  "updated": "2026-05-06T08:17:46.7416797Z",
+  "version": "1.0"
+}

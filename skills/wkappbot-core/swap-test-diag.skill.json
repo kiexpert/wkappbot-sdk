@@ -1,0 +1,37 @@
+{
+  "id": "swap-test-diag",
+  "app": "wkappbot-core",
+  "title": "swap test",
+  "title_ko": null,
+  "desc": "diagnosing swap",
+  "steps": [
+    "STEP_B content",
+    "STEP_A content",
+    "STEP_C content"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read swap-test-diag",
+      "expect": "STEP_A",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot --version",
+      "expect": "v7",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill list",
+      "expect": "wkappbot-core",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-23T08:37:07.287787Z",
+  "updated": "2026-05-23T08:44:42.9563955Z",
+  "version": "1.3"
+}
