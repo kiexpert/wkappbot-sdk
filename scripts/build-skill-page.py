@@ -6,6 +6,7 @@ from __future__ import annotations
 import html
 import json
 import re
+import shutil
 from pathlib import Path
 from typing import Any
 
@@ -193,6 +194,46 @@ def infer_parent_skill_id(skill_id: str) -> str | None:
     return skill_id[: m.start()] if m else None
 
 
+# Junk test-fixture skills accumulate in HQ from CLI feature testing (skill add/edit/
+# steps-file exercises) and occasional filename corruption (trailing-dot artifacts).
+# Filter them here so a future sync never needs a manual heuristic pass again.
+JUNK_ID_PREFIXES = (
+    "ev-", "test-ev", "sv-", "zt-", "stepordertest", "__test_",
+    "_test-broken-skill", "test-step", "teststepsfile", "swap-test-diag",
+)
+_JUNK_PLACEHOLDER_TEXT = {"temp", "test", "test desc", "n/a", "todo", "tbd", ""}
+
+# Explicit content holdbacks (owner-reviewed, not caught by any generic filter above):
+# a skill describing a NOT-YET-FIXED live issue or a PENDING (unbuilt) security control
+# is a disclosure risk until the underlying work lands. HQ_SKILL_DIRS lists the live
+# local catalog ahead of the committed REPO_ROOT/skills fallback, so on a machine where
+# the live path exists, a locally-run build silently re-discovers ANY app-allowed skill
+# from live HQ even if it was deliberately left out of the committed skills/ folder --
+# this denylist is the one place that binds regardless of which root found the record.
+HELD_BACK_SKILL_IDS = {
+    "always-on-ai-automation-daemon-appbot-eye-internals-ref",  # mojibake investigation: NOT YET FIXED (2026-07-05)
+    "proto-cleanup-discipline",  # pre-push danger-scan: IMPLEMENTATION pending (2026-07-05)
+}
+
+
+def is_junk_skill(skill_id: str, record: dict[str, Any]) -> bool:
+    lid = skill_id.strip().lower()
+    if lid in HELD_BACK_SKILL_IDS:
+        return True
+    if lid.endswith("."):
+        return True  # trailing-dot filename/id corruption artifact
+    if any(lid.startswith(p) for p in JUNK_ID_PREFIXES):
+        return True
+    desc = as_text(record.get("desc")).strip().lower()
+    title = as_text(record.get("title")).strip().lower()
+    if desc in _JUNK_PLACEHOLDER_TEXT and title in _JUNK_PLACEHOLDER_TEXT:
+        return True
+    steps = as_list(record.get("steps"))
+    if steps and all(as_text(s).strip().lower() in _JUNK_PLACEHOLDER_TEXT for s in steps):
+        return True
+    return False
+
+
 def collect_skills() -> list[dict[str, Any]]:
     skills_by_id: dict[str, dict[str, Any]] = {}
 
@@ -206,6 +247,8 @@ def collect_skills() -> list[dict[str, Any]]:
 
             skill_id = as_text(record.get("id")) or path.stem.replace(".skill", "")
             app = as_text(record.get("app")) or "wkappbot"
+            if is_junk_skill(skill_id, record):
+                continue
             if record_mentions_excluded_app(record):
                 continue
             tags = as_list(record.get("tags"))
@@ -976,6 +1019,10 @@ def build_app_index(app_name: str, app_skills: list[dict[str, Any]]) -> str:
 
 def main() -> int:
     skills = collect_skills()
+    # Purge stale output first: a skill removed from the source set (junk cleanup,
+    # a held-back ID, an app moved to EXCLUDED_APPS) must not leave an orphaned HTML
+    # page from a previous run sitting in the tree indefinitely.
+    shutil.rmtree(SKILLS_OUTPUT_DIR, ignore_errors=True)
     SKILLS_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
     # Build main index (app navigation only)
