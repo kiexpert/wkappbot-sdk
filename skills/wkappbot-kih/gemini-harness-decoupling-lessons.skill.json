@@ -1,0 +1,48 @@
+{
+  "id": "gemini-harness-decoupling-lessons",
+  "app": "wkappbot-kih",
+  "title": "Gemini Harness Decoupling & Delegation Lessons",
+  "title_ko": null,
+  "desc": "Lessons learned from wkappbot-kih extraction: PowerShell interpolation bugs, bash shadowing, proactive API usage, and granular model tiering.",
+  "steps": [
+    "1. PROACTIVE API USAGE: Do not halt when an existing tool script (e.g., gmail_manager.py) lacks support for a specific account. Check the global .env file for existing OAuth tokens and write a direct API script (e.g., gmail_send.py) to fulfill the user's intent.",
+    "2. POWERSHELL INTERPOLATION TRAP: When using string replacement (Python/sed) to patch .ps1 files, do not accidentally convert double quotes to single quotes. Single quotes block variable interpolation (e.g., '\\'), causing CommandNotFoundException during subagent delegation.",
+    "3. BASH SHADOWING: In the WKAppBot ecosystem, calling 'bash' from PowerShell might resolve to 'WKAppBot/bin/Bash.cmd'. When invoking .sh wrappers (like wkgemini.sh), explicitly use Git Bash (C:/Program Files/Git/bin/bash.exe) to avoid syntax errors.",
+    "4. STALL-GUARD MODEL PARSING: Avoid monolithic tier mapping for diverse model families. Parse \\ to map Gemini Flash to Haiku-tier (3m) and Gemini Pro to Sonnet-tier (6m). Reserve Opus for top-tier orchestrator blocks.",
+    "5. MARKDOWN ENCODING: Always save .md files as UTF-8 without BOM (use Python encoding='utf-8' without -sig)."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read gemini-harness-decoupling-lessons",
+      "expect": "PROACTIVE API USAGE",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read gemini-harness-decoupling-lessons",
+      "expect": "POWERSHELL INTERPOLATION TRAP",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read gemini-harness-decoupling-lessons",
+      "expect": "BASH SHADOWING",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "harness",
+    "decoupling",
+    "lessons",
+    "powershell",
+    "bash",
+    "gemini",
+    "delegation",
+    "postmortem"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-07T08:13:41.2522596Z",
+  "updated": "2026-06-07T08:13:41.2522687Z",
+  "version": "1.0"
+}

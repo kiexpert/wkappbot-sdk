@@ -4,6 +4,7 @@
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot/</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-core/</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-debug/</loc></url>
+<url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-kih/</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-sdk/</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-webbot/</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-win32/</loc></url>
@@ -54,8 +55,10 @@
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-sdk/wkappbot-beginner-onboarding-from-zero-to-first-automation.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-sdk/wkappbot-sdk-daily-system-heal-checklist.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-sdk/wkappbot-the-artificial-knowledge-platform.html</loc></url>
+<url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-sdk/wkdoctor-emergency-physician-spawn-storm-kill.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-sdk/wkdoctor-sdk-environment-health-check.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-sdk/wkdoctor-system-physician.html</loc></url>
+<url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-sdk/wkdr-emergency-doctor-wkappbot-core-spawn-storm-kill.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-sdk/youtube-ad-skipper.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-webbot/ask-gpt-editor-wait-tag-and-rescue-fallback.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-webbot/cdp-open-reuse-existing-chrome-tab.html</loc></url>
@@ -78,17 +81,22 @@
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/claude-kill-guard-hook.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/claude-md-todo-sync.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/claude-md-guide.html</loc></url>
+<url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/codex-default-deny-allow-override-spec.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/diagnostic-commands-cheatsheet.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/file-command-cheatsheet.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/foundation-is-roots-charge-not-a-chore.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/gemini-flash-reflection.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/git-commit-conventions.html</loc></url>
+<url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/gpt-mini-reflection.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/grap.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/haiku-as-qa-canary.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/harness-active-model-scoping.html</loc></url>
+<url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/harness-commit-push-gate-spec.html</loc></url>
+<url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/harness-guard-exemption-ladder-spec.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/harness-hardening-playbook-13-reflexes-from-the-2026-06-20-marathon.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/harness-learn-self-evolving-skills.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/linkedin-manager.html</loc></url>
+<url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/multi-family-harness-coexistence.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/multi-tab-assistant-implementation-checklist.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/multi-tab-assistant-interface-mvp.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/nightly-schedule-guard.html</loc></url>
@@ -196,6 +204,7 @@
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-core/user-skill-template.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-core/web-open-idle-keepalive.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-core/win-click-postmessage-mfc-nfrunlite.html</loc></url>
+<url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-core/wkappbot-speak-tts-bugs-harness-95-auto-speak-loop-karaoke-drift.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-core/wkchat-shortcut-geometry-lnk-update.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-core/wkchat-conpty-enter-intercept-rename-first-hardlink-live-swap.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-core/wkchat-session-routing-guard.html</loc></url>
@@ -204,6 +213,7 @@
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-core/wktest-staging-build-storm-safe-deploy-pipeline.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-core/wktest-staging-build-pipeline.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-debug/guard-cdp-probe-ports-against-low-port-discard-values.html</loc></url>
+<url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-kih/gemini-harness-decoupling-lessons.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-sdk/sonnet-reflection.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-sdk/placement-port-pid-filter.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-sdk/gmail-support-bot.html</loc></url>
@@ -250,6 +260,7 @@
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/codex-session-tool-usage-statistics-551-sessions-analyzed.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/codex-shell-command-harness-gap-analysis-and-fix-spec.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/codex-skill-registration-edit-guide.html</loc></url>
+<url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/codex-pace-guard.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/commit-push-hook-policy-overview.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/cp949-save-guard.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/native-tool-deny-codex-only.html</loc></url>
@@ -259,9 +270,12 @@
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/gemini-agent-tier-onboarding.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/guard-block-recurrence-failure-score.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/haiku-handoff-on-cli-retry.html</loc></url>
+<url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/haiku-sandbox-problem-solving.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/handoff-send-best-practice.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/harness-agent-brief-guard.html</loc></url>
+<url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/harness-canonical-edit-via-sandbox-merge.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/harness-edit-write-study-lock-hole-fixed.html</loc></url>
+<url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/harness-self-heal-incident-2026-06-10.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/harness-throttle-rot-spec-drift-prevention.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/harness-codex-pace-guard.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/harness-skill-format-required-single-line-pattern.html</loc></url>
@@ -276,6 +290,7 @@
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/on-load.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/opus-files-bugs-on-sight.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/opus-mechanical-self-drag-antipattern.html</loc></url>
+<url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/pace-deadlock-escapes-harness-editable-and-jisikhwa-free.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/powershell-here-string-multiline.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/ps-script-mojibake-is-output-encoding-first-not-argv.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/reflex-audit-transfer-quiz-template.html</loc></url>
@@ -422,6 +437,12 @@
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-core/wkchat-conpty-enter-intercept-two-phase.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-core/zt.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-core/launcher-direct-core-routing-for-critical-cmds.html</loc></url>
+<url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-kih/hongik-harness-modular-independence-design.html</loc></url>
+<url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-kih/wk-cleanbaseline-test.html</loc></url>
+<url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-kih/wk-parsecheck.html</loc></url>
+<url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-kih/wk-pstest.html</loc></url>
+<url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-kih/wk-sourceread-test-launcher.html</loc></url>
+<url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-kih/wkappbot-deployment-architecture.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-sdk/_test-broken-skill.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-sdk/cdp-health-check.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-sdk/guard-feeding-cache-confirm-before-block.html</loc></url>
@@ -437,6 +458,7 @@
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-sdk/show-hn-and-producthunt-launch-strategy.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-sdk/verify-tool-or-guard-synthetic-live-static.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-sdk/wkdoctor.html</loc></url>
+<url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-sdk/wktasklist-cached-process-snapshot.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-webbot/chatgpt-blank-false-positive-guard.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-webbot/chatgpt-stop-button-drain-before-send.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-webbot/yt-controller.html</loc></url>

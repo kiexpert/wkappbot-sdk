@@ -43,7 +43,6 @@ EXCLUDED_APPS = (
     "senior",
     "unemployment",
     "youtube-trader",
-    "wkappbot-kih",
     "wkappbot-test",
 )
 

@@ -1,0 +1,35 @@
+{
+  "id": "proto-cleanup-discipline-ref",
+  "app": "wkappbot-kih",
+  "title": "Proto-cleanup discipline -- incidents + history (ref)",
+  "title_ko": null,
+  "desc": "T3 ref tier of proto-cleanup-discipline: dated incidents behind the proto-suffix discipline, the dead-script detector, the unguarded-CI audit, and the env-backdoor removals. Consult for WHY a rule exists.",
+  "steps": [
+    "ORIGIN: the proto/-prove/-probe/-model suffix discipline (keep <=2 unconnected per folder, ROOT-deletes-never-an-agent, connect-verified-logic-to-canonical BEFORE removing) came from repeated sandbox-junk accumulation; ROOT git-cleaned ~105 dead -proto.ps1 in one pass (the pace-exempt git method for gitignored protos). The standing rule: clean junk BEFORE delegating, and a cheap intel prototypes into a -proto/-probe sandbox while ROOT promotes the canonical."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read proto-cleanup-discipline-ref",
+      "expect": "ORIGIN",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read proto-cleanup-discipline",
+      "expect": "discipline",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read proto-cleanup-discipline-howto",
+      "expect": "pre-push",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-27T17:41:58.6342598Z",
+  "updated": "2026-06-27T17:41:58.6342685Z",
+  "version": "1.0"
+}

@@ -1,0 +1,46 @@
+{
+  "id": "wkappbot-deployment-architecture",
+  "app": "wkappbot-kih",
+  "title": "WKAppBot SDK & Harness End-User Deployment Architecture",
+  "title_ko": null,
+  "desc": "Mandates sibling directory structure (wkappbot-sdk and wkappbot-kih) under the user's Documents folder. Specifies wkappbot-sdk/bin as the core AppBot folder. Guides AI agents on path resolution for deployment.",
+  "steps": [
+    "1. SIBLING REQUIREMENT: wkappbot-sdk and wkappbot-kih MUST be deployed as sibling directories inside the exact same parent folder.",
+    "2. OS LOCATION: The parent folder MUST be located in the user's OS Documents directory (e.g., C:\\Users\\<Username>\\Documents\\ or ~/Documents/).",
+    "3. CORE BINARY FOLDER: The user's 'AppBot folder' refers to the wkappbot-sdk/bin directory, which contains the executables.",
+    "4. AGENT RULE: All AI agents MUST assume this exact layout for path resolution, configuration, and troubleshooting in end-user environments. Do not assume 'D:\\GitHub' for end-users."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read wkappbot-deployment-architecture",
+      "expect": "SIBLING REQUIREMENT",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill search deployment",
+      "expect": "wkappbot-deployment-architecture",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wkappbot-deployment-architecture",
+      "expect": "CORE BINARY FOLDER",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "deployment",
+    "architecture",
+    "wkappbot-sdk",
+    "wkappbot-kih",
+    "sibling",
+    "documents",
+    "path-resolution"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-07T07:26:55.4156173Z",
+  "updated": "2026-06-07T07:26:55.4156261Z",
+  "version": "1.0"
+}
