@@ -199,7 +199,24 @@ partial class Program
             // -- that is the pre-existing single-Chrome-instance bootstrap case, not a hijack risk.
             if (expectedPort.HasValue)
             {
-                if (TryGetListeningPid(expectedPort.Value, out int cdpPid) && cdpPid > 0)
+                // RACE FIX (user 2026-07-06, confirmed live): a freshly-launched Chrome's
+                // CDP listener socket takes a short moment to bind after process start.
+                // A single TryGetListeningPid check right after launch can race ahead of
+                // that bind, misreporting "no listener yet" and skipping placement for a
+                // Chrome that IS ours and about to be reachable moments later (confirmed:
+                // wkappbot cdp status --port 9980 showed ACTIVE immediately after this
+                // check reported no listener). Retry a few times with a short bounded
+                // backoff -- NOT a guess-and-hope retry, just waiting out Chrome's own
+                // fast, deterministic listener-bind step -- before concluding ownership
+                // truly cannot be verified.
+                int cdpPid = 0;
+                bool found = false;
+                for (int attempt = 0; attempt < 5 && !found; attempt++)
+                {
+                    if (attempt > 0) System.Threading.Thread.Sleep(150);
+                    found = TryGetListeningPid(expectedPort.Value, out cdpPid) && cdpPid > 0;
+                }
+                if (found)
                 {
                     var filtered = candidates.Where(c => c.pid == cdpPid).ToList();
                     Console.Error.WriteLine($"[PLACEMENT:STEP2] CDP port {expectedPort.Value} -> pid={cdpPid}, filtered to {filtered.Count} candidate(s)");
@@ -207,7 +224,7 @@ partial class Program
                 }
                 else
                 {
-                    Console.Error.WriteLine($"[PLACEMENT:STEP2] no listener yet on port {expectedPort.Value} -- cannot verify ownership, skipping move (never fall back to unfiltered/foreign Chrome)");
+                    Console.Error.WriteLine($"[PLACEMENT:STEP2] no listener yet on port {expectedPort.Value} after retry -- cannot verify ownership, skipping move (never fall back to unfiltered/foreign Chrome)");
                     candidates = new System.Collections.Generic.List<(IntPtr hwnd, int pid, DateTime startedAt)>();
                 }
                 if (candidates.Count == 0)
