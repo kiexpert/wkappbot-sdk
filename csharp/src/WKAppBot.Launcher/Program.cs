@@ -697,9 +697,12 @@ partial class Program
             }
         }
 
-        // skill contribute/delete writes to callerCwd/skills/ -- must run Core with real CWD, not Eye's CWD
+        // skill WRITE subcommands write to skills/ -- must run Core (a fresh clean image), NOT the Eye:
+        // a stale/tainted Eye (running from a hot-swap-deleted image) has its file writes AV-blocked
+        // (UnauthorizedAccessException), so a piped write fails. edit/add were the gap that let skill
+        // edits hit the tainted Eye. suggest 1784193313.
         var isSkillWrite = cmd == "skill" && forwardArgs.Length > 1
-            && forwardArgs[1].ToLowerInvariant() is "contribute" or "delete" or "import" or "install";
+            && forwardArgs[1].ToLowerInvariant() is "edit" or "add" or "contribute" or "delete" or "import" or "install" or "sync";
         var isFileMutation = cmd == "file" && forwardArgs.Length > 1
             && forwardArgs[1].ToLowerInvariant() is "edit" or "write" or "undo";
         // suggest + skill: try Eye first (100ms guard) for fast in-process handling,
@@ -724,6 +727,7 @@ partial class Program
         // Also a critical command that must work even when Eye is broken.
         var isNewchat = string.Equals(cmd, "newchat", StringComparison.OrdinalIgnoreCase);
         if (!quietFind && !onlyCore && !isEyeDaemon && !isSlowFileCmd && !isWorkerMode && !isHackWorker && !isSkillWrite && !isSudoRequest && !isChatCmd && !isNewchat
+            && !isFileMutation && cmd != "suggest"  // WRITE cmds skip the Eye pipe: a tainted Eye AV-blocks the write (suggest 1784193313); file write/edit/undo + suggest all write.
             && cmd != "logcat" && cmd != "grep" && cmd != "grap"
             && cmd != "help" && cmd != "--help" && cmd != "-h")
         {
