@@ -1,15 +1,24 @@
-# wkdoctor check: eye-staleness -- detect (and, gated by -EmergencyKill, heal) a STUCK/STALE Eye.
+# wkdoctor check: eye-staleness -- DETECT (warn-only) a STUCK/STALE Eye.
 #
 # LAYER 3 of the Eye-staleness defense. Runs in PARALLEL with ROOT's LAYER 2 (Eye self-heal /
 # self-retire on hot-swap failure). This layer is the OUTER safety net: if an Eye fails to
-# hot-swap and keeps running stale/tainted code, this doctor plugin finds it and (only when
-# EmergencyKill is explicitly requested) clears it via an OS-level kill so the mutex-guarded
-# guardian (Global\WKAppBotEyeGuardian, single-flight -- see AppBotEyeCommands.cs) respawns a
-# fresh Eye from the on-disk binary.
+# hot-swap and keeps running stale/tainted code, this doctor plugin FINDS it and WARNS -- it
+# does NOT kill it. Clearing a stale Eye is a human/sanctuary-gated action via `wkappbot taskkill`.
 #
-# PROTO FILE: the wkdoctor loader excludes '*-proto.ps1' from live runs
-#   (Get-ChildItem $doctorDir -Filter '*.ps1' | Where-Object { $_.Name -notmatch '-proto\.ps1$' })
-# so this file is inert until ROOT reviews it and promotes it to '55-stale-eye-heal.ps1'.
+# STATUS: LIVE. DETECT+WARN ONLY.
+#
+# INCIDENT 2026-07-16 (suggest 1784193313): this plugin previously ran a raw OS-level
+# `taskkill.exe /F /PID` on every process matching the heuristic below whenever invoked under
+# `wkdoctor -EmergencyKill`. HandleCount>200 is only a PROXY for "this is the full Eye daemon" --
+# it CANNOT positively exclude a session core, a guardian process, or an MCP worker belonging to
+# a DIFFERENT live session. The proxy over-matched and the raw OS kill destroyed the cores/
+# terminals of 4 unrelated live sessions (GitHub-w, GitHub-p, codex). The raw-taskkill-under-
+# EmergencyKill path has been REMOVED PERMANENTLY. `-EmergencyKill` auto-fires at 60% CPU/RAM,
+# which made this a live auto-hazard -- exactly what `wkappbot taskkill` (sanctuary-aware,
+# foreign-tree-refusing) exists to prevent. Routing around it with raw taskkill was the bug.
+# Any future re-introduction of an automatic kill path here MUST first replace the HandleCount
+# proxy with a POSITIVE command-line-based Eye classifier (see RESIDUAL GAP below) and route the
+# kill through `wkappbot taskkill`, never a raw OS taskkill.
 #
 # DETECTION HEURISTIC (live-proven 2026-07-16) -- ALL THREE must hold:
 #   1. StartTime of the wkappbot-core.exe process is OLDER than the deployed
@@ -22,25 +31,21 @@
 #      poll-loop process and short-lived detached MCP worker subprocesses, which also run
 #      wkappbot-core.exe but are not the thing we want to touch).
 #
-# WHY OS taskkill, not `wkappbot taskkill`: a stale Eye is -- by construction -- running code
-# older than the currently-deployed binary, so it is a "foreign-tree" process from the current
-# session's point of view, and `wkappbot taskkill` REFUSES to act on a foreign-tree Eye. The
-# only way to actually clear a stuck stale Eye is the raw OS kill: taskkill.exe /F /PID.
+# REMEDIATION: this plugin never kills. When a stale Eye is detected it emits an operator
+# remediation line pointing at `wkappbot taskkill --force <pid>` -- the sanctuary-aware tool
+# that refuses to act on a non-Eye or foreign-tree session core, the exact protection a raw OS
+# taskkill lacks.
 #
 # WMI-STORM DISCIPLINE (wktasklist-intelligent-management): enumerate ONLY via
 # `Get-Process -Name wkappbot-core`. NEVER Get-CimInstance/Get-WmiObject Win32_Process here.
 #
-# SANCTUARY: never act on a process that fails ANY of the 3 heuristic conditions above. The
-# guardian and MCP workers are meant to be excluded by the Handles>200 gate (condition 3) since
-# they are not the full Eye daemon. RESIDUAL RISK (flagged for ROOT review): Get-Process cannot
-# read a process's command line without a WMI/CIM query, which is itself forbidden here by
-# WMI-storm discipline -- so this proto cannot positively confirm "this pid is NOT the guardian"
-# by command line the way `wkappbot taskkill`'s own classifier does. The 3-condition
-# AND-heuristic is a best-effort proxy, not a certainty. If ROOT wants a harder guarantee before
-# promoting this proto to live -EmergencyKill behavior, consider reading the guardian's own PID
-# out of a marker it could optionally drop next to the eye pid log (wkappbot.hq/logs), or reuse
-# the existing native (non-WMI) GetProcessCommandLine helper already used by
-# cdp-open-reuse-existing-chrome-tab, exposed as a wkappbot CLI verb.
+# RESIDUAL GAP (flagged for ROOT review): Get-Process cannot read a process's command line
+# without a WMI/CIM query, which is itself forbidden here by WMI-storm discipline -- so this
+# heuristic cannot positively confirm "this pid is NOT the guardian / NOT another session's
+# core" the way `wkappbot taskkill`'s own classifier does. The 3-condition AND-heuristic is a
+# best-effort proxy, not a certainty, which is precisely why it must stay detect+warn-only until
+# a positive command-line-based classifier exists (candidate: a native GetProcessCommandLine CLI
+# verb, already used by cdp-open-reuse-existing-chrome-tab, or a guardian-PID marker file).
 #
 # FAIL-OPEN: every block wrapped in try/catch. A doctor plugin must never throw.
 
@@ -108,31 +113,19 @@ if ($eyeStalenessBinaryOk) {
                 Add-Check 'eye-staleness' 'warn' $detail
                 Emit '!' 'eye-staleness' $detail
 
-                if ($EmergencyKill) {
-                    try {
-                        # OS-level kill only -- `wkappbot taskkill` refuses a foreign-tree (stale) Eye.
-                        $killProc = Start-Process -FilePath 'C:\Windows\System32\taskkill.exe' `
-                            -ArgumentList @('/F', '/PID', "$($c.Pid)") `
-                            -NoNewWindow -Wait -PassThru -ErrorAction Stop
-                        if ($killProc -and $killProc.ExitCode -eq 0) {
-                            Add-Check 'eye-staleness:heal' 'ok' "OS-killed stale Eye pid=$($c.Pid) (taskkill exit=0)"
-                            Emit 'ok' 'eye-staleness:heal' "killed stale Eye pid=$($c.Pid) -- guardian (single-flight Global\WKAppBotEyeGuardian mutex) should respawn a fresh Eye from the on-disk binary"
-                        } else {
-                            $code = if ($killProc) { $killProc.ExitCode } else { 'null' }
-                            Add-Check 'eye-staleness:heal' 'warn' "taskkill exit=$code for pid=$($c.Pid) -- kill may not have succeeded"
-                            Emit '!' 'eye-staleness:heal' "taskkill exit=$code for pid=$($c.Pid)"
-                        }
-                    } catch {
-                        Add-Check 'eye-staleness:heal' 'warn' "OS kill failed for pid=$($c.Pid): $($_.Exception.Message)"
-                        Emit '!' 'eye-staleness:heal' "OS kill failed for pid=$($c.Pid): $($_.Exception.Message)"
-                    }
-                }
+                $remediation = "stale Eye pid=$($c.Pid) -- auto-kill DISABLED (over-killed other sessions 2026-07-16). Clear it safely via: wkappbot taskkill --force $($c.Pid) (sanctuary-aware; refuses non-Eye/foreign session cores)."
+                Add-Check 'eye-staleness:heal' 'warn' $remediation
+                Emit '!' 'eye-staleness:heal' $remediation
             }
         }
     }
 }
 
-# PHASE 4: PREVENT -- this check runs every wkdoctor session once promoted off -proto; a stale
-# Eye that keeps failing hot-swap cannot silently persist across sessions.
-Add-Check 'eye-staleness:guard' 'ok' 'stale-Eye check runs every session once promoted (currently PROTO, inert)'
-Emit 'ok' 'eye-staleness:guard' 'proto -- promote to enable'
+# PHASE 4: PREVENT -- this check runs every wkdoctor session (LIVE); a stale Eye that keeps
+# failing hot-swap cannot silently persist across sessions. DETECT+WARN ONLY: auto-kill was
+# intentionally removed 2026-07-16 (suggest 1784193313) pending a positive command-line-based
+# Eye classifier -- HandleCount>200 was an unsafe proxy that over-matched other live sessions'
+# cores. Clearing a detected stale Eye is now a human/sanctuary-gated action via
+# `wkappbot taskkill --force <pid>`.
+Add-Check 'eye-staleness:guard' 'ok' 'stale-Eye check runs every session (LIVE, detect+warn only -- auto-kill removed 2026-07-16, suggest 1784193313)'
+Emit 'ok' 'eye-staleness:guard' 'live -- detect+warn only, no auto-kill'
