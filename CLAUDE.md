@@ -475,6 +475,21 @@ wkappbot skill read wksplit-md  # Usage: thin launcher for bin/wksplit_md.py
 wkappbot skill read willkim-tool-harness-independence-install-location  # Impl: bare-name verification mandate (bash needs the .cmd extension)
 wkappbot skill read verify-tool-or-guard-synthetic-live-static  # Task: verify launcher forwards args correctly (--dry-run, --file, --threshold)
 
+## harness:skill **/wkread_image.py
+wkappbot skill read wkread-image-privacy-tiered-image-analysis-no-anthropic  # Usage: tiering design, anti-Anthropic gate, canonical home as of 2026-07-02
+wkappbot skill read wkread-image-v2-segmentation-design  # Impl: a11y-tree + Tesseract PSM segmentation
+wkappbot skill read emergency-write-freeze-escape-ladder-for-non-pro-new-file-creation  # Task: cross-repo promotion history
+
+## harness:skill **/wkread_image_segment.py
+wkappbot skill read wkread-image-v2-segmentation-design  # Usage: a11y-tree + Tesseract PSM segmentation module
+wkappbot skill read wkread-image-privacy-tiered-image-analysis-no-anthropic  # Impl: shares the anti-Anthropic gate contract
+wkappbot skill read emergency-write-freeze-escape-ladder-for-non-pro-new-file-creation  # Task: cross-repo promotion history
+
+## harness:skill **/wkread-image.cmd
+wkappbot skill read wk-read-image  # Usage: thin launcher for bin/wkread_image.py
+wkappbot skill read willkim-tool-harness-independence-install-location  # Impl: bare-name verification mandate
+wkappbot skill read verify-tool-or-guard-synthetic-live-static  # Task: verify launcher forwards args correctly
+
 ## harness:skill bin/wkappbot.hq/doctor/*harness*
 wkappbot skill read cross-family-harness-integration       # Usage: the cross-family harness map + personal-docs->kih migration + the divergence trap
 wkappbot skill read cross-family-harness-integration-howto # Impl: relay, induce, autonomy.toml, doctor repair guards
@@ -576,4 +591,9 @@ wkappbot skill read claude-md-harness-rules     # Task: harness:skill rule + stu
 wkappbot skill read wksplit-cs-utility  # Usage: six split-safety gates + 0-token determinism
 wkappbot skill read wksplit-smart-multi-language-dedup-round-trip-spec  # Impl: round-trip + dedup spec
 wkappbot skill read verify-tool-or-guard-synthetic-live-static  # Task: run-verify not parse-only
+
+## harness:skill (?i)[/\\]wkpushsdk\.sh$
+wkappbot skill read wkpushsdk  # Usage: push the wkappbot-sdk repo to origin (SDK release push), guard-free
+wkappbot skill read wk-gitsync  # Impl: same wk-prefixed internal-git guard-escape pattern for the main repo
+wkappbot skill read verify-tool-or-guard-synthetic-live-static  # Task: run-verify the sdk push live, not parse-only
 
