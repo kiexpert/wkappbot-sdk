@@ -1,0 +1,43 @@
+{
+  "id": "standard-appbot-window-t1-core",
+  "app": "wkappbot",
+  "title": "Standard AppBot Window T1 Core",
+  "title_ko": null,
+  "desc": "Core definition and caller-HWND rules for Standard AppBot Window. This is the shortest entrypoint for placement and IPC identity.",
+  "steps": [
+    "Use the nearest ancestor process that owns a usable window as the Standard AppBot Window.",
+    "Never use foreground as a caller signal; ancestor walk is the only source of truth.",
+    "Return Zero when no valid caller window exists and skip placement."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read standard-appbot-window",
+      "expect": "DEFINITION",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read standard-appbot-window-howto",
+      "expect": "T2 howto",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read standard-appbot-window-ref",
+      "expect": "T3 reference",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "window",
+    "caller",
+    "ipc",
+    "core",
+    "placement"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-01T15:26:13.0178517Z",
+  "updated": "2026-06-01T15:26:13.0178624Z",
+  "version": "1.0"
+}

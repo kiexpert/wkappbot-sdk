@@ -1,0 +1,73 @@
+{
+  "id": "wkchat-welcome-banner",
+  "app": "wkappbot-core",
+  "title": "wkchat welcome banner -- claude-code style boxed greeting on chat startup",
+  "title_ko": null,
+  "desc": "Every `wkappbot chat` (interactive) prints a boxed welcome banner at session start: WKAppBot ASCII logo, version, current model, user/email (from license identity), Eye health (healthy/starting/down), and CWD. Width auto-adapts to console (clamped 60-120). Suppressed when stdin/stdout is redirected (piped, --help, scripted). Logo source-of-truth shared with UsageCommand via GetBannerLogoLines() so the help screen and chat banner never drift.",
+  "steps": [
+    "[ENTRY] ChatCommand.cs Program.PrintWelcomeBanner() called once at session start. Idempotent via _welcomeBannerPrinted volatile flag -- chat has multiple branches (interactive claude, codex, AI REPL, OS shell) but banner prints only at the first one. try/catch wraps the core; banner is cosmetic so a failure NEVER breaks chat startup.",
+    "[FIELDS RESOLVED] (1) ResolveVersionString -> v6.8.NN from assembly. (2) ResolveUserIdentity -> (login, email) from LicenseManager identity probe; falls back to Environment.UserName + kiexpert@kivilab.co.kr. (3) ResolveDefaultModelName -> e.g. claude-sonnet-4-6 from settings. (4) ResolveEyeHealth -> healthy/starting/down via Eye tick probe. (5) TruncateCwd(Environment.CurrentDirectory, 60) -- long paths get ellipsis-truncated.",
+    "[WIDTH] consoleW = SafeWindowWidth(); width = Math.Clamp(consoleW - 2, 60, 120); inner = width - 2. Banner box uses Unicode box-drawing chars (rounded corners ╭─╮ │ │ ╰─╯). Title segment ' WKAppBot v6.8.NN ' is centered in the top border. Greeting line: '안녕하세요 {greetName}님!'.",
+    "[LOGO REUSE] GetBannerLogoLines() in UsageCommand.cs returns the 6 pre-padded ASCII art lines (the WKAPPBOT block-letter logo). Both the --help banner and the chat welcome banner pull from this single function. Refactored 2026-05-05 (commit 9b4cf3c3) to eliminate duplicated logo strings -- if the logo is ever updated, both surfaces follow automatically.",
+    "[SUPPRESS WHEN PIPED] If Console.IsInputRedirected || Console.IsOutputRedirected -> skip banner entirely (returns without printing). Same gate is used by --no-autostart logic. This makes scripts and CI runs (`echo q | wkappbot chat`) silent and avoids polluting captured stdout with box-drawing chars.",
+    "[SUPPRESS WHEN --help] When `wkappbot chat --help` is invoked, the help dispatcher returns before ChatCommand.Entry runs, so PrintWelcomeBanner is never reached. No special-case needed.",
+    "[STARTUP CONTEXT] Banner prints AFTER PrintCallerHostBranding (Caller-Host: ... line) and AFTER EnsureChatAutoStartupRegistration silent registry probe, but BEFORE the first prompt. Order matters: license identity must already be resolved (Caller-Host probe loads it) so ResolveUserIdentity returns the real email.",
+    "[AUDIT 2026-06-03] source_refs broken: empty source_refs file entries."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot chat",
+      "expect": "boxed welcome banner with logo, version, model, user, Eye health, CWD",
+      "prompt": null
+    },
+    {
+      "cmd": "echo q | wkappbot chat",
+      "expect": "no banner (stdin redirected -- silent for scripts)",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot chat --help",
+      "expect": "help text only, no banner",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "wkchat",
+    "chat",
+    "banner",
+    "welcome",
+    "logo",
+    "GetBannerLogoLines",
+    "license-identity",
+    "eye-health",
+    "claude-code-style",
+    "no-pipe",
+    "v6.8"
+  ],
+  "source_refs": [
+    {
+      "file": "",
+      "line": 22,
+      "pattern": "PrintWelcomeBanner",
+      "note": null
+    },
+    {
+      "file": "",
+      "line": 57,
+      "pattern": "GetBannerLogoLines",
+      "note": null
+    },
+    {
+      "file": "",
+      "line": 1,
+      "pattern": "GetBannerLogoLines",
+      "note": null
+    }
+  ],
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-05T00:00:00",
+  "updated": "2026-06-02T19:49:18.1936494Z",
+  "version": "1.1"
+}

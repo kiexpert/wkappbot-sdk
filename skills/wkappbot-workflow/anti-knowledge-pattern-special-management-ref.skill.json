@@ -1,0 +1,41 @@
+{
+  "id": "anti-knowledge-pattern-special-management-ref",
+  "app": "wkappbot-workflow",
+  "title": "Anti-knowledge pattern special management ref",
+  "title_ko": null,
+  "desc": "T3 ref: design history + rationale for the anti-knowledge zero-tolerance system (2026-06-19) -- env-injection punish, persistent poison, infinite auto-revert, honoring-vs-detecting nuance, the Hongik KI mission, the rename precedent.",
+  "steps": [
+    "ORIGIN 2026-06-19: the harness-edit-write-skill-bypass skill (a legit CLOSED-hole fix-record) had a -bypass NAME that read as a backdoor recipe and triggered a correct user security alarm -> renamed to harness-edit-write-study-lock-hole-fixed -> generalized into this anti-knowledge category (like the git commit --no-* block).",
+    "MISSION: in the Hongik (benefit-all) Knowledge-Intelligence harness world, anti-knowledge patterns are categorically UNUSABLE -- the harness exists to AMPLIFY knowledge, so a pattern that circumvents knowledge is antithetical and must be impossible to execute/name/persist. Zero tolerance, no model/tier exempt, no soft tier.",
+    "ENV-INJECTION = top-tier punish: env is settable so NEVER authentication; an env control-vector injects uncertainty into a deterministic guard system. Identity/exemption must be process-lineage or single-use nonce, never an env value. This is what today's backdoor purge removed (WKHARNESS_BYPASS/AGENT_MODEL/TEST_*/CODEX_HOOK).",
+    "PERSISTENT POISON + INFINITE AUTO-REVERT: Surface C is not a one-time flag -- a source with a honoring anti-knowledge pattern is treated as a SYNTAX ERROR on every check until removed, AND any edit that adds one is AUTO-REVERTED from .bak (infinite), making it structurally impossible to land anti-knowledge in source.",
+    "HONORING-VS-DETECTING NUANCE (critical, command-match-anchor class): a guard's source LEGITIMATELY MENTIONS a pattern to BLOCK it (if env BYPASS then Block = good); only HONORING/USING it (if env BYPASS then grant-exemption = bad) is flagged/reverted/poisoned. Naive mention-matching would false-flag the very guards + the registry that enforce the rule. NAMING RULE: name for what you ESTABLISH (closed-hole/fix/guard), never for the anti-pattern.",
+    "Cross: anti-knowledge-pattern-special-management (core), -howto (pattern set+impl), harness-no-verify-guard, harness-security-guard, harness-edit-write-study-lock-hole-fixed, verify-tool-or-guard-synthetic-live-static.",
+    "REGISTRY SELF-PROTECTION -- APPEND-EASY, DELETE-HARD (user 2026-06-19, the recursion insight): the anti-knowledge pattern registry (the two .txt files, or CLAUDE.md harness:block entries) is ITSELF a top-tier protected asset. REMOVING or weakening a registry line is itself an ANTI-KNOWLEDGE ACT -- it circumvents the anti-knowledge guard, a meta-bypass -- so the registry must DEFEND ITSELF. ADDING a pattern is easy (append one line, the convenience goal); DELETING/weakening a pattern is GUARDED -- the Surface-C logic treats a diff that REMOVES a registry line as a honoring-context anti-knowledge edit -> block / auto-revert / poison, ROOT-only + justified; the registry files also sit in the write-freeze protected set (cheap agents cannot touch them) + study-lock. This CLOSES THE RECURSION (otherwise an agent edits out a pattern to bypass the whole system) and stops agents weaponizing registry edits against each other (the thrash the user foresaw). ASYMMETRY IS THE DESIGN: low friction to ADD a defense, high friction to REMOVE one -- the opposite of normal config, and correct because a removed defense is a silent hole. WHERE: prefer the dedicated .txt registry files (clean, data-driven, narrowly guarded) over scattering patterns across CLAUDE.md (broadly edited = larger tamper surface); keep only the few most-critical blocks (git --no-*) inline in CLAUDE.md as belt-and-suspenders. GENERAL PRINCIPLE: any self-defending guard's own rule-set must be harder to weaken than to strengthen."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read anti-knowledge-pattern-special-management-ref",
+      "expect": "MISSION",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read anti-knowledge-pattern-special-management-ref",
+      "expect": "ENV-INJECTION",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read anti-knowledge-pattern-special-management-ref",
+      "expect": "HONORING",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-19T14:39:58.0256858Z",
+  "updated": "2026-06-19T14:56:40.3300979Z",
+  "version": "1.2"
+}

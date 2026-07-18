@@ -1,0 +1,49 @@
+{
+  "id": "wk-tool-sub-1s-response-time-mandate-ref",
+  "app": "wkappbot-workflow",
+  "title": "wk-tool sub-1s REF: historical analysis, dot-source incident",
+  "title_ko": null,
+  "desc": "T3 reference tier for wk-tool-sub-1s-response-time-mandate. Historical incidents and detailed analysis. Core -> wkappbot skill read wk-tool-sub-1s-response-time-mandate.",
+  "steps": [
+    "SKILL-READ SLOWNESS PROFILE (2026-06-24): ~1.5-2.5s per wkappbot skill read. TWO costs: (1) per-call FULL session-JSONL rescan in Get-WkSessionSkillReadIds -- the :-scoped cache dies PER-PROCESS (each PreToolUse spawns fresh PS so cache ALWAYS misses, rewasting 10-25s on 50-call workflows). (2) ~1.5s PS cold-start. FIX: incremental cross-process tail-read cache (persist {scannedByteOffset, lastCompactionTs, skillIds} to TEMP JSON, tail-read only new bytes). PROTO BUILT + parity-verified (wkharness-common-skillscore-proto.ps1). IMMEDIATE WIN = promote cache proto. Architectural finish = PS-floor removal.",
+    "SYSTEMIC 2-PS-STARTUP BUG (2026-06-29): wk-tool shim (.cmd) -> wkwrap.ps1 = PS startup 1. wkwrap sibling fallback L67 -> '& powershell ... -File sibling.ps1' = PS startup 2. EVERY sibling-.ps1 wk-tool pays TWO cold-starts. Measured: wkpace 2370ms median. PROPOSED FIX: change wkwrap.ps1 L67 from spawn to in-process dot-source. RISK: switch-arg binding difference (see step below).",
+    "WKWRAP DOT-SOURCE ATTEMPT + REVERT (2026-06-29, Opus, hard lesson): measured 1312ms on dot-source proto = 45% win. BUT: dot-source BREAKS switch-arg tools -- PS5.1 does not bind -Leaks/-All as [switch] params from @Rest array; binds literal '-Leaks' to next [int] positional = type error. Result: wkjobs -Leaks (agent-leak-guard) exits 0 instead of 1 = leak guard goes BLIND. VERIFIED by dispatched agent running 'wkjobs -Leaks' vs canonical. REVERTED via git checkout. ROOT LESSON: NEVER merge hot-path on reasoning alone -- run the critical switch-arg case (wkjobs -Leaks exit code) not just positional + bare calls.",
+    "CORRECT FIX (pending): (a) compiled wkwrap.exe that does 'powershell -File sibling.ps1 @args' (removes wkwrap.ps1 PS process, keeps ONE -File spawn = correct switch parsing) or (b) parse @Rest into hashtable for switch args before splatting. Both must be run-verified against 'wkjobs -Leaks' exit code before merge. Cross: verify-tool-or-guard-synthetic-live-static, wkwrap, incident-trauma-reflex-ref.",
+    "NAVIGATION: how-to (measure protocol, fix classes, heart-v2 bypass, conpty exception) -> wkappbot skill read wk-tool-sub-1s-response-time-mandate-howto."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read wk-tool-sub-1s-response-time-mandate",
+      "expect": "MANDATE",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wk-tool-sub-1s-response-time-mandate-ref",
+      "expect": "SKILL-READ SLOWNESS",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill search sub-1s wkwrap dot-source",
+      "expect": "wk-tool-sub-1s-response-time-mandate-ref",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "performance",
+    "sub-1s",
+    "ref",
+    "t3",
+    "history",
+    "dot-source",
+    "wkwrap",
+    "ps-startup",
+    "skill-read"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-30T11:12:42.0080284Z",
+  "updated": "2026-06-30T11:12:42.0080363Z",
+  "version": "1.0"
+}

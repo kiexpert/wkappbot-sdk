@@ -1,0 +1,45 @@
+{
+  "id": "dialectic-guard-gotchas-relay-truncation-brief-labels-evidence-window",
+  "app": "wkappbot-workflow",
+  "title": "Dialectic-guard gotchas: relay truncation, brief labels, evidence window",
+  "title_ko": null,
+  "desc": "T3 reference for harness-dialectic-guard: confirmed live gotchas -- Agent tool vs Agent.cmd evidence counting, evidence recency window, brief-label format requirement, and multiline-prompt relay truncation. See harness-dialectic-guard for the short actionable core.",
+  "steps": [
+    "EVIDENCE COUNTING: only calls made via the Bash CLI dispatcher count as dialectic evidence, not calls made via the in-IDE delegation tool -- 3+ successful delegation-tool dispatches still leave the counter at 0. Always build dialectic evidence via the CLI dispatcher form.",
+    "EVIDENCE WINDOW (2026-07-02): evidence appears recency-windowed, not session-lifetime -- earlier evidence can roll off while later evidence still counts. If a synthesis dispatch reports missing evidence you thought you already built, re-fire fresh thesis and antithesis immediately before the next attempt.",
+    "STACKED GUARDS (2026-07-04): a foreground dispatcher call gets blocked by a separate guard demanding background execution mode -- both requirements (background mode + correct dispatcher form) must be satisfied together, background flag first, or the evidence call never even starts.",
+    "BRIEF-LABEL FORMAT (2026-07-04): the brief-completeness guard requires the literal labels Goal colon, Files colon, Approach colon, Constraints colon, Exit colon as line-start markers -- narrative prose covering the same content without the literal words still gets blocked. Put each label on its own line.",
+    "MULTILINE RELAY TRUNCATION (2026-07-04): a prompt with embedded newlines sent as a plain string argument, even backgrounded, truncates at the first line break during the shell relay, losing everything after the first line. Reliable fix: wrap the whole prompt in a bash heredoc form, which survives the relay intact."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read dialectic-guard-gotchas-relay-truncation-brief-labels-evidence-window",
+      "expect": "EVIDENCE COUNTING",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill search dialectic relay truncation",
+      "expect": "dialectic-guard-gotchas-relay-truncation-brief-labels-evidence-window",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read dialectic-guard-gotchas-relay-truncation-brief-labels-evidence-window",
+      "expect": "MULTILINE RELAY TRUNCATION",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "dialectic",
+    "opus",
+    "gotcha",
+    "ref",
+    "history"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-07-04T12:53:34.1857125Z",
+  "updated": "2026-07-04T12:53:34.1857216Z",
+  "version": "1.0"
+}

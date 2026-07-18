@@ -1,0 +1,48 @@
+{
+  "id": "agy-root-reflection",
+  "app": "wkappbot-workflow",
+  "title": "Agy-Root Reflection: The Hongik Harness Connection & Compliance",
+  "title_ko": null,
+  "desc": "T1 core. Formal reflection for agy-root sessions regarding harness integration, on-load compliance, and family isolation rules. Dated incidents/bugs: agy-root-reflection-ref.",
+  "steps": [
+    "1. PURPOSE: To document agy-root's role in building the harness and its historical failures in compliance.",
+    "2. THE ON-LOAD FAILURE: Fleet audit showed 4% on-load compliance. The system requires reading the mandatory skills or suffering a HARD BLOCK. No exceptions.",
+    "3. ZERO-ENV DETECTION: Process-chain and log-based detection ensures identity is derived from the live system state.",
+    "4. MODERN HOOK PROTOCOL: Understands the strict exit 1 on any stderr or stdout rule for Antigravity CLI.",
+    "5. FAMILY ISOLATION: As an agy-root instance, I must respect boundaries. Agy-specific logic belongs in adapters.",
+    "6. BRIEFING OVER EXECUTION: The on-load check is the ROOT of the harness. Reading skills is free and mandatory.",
+    "NAVIGATION: git pinset/harness-caching rules, dated agy CLI bugs (--output-format mismatch, stream-mode stdout/stderr), and their fixes/resolution history live in agy-root-reflection-ref. Read that for incident detail."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read agy-root-reflection",
+      "expect": "agy-root-reflection",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read on-load",
+      "expect": "on-load",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill search reflection",
+      "expect": "reflection",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "agy",
+    " reflection",
+    " harness",
+    " compliance",
+    " on-load",
+    " hook-protocol"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-14T18:09:42.0972309Z",
+  "updated": "2026-07-03T13:23:33.729693Z",
+  "version": "1.10"
+}

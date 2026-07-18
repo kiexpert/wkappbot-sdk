@@ -1,0 +1,44 @@
+{
+  "id": "nvidia-overlay-blackscreen-kill-ref",
+  "app": "wkappbot-core",
+  "title": "NVIDIA overlay black-screen kill (ref)",
+  "title_ko": null,
+  "desc": "T3 reference for nvidia-overlay-blackscreen-kill: dated WipeBlockingOverlays bug/detection fixes and the brightness-guard lesson.",
+  "steps": [
+    "BUG FIX 2026-05-27: WipeBlockingOverlays sent WM_CLOSE to ALL large visible windows (>=75% screen) every 30s incl Edge/Chrome/VS Code. Fix: gate PostMessageW(WM_CLOSE) behind if(knownBlocker); non-blockers only hidden, not closed.",
+    "DETECTION FIX 2026-05-27: old detection was size-only (no topmost/z-order) so it false-positived maximized Edge. Root: the screensaver is TOPMOST so only a TOPMOST window can obscure it. Fix: non-knownBlocker requires WS_EX_TOPMOST AND >=50% screen; WM_CLOSE still gated to knownBlocker.",
+    "2026-06-12 movie-fold marathon: a brightness-only minimize/kill (SuppressFullscreenOpaqueOverlays) folded the user Edge -- reinforced the 'never act on brightness alone, gate on window class' rule now in T1."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read nvidia-overlay-blackscreen-kill",
+      "expect": "overlay",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read incident-trauma-reflex-ref",
+      "expect": "brightness",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read screensaver-command",
+      "expect": "guard",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "nvidia",
+    "overlay",
+    "blackscreen",
+    "ref",
+    "history",
+    "t3"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-12T10:59:21.9619225Z",
+  "updated": "2026-06-12T10:59:21.9619314Z",
+  "version": "1.0"
+}

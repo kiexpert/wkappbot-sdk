@@ -1,0 +1,81 @@
+{
+  "id": "wkchat-shortcut-geometry-lnk-update",
+  "app": "wkappbot-core",
+  "title": "wkchat .lnk shortcut window geometry update -- write WindowOrigin into NT_CONSOLE_PROPS",
+  "title_ko": null,
+  "desc": "On wkchat exit (and after window move/resize), locate the .lnk that launched this console and write the current WindowOrigin into the .lnk's NT_CONSOLE_PROPS ExtraData block via IShellLinkW + IShellLinkDataList COM. Result: next double-click on the .lnk reopens the console at the same on-screen position even though .lnk does not store arbitrary RECTs.",
+  "steps": [
+    "[DISCOVERY - PRIMARY] GetStartupInfoW.lpTitle. When Explorer launches a console via .lnk it sets STARTUPINFO.lpTitle to the FULL .lnk path (not the executable name). Read it once at chat startup with P/Invoke STARTUPINFOW_Title struct, validate the path ends with .lnk and exists. Stored in _launchingShortcutPath -- used for all subsequent geometry writebacks. Source: ChatCommand.ShortcutGeometry.cs:58 GetStartupInfoW + :87 si.lpTitle.",
+    "[DISCOVERY - FALLBACK] When lpTitle is null/empty (e.g. launched from cmd.exe, not Explorer): scan Desktop + Start Menu folders (CSIDL_DESKTOP, CSIDL_STARTMENU, CSIDL_COMMON_STARTMENU) for any .lnk whose IShellLink Target resolves to wkappbot-core.exe AND WorkingDirectory matches Environment.CurrentDirectory. Walks recursively via EnumerateFiles. Source: ChatCommand.ShortcutGeometry.Search.cs (added commit 011d025b 2026-05-05).",
+    "[NT_CONSOLE_PROPS BLOCK] Signature 0xA0000002, attached as IShellLinkDataList ExtraData on .lnk files that target a console. Layout matches the public CONSOLE_FE_PROPS / NT_CONSOLE_PROPS structures (cbSize, dwSignature, wFillAttribute, wPopupFillAttribute, dwScreenBufferSize, dwWindowSize, dwWindowOriginX/Y, ...). Total Marshal.SizeOf MUST equal cbSize so AddDataBlock accepts the write.",
+    "[READ EXISTING] var dataList = (IShellLinkDataList)link; hr = dataList.CopyDataBlock(NT_CONSOLE_PROPS_SIG_INT, out blockPtr). If found, Marshal.PtrToStructure<NT_CONSOLE_PROPS>(blockPtr) and modify dwWindowOriginX/Y. If absent, NewDefaultConsoleProps() seeds a sensible default block.",
+    "[WRITE BACK] dataList.RemoveDataBlock(NT_CONSOLE_PROPS_SIG_INT) first (you cannot Update an existing block, only Remove+Add). Marshal.StructureToPtr the modified struct, AddDataBlock, then IPersistFile.Save(path, fRemember=true).",
+    "[COORDINATE UNIT] dwWindowOriginX/Y in NT_CONSOLE_PROPS is documented as character cells (column,row), NOT pixels. We compute approximate cell coords from the live window pixel rect / current font cell size at save time. Cross-monitor differences in DPI accepted as best-effort.",
+    "[SIGNATURE QUIRK] 0xA0000002 fits in 32 bits either way. We expose two constants -- NT_CONSOLE_PROPS_SIG_INT (signed int for IShellLinkDataList COM signatures, marshaled as DWORD/int) and NT_CONSOLE_PROPS_SIG_UINT (uint for the struct dwSignature field). Mixing them silently fails CopyDataBlock with E_FAIL.",
+    "[WHEN INVOKED] (1) After SaveParentWindowGeo on WT WM_MOVESIZEEND, (2) on AppDomain.ProcessExit/CancelKeyPress final flush. Both routes call the same UpdateLnkGeometry(path, x, y) helper. Failures logged to stderr but never block chat continuation -- shortcut geometry is a quality-of-life feature.",
+    "[AUDIT 2026-06-03] source_refs broken: empty source_refs file entries."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot chat",
+      "expect": "WT window opens at last saved position; on exit the launching .lnk's NT_CONSOLE_PROPS WindowOrigin matches",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot eye tick",
+      "expect": "health percent shown",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot windows",
+      "expect": "console window listed (geometry probe path functional)",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "wkchat",
+    "shortcut",
+    "lnk",
+    "NT_CONSOLE_PROPS",
+    "IShellLink",
+    "IShellLinkDataList",
+    "GetStartupInfoW",
+    "lpTitle",
+    "WindowOrigin",
+    "conhost",
+    "geometry",
+    "persistence"
+  ],
+  "source_refs": [
+    {
+      "file": "",
+      "line": 58,
+      "pattern": "GetStartupInfoW",
+      "note": null
+    },
+    {
+      "file": "",
+      "line": 153,
+      "pattern": "CopyDataBlock",
+      "note": null
+    },
+    {
+      "file": "",
+      "line": 216,
+      "pattern": "RemoveDataBlock",
+      "note": null
+    },
+    {
+      "file": "",
+      "line": 1,
+      "pattern": "Desktop",
+      "note": null
+    }
+  ],
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-05T00:00:00",
+  "updated": "2026-06-02T19:49:17.5196905Z",
+  "version": "1.1"
+}

@@ -1,0 +1,58 @@
+{
+  "id": "headhunter-mail-manager",
+  "app": "wkappbot-workflow",
+  "title": "Headhunter email watcher: Naver IMAP auto-draft + notify",
+  "title_ko": null,
+  "desc": "Naver IMAP poller that detects headhunter emails, auto-drafts Korean reply using resume data, notifies via wkappbot pending_prompts, sends via SMTP after user approval.",
+  "steps": [
+    "Setup: python resume/scripts/headhunter_mail.py setup -- creates hh_config.json template",
+    "Check inbox: python resume/scripts/headhunter_mail.py check -- scans UNSEEN, drafts, notifies",
+    "List drafts: python resume/scripts/headhunter_mail.py list",
+    "Send: python resume/scripts/headhunter_mail.py send <uid>",
+    "Cron: wkappbot cron add --interval 30m 'python .../headhunter_mail.py check'",
+    "Notify: .wkappbot/pending_prompts/prompt_NOW_{guid}.json -- Eye delivers to Claude session",
+    "Config: hh_config.json (gitignored) -- naver_id, naver_app_password, display_name",
+    "Drafts: hh_drafts/draft_{uid}.json -- status: pending to sent",
+    "App password: naver mail settings POP3/IMAP page",
+    "Credentials: load from D:\\GitHub\\.env (NAVER_ID=kiexpert, NAVER_APP_PASSWORD=4VRQKGRRJD3L). hh_config.json is gitignored.",
+    "MANDATORY -- Mail scan log: every Naver IMAP read MUST save ALL messages to resume/drafts/YYYYMMDD_naver_inbox_scan.md (full From+Subject table) and commit immediately. No exceptions.",
+    "Known headhunter: usvksl@searchnet.co.kr (SEARCHNET -- 민트로켓/Nexon 담당, 2026-05-02)",
+    "Business partner follow-up emails (lisart/investor type): prepare 4-doc package (patent summary, tech doc, govt grants list, venture cert checklist) -> fix any missing fields in docs -> create email draft in resume/drafts/YYYYMMDD_<partner>_reply_email.md -> commit -> send via Naver mail (kiexpert@naver.com)",
+    "MANDATORY before send: 1) Opus review (tone/accuracy) 2) Codex proofread (typos/facts) 3) show results to user 4) wait for explicit user approval. NEVER auto-send without approval.",
+    "Cross-reference: wkappbot skill read willkim-schedule for job application deadlines and NVIDIA/Smilegate interview timeline",
+    "STANDARD ATTACHMENTS for all job applications: (1) resume/references/WkBitwiseSortSet-v18.pdf (2) resume/references/kimgiil_Portfolio_Algorithms_Optimization.PDF (3) resume/references/WillKim_Career_Description_bitwise.txt. Source: kiexpert/bitwise-sets GitHub docs/. Local copies committed in personal-docs. Run mail-send-review-gate BEFORE sending.",
+    "STATUS 2026-06-02: 김은하 추천 공고 7개 수신 완료 (5/25~26, 미검토): 모픽/모비어스/제노코/백금티앤에이/투아이시스/넷진테크/디자인그룹나인. NVIDIA JR2012622 불합격 (6/1), Smilegate 엔진프로그램 서류 탈락 (5/26). 상세 타임라인: wkappbot skill read willkim-schedule."
+  ],
+  "requirements": [
+    {
+      "cmd": "python resume/scripts/headhunter_mail.py setup",
+      "expect": "Config created",
+      "prompt": null
+    },
+    {
+      "cmd": "python resume/scripts/headhunter_mail.py list",
+      "expect": "(No drafts|UID)",
+      "prompt": null
+    },
+    {
+      "cmd": "python resume/scripts/headhunter_mail.py check",
+      "expect": "CHECK",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "naver",
+    "imap",
+    "headhunter",
+    "email",
+    "resume",
+    "automation"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-30T18:01:50.9335394Z",
+  "updated": "2026-06-02T01:10:46.8431693Z",
+  "version": "1.10"
+}

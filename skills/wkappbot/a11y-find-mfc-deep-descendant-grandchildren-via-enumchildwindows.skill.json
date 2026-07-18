@@ -1,0 +1,50 @@
+{
+  "id": "a11y-find-mfc-deep-descendant-grandchildren-via-enumchildwindows",
+  "app": "wkappbot",
+  "title": "a11y find: MFC deep-descendant grandchildren via EnumChildWindows",
+  "title_ko": null,
+  "desc": "HTS/MFC apps expose empty UIA tree below top frame; controls live 3-4 levels under custom container classes. FindChildByPattern now recurses via Win32 EnumChildWindows as final fallback (after MDIClient/direct-children layers) so grap like '*Hero*/Form1101/*StockCode*' reaches grandchildren.",
+  "steps": [
+    "grap child segment X/Y/Z: each segment becomes a FindChildByPattern call against the previous hwnd",
+    "Layer 1 MDIClient children (depth 2)",
+    "Layer 2 direct children of hParent (depth 1)",
+    "Layer 3 EnumChildWindows full subtree recurse -- catches MFC 3+ depth controls the prior layers missed",
+    "Returns first pattern match in enumeration order",
+    "Use '[cls] title cid=N hwnd=H WxH' search key; PatternMatcher.TokenMatchAny matches title + key",
+    "Usage example: wkappbot a11y find '*Hero*/MDIClient/Form1101/*StockCode*' reaches MFC grandchildren that prior 2-layer logic missed",
+    "Verified 2026-04-19: experience/tests/session/test-session-fix-verify-20260419.sh (resolve ts=2026-04-19T06:48:31)",
+    "[v6.2+ SIMPLE PATH] For top-level MDI panel discovery, simple wildcard 'a11y find *panel-title*' now works -- FindWindows simple-pattern path auto-falls-back to MDI child enumeration. This skill's grap-chain layer (Parent/MDIClient/Form1101/*StockCode*) is still required for drilling INTO MFC grandchildren via Win32 EnumChildWindows; simple fallback covers top-level MDI Window elements only.",
+    "STOP-EARLY PATTERN: grap path can target any intermediate window in the hierarchy -- you do NOT need to reach a leaf field. '*App*/MDIClient/Form1101' returns the Form1101 container hwnd directly. Use this when you need the container window itself (screenshot, click-region, child enumeration) rather than a specific element inside it. Combining with cls glob: '{cls:*Form*}' or '{proc:App}#MDIClient/MyPanel' stops at the panel. This avoids brittle deep paths when the container is the actual target."
+  ],
+  "requirements": null,
+  "primary_cmd": null,
+  "tags": [
+    "a11y",
+    "find",
+    "hts",
+    "mfc",
+    "mdi",
+    "grap",
+    "win32",
+    "focusless-first"
+  ],
+  "source_refs": [
+    {
+      "file": "csharp/src/WKAppBot.Win32/Window/WindowFinder.cs",
+      "line": null,
+      "pattern": "FindChildByPattern",
+      "note": null
+    },
+    {
+      "file": "csharp/src/WKAppBot.Win32/Native/NativeMethods.cs",
+      "line": null,
+      "pattern": "EnumChildWindows",
+      "note": null
+    }
+  ],
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-19T07:18:44.1605811Z",
+  "updated": "2026-05-18T04:37:18.5830472Z",
+  "version": "1.4"
+}

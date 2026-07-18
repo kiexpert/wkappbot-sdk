@@ -1,0 +1,90 @@
+{
+  "id": "codex-global-approval",
+  "app": "wkappbot-core",
+  "title": "Codex Global Approval",
+  "title_ko": null,
+  "desc": "Configure Codex CLI global defaults for low-friction appbot work: cheap default model, never ask for approval, danger-full-access sandbox for trusted repos, named profiles, and appbot auto-accept environment baseline.",
+  "steps": [
+    "Open C:\\Users\\kiexp\\.codex\\config.toml.",
+    "Set model to gpt-5.4-mini for the default worker path unless a stronger model is explicitly needed.",
+    "Set ask_for_approval = never and approval_policy = never for compatibility with current and older Codex config keys.",
+    "Set sandbox_mode = danger-full-access for trusted local automation sessions.",
+    "Add profiles worker, frontier, and readonly so routine execution, strong reasoning, and safe read-only checks are explicit.",
+    "Keep trusted project entries for active repos such as WKAppBot, WkAutoQuant, personal-docs, and wkappbot-sdk.",
+    "Set WKAPPBOT_AUTO_APPROVE_ALL=1 in User environment when appbot-heavy work should proceed without repeated prompts.",
+    "Read codex-auto-approval for default.rules prefix policy before editing approval rules.",
+    "Read post-compaction-recovery after context compaction to re-check this baseline.",
+    "2026-05-06 appbot skill auto-accept baseline: default.rules should include narrow allow prefixes for wkappbot skill read/search/edit/contribute/install/delete/sync, for both Join-Path (Get-Location) \u0027bin\u0027 and Join-Path D:\\GitHub\\WKAppBot \u0027bin\u0027 PATH bootstrap forms. Keep WKAPPBOT_AUTO_APPROVE_ALL=1 in User environment.",
+    "2026-05-06 global-config auto-accept baseline: default.rules should include narrow allow prefixes for reading and validating C:\\Users\\kiexp\\.codex\\config.toml, inspecting C:\\Users\\kiexp\\.codex\\rules\\default.rules, setting/getting WKAPPBOT_AUTO_APPROVE_ALL, and making timestamped backups before config/rule changes.",
+    "2026-05-06 global Codex instructions baseline: keep C:\\Users\\kiexp\\.codex\\AGENTS.md as the Codex-side counterpart to C:\\Users\\kiexp\\.claude\\CLAUDE.md. It must state default model gpt-5.4-mini, Korean polite final responses, AppBot skill command discipline, auto-accept baseline, process safety, crash reboot console recovery, and handoff/compaction skill reads."
+  ],
+  "requirements": [
+    {
+      "cmd": "Get-Content C:\\Users\\kiexp\\.codex\\config.toml",
+      "expect": "approval_policy",
+      "prompt": null
+    },
+    {
+      "cmd": "Get-Content C:\\Users\\kiexp\\.codex\\config.toml",
+      "expect": "sandbox_mode",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read codex-auto-approval",
+      "expect": "prefix_rule",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read post-compaction-recovery",
+      "expect": "CODEX GLOBAL CONFIG",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read claude-session-handoff",
+      "expect": "Codex handoff",
+      "prompt": null
+    },
+    {
+      "cmd": "Select-String -Path C:\\Users\\kiexp\\.codex\\rules\\default.rules -Pattern \u0027wkappbot skill edit\u0027",
+      "expect": "prefix_rule",
+      "prompt": null
+    },
+    {
+      "cmd": "Select-String -Path C:\\Users\\kiexp\\.codex\\rules\\default.rules -Pattern \u0027wkappbot skill sync\u0027",
+      "expect": "prefix_rule",
+      "prompt": null
+    },
+    {
+      "cmd": "Select-String -Path C:\\Users\\kiexp\\.codex\\rules\\default.rules -Pattern \u0027config.toml\u0027",
+      "expect": "prefix_rule",
+      "prompt": null
+    },
+    {
+      "cmd": "Get-Content C:\\Users\\kiexp\\.codex\\AGENTS.md",
+      "expect": "Global Codex Operating Rules",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read suggest-workflow",
+      "expect": "Suggest Management",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "codex",
+    "approval",
+    "config",
+    "sandbox",
+    "global",
+    "appbot",
+    "wkappbot",
+    "auto-accept"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-21T11:51:57.6580303Z",
+  "updated": "2026-05-06T02:52:49.6716301Z",
+  "version": "1.7"
+}

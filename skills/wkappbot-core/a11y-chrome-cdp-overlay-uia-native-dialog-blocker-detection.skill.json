@@ -1,0 +1,41 @@
+{
+  "id": "a11y-chrome-cdp-overlay-uia-native-dialog-blocker-detection",
+  "app": "wkappbot-core",
+  "title": "a11y Chrome: CDP overlay \u002B UIA native dialog blocker detection",
+  "title_ko": null,
+  "desc": "When a11y click/invoke fails on Chrome with a CSS dialog overlay or native confirm/alert, the blocker is now detected and reported as a BLOCKED grap. Stage 1: UIA tree search for confirm/cancel buttons in Chrome window. Stage 2: CDP z-index\u003E=100 fixed/absolute element covering \u003E5% viewport.",
+  "steps": [
+    "Net result: a11y click/invoke prints specific BLOCKED grap guide instead of silent fail",
+    "When a11y target not found on Chrome: call TryReportChromeNativeDialogViaUia then TryReportCdpOverlayBlocker",
+    "TryReportChromeNativeDialogViaUia: UIA EnumWindows finds confirm/cancel/OK/Leave buttons in Chrome tree",
+    "TryReportCdpOverlayBlocker: CDP JS checks z-index\u003E=100 \u002B position:fixed/absolute \u002B \u003E=5% viewport =\u003E BLOCKED grap",
+    "EmitBlockerGrap: outputs BLOCKED grap with dismiss button; adds [ELEVATED:needs --sudo] when UIPI detected",
+    "InspectionCommands.cs calls both detectors when inspect returns null on Chrome window",
+    "a11y capture on blocked Chrome page: blocker detection runs before returning error -- prints BLOCKED grap"
+  ],
+  "requirements": [
+    {
+      "cmd": "grep -c TryReportCdpOverlayBlocker D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/A11yCommand.Cdp.cs",
+      "expect": "1",
+      "prompt": null
+    },
+    {
+      "cmd": "grep -c TryReportChromeNativeDialogViaUia D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/A11yCommand.Cdp.cs",
+      "expect": "1",
+      "prompt": null
+    },
+    {
+      "cmd": "grep -c EmitBlockerGrap D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/A11yCommand.cs",
+      "expect": "1",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-30T16:24:22.2297492Z",
+  "updated": "2026-04-30T16:25:34.3203284Z",
+  "version": "1.8"
+}

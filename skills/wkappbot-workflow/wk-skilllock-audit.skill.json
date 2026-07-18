@@ -1,0 +1,37 @@
+{
+  "id": "wk-skilllock-audit",
+  "app": "wkappbot-workflow",
+  "title": "wk-skilllock-audit",
+  "title_ko": null,
+  "desc": "Repo-root launcher wk-skilllock-audit.ps1 -- audits recently-touched critical source files for missing harness:skill lock registration in CLAUDE.md, part of the gg Main Workflow step 0.5",
+  "steps": [
+    "WHAT: scans git history for files touched in the last N days (-DaysBack) against critical-source patterns and flags any without a harness:skill lock entry in CLAUDE.md",
+    "USAGE: run from repo root as ./wk-skilllock-audit.ps1 -DaysBack 7 (bare wk-skilllock-audit form once on PATH is pace-exempt) -- unprotected files must get a harness:skill block added then re-run to 0",
+    "SEE ALSO: skill-lock-audit-and-auto-registration-for-critical-source-files for the full registration procedure"
+  ],
+  "requirements": [
+    {
+      "cmd": "./wk-skilllock-audit.ps1 -DaysBack 7",
+      "expect": "exit code and list of unprotected files (0 if none)",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read skill-lock-audit-and-auto-registration-for-critical-source-files",
+      "expect": "registration procedure",
+      "prompt": null
+    },
+    {
+      "cmd": "grep 'harness:skill' CLAUDE.md",
+      "expect": "shows registered critical-source locks",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-07-02T03:12:32.2533172Z",
+  "updated": "2026-07-02T03:12:32.2533254Z",
+  "version": "1.0"
+}

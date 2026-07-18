@@ -1,0 +1,48 @@
+{
+  "id": "md-heal-howto",
+  "app": "wkappbot-workflow",
+  "title": "md-heal how-to: scan, drift, gg, sync, commit",
+  "title_ko": null,
+  "desc": "T2 how-to for md-heal: the step-by-step CLAUDE.md heal procedures (scan repo MD, drift-check vs README and AGENTS, gg validation, global sync, fix and commit, checklist).",
+  "steps": [
+    "SCAN REPO ROOT MD: list all MD at repo root. Read CLAUDE.md, and README.md and AGENTS.md if present. Look for changed build commands, removed features still mentioned, new tools not documented, wrong paths, stale versions, and a gg section that no longer works end to end.",
+    "DRIFT CHECK: for every subject in both CLAUDE.md and README.md or AGENTS.md, verify the descriptions agree. Common drift is build command, main entry point, architecture summary, key env vars, deploy steps. Fix discrepancies in both files in the same commit.",
+    "GG VALIDATION: find the gg Main Workflow section in the project CLAUDE.md. Dry-run each step: does the skill id still exist via wkappbot skill read id, does the shell command still work, is the Agent prompt still accurate. Fix anything broken or stale.",
+    "GLOBAL SYNC: open the global CLAUDE.md. Check whether the project file contradicts a global rule. If a global rule changed, ensure the project file reflects or explicitly overrides it. The project file wins but should acknowledge the global baseline.",
+    "FIX AND COMMIT: apply fixes with the Edit tool since the project CLAUDE.md is tracked. Commit all changed MD files together in one commit with a docs claude heal message plus a one-line summary. Do not split MD fixes across commits.",
+    "CHECKLIST: build command verified, architecture accurate, gg section tested end to end, README and AGENTS drift fixed, stale commands removed, new patterns added, committed with all MD in one commit."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read md-heal-howto",
+      "expect": "scan drift gg sync fix procedures",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read md-heal",
+      "expect": "core heal flow",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill search md-heal",
+      "expect": "md-heal cluster",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "md-heal",
+    "heal",
+    "howto",
+    "claude",
+    "readme",
+    "agents",
+    "drift"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-03T19:02:53.9365854Z",
+  "updated": "2026-06-03T19:02:53.9365991Z",
+  "version": "1.0"
+}

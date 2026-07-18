@@ -1,0 +1,47 @@
+{
+  "id": "runaway-subagent-reap-postmortem-kill-switch-pace-blocked",
+  "app": "wkappbot-workflow",
+  "title": "Runaway/hung subagent: reap + post-mortem when the kill-switch is pace-blocked",
+  "title_ko": null,
+  "desc": "A delegated subagent can run away burning TOKENS (not CPU) in a guard-cascade/escaping retry loop, invisible to wkjobs. TaskStop+ToolSearch are pace-blocked over-budget (backwards-gate), so the AI cannot self-reap; use wkhippo as a pace-exempt X-ray + FleetView human-stop. Post-mortem via bounded grep.",
+  "steps": [
+    "PREVENTION: dispatch cheap agents with a TIGHT exit criterion + a fallback ladder so they do not loop forever on a mis-quoted edit; prefer the PROVEN approach over re-deriving (a265 looped on the exact wkedit pipe/quote-escaping the dispatcher had already solved a cleaner way). Cluster/Next: harness-pace-guard (step5 backwards-gate + the fix), hippocampus-living-memory-howto (wkhippo recent + session-id keyword X-ray + export/cwd gaps), wkjobs-ai-process-monitor (CPU-only, misses token-hippos), pace-deadlock-escapes-harness-editable-and-jisikhwa-free (wk-launcher escapes), wk-pstest, claude-code-agent-tier-routing (parallel-fleet caps)."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkjobs.cmd -All",
+      "expect": "lists AI processes but a token-hippo subagent shows idle (CPU-only, misses it)",
+      "prompt": null
+    },
+    {
+      "cmd": "wkhippo recent a265af92772b03978",
+      "expect": "ranks that subagent first (pace-exempt X-ray when TaskOutput is pace-blocked)",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read harness-pace-guard",
+      "expect": "step5 says TaskStop and ToolSearch should be pace-exempt (the fix this skill tracks)",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "harness",
+    "subagent",
+    "runaway",
+    "kill-switch",
+    "pace",
+    "backwards-gate",
+    "wkhippo",
+    "wkjobs",
+    "post-mortem",
+    "token-hippo",
+    "fleet"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-25T09:40:27.727617Z",
+  "updated": "2026-06-25T09:40:27.9727595Z",
+  "version": "1.1"
+}

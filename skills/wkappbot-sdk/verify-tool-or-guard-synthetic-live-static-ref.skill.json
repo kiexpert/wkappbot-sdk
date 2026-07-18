@@ -1,0 +1,45 @@
+{
+  "id": "verify-tool-or-guard-synthetic-live-static-ref",
+  "app": "wkappbot-sdk",
+  "title": "Verify tool/guard (T3 ref): dated incidents + derivations",
+  "title_ko": null,
+  "desc": "Reference tier of verify-tool-or-guard-synthetic-live-static: the dated incidents that birthed each verification rule, plus the fail-safe/confirm-before-block/canary derivation. Read when you need the WHY or a worked example.",
+  "steps": [
+    "PS5.1 SCRIPTBLOCK SCOPE TRAP (2026-06-10): in a synthetic gate test that exercises [regex]::Replace with a MatchEvaluator scriptblock, PS5.1 COPIES outer plain variables INTO the scriptblock scope (no closure). So a plain $counter incremented inside reads 0 outside; a List<string> works (reference type, shared). Assertion: check $assignments.Count>0 AFTER the hoist, not a counter; or use the programmatic-range / manual-Matches approach avoiding scriptblocks (wksplit-cs-utility G2).@@WKSPLIT-CS G3 PRECHECK BUG (2026-06-11): symbol_precheck called find_members on unfinalized planned-part lines; make_header ends with the class-body-open brace, first body line blank -> class_indent=0, max_member_indent=4, real members at 8 spaces all skipped -> precheck reports all members dropped -> wrong G3 remerge. Fix: find_members scans forward to the FIRST NON-BLANK line for indent detection. Test G3 on unfinalized partial lines, not finalized reads.@@A-GUARD-CAN-BE-PRESENT-BUT-SILENTLY-NOT-FIRE / fail-open blindness (2026-06-12): study-lock did NOT block ROOT editing live harness code (edited without reading the skill). Causes: (1) Edit/Write TOOL bypassed harness:skill via an early exit-0 in wkharness-guards.ps1; (2) required-set EMPTY (no inline #/// + no harness:skill rule) -> guard returns false by design. TRIGGER: never assume present==enforcing; prove a new guard FIRES with a synthetic self-edit test (impersonate the edit, assert verdict=block). ROOT-CAUSE CLASS: fail-open guards + tool-path bypass = silent non-enforcement. Every new guard ships with a synthetic does-it-fire canary in the doctor suite.@@WIRED-HEART PROTO (2026-06-19): a pluggable guard registry that dot-sources N module files must dot-source ALL at SCRIPT TOP LEVEL (PS5.1 dot-source scope trap: defs in function-local scope vanish on return). Load-WkModules() becomes a no-op stub; top-level foreach over paths with '. $path' is correct.@@PLACEMENT/COLLISION review (2026-06-22): a delegated file-emitting output can be content-correct (round-trip 0-diff + parse 0 + smoke pass) yet STRUCTURALLY wrong -- wksplit dumped 35 generic-named modules into bin/ ROOT (on PATH, collision-prone). ROOT review of any file-emitting delegation MUST check WHERE files land + NAMES + PATH/namespace/collision, not only content-integrity. content-verify != placement-verify.@@GG_MAIN.PY DANGER-CHECK (2026-06-22): py_compile is parse-level ONLY (parse-clean != runtime proof); the LIVE verify for a gg danger-check is the next gg run STEP 6 showing the warning fire. Gate ladder: py_compile (syntax) -> next gg run (runtime). gg_main.py warning STRINGS must be PURE ASCII (Korean-in-.py guard).@@DIFFSTAT-GATE (2026-06-22): wkopus told to apply a +23 insertion to hantoo_kr.py SILENTLY DROPPED 479 lines (982->535) -- the worker was a HAIKU that tried to split on the wksplit nag; result was AST-CLEAN + imported fine (parse-clean hid the loss). ONLY git diff --stat caught it (28+/479-). REFLEX: after ANY delegated source edit, run git diff --stat + assert deletion count matches intent (insertion-only fix MUST be +N/-0); large deletions = silent drop, REVERT. AST/import/compile pass on a gutted file.@@DERIVATION of the fail-safe optimization algorithm (2026-06-22..23): fail-safe!=fail-open (full-scan fallback on error preserves correctness, not the guard allow/deny sense); OUTPUT-IDENTITY catches silent undercount; CONFIRM-BEFORE-BLOCK re-runs the authoritative full check on any would-deny (zero false-blocks at runtime); MISMATCH auto-fires a deduped top-priority canary suggest (self-monitoring). The full 4-layer algorithm + design test now lives in its own cross-family skill: guard-feeding-cache-confirm-before-block (read that for the citable concept; this is the historical derivation)."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read verify-tool-or-guard-synthetic-live-static-ref",
+      "expect": "PS5.1",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read verify-tool-or-guard-synthetic-live-static",
+      "expect": "THREE VERIFICATION MODES",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read guard-feeding-cache-confirm-before-block",
+      "expect": "CONFIRM-BEFORE-BLOCK",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "verification",
+    "reference",
+    "incidents",
+    "synthetic",
+    "static",
+    "confirm-before-block",
+    "fail-safe",
+    "diffstat",
+    "split-safety"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-22T16:54:18.624535Z",
+  "updated": "2026-06-22T16:54:18.6245441Z",
+  "version": "1.0"
+}

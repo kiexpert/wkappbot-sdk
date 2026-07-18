@@ -1,0 +1,50 @@
+{
+  "id": "a11y-focus-tier-chain",
+  "app": "wkappbot-core",
+  "title": "a11y focus: SmartSetWindowOrder + full tier chain (v6.8+)",
+  "title_ko": null,
+  "desc": "WKAppBot complete OS-level focus service spec. SmartSetWindowOrder is the single focusless Z-order primitive — called before all interactive write actions and focus commands. Zero keyboard-focus steal from user at all times.",
+  "steps": [
+    "SMART WINDOW ORDER -- SmartSetWindowOrder(hwnd) [A11yCommand.WindowActions.cs]: the single focusless Z-order primitive, never steals keyboard focus. 6 steps: (1) GetParent chain walk to root ancestor; (2) iconic root -> ShowWindow(SW_SHOWNOACTIVATE); (3) MDI/child window -> BringWindowToTop(hwnd); (4) PlaceRootBehindForeground: strip WS_EX_TOPMOST, SetWindowPos(insertAfter=fg, SWP_NOACTIVATE) -> rank 2; (5) owner chain via GW_OWNER up to 8 levels, same treatment; (6) target ends at Z-order rank 2 behind the user active window, focus never transferred",
+    "WINDOW-LEVEL FOCUS -- A11yFocus(hwnd, tag): IsIconic -> SW_RESTORE, then SmartSetWindowOrder (full 6-step service)",
+    "ELEMENT-LEVEL FOCUS -- A11yFocusElement(el, hwnd) [A11yActions.Focus.cs]: 5-tier cascade -- Tier -1 PRE (FindRootWindow + SmartSetWindowOrder), Tier 0 CDP (TryCdpFocus, Chrome only), Tier 1 UIA (el.Focus()), Tier 2 Win32 (SetFocus on element hwnd), Tier 3 Win32 root fallback",
+    "WRITE ACTION PRE-FOCUS -- SmartSetWindowOrder(hwnd) runs BEFORE 10 interactive write actions (invoke, click, type, set-value, set-range, toggle, expand, collapse, select, scroll). EXCLUDED: read/find/inspect/screenshot/ocr/windows (read-only), close/minimize/maximize/restore (own Z-order needs), highlight/focus (own handling)",
+    "ZERO-STEAL RULES (absolute, no exceptions): FORBIDDEN -- SetForegroundWindow, SetActiveWindow, AttachThreadInput (all steal keyboard focus). ALLOWED Z-order -- SetWindowPos(SWP_NOACTIVATE), BringWindowToTop (child only), ShowWindow(SW_SHOWNOACTIVATE). ALLOWED keyboard focus -- UIA el.Focus(), Win32 SetFocus(elementHwnd) (set focus on a specific control without changing foreground window)",
+    "SOURCE FILES: A11yCommand.WindowActions.cs (SmartSetWindowOrder, A11yFocus, overlay guard), A11yActions.Focus.cs (A11yFocusElement, tier cascade), A11yCommand.cs:1907 (write-action pre-focus injection)",
+    "NAVIGATION: implementation detail, overlay guard, focusless-first principle, and full pitfalls list -> wkappbot skill read a11y-focus-tier-chain-howto. Version history and the 2026-05-19 FOCUS-STEAL incident investigation+dispatch -> wkappbot skill read a11y-focus-tier-chain-ref."
+  ],
+  "requirements": null,
+  "primary_cmd": "wkappbot a11y focus \"*AppTitle*\"",
+  "tags": [
+    "a11y",
+    "focus",
+    "SmartSetWindowOrder",
+    "BringWindowToTop",
+    "focusless",
+    "tier-chain",
+    "child-window",
+    "root-window",
+    "CDP",
+    "UIA",
+    "Win32"
+  ],
+  "source_refs": [
+    {
+      "file": "csharp/src/WKAppBot.CLI/Commands/A11yCommand.WindowActions.cs",
+      "line": null,
+      "pattern": null,
+      "note": null
+    },
+    {
+      "file": "csharp/src/WKAppBot.CLI/Commands/A11yActions.Focus.cs",
+      "line": null,
+      "pattern": null,
+      "note": null
+    }
+  ],
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-03T13:30:00Z",
+  "updated": "2026-07-02T07:23:35.1252935Z",
+  "version": "1.34"
+}

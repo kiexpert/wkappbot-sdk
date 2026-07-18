@@ -1,0 +1,38 @@
+{
+  "id": "gg-ecosystem-unified",
+  "app": "wkappbot-workflow",
+  "title": "gg Ecosystem: 4-Repo Unified Workflow",
+  "title_ko": null,
+  "desc": "Unified gg-ecosystem principle: Periodic execution detects risks → immediate safety measures → autonomous problem resolution. 4-repo workflows (WKAppBot suggest triage, personal-docs legal ops, wkappbot-sdk QA health, WkAutoQuant market mgmt) with CronCreate automation per repo, Step Count Contract enforcement, harness:skill validation, and auto-healing anomaly detection every 3 hours.",
+  "steps": [
+    "PURPOSE: 4-repo unified gg. Periodic execution detects risks -> immediate safety -> autonomous resolution. Repos: WKAppBot (suggest triage), personal-docs (legal/career), wkappbot-sdk (QA health), WkAutoQuant (market). next:gg-ecosystem-unified-ref for per-repo script paths + CronCreate schedules.",
+    "AUTOMATION: CronCreate per repo in CLAUDE.md Nightly Schedules. nightly-schedule-guard validates all entries at session start. STEP COUNT CONTRACT: each script STEPS list must match CLAUDE.md workflow count. Mismatch = speak alert + exit 1.",
+    "ANOMALY DETECTION: novel errors in errors.jsonl OR novel suggest patterns -> BUG-AUTO file + Opus escalation when urgent>=10 or error-pattern>=15. ZERO APPROVAL DELAY. Script self-learning via .anomalies.jsonl.",
+    "HARNESS:SKILL: each script declares 3 required skill reads (Usage/Impl/Task). Registered in each repo CLAUDE.md near workflow definition. Codex delegates multi-repo fixes (1 commit per repo)."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read wk-gg-main-script",
+      "expect": "Step Count Contract",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read nightly-schedule-guard",
+      "expect": "CronCreate",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read suggest-workflow",
+      "expect": "SUBMIT RULE",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-28T04:24:30.7321297Z",
+  "updated": "2026-05-31T12:46:08.2135834Z",
+  "version": "1.8"
+}

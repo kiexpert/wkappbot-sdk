@@ -1,0 +1,21 @@
+{
+  "id": "hn-oculos-give-ai-agents-control-of-your-desktop-via-mcp-ai-computer-use-pattern-reference",
+  "app": "wkappbot-workflow",
+  "title": "[HN] OculOS \u2013 Give AI agents control of your desktop via MCP \u2014 AI computer-use pattern reference",
+  "desc": "Extend WKAppBot\u0027s MCP server to expose desktop control actions (click/type/screenshot) as MCP tools callable by external AI agents. Source: https://github.com/huseyinstif/oculos (score=4, auto-generated from ai-news-briefing 2026-04-23 11:24)",
+  "steps": [
+    "SOURCE: OculOS \u2013 Give AI agents control of your desktop via MCP -- https://github.com/huseyinstif/oculos"
+  ],
+  "tags": [
+    "ai-news",
+    "computer-use",
+    "auto-skill",
+    "hn"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-23T02:25:07.2729775Z",
+  "updated": "2026-04-23T02:25:07.2729869Z",
+  "version": "1.0"
+}

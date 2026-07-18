@@ -1,0 +1,35 @@
+{
+  "id": "harness-installer-owns-all-setup",
+  "app": "wkappbot-sdk",
+  "title": "Harness installer owns ALL setup (surgical clean-then-install, preserve user config)",
+  "title_ko": null,
+  "desc": "When the harness is distributed to a user, the INSTALLER -- not wkdoctor (runtime health) and never manual patching -- is fully responsible for wiring everything: settings.json hooks, the load-bearing hub redirect, git hooks, shims, env. Surgically removes ONLY old harness logic while preserving all other user settings, then installs fresh. Idempotent, backed up, verified.",
+  "steps": [
+    "INSTALLER OWNS ALL SETUP. A customer runs ONE install script and the harness just works -- wkdoctor is runtime health only, manual patching is forbidden (it is fragile and caused two incidents in one day). SURGICAL CLEAN-THEN-INSTALL: remove ONLY the old harness logic (settings.json hook entries whose command references a wkharness path, stale core.hooksPath, old hub files) while PRESERVING every other user setting (custom hooks, permissions, env vars, keys); then insert fresh. MUST WIRE: (1) settings.json PreToolUse + PostToolUse; (2) the HUB REDIRECT files D:/GitHub/wkharness.ps1 and the post variant -- LOAD-BEARING because Agent.cmd child-spawn invokes that exact literal path, so each must exist as a thin re-exec shim to the kih entry (input piped to powershell -File kih-entry then exit LASTEXITCODE); (3) git hooks pre-commit pre-push commit-msg via core.hooksPath, clear old then install fresh; (4) tool shims and symlinks; (5) env vars WKHARNESS_REPO_ROOT and WKAPPBOT_HOME. IDEMPOTENT plus BACKUP settings.json first. VERIFY AFTER: status -Test passes AND a trivial Agent.cmd spawn succeeds (a missing hub breaks the spawn path with rc=-196608 while a clean -Test still passes, so delegation can be silently dead -- always test a real spawn)."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot file grep settings D:/GitHub/wkappbot-kih/install.ps1",
+      "expect": "installer wires settings.json hooks not just env vars",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot file grep hooksPath D:/GitHub/wkappbot-kih/install.ps1",
+      "expect": "git hooks clear-then-install present",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot file grep wkharness D:/GitHub/wkappbot-kih/install.ps1",
+      "expect": "hub redirect creation present",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-05T13:54:43.1750885Z",
+  "updated": "2026-06-05T13:54:43.1751051Z",
+  "version": "1.0"
+}

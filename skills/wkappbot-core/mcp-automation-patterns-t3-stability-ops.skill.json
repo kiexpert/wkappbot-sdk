@@ -1,0 +1,43 @@
+{
+  "id": "mcp-automation-patterns-t3-stability-ops",
+  "app": "wkappbot-core",
+  "title": "MCP Automation T3 Stability Ops",
+  "title_ko": null,
+  "desc": "Operational stability tier for WKAppBot MCP. Covers admin core cutover, hot-swap orphan cleanup, and MCP warmup guards so the server stays reliable under elevation and startup churn.",
+  "steps": [
+    "Use admin core swap rules to defer hot-swap while elevated work is active.",
+    "Use hot-swap/orphan cleanup when stale workers pin the old binary or leak after swaps.",
+    "Use the MCP warmup guard to avoid startup blocking while caches and prompts are still cold."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read hot-swap-stuck-orphan-mcp-workers-kill-force-swap",
+      "expect": "force-swap",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read eye-findallprompts-blocking-fix-cooldown-10s-mcp-warmup-guard",
+      "expect": "MCP cache warm",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read mcp-admin-core-swap-elevation-triggered-graceful-cutover",
+      "expect": "admin Core",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "mcp",
+    "ops",
+    "hot-swap",
+    "warmup",
+    "admin"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-01T15:24:51.8177637Z",
+  "updated": "2026-06-01T15:24:51.8177728Z",
+  "version": "1.0"
+}

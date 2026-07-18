@@ -1,0 +1,48 @@
+{
+  "id": "harness-guard-exemption-ladder-spec-howto",
+  "app": "wkappbot-workflow",
+  "title": "Harness guard exemption ladder howto (phases, adapters, joseki)",
+  "title_ko": null,
+  "desc": "Exemption ladder implementation: 3-phase execution, stall accounting, cross-family R1-R6, family adapter contract, joseki-guidance, knowledge-score.",
+  "steps": [
+    "EXECUTION ORDER 3 PHASES (strictly in order): PHASE 1 EMERGENCY SAFETY = stop the brick NOW: real /usage anchor + expiring temp bridge so pace reflects truth, AND make knowledge-ification + harness-source self-repair always-pass. STATUS DONE 2026-06-10. PHASE 2 PROBLEM SOLVING = implement single TIER0/1/2 ladder + isKnowledgeOp/isHarnessSourceEdit helpers, REMOVE scattered per-guard exemptions, consolidate duplicate stall-guard into one, fix reset-on-user-turn. PHASE 3 RECURRENCE PREVENTION = harness self-test green, confirm knowledge + source edits pass even at 95pct+ pace, knowledge-ify the ladder, assert SACRED-surface principle.",
+    "CONSOLIDATE: merge duplicate stall-guard (wkharness-guards-infra.ps1 vs wkharness-guards.ps1 ~line1012) into one implementation, fix reset-on-user-turn so a fresh user message clears the stall window. Keep Claude-family /usage anchor corrector (wkharness-guards-pace-claude-usage.ps1) plus expiring temp bridge for pace accuracy. VERIFY: run harness self-test and confirm knowledge ops AND harness-source edits pass even at 95pct+ pace.",
+    "PHASE 2 DETAIL -- stall accounting includes read-only tools: read-only built-in tools and TIER0 exempt ops MUST STILL update stall-window accounting (firstToolAt/lastToolAt) even though never BLOCKED. Hoist stall-state update so it runs for ALL tools BEFORE any early-exit/allow, then apply block decision only for TIER2. Without this, a read-heavy grind looks idle, 300s-since-lastToolAt check falsely resets the window, stall-guard fires inconsistently. Counting reads makes solo-loop duration accurate.",
+    "SIMPLIFICATION (Opus review 2026-06-10): first pass had two smells: (a) read-only stall accounting duplicated; (b) guard modules dot-sourced in TWO branches. FIX to single linear flow: classify once, if tier0 exit0, if tier1 study-lock+exit0, if NOT read-only run pace guard, dot-source guard modules EXACTLY ONCE. Read-only tools fall through to single dot-source; stall accounting+block lives in ONE place (infra.ps1). Net: one classification, one pace decision, one module dot-source, one stall implementation.",
+    "CROSS-FAMILY RULES R1-R6 (DEFINITIVE -- Claude/Codex/Gemini/agy/GPT): R1 NORMALIZE-FIRST: map every family native tool name to canonical set and populate filePath BEFORE ladder classifies, so TIER0 detection is family-agnostic. R2 Knowledge-support set and read-only set defined ONLY on canonical names + path patterns -- ONE ladder serves all families. R3 PACE stays family-branched: Claude=JSONL+/usage anchor; Gemini=wkgemini_usage.jsonl; Codex=codex_balance.json. NEVER score one family with another counter. R4 STALL reads ACTIVE family session keyed by family-qualified sessionId. R5 SUBAGENTS (env marker set on spawn) are exempt from stall. R6 FAIL-OPEN: if family cannot be determined OR session log cannot be parsed, guard MUST ALLOW (exit 0). Every per-family parse wrapped in try/catch defaulting to ALLOW.",
+    "AUTO-CALIBRATION ON WOULD-BE-BLOCK (near-realtime self-correction, user 2026-06-10): when a guard is about to BLOCK AND the real-usage anchor is STALE (older than 60min) OR missing, harness MUST run on-demand real-usage capture, re-read fresh anchor, RE-EVALUATE -- block ONLY if real numbers confirm over-target. GATING: cooldown stamp written BEFORE capture to prevent block-storm triggers. TIMEOUT: synchronous capture bounded ~15s. FAIL-OPEN per R6: if capture errors or times out, ALLOW. Wiring point: pace guard, immediately before each Block call, call Get-ClaudeUsageAnchorOrRecalibrate.",
+    "FAMILY ADAPTER CONTRACT (any new family slots in with ZERO core/ladder changes): ONE adapter per family implementing 4 contract members: (1) DETECT Test-Is<Family>() bool + tier label, registered in ONE dispatch table. (2) TOOLMAP hashtable native-name to canonical applied BEFORE ladder, must populate filePath for mapped Edit/Write. (3) USAGE Get-<Family>UsageAnchor returning totalPct/sonnetPct/resetUtc from family OWN source + on-demand recalibration; FAIL-OPEN to null. (4) SESSION Get-<Family>ActiveSession returning path/lastUserTurnTs for stall accounting; FAIL-OPEN. CLAUDE IS THE REFERENCE IMPL. ACTIVATION: copy Claude adapter, point 4 members at family source, add ONE row to dispatch table, run self-test -- NO edits to ladder or core guards. Keep each adapter under ~150 lines.",
+    "EMPIRICAL PER-FAMILY USAGE SOURCES (CLI test 2026-06-10): CLAUDE = bare claude /usage (positional slash, NOT -p) -- cleanest, fully parseable. CODEX = NO usage command; usage from rate-limit events via codex_balance.json / codex_pace.json. GEMINI = /stats interactive-only; usage = wkgemini_usage.jsonl proxy. AGY = minimal Go flags, usage TBD. OLLAMA = local, no quota. WKDOCTOR consumes adapter USAGE members for per-family dashboard AND must functionally check + auto-repair each family CLI (claude bin symlink dead target detection + re-link; existence check alone not enough, run functional smoke).",
+    "SELF-DOCUMENTING HARNESS FILENAMES (user 2026-06-10): a harness source filename MUST encode its role so any intelligence knows scope, purpose, owner, and edit-rights at a glance with ZERO doc-read. Convention: base = domain path (wkharness-guards-pace), trailing qualifiers = sub-domain or owner (-claude-usage). Scratch SUFFIX doubles as rank/permission tag: NO suffix = canonical live source ROOT-only; -proto/-probe = sandbox/experiment cheap-editable; -modelname = that model private scratch. Naming discipline = cheapest possible documentation.",
+    "KNOWLEDGE-VERIFICATION (skill Require/requa contract patterns, user 2026-06-10): executing skill requirement contracts IS part of knowledge lifecycle and must not brick. BUT NOT as blanket pattern-whitelist: a skill requirement command can be arbitrary, so auto-exempting any command matching a declared requirement is an ABUSE HOLE. SAFE design: requirement-execution is FREE only INSIDE harness-controlled verification flow (tagged as verification-context) -- NOT when an AI types the same command free-form. AND it MUST run against a CLONE/dry-run target, never the live skill. NET: knowledge VERIFICATION is free + sandboxed; exemption follows the CONTEXT not the raw command string.",
+    "JOSEKI-GUIDANCE PRINCIPLE (user 2026-06-10): every harness signal -- BLOCK message, post-action tip, knowledge-score nudge -- MUST GUIDE the intelligence to the precise correct NEXT MOVE, not merely deny. ACTION-FIRST: lead with what TO DO, then why. Live examples: pace block emits TRY: Agent.cmd model agy or wkcodex.sh; stall block emits 3 numbered escape methods; wkharness-post.ps1 PostToolUse skill-tips emitter pre-warns 5 common skill blocks before they trip. DESIGN TEST: can a cheap intelligence place the correct next stone from this message alone, WITHOUT a blocked retry?",
+    "BULK STUDY-LOCK ON SANDBOX SOURCE (user 2026-06-10): sandbox/draft source should carry a harness:skill STUDY-LOCK so the delegate connects reflexes before editing. PROBLEM: a sub-pro like Haiku cannot reliably AUTHOR the study-lock tag itself (chicken-and-egg). SOLUTION: apply study-lock IN BULK via a single harness:skill PATTERN rule declared ONCE by ROOT -- e.g. in CLAUDE.md a glob rule matching the sandbox/draft path plus the skill reads. A pattern rule auto-attaches the lock to EVERY matching file. NET: ROOT declares bulk study-lock pattern once; delegates guided automatically. Moves authorship from cheap delegate up to ROOT pattern.",
+    "GITIGNORE THE SANDBOX SERIES + SELF-PROVISIONING (user 2026-06-10): (A) .gitignore the -proto and -probe globs makes every sandbox/draft file UNTRACKED by construction -- FREE zone (any delegate edits it) -- ROOT promotes by COMMITTING (the commit IS the gate). COMPOSES with bulk study-lock: sandbox file is FREELY editable AND study-locked simultaneously. (B) A validly-authored harness:skill study-lock tag by a sub-pro earns a knowledge-score bonus (valid parseable only, capped). (C) SELF-PROVISIONING: harness setup.ps1 idempotently ENSURES .gitignore contains base patterns. wkdoctor CHECKS + HEALS this. When a family registers via FAMILY ADAPTER CONTRACT, it SELF-ADDS its model-suffix pattern to .gitignore as a 5th adapter member. Self-installing and self-healing. NOTE: linked-web read bonus + peer-eval wiring into Get-WkTierScore moved to knowledge-aliveness-health-howto cluster."
+  ],
+  "comments": null,
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read harness-guard-exemption-ladder-spec",
+      "expect": "SACRED",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read harness-guard-exemption-ladder-spec-howto",
+      "expect": "PHASE 1",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read harness-guard-exemption-ladder-spec-howto",
+      "expect": "FAMILY ADAPTER",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-10T05:27:05.0624372Z",
+  "updated": "2026-06-10T08:01:37.6104845Z",
+  "version": "1.4"
+}

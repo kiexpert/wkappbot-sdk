@@ -1,0 +1,54 @@
+{
+  "id": "linkedin-manager",
+  "app": "wkappbot-workflow",
+  "title": "LinkedIn Profile Manager: CDP Read, Navigate, Update",
+  "title_ko": null,
+  "desc": "Manage LinkedIn profile via CDP WebSocket. Profile at linkedin.com/in/kiexpert. Sections lazy-load on scroll. Use comtypes UIA Invoke for buttons. Chrome hwnd:0x18135E. Current state 2026-04: headline=Cloud Coding, company=ProtoPie(stale), needs WKAppBot SDK.",
+  "steps": [
+    "1. Find LinkedIn tab: urllib /json, filter url contains linkedin",
+    "2. Activate \u002B CDP connect suppress_origin=True",
+    "3. Scroll to load sections: Runtime.evaluate window.scrollTo(0,document.body.scrollHeight)",
+    "4. Extract text chunks: innerText.substring(offset, offset\u002B4000)",
+    "5. Experience section: getElementById(\u0027experience\u0027) closest(\u0027section\u0027).innerText",
+    "6. Edit headline: navigate linkedin.com/me/profile-edit/ then find h1 or tagline input",
+    "7. Add experience: navigate to profile add experience flow",
+    "8. Save buttons: comtypes UIA FindFirst name=Save or \uC800\uC7A5 Invoke",
+    "9. Headline needs update: add WKAppBot SDK Open Source creator",
+    "10. Experience: add WKAppBot SDK 2025.08~present, remove stale ProtoPie",
+    "12. LinkedIn headline updated 2026-04-30: WKAppBot SDK Creator | High-End Runtime Engine \u0026 Algorithm Optimizer | C/C\u002B\u002B 35yr | AI Agent UI Automation OSS - github.com/kiexpert/wkappbot-sdk",
+    "12. LinkedIn headline updated 2026-04-30: WKAppBot SDK Creator | High-End Runtime Engine \u0026 Algorithm Optimizer | C/C\u002B\u002B 35yr | AI Agent UI Automation OSS - github.com/kiexpert/wkappbot-sdk",
+    "15. Experience added 2026-04-30: WKAppBot SDK | Open Source Developer \u0026 Creator | \uC790\uC601\uC5C5 | 2025.08~present",
+    "15. Experience added 2026-04-30: WKAppBot SDK | Open Source Developer \u0026 Creator | \uC790\uC601\uC5C5 | 2025.08~present"
+  ],
+  "requirements": [
+    {
+      "cmd": "python3 -c \u0022import urllib.request,json;r=urllib.request.urlopen(\u0027http://localhost:9222/json\u0027);tabs=json.load(r);print(any(\u0027linkedin\u0027 in t.get(\u0027url\u0027,\u0027\u0027) for t in tabs))\u0022",
+      "expect": "True",
+      "prompt": null
+    },
+    {
+      "cmd": "python3 -c \u0022import urllib.request,json;tabs=json.load(urllib.request.urlopen(\u0027http://localhost:9222/json\u0027));li=next(t for t in tabs if \u0027linkedin\u0027 in t.get(\u0027url\u0027,\u0027\u0027));print(\u0027found\u0027)\u0022",
+      "expect": "found",
+      "prompt": null
+    },
+    {
+      "cmd": "python3 -c \u0022import websocket,json;ws=websocket.create_connection(\u0027ws://localhost:9222\u0027,suppress_origin=True,timeout=5);ws.close();print(\u0027ok\u0027)\u0022",
+      "expect": "ok",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "linkedin",
+    "profile",
+    "cdp",
+    "career",
+    "resume"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-30T13:22:34.5769072Z",
+  "updated": "2026-04-30T13:50:22.7875398Z",
+  "version": "1.4"
+}

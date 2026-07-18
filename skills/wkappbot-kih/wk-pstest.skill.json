@@ -1,0 +1,35 @@
+{
+  "id": "wk-pstest",
+  "app": "wkappbot-kih",
+  "title": "wk-pstest pace-routing synthetic test runner",
+  "title_ko": null,
+  "desc": "Runs the codex family-routing fix synthetic test from the wkappbot-kih repo",
+  "steps": [
+    "Run ./wk-pstest.cmd from repo root to verify codex pace routing fix (wkharness-guards-proto.ps1). Expected output: VERDICT: PASS with 13/13 cases passing."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read wk-pstest",
+      "expect": "synthetic test runner",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill search wk-pstest",
+      "expect": "wk-pstest",
+      "prompt": null
+    },
+    {
+      "cmd": "./wk-pstest.cmd",
+      "expect": "VERDICT: PASS",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-26T05:09:06.0690719Z",
+  "updated": "2026-06-26T05:09:06.0690842Z",
+  "version": "1.0"
+}

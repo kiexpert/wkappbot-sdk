@@ -1,0 +1,35 @@
+{
+  "id": "cheap-commit-todo-gate",
+  "app": "wkappbot-workflow",
+  "title": "cheap-commit-todo-gate",
+  "title_ko": null,
+  "desc": "PreToolUse gate that blocks git commit from Haiku/Sonnet sessions unless CLAUDE.md Pending was edited in the last 30 turns. Prevents commit drift when todo state diverges from work history. Gate offers two paths: (1) user edits CLAUDE.md Pending to mark done/add findings, then retries commit (Opus auto-reviews downstream); (2) delegate via Opus subagent (Opus sessions exempt). Design goal: keep cheap-model session state current before every commit.",
+  "steps": [
+    "Trigger: cheap-model session (Haiku or Sonnet) tries git commit (any variant: git commit -m, git commit --amend, after semicolon or ampersand, via cmd /c git commit, etc.). PreToolUse hook in wkharness-guards.ps1 catches it.\nGate condition: hook calls Test-RecentClaudeMdEdit -MaxTurns 30 (helper in wkharness-common.ps1). It scans tail of session JSONL for Edit/Write/MultiEdit/Update tool calls with file_path matching CLAUDE.md, OR Bash/PowerShell commands writing CLAUDE.md via wkedit / wkappbot file edit / Set-Content / Add-Content / Out-File. If found within 30 turns: pass. If not: BLOCK.\nBlock message offers two paths. Path 1: user edits CLAUDE.md Pending to mark completed work [x] and add new findings [ ], then re-runs git commit. CLAUDE.md edit trips claude-md-sync-guard, forcing Opus review of both TODO change and staged diff. Path 2: spawn Opus subagent with verbatim SPEC; Opus session is model-exempt from this gate, so its commit lands.\nWhy this design: cheap models commit drift faster than CLAUDE.md rules catch it. Gating at commit time means Edits flow freely (token-cheap), but history stays clean and TODO state stays current. Path 1 is preferred because cheap reflects on own work (durable context for next session) and Opus only audits, not authors.\nOpus exemption: session-model check itself. Test-HaikuSession -or Test-SonnetSession returns false for Opus sessions, so gate is never entered. No INTERNAL_SPAWN env dance needed. User-spawned Agent(model:opus) subagents are exempt automatically.\nEdge cases: git commit-tree and git commit-graph are NOT matched (regex uses trailing boundary). Internal wkappbot suggest commits happen inside wkappbot-core.exe and never trigger tool call hook. Empty Pending edits (whitespace only) pass gate because Test-RecentClaudeMdEdit checks that edit happened, not content quality; claude-md-sync-guard plus Opus auto-review are quality gate downstream.\nFiling precedent 2026-05-29: rule built from user request to block cheap models from committing unless Pending TODO is updated. Replaces ad-hoc nagging to update CLAUDE.md after work. Self-enforcing policy for session discipline."
+  ],
+  "requirements": [
+    {
+      "cmd": "in Sonnet session, run git commit -m 'test' with NO recent CLAUDE.md edit",
+      "expect": "blocked with two-path message",
+      "prompt": null
+    },
+    {
+      "cmd": "in Sonnet session, edit CLAUDE.md Pending then run git commit -m 'test'",
+      "expect": "gate passes, commit proceeds",
+      "prompt": null
+    },
+    {
+      "cmd": "in Opus session, run git commit",
+      "expect": "proceeds without entering gate (session-model exempt)",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-31T07:49:26.2697872Z",
+  "updated": "2026-05-31T07:49:26.2697962Z",
+  "version": "1.0"
+}

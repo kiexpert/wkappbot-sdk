@@ -1,0 +1,54 @@
+{
+  "id": "wkharness-agent-bulletin-shared-live-steering-channel-for-background-agents",
+  "app": "wkappbot-workflow",
+  "title": "wkharness agent bulletin (shared live steering channel for background agents)",
+  "title_ko": null,
+  "desc": "Design for a shared append-only bulletin file that all running background agents reference live, force-fed by a PostToolUse hook (per-agent seq cursor plus @all and @agent addressing). Live counterpart to CLAUDE.md; fills the Bash-launched Agent.cmd background-agent gap that SendMessage does not cover. Enables mid-run persistence nudges, broadcast stop or constraint, clean abort, and inter-agent coordination. STATUS 2026-05-29: PLANNED.",
+  "steps": [
+    "Problem: Bash-launched Agent.cmd background agents have no live steering channel. The IDE Agent tool has SendMessage, but the wkcodex and Agent.cmd background path does not, so you cannot course-correct or send persistence nudges mid-run; only kill and restart, which wastes partial progress and tokens.",
+    "Solution: one shared append-only bulletin file (a blackboard or event log) that every running agent references live. A single append reaches all agents at once, and agents can also leave notes for each other.",
+    "Delivery is harness-enforced, not model-polled. A PostToolUse hook on each subagent tails the bulletin and injects unconsumed relevant lines into the agent next turn, prefixed BULLETIN. Cheap models forget to poll, so the hook force-feeds them.",
+    "Per-reader cursor: one file, N cursors. The injector stores each agent last-seen seq number in a sidecar json keyed by agent-id, so each agent receives only lines newer than what it already consumed.",
+    "Addressing: each line carries a target token. at-all broadcasts to every agent; at-agent-ID targets one. The injector keeps a line when the target matches this agent AND the seq is newer than the agent cursor.",
+    "Append-only and atomic: writers only append, never rewrite. Each line is seq plus timestamp plus target plus message. This avoids interleave corruption when several writers (orchestrator and agents) append concurrently.",
+    "Size cap and rotation: cap the bulletin and drop fully-consumed old lines so per-turn re-scan does not bloat tokens. Cursors survive rotation because they track seq, not byte offset.",
+    "Use cases: orchestrator persistence nudges (do not give up, work the next fallback rung), broadcast stop or a new constraint, clean abort when work moved elsewhere, and inter-agent handoff notes. Live counterpart to CLAUDE.md, which is the static shared file read once at session start.",
+    "Build phases: P0 single shared file plus manual append plus injector hook with one global cursor for broadcast only. P1 per-agent seq cursor sidecar. P2 addressing for at-all and at-agent-ID. P3 rotation and size cap. P4 a wk helper command to append a bulletin line plus self-test cases.",
+    "Relation to existing infra: builds on the wkharness PostToolUse hook. SendMessage already covers in-harness Agent-tool agents; this skill fills the Bash-launched Agent.cmd background-agent gap. STATUS 2026-05-29 PLANNED, enshrined per user request, not yet built."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read wkharness-agent-bulletin",
+      "expect": "bulletin",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wkharness-agent-bulletin",
+      "expect": "PostToolUse",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wkharness-agent-bulletin",
+      "expect": "PLANNED",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "wkharness",
+    "agent",
+    "bulletin",
+    "blackboard",
+    "coordination",
+    "posttooluse",
+    "background-agent",
+    "design",
+    "planned"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-29T04:26:19.1618128Z",
+  "updated": "2026-05-29T04:26:19.1618266Z",
+  "version": "1.0"
+}

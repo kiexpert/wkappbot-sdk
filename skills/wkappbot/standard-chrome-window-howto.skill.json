@@ -1,0 +1,40 @@
+{
+  "id": "standard-chrome-window-howto",
+  "app": "wkappbot",
+  "title": "Standard Chrome Window T2 HowTo",
+  "title_ko": null,
+  "desc": "T2 domain tier. How-to: GetWindowForTarget, SetWindowBoundsAsync, multi-tab, non-active tab, minimized Chrome, coordinate clamping.",
+  "steps": [
+    "GetWindowForTarget: cdp.GetWindowForTargetAsync(cdp.TargetId) returns {windowId, bounds}. Use windowId for all setBounds calls. Multi-tab: any targetId returns the ROOT browser window (all tabs share it).",
+    "Non-active tab: our CDP target may be in background. GetWindowForTarget with background tab targetId still returns correct root window. Tab does not need to be active.",
+    "Minimized Chrome: SetWindowBoundsAsync -- (1) setBounds windowState=normal (2) await WaitForWindowStateAsync(normal) (3) setBounds with actual target coords. Implemented in CdpClient.Window2.cs.",
+    "ClampBoundsToVisible: last-resort in SetWindowBoundsAsync. Calls ChromeLauncher.ClampBoundsToVisible before sending. Never use negative x as off-screen -- use MonitorFromPoint. Negative x valid on left monitor.",
+    "Chrome_WidgetWin_1 enumeration: GetWindowsByPid(chromePid).Where(w => GetClassName==Chrome_WidgetWin_1 AND GetWindow(GW_OWNER)==0 AND IsWindowVisible). First match = target for placement.",
+    "Coordinate verification: CDP:MOVE log coords should match cdp-mon ACT-POS. Discrepancy = DPI context mismatch. Check TrySetPerMonitorV2DpiAwareness called at Launcher Main() entry."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read standard-chrome-window-howto",
+      "expect": "T2 howto",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read standard-chrome-window",
+      "expect": "T1 core",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read standard-appbot-window",
+      "expect": "caller detection",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-31T12:23:10.7756077Z",
+  "updated": "2026-05-31T12:23:10.7756176Z",
+  "version": "1.0"
+}

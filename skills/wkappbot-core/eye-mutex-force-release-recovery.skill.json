@@ -1,0 +1,33 @@
+{
+  "id": "eye-mutex-force-release-recovery",
+  "app": "wkappbot-core",
+  "title": "Eye mutex force-release recovery",
+  "title_ko": null,
+  "desc": "Force-release abandoned Eye mutexes via PowerShell when Eye cannot restart after crash. Mutex names: Global\\WKAppBotEyeAlive/Guardian/Spawn. Use Mutex.OpenExisting\u002BReleaseMutex then wkappbot-core.exe eye to restart.",
+  "steps": [],
+  "requirements": [
+    {
+      "cmd": "wkappbot eye status",
+      "expect": "running",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot a11y windows",
+      "expect": "no error",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read web-command-cheatsheet",
+      "expect": "contains grap",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-07T12:53:54.4403504Z",
+  "updated": "2026-05-07T12:53:54.4403595Z",
+  "version": "1.0"
+}

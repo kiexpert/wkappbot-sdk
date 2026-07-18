@@ -1,0 +1,53 @@
+{
+  "id": "wkpush-git-push-race-winner",
+  "app": "wkappbot-workflow",
+  "title": "wkpush -- git push race-winner for rapid auto-commit repos",
+  "title_ko": null,
+  "desc": "WillKim bin tool at WKAppBot/bin/wkpush.sh that wins the git push race when a bot or pipeline commits to origin every ~1s. Retries pull rebase autostash then push until a gap opens; -d <dir> auto-resolves data-file conflicts by taking HEAD. Reusable across any git repo.",
+  "steps": [
+    "PROBLEM: when a bot or pipeline auto-commits to origin every ~1 second (e.g. WkAutoQuant trade-state), a manual push loses the race because origin advances between your fetch and push, so push is rejected repeatedly.",
+    "SOLUTION: wkpush retries pull rebase autostash then push in a loop, default 12 tries, until a gap opens. Speed alone never wins the race; retrying does.",
+    "USAGE: wkpush [max_tries]. For repos where a bot rewrites data files use wkpush -d <data-dir> for example wkpush -d wavevault; on an autostash or merge conflict it takes the HEAD version of files under that dir (the bot regenerates them) and continues, then retries.",
+    "LOCATION: D:/GitHub/WKAppBot/bin/wkpush.sh, on PATH, usable from any git repo, a WillKim bin tool alongside wkcodex wkclaude wkedit.",
+    "OFTEN UNNEEDED: infra or code commits usually do not require wkpush because a local commit rides the pipeline next rebase-and-push to origin automatically (it sits in local main history). Use wkpush only when the commit must reach origin promptly.",
+    "SAFETY: on a real non-data merge conflict wkpush stops and prints the conflicted files for manual resolution and never blindly discards your changes. Exit codes 0 pushed, 1 race lost after N tries, 2 manual conflict, 3 not a git repo.",
+    "FRAMING CORRECTION (supersedes the earlier OFTEN UNNEEDED note): wkpush is a PUSH tool, so USE it -- run wkpush after every commit you want on origin so the change lands promptly and verifiably. The local-commit-rides-the-pipeline behavior is only an incidental safety net for when wkpush exhausts its retries, NOT a reason to skip pushing. A push tool that does not push is pointless. Default behavior: commit, then wkpush.",
+    "BUG: 2026-07-05 incident -- wkpush.sh 40 -d wavevault (also seen at default 12 tries) reported 'origin too busy after N tries -- commit stays local' (exit 1) on WkAutoQuant, but afterward the local commit (a single-file .github/workflows fix, unrelated to wavevault) was GONE from git log on the current branch -- confirmed via git log --all --grep that the commit object still existed (unreachable/dangling) but main no longer pointed at it, and the working-tree file had reverted to the pre-fix content. The pull-rebase-autostash retry loop appears able to silently drop a local commit on failure rather than leaving it safely on top of local main. RECOVERY: git log --all --grep '<commit message>' to find the orphaned SHA, then git checkout -B main origin/main (clean reset to remote tip) + manually reapply the change (wkedit) + commit + push fresh, rather than trusting wkpush's failure state to preserve the commit. LESSON: after ANY wkpush exit 1, verify with 'git log --oneline -5 -- <changed file>' that your change is still on the current branch before assuming it merely 'stayed local' -- it may have been dropped entirely."
+  ],
+  "requirements": [
+    {
+      "cmd": "test -f D:/GitHub/WKAppBot/bin/wkpush.sh",
+      "expect": "exit 0, tool deployed",
+      "prompt": null
+    },
+    {
+      "cmd": "grep -c rebase D:/GitHub/WKAppBot/bin/wkpush.sh",
+      "expect": "at least 1, retry-loop present",
+      "prompt": null
+    },
+    {
+      "cmd": "grep -c diff-filter D:/GitHub/WKAppBot/bin/wkpush.sh",
+      "expect": "1, conflict guard present",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "git",
+    "push",
+    "race",
+    "rebase",
+    "autostash",
+    "willkim-tool",
+    "wkappbot-bin",
+    "conflict",
+    "pipeline",
+    "wkpush"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-26T15:52:34.6706521Z",
+  "updated": "2026-07-04T17:05:41.7036075Z",
+  "version": "1.2"
+}

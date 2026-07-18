@@ -1,0 +1,40 @@
+{
+  "id": "agent-failure-reflection-gate-howto",
+  "app": "wkappbot-workflow",
+  "title": "agent-failure-reflection-gate howto",
+  "title_ko": null,
+  "desc": "Implementation mechanics for the agent-failure-reflection-gate: module location, resolution order, record-check, self-test, env overrides. Read agent-failure-reflection-gate first for the design/spec; this is the how.",
+  "steps": [
+    "MODULE LOCATION: tools/wkharness-guards-agent-failure-reflection.ps1, dot-sourced from wkharness-guards.ps1 immediately BEFORE tools/wkharness-guards-agent.ps1 (the latter's Agent-dispatch wiring calls Get-WkAgentFailureGateVerdict, defined in the former; load order matters).",
+    "DETECTION MECHANICS: scan the newest subagents/agent-*.jsonl file's last assistant message for failure markers (could not complete, unable to complete, failed to, gave up, I cannot, permission denied, blocked by clean-baseline/busy-fleet/write-freeze) OR a leaf-redelegation tell (I have dispatched/launched an agent -- a leaf claiming it delegated means it did NOT do the work itself) OR any tool_result rc field != 0.",
+    "RESOLUTION (rewritten 2026-07-03, see agent-failure-reflection-gate-ref for the bug this fixed): Get-WkAfgAllReflectionCandidates builds ONE table of (Key, SkillId) pairs from the hardcoded aliases (haiku/sonnet/codex|gpt/codex-mini|gpt-mini/gemini|flash/opus) PLUS every real installed reflection skill own filename-derived key. Get-WkAfgReflectionSkillId then checks whether the RAW model string (a real transcript records the FULL id, e.g. claude-haiku-4-5-20251001, never a short alias) CONTAINS a candidate Key as a substring, picking the LONGEST matching Key as most specific -- this single reversed-containment rule replaces the old two-step map-then-loose-search design and also disambiguates gemini-pro vs agy-gemini-pro without a separate starts-with rule. If nothing matches, suggest the canonical <model>-reflection id and block with NeedsCreate=true -- the VERY NEXT verdict check then re-resolves once the skill exists and falls into the RECORD check below (no separate read-only closure state; that two-state design was tried and found unreachable in practice, see agent-failure-reflection-gate-ref).",
+    "RECORD CHECK (Test-WkRecentReflectionEdit): satisfied by EITHER a session-log line matching skill edit <id> --add-step OR a line matching skill contribute plus --id <id> -- unified so a freshly created skill with good --steps content does not need a redundant follow-up edit.",
+    "SELF-TEST: a standalone self-test lives at the bottom of the module file, guarded by checking MyInvocation.InvocationName so it never runs during normal dot-sourcing (only when the file is executed directly). Covers 8 scenarios: no-failure-allow, mapped-skill-needs-record, mapped-skill-recorded-allow, rc-nonzero-failure, leaf-redelegation-failure, unmapped-model-needs-create, unmapped-model-created-but-unrecorded, unmapped-model-recorded-via-contribute-allow. Run with: powershell -NoProfile -File tools/wkharness-guards-agent-failure-reflection.ps1 (direct execution, not dot-sourced).",
+    "TEST ENV OVERRIDES (used by the self-test and available for any live debugging): WKHARNESS_TEST_AGENTFAIL_JSONL points Get-WkNewestAgentFailureJsonl at a fixture file instead of scanning subagents/; WKHARNESS_TEST_REC_JSONL points the session-log check at a fixture instead of the real active session; WKHARNESS_TEST_SKILL_BASES (newline-separated paths) points the skill-cache scan at fixture directories instead of the real skill caches."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read agent-failure-reflection-gate-howto",
+      "expect": "MODULE LOCATION",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read agent-failure-reflection-gate-howto",
+      "expect": "RESOLUTION ORDER",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read agent-failure-reflection-gate-howto",
+      "expect": "SELF-TEST",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-07-03T06:48:51.9789684Z",
+  "updated": "2026-07-03T07:15:08.1428605Z",
+  "version": "1.2"
+}

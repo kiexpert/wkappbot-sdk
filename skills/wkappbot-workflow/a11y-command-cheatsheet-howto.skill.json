@@ -1,0 +1,49 @@
+{
+  "id": "a11y-command-cheatsheet-howto",
+  "app": "wkappbot-workflow",
+  "title": "a11y Sub-Actions How-To",
+  "title_ko": null,
+  "desc": "How-to reference for a11y sub-actions: discovery, window-state, input, read, wait, common flags.",
+  "steps": [
+    "AMBIGUOUS GRAP AUTO-RESOLUTION: action commands (type/click/invoke/...) given an ambiguous grap auto-switch to a11y find first (L1 TargetAmbiguityGuard). [OK] Nms in errors.jsonl fields = find step resolved grap; exit:1 = action after resolution failed. Two independent outcomes recorded together.",
+    "Discovery sub-actions (read-only safe): inspect (UIA dump) find (copy-paste TARGET line) windows (enumerate top-level) screenshot (PNG of window) ocr (Tesseract on pixels)",
+    "Window-state sub-actions: close (WM_CLOSE focusless) minimize maximize restore focus move resize. Use focus sparingly -- it steals foreground. Use a11y invoke on Close-button control instead of a11y close when close button lives in a nested scope",
+    "Invoke/select sub-actions: click (best-tier auto) invoke (pure UIA no focus) toggle expand collapse select scroll. invoke is the safest verb for buttons exposing InvokePattern",
+    "Input sub-actions: type (SendKeys + focus) type --hotkey (Hotkey for modifiers e.g. ctrl c) set-value (ValuePattern focusless) set-range (RangeValuePattern focusless)",
+    "Read sub-actions: read (UIA Name+Value+HelpText concat) clipboard-read clipboard-write. MFC owner-drawn grids have no UIA cells -- use a11y grid-read clipboard bridge (see a11y-grid-read skill)",
+    "Wait sub-action with conditions: wait --condition enabled visible invisible text. Poll-based. Useful between state-change actions to avoid races. Optional --not --timeout N flags",
+    "Common flags across actions: --all (fan-out to every match) --nth N (disambiguate hits) --force (bypass ambiguity guard) --timeout N (per-op cap) --eval-js (CDP targets) --speak (TTS on success)",
+    "--ocr opt-in: hack and inspect default to CCA+UIA only. --ocr enables Tesseract + Gemini Vision. Saves CPU and avoids CDP focus steal from VisionWorker",
+    "kill sub-action: a11y kill <pattern>[/<ancestor>] kills matching process tree. Ancestor constraint prevents mass-kill. CRITICAL on Win11: never taskkill Notepad -- session restore resurrects all closed tabs; use a11y close instead",
+    "Error expectations: action can exit:1 even after grap resolved. Check errors.jsonl fields [OK] for resolution step separately from action step",
+    "Action ladder per tier: (1) UIA pattern Invoke/Value/Toggle/Select focusless (2) Win32 PostMessage WM_COMMAND/WM_SETTEXT focusless (3) SendInput keystroke with EnsureFocus -- requires foreground. Most HTS MFC controls skip tier 1 and land on tier 2 directly",
+    "BLOCKED_CDP_OVERLAY detection: when a11y inspect fails to find input on Chrome, TryReportCdpOverlayBlocker runs CDP z-index eval (>=100 fixed/absolute covering >=5% viewport). Outputs # BLOCKED_CDP_OVERLAY with overlay text+buttons on stdout. a11y invoke has AutoApproveYield=true -- focusless UIA Invoke/BM_CLICK bypass user-active callout",
+    "Blocker detection (all a11y actions): emit # BLOCKED {grap}#*dismissBtn* title=... [ELEVATED:needs --sudo] on stdout when probeReport.ActiveBlocker != null. Followed by InspectBlockerContent() = a11y inspect on blocker hwnd. Action exits with fail -- dismiss blocker first, then retry",
+    "Auto-inspect fallback (2026-05-02): when a11y action (click/type/invoke/etc.) is called with only a window grap (no #node), the command automatically runs 'a11y inspect <grap>' first, then exits with error showing copy-paste grap paths. Bypass: add --i-really-want-to-act-on-this-window-directly to act on window directly without inspection"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot a11y find {proc:'explorer'} --help",
+      "expect": "--nth",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot a11y click --help",
+      "expect": "--all",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot a11y read --help",
+      "expect": "--eval-js",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-31T12:03:47.7014397Z",
+  "updated": "2026-05-31T12:03:47.7014586Z",
+  "version": "1.0"
+}

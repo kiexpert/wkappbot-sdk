@@ -1,0 +1,38 @@
+{
+  "id": "standard-chrome-window-ref",
+  "app": "wkappbot",
+  "title": "Standard Chrome Window T3 Reference",
+  "title_ko": null,
+  "desc": "T3 reference tier. DPI audit, bug-fix history, triad-verified patterns, wkcodex lock note.",
+  "steps": [
+    "DPI verified 2026-05-16: physical pixels end-to-end when PerMonitorV2-aware. TrySetPerMonitorV2DpiAwarenessOnce() at Run() entry. AskCommands.CallerPlacement and SetWindowBoundsAsync share same physical-pixel space.",
+    "BUGS FIXED: targetId passed to GetWindowForTargetAsync. SetWindowBoundsAsync 2-step minimize restore (CdpClient.Window2.cs). ClampBoundsToVisible. WithAutoReconnectAsync on DOM calls (26dd30c8).",
+    "TRIAD-VERIFIED 2026-05-27: Chrome_WidgetWin_1 = canonical frame. Chrome_BrowserWindow = legacy/unsafe. Wrong-window placement if Chrome_BrowserWindow targeted.",
+    "DONE 2026-05-27: MyCdpContext.Placement.cs targets Chrome_WidgetWin_1 only (commit 7e1539aa wkappbot-sdk). v7.4.16."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read standard-chrome-window-ref",
+      "expect": "T3 reference",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read standard-chrome-window",
+      "expect": "T1 core",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read standard-chrome-window-howto",
+      "expect": "T2 howto",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-31T12:23:41.1074485Z",
+  "updated": "2026-05-31T12:23:41.1074573Z",
+  "version": "1.0"
+}

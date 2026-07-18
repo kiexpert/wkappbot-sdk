@@ -1,0 +1,55 @@
+{
+  "id": "nvidia-overlay-blackscreen-kill",
+  "app": "wkappbot-core",
+  "title": "NVIDIA Overlay blackscreen kill",
+  "title_ko": null,
+  "desc": "NVIDIA Overlay (GeForce Experience Share) periodically creates fullscreen black windows causing desktop blackout and taskbar animation. Kill the process (nvsphelper64/nvcontainer), not just the HWND.",
+  "steps": [
+    "SYMPTOM: desktop periodically goes black, taskbar animates. Root cause: NVIDIA Overlay (GeForce Experience Share) creates fullscreen HWND covering entire monitor. wkappbot screensaver close detects window but leaves process alive -- NVIDIA respawns it.",
+    "DETECT: wkappbot screensaver close logs [SCREENSAVER] wiped ... NVIDIA GeForce Overlay. Or: PowerShell Get-Process NVIDIA Overlay ",
+    " Where CPU -gt 50",
+    "KILL SESSION: Get-Process NVIDIA Overlay -EA SilentlyContinue ",
+    " Stop-Process -Force. Get-Process nvcontainer ",
+    " Sort CPU -Desc ",
+    " Select -First 2 ",
+    " Stop-Process -Force",
+    "PERMANENT FIX: GeForce Experience -> Settings -> Share -> toggle OFF. Prevents respawn at OS level.",
+    "INTEGRATED: screensaver close (v7.3.193+) auto-kills NVIDIA Overlay + nvsphelper64 (ShadowPlay helper) + nvcontainer (GeForce plugin container) when fullscreen black HWND detected. knownOverlayProcs includes all three -- no manual kill needed. Code fix: 66a4f31a5 ScreenSaverStandaloneCommand.cs line 189.",
+    "WKAPPBOT_NO_SCREENSAVER=1 disables periodic Eye screensaver scan. Unset to re-enable 2s auto-scan.",
+    "SCREENSAVER SELF-WIPE: ScreenSaverOverlay.Lifecycle.cs now calls WipeBlockingOverlays() every 30s while screensaver is visible. This auto-wipes fullscreen (>=75% monitor) non-own windows + NVIDIA Overlay/nvsphelper64/nvcontainer/TextInputHost by name. No manual screensaver close needed while screensaver is active.",
+    "BUG FIX 2026-05-27: WipeBlockingOverlays() was sending WM_CLOSE to ALL large visible windows (>=75% screen) every 30s -- including Edge, Chrome, VS Code. Fix: gate PostMessageW(WM_CLOSE) behind if(knownBlocker) check. Non-blocker processes are now only hidden (SetLayeredWindowAttributes+ShowWindow+SetWindowPos) not closed.",
+    "DETECTION FIX 2026-05-27: WipeBlockingOverlays old detection was size-only (>=75% screen, no topmost/z-order check) -> false-positived every maximized window (Edge). Root: screensaver is TOPMOST, so only a TOPMOST window can obscure it. Non-topmost windows sit behind and can never block. Fix: for non-knownBlocker, require WS_EX_TOPMOST AND >=50% screen before wipe; WM_CLOSE still gated to knownBlocker only (unknown topmost just hidden). WS_EX_TOPMOST=0x8 added to PInvoke."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot screensaver close",
+      "expect": "SCREENSAVER",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read screensaver-close-command",
+      "expect": "steps",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill list",
+      "expect": "v1",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "screensaver",
+    "nvidia",
+    "overlay",
+    "blackscreen",
+    "desktop",
+    "geforce"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-23T05:21:25.2792314Z",
+  "updated": "2026-05-26T07:27:52.9195509Z",
+  "version": "1.9"
+}

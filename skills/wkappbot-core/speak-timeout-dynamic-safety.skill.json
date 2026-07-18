@@ -1,0 +1,43 @@
+{
+  "id": "speak-timeout-dynamic-safety",
+  "app": "wkappbot-core",
+  "title": "speak: dynamic safety timer based on text length and markers",
+  "desc": "Safety timer arms on first KaraokeTick when playback starts, not on window load. Duration = max(60s, lastMarker.AudioPos\u002B30s, charCount*0.4s\u002B30s)",
+  "steps": [
+    "Old: hardcoded 30s from Loaded event (races with synth.Speak \u002B player.Load)",
+    "New: _safetyTimerArmed flag, armed in KaraokeTick when _stopwatch.IsRunning",
+    "Duration computed from last marker AudioPos \u002B 30s buffer (min 60s)",
+    "Fixes: 250-300 char Korean text timing out before playback completes",
+    "Verified 2026-04-26: test-speak-timeout-safety.sh (resolve ts=2026-04-26T09:58:39.7038554Z)"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot speak \u0027short text\u0027",
+      "expect": "completes without SAPI fallback within 60s",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot speak \u0027long Korean text 300 chars...\u0027",
+      "expect": "does not timeout before playback ends",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot speak text",
+      "expect": "safety timer starts only after player.PlaySync begins not on window load",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot speak test",
+      "expect": "spoken in under 5s (not 30s timeout)",
+      "prompt": "speak safety timer dynamic: KaraokeTick-based, text-length duration. Commit 967ccc72."
+    }
+  ],
+  "primary_cmd": "wkappbot speak test",
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-26T15:11:09.9331599Z",
+  "updated": "2026-04-26T15:17:14.3725441Z",
+  "version": "1.2"
+}

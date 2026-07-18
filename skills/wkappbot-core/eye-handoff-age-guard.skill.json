@@ -1,0 +1,25 @@
+{
+  "id": "eye-handoff-age-guard",
+  "app": "wkappbot-core",
+  "title": "Eye handoff: age guard prevents false-positive on session start",
+  "desc": "Eye CWD-fallback path was picking up a previous session large JSONL and firing handoff immediately on Eye restart. Fix: if using CWD fallback (no explicit SessionJsonl registered) and file is older than 30min, skip until genuine new growth. Uses jsonlAge (was discarded as _ before).",
+  "steps": [
+    "Verify eye tick no longer fires handoff on start with old JSONL: wkappbot eye tick",
+    "Check AppBotEyeClaudeStatusStreamer.cs for 30min age guard after CWD fallback",
+    "If handoff fires on startup, check card.SessionJsonl registration -- explicit beats fallback",
+    "Verified 2026-04-21: test-eye-handoff-age-guard.cmd (resolve ts=2026-04-21T03:31)"
+  ],
+  "tags": [
+    "eye",
+    "handoff",
+    "context",
+    "session",
+    "false-positive"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-21T07:13:19.0488385Z",
+  "updated": "2026-04-21T07:13:51.8265516Z",
+  "version": "1.1"
+}

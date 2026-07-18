@@ -1,0 +1,45 @@
+{
+  "id": "naver-mail-compose-spa-read-fiber",
+  "app": "wkappbot-webbot",
+  "title": "Naver mail compose SPA read via CDP fiber",
+  "title_ko": null,
+  "desc": "Reading Naver mail compose editor content via CDP in React SPA. Use eval-js to access React fiber internals for editor state.",
+  "steps": [
+    "Naver mail is a React SPA. DOM text nodes do not reflect editor state directly -- use CDP eval-js to read React fiber props.",
+    "Target the compose editor container via CSS selector, then access .__reactFiber or stateNode to get current editor content.",
+    "Fallback: if React fiber unavailable, use window.getSelection() or the contenteditable innerText."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot a11y read Chrome#naver.com",
+      "expect": "Chrome alive",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read naver-mail-compose-spa-read-fiber",
+      "expect": "naver",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot eye tick",
+      "expect": "eye alive",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "naver",
+    "mail",
+    "react",
+    "spa",
+    "cdp",
+    "fiber",
+    "compose"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-26T07:54:01.9237394Z",
+  "updated": "2026-05-04T07:54:34.9383357Z",
+  "version": "1.4"
+}

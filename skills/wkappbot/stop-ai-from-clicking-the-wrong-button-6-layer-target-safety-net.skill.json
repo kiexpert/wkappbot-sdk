@@ -1,0 +1,46 @@
+{
+  "id": "stop-ai-from-clicking-the-wrong-button-6-layer-target-safety-net",
+  "app": "wkappbot",
+  "title": "Stop AI From Clicking the Wrong Button -- 6-Layer Target Safety Net",
+  "title_ko": null,
+  "desc": "L1: ambiguous pattern matches multiple windows -\u003E list \u002B hwnd auto-heal. L2: modal alert blocking -\u003E auto-find buttons inside. L3: FOCUSED/LEAF terminal node -\u003E suggest grab target. L4: Win32 child not found -\u003E list siblings (MFC/HTS). L5: no #scope on element action -\u003E root children \u002B focus chain. L6: UIA scope element miss -\u003E list available elements.",
+  "steps": [
+    "Layers 1-3 cover ambiguous targets: L1 ambiguous pattern matches multiple windows -\u003E list candidates and auto-heal by hwnd; L2 modal alert blocks the action -\u003E auto-find buttons inside the modal; L3 a FOCUSED/LEAF terminal node is detected -\u003E suggest grabbing the focused target.",
+    "Layers 4-6 cover scoping mistakes: L4 Win32 child not found -\u003E list siblings (helps MFC/HTS dialogs); L5 element action invoked without #scope -\u003E dump root children \u002B focus chain so the user can pick; L6 UIA scope element miss -\u003E list elements available inside that scope.",
+    "Each layer fails \u0027soft\u0027 with a structured suggestion instead of a click \u2014 the AI must read the suggestion and re-issue a precise grap before any action is taken."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot a11y windows",
+      "expect": "hwnd",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read stop-ai-from-clicking-the-wrong-button-6-layer-target-safety-net",
+      "expect": "safety",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot a11y find \u0027*notepad*;*calc*\u0027",
+      "expect": "TARGET",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "ambiguity",
+    "uia",
+    "guard",
+    "safety",
+    "mfc",
+    "ai",
+    "target",
+    "project"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-07T04:53:02.3505015Z",
+  "updated": "2026-05-04T07:35:21.488311Z",
+  "version": "1.2"
+}

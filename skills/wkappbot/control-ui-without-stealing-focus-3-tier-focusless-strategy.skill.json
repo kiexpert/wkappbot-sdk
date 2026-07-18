@@ -1,0 +1,45 @@
+{
+  "id": "control-ui-without-stealing-focus-3-tier-focusless-strategy",
+  "app": "wkappbot",
+  "title": "Control UI Without Stealing Focus -- 3-Tier Focusless Strategy",
+  "title_ko": null,
+  "desc": "UIA Invoke/Value/Toggle/Select = truly focusless. WM_CHAR = focusless typing via PostMessage. SendInput/Hotkey = must EnsureFocus first. Tier order: UIA pattern -\u003E Win32 PostMessage -\u003E SendInput. MFC CMaskEditEx: WM_CHAR only -- TranslateMessage auto-generates it, never use EM_SETTEXT or you get double input.",
+  "steps": [
+    "Tier 1 (preferred, truly focusless): UIA Invoke / Value / Toggle / Select patterns \u2014 element pattern call, no message pump, no foreground change.",
+    "Tier 2 (focusless typing): Win32 PostMessage with WM_CHAR \u2014 bypasses focus-grab. Note for MFC CMaskEditEx, send WM_CHAR only; never EM_SETTEXT or you get double input because TranslateMessage already auto-generates WM_CHAR.",
+    "Tier 3 (last resort): SendInput / Hotkey \u2014 must call EnsureFocus first, so this path can steal focus from the user. Use only when patterns 1\u002B2 unavailable."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot a11y windows",
+      "expect": "FOCUS",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read control-ui-without-stealing-focus-3-tier-focusless-strategy",
+      "expect": "focusless",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot file grep WM_CHAR csharp/src/WKAppBot.Win32",
+      "expect": "WM_CHAR",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "focusless",
+    "uia",
+    "win32",
+    "input",
+    "mfc",
+    "focus",
+    "project"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-07T04:52:43.1677642Z",
+  "updated": "2026-05-04T07:34:56.2413426Z",
+  "version": "1.2"
+}

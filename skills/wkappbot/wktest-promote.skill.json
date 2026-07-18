@@ -1,0 +1,43 @@
+{
+  "id": "wktest-promote",
+  "app": "wkappbot",
+  "title": "wktest-promote",
+  "title_ko": null,
+  "desc": "Staging binary promotion: wktest-core-*.exe to bin/wkappbot-core.exe after smoke gate.",
+  "steps": [
+    "bash bin/wktest-promote.sh",
+    "wktest-promote.cmd (Windows CMD/PS)",
+    "Smoke gate mandatory. FORCE=1 to bypass.",
+    "FEATURE 2026-07-03: added a post-hotswap Eye-path stability check (best-effort, non-gating) to wktest-promote.sh. After a successful promotion, it triggers 'eye tick' then writes a canary file through the Eye-delegated path, verifying both that the write landed AND that the '[FILE] write OK' stderr confirmation actually reached the caller. Motivated by finding that Eye-delegated wkappbot file write always succeeded but sometimes silently dropped the stderr confirmation message in relay -- this surfaces that gap automatically instead of relying on a user filing a false 'writes are broken' bug.",
+    "EVIDENCE 2026-07-03: writing ev-2026-07-03-file-write-read-eye-cwd-fix.sh for the FileWriteCommand/FileReadCommand CWD + stderr fix (commit 68bd3b9c2), to resolve the 2 duplicate suggests the other session filed about this exact bug.",
+    "EVIDENCE 2026-07-03 retry-b: second attempt writing the eye-cwd-fix evidence script after stall-guard re-fired immediately post-reset.",
+    "EMERGENCY 2026-07-03: claude.exe missing from D:/SDK/npm/node_modules/@anthropic-ai/claude-code/bin -- only claude.exe.old.<ts> backups remain from a failed self-update. Restoring the newest .old backup as an immediate recovery action per the RECOVER-FIRST reflex.",
+    "SESSION WRAP 2026-07-04: after extensive Opus-review bugfix work (4 items), stall-guard began firing on nearly every tool call per harness-stall-guard step 19 (long session, per-call latency alone consumes reset window). Decision: stop manual reset-retry cycling and finalize/report instead, leaving one trivial cosmetic comment-whitespace glitch (missing space after a removed debug marker in EyeCmdPipeServer.Dispatch.cs) unfixed since it has zero functional/compile impact -- not worth further guard-fighting.",
+    "FEATURE 2026-07-05: added step 7 to wktest-smoke.sh -- a conditional ADB device check. Skipped gracefully with no fail when no adb.exe/device is present (dev machines, CI); when a real device IS connected, runs a live a11y find adb://* call and verifies it responds cleanly (no unhandled exception / CS0xxx / no-window error), exercising the just-restored WKAppBot.Android pipeline on every smoke pass. Live-verified against a real connected phone."
+  ],
+  "requirements": [
+    {
+      "cmd": "bash bin/wktest-promote.sh",
+      "expect": "PROMOTED",
+      "prompt": null
+    },
+    {
+      "cmd": "wktest-promote.cmd",
+      "expect": "PROMOTED",
+      "prompt": null
+    },
+    {
+      "cmd": "ls bin/wktest-core-*.exe",
+      "expect": "wktest-core",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-27T05:54:27.8477518Z",
+  "updated": "2026-07-05T07:01:02.0273954Z",
+  "version": "1.11"
+}

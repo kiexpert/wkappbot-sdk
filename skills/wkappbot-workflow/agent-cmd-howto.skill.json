@@ -1,0 +1,48 @@
+{
+  "id": "agent-cmd-howto",
+  "app": "wkappbot-workflow",
+  "title": "Agent.cmd howto: operational dispatch recipes",
+  "title_ko": null,
+  "desc": "T2 howto for agent-cmd: heredoc and --file multiline briefs, model routing, background-for-Opus, and the 3-skill + 5-SPEC brief-guard contract. T1 core = agent-cmd; T3 incidents = agent-cmd-ref.",
+  "steps": [
+    "MULTILINE or special-char brief: use a bash heredoc with a QUOTED delimiter so Agent.ps1 reads stdin verbatim with no tokenization; a single-line ASCII brief may stay a quoted positional arg.",
+    "--file path: Agent.cmd --file reads the brief from a UTF-8 file, bypassing the bash to cmd.exe percent-star mangling of newlines, non-ASCII, and shell metachars; this is the canonical path for codex and any multiline brief.",
+    "MODEL routing: --model selects haiku/sonnet/opus (Claude), codex/gpt/mini (wkcodex), flash/pro/gemini (agy), ask-gpt/ask-triad (wkappbot ask), or auto (capability+pace router); --family and --tier are the proto tier-selector that overrides --model.",
+    "BACKGROUND mandatory for Opus: dispatch with run_in_background true -- a foreground Agent.cmd from Opus is blocked by the Opus-parallel-delegation guard so the Opus process stays idle while agents work (escape WKHARNESS_OPUS_FG=1).",
+    "BRIEF-GUARD contract in ONE pass: the prompt MUST contain 3+ wkappbot skill read lines (one MUST be agent-on-load) AND the five LITERAL labels Goal: Files: Approach: Constraints: Exit: -- a parenthetical before the colon (Approach (...):) FAILS the label check."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read agent-cmd-howto",
+      "expect": "MULTILINE",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read agent-cmd-howto",
+      "expect": "BRIEF-GUARD",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read agent-cmd-howto",
+      "expect": "MODEL routing",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "agent-cmd",
+    "howto",
+    "delegation",
+    "brief-guard",
+    "heredoc",
+    "file",
+    "model-routing",
+    "t2"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-25T13:56:49.956744Z",
+  "updated": "2026-06-25T13:56:49.9567529Z",
+  "version": "1.0"
+}

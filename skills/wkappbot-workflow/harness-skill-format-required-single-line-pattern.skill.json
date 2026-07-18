@@ -1,0 +1,40 @@
+{
+  "id": "harness-skill-format-required-single-line-pattern",
+  "app": "wkappbot-workflow",
+  "title": "harness:skill Format — Required Single-Line Pattern",
+  "title_ko": null,
+  "desc": "Documents the mandatory format for harness:skill rules in CLAUDE.md. Pattern must use 3 required skills on single lines with inline # comments (shell-safe).",
+  "steps": [
+    "MANDATORY FORMAT (single-line only): ## harness:skill <file-glob-pattern> followed by 3 skill read commands, each on its own line with trailing # comment. Shell ignores # and beyond, so multi-line comments break harness parsing.",
+    "REQUIRED SKILLS (3-role pattern): Usage (how code is used — policy/scope/rules), Impl (how code is implemented — algorithms/validation/errors), Task (what to do when editing — keywords/tests/side-effects).",
+    "CORRECT EXAMPLE: ## harness:skill csharp.**/MyCdpContext.cs  followed by three lines: 'wkappbot skill read standard-appbot-window  # Usage: caller detection', 'wkappbot skill read standard-chrome-window  # Impl: window filtering', 'wkappbot skill read wkfind-caller-hwnd-validation-3tier-pattern  # Task: ancestor walk maintenance'",
+    "SHELL-SAFE FORMAT: # comments at end of line are ignored by shell. Never break into multiple lines (harness parser expects single-line entries). Trailing # lets humans document WITHOUT breaking machine parsing.",
+    "SKILL ID VALIDATION: Each of the 3 skill IDs is auto-validated by wkappbot skill edit. If any skill does not exist, the edit is rejected with missing IDs listed. Always verify skill IDs exist before submitting.",
+    "AVOID (FORBIDDEN): Multi-line comments with opening ## or /*, multi-skill-read on same line, embedding harness:skill text inside tool steps (looks like rule but won't parse), using or/and to group skills"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read wkharness-guards",
+      "expect": "GUARD 1 ASK-GUARD",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read on-load",
+      "expect": "MANDATORY Skill Loads",
+      "prompt": null
+    },
+    {
+      "cmd": "grep -n '## harness:skill' D:\\GitHub\\WKAppBot\\CLAUDE.md",
+      "expect": "csharp.*MyCdpContext",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-27T18:46:37.6226521Z",
+  "updated": "2026-05-27T18:46:37.6226615Z",
+  "version": "1.0"
+}

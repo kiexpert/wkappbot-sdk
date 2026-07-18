@@ -1,0 +1,39 @@
+{
+  "id": "foundation-is-roots-charge-not-a-chore-howto",
+  "app": "wkappbot-workflow",
+  "title": "Foundation is root's charge (howto)",
+  "title_ko": null,
+  "desc": "The protocol for keeping foundation work on ROOT: the test, the category line, the triple-reflex.",
+  "steps": [
+    "THE ONE TEST before delegating ANYTHING: does this shape how other intelligences THINK or what they STAND ON? If YES it is the FOUNDATION -- keep it on ROOT and do it yourself with full care. Delegating the foundation to the intelligences that depend on it INVERTS the hierarchy.",
+    "CATEGORY LINE: CHORE = mechanical, replaceable, shapes nothing downstream (grep, parse-verify, file string edits, log scans) -> delegate to Agent.cmd. FOUNDATION = harness enforcement, on-load/Require wiring, the constitution, knowledge-architecture, reflex-pushing, recurrence-prevention -> ROOT does it directly.",
+    "TRIPLE REFLEX after EVERY user correction (not just a fix): (1) FIX the immediate issue, (2) KNOWLEDGE-IFY it into a skill + an action-first reflex, (3) EMBODY it in the harness so it SELF-ENFORCES (a guard, an enforcer read, a push onto the wire the next agent trips). A fix alone repeats; a skill alone is pull; only harness-embodiment makes it permanent + human-free. DONE TEST: would the next FRESH model hit this correction automatically without the user saying anything?",
+    "OVERCOMING: the moment you catch yourself labeling foundational/harness/knowledge-wiring work as a chore to offload, STOP -- that impulse IS the enemy; reclaim the task.",
+    "DELEGATION BOUNDARY: skill authoring + cross-linking REQUIRE high intelligence + ARE the foundation -> OPUS does them directly; delegate only read-only survey, parse-verify, guard-message strings, and mechanical residue."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read foundation-is-roots-charge-not-a-chore-howto",
+      "expect": "ONE TEST",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read foundation-is-roots-charge-not-a-chore-howto",
+      "expect": "CATEGORY LINE",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read foundation-is-roots-charge-not-a-chore-howto",
+      "expect": "TRIPLE REFLEX",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-24T07:15:00.50793Z",
+  "updated": "2026-06-24T07:15:00.5079411Z",
+  "version": "1.0"
+}

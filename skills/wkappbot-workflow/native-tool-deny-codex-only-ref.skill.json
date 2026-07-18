@@ -1,0 +1,52 @@
+{
+  "id": "native-tool-deny-codex-only-ref",
+  "app": "wkappbot-workflow",
+  "title": "native-tool-deny-codex-only-ref",
+  "title_ko": null,
+  "desc": "Reference tier: dated incident history for the Codex-only native-tool deny mechanism -- 2026-05-27 Claude-settings pollution root cause, 2026-06-25 PermissionRequest consume-allow-once, 2026-06-29 approval-loop fix plus authoritative Codex deny contract, 2026-07-03 harness-owner TODO principles, 2026-07 Get-CodexToolName consolidation.",
+  "steps": [
+    "2026-05-27 ROOT CAUSE plus fix: wkharness-session-init.ps1 auto-injected a per-repo Claude permissions deny of Edit and Write on every hook; a Sonnet session mis-applied the Codex-intended deny to the Claude layer, disabling Claude own Edit and Write for every model including Opus. Fix: block removed, polluted wkappbot-sdk settings cleaned to empty deny, global settings kept Edit and Write in allow.",
+    "2026-06-25 CodexHookAdapter PermissionRequest equals consume-allow-once: Write-CodexPermissionDecision narrowed to allow or deny only (dropped ask plus the continue, permissionDecision, hookSpecificOutput fields). On a PermissionRequest a prior PreToolUse harness-allow (Test-CodexLatestHarnessAllow) is treated as ONE-TIME approval and immediately CONSUMED via Consume-CodexLatestHarnessAllow (writes a deny snapshot) so one allow cannot unlock multiple native-tool calls.",
+    "2026-06-29 approval-loop fix: CodexPreToolPolicy applies shell-syntax blocking ONLY when tool_name is a shell tool; never scan an apply_patch payload as a shell command (patch bodies are multiline and full of diff metacharacters by design, so the generic regex false-denied every patch and forced an unwanted PermissionRequest dialog). Native edits still route through the shared harness; direct .skill.json edits stay separately denied by target-path policy.",
+    "2026-06-29 audit follow-up plus implemented (25 pass 0 fail): CodexPreToolUseAdapter returns minimal deny JSON with exit 0 instead of stderr plus exit 2; CodexHookAdapter converts child nonzero exits into clean deny JSON, avoids duplicating Raw stdin when RawFile is used, drains stdout and stderr asynchronously with a bounded kill, and rejects identity-free allow snapshots. Reusable verification: tools/wk-codex-hook-test.ps1.",
+    "2026-06-29 AUTHORITATIVE Codex deny contract: a PreToolUse deny emits exactly one stdout JSON object with hookSpecificOutput.hookEventName equal to PreToolUse, hookSpecificOutput.permissionDecision equal to deny, and a non-empty hookSpecificOutput.permissionDecisionReason; exit 0 and keep stderr empty. A top-level decision plus reason is NOT the Codex deny contract.",
+    "TODO status 2026-07-03: five harness-owner principles (user 2026-05-27) still only in CLAUDE.md. 1 Opus reserve is sacred (TargetPct 95 for Opus system intervention; never cost-gate a WKHARNESS_INTERNAL_SPAWN harness-internal Opus spawn). 2 path-normalize backslash to forward-slash ONCE into one var then match all guard clauses. 3 no unbounded sync-spawn in hooks: WaitForExit timeout plus Kill plus fail-open, read streams after, log calls over one second. 4 safe harness-delegation: write the spec to a pace-exempt memory md file and give the agent a short dash-free prompt. 5 audit every Opus auto-intervention into a persistent opus-autoreview-audit.jsonl.",
+    "2026-07 Get-CodexToolName consolidation: added a shared 4-way toolName fallback helper (tool_name, name, tool.name, tool-as-string) to CodexPreToolPolicy.ps1 mirroring wkharness-codex-main.ps1, and replaced the single tool_name-only inline extraction at all three sites (CodexPreToolPolicy, CodexHookAdapter Test-CodexLatestHarnessAllow, CodexPreToolUseAdapter) so the tool-identity match no longer silently fails on non-tool_name payload shapes; also removed dead unreachable dollar-policy code in the CodexHookAdapter PermissionRequest branch (unconditional deny kept)."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read native-tool-deny-codex-only-ref",
+      "expect": "consume-allow-once",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read native-tool-deny-codex-only-ref",
+      "expect": "deny contract",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read native-tool-deny-codex-only-ref",
+      "expect": "Get-CodexToolName",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "codex",
+    "harness",
+    "deny",
+    "incident",
+    "history",
+    "permissionrequest",
+    "deny-contract",
+    "reference",
+    "hook",
+    "adapter"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-07-03T16:53:41.4915496Z",
+  "updated": "2026-07-03T16:53:41.491561Z",
+  "version": "1.0"
+}

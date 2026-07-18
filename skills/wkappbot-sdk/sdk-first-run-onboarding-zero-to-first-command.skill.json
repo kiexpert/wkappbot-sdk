@@ -1,0 +1,37 @@
+{
+  "id": "sdk-first-run-onboarding-zero-to-first-command",
+  "app": "wkappbot-sdk",
+  "title": "SDK first-run onboarding: zero to first command",
+  "title_ko": null,
+  "desc": "Step-by-step guide for a brand-new customer: GitHub account setup through running their first wkappbot command. Written from customer perspective. No assumed knowledge of the codebase.",
+  "steps": [
+    "PREREQUISITE: GitHub account required (free). Install gh CLI: winget install GitHub.cli then gh auth login. This is the license auth infra -- without it wkappbot runs in Free tier only.",
+    "SETUP SCRIPT (setup.ps1): idempotent first-run script distributed with SDK. Creates .wkappbot/config.json from template, prompts Slack webhook token, adds wkappbot bin\\ to PATH, runs \u0027wkappbot eye tick\u0027 to verify Eye starts. Re-running is safe -- detects already-configured state and skips. Reduces support tickets from PATH/config issues.",
+    "DIAGNOSTICS: \u0027wkappbot diagnostics\u0027 subcommand dumps env report -- OS version, wkappbot version, install path, PATH check, Eye status (running/stopped), license tier, last 5 errors from errors.jsonl. Include output in every support ticket. Reduces back-and-forth with support."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot --version",
+      "expect": "prints version without error",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot validate",
+      "expect": "shows license tier (Free/CDP/Sudo)",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot a11y find \u0027*notepad*\u0027",
+      "expect": "returns UI element tree or clear error if notepad not running",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-28T18:26:05.9188062Z",
+  "updated": "2026-04-28T20:00:44.1773061Z",
+  "version": "1.2"
+}

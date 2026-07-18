@@ -1,0 +1,54 @@
+{
+  "id": "codex-skill-id-desc-limit-enforcement",
+  "app": "wkappbot-core",
+  "title": "Codex skill id/desc limit: prefix-64 resolve + 60-char unique (link-safe)",
+  "title_ko": null,
+  "desc": "T1 core. Codex silently skips any skill whose id>64 or desc>1024 chars. Enforce LINK-SAFELY: resolve lookups by the first 64 chars (so a Codex-truncated ref still resolves to the full skill, NO rename, existing inbound cluster/[[id]]/harness:skill/read links survive); at CREATION require the first 60 chars of a new id to be unique (reserve 4 chars for a dedup suffix inside the 64 window); reject desc>1024 on contribute and edit; never auto-rename an existing over-long id. Cluster: skill-contribute-edit, wktest-staging-build-storm-safe-deploy-pipeline.",
+  "steps": [
+    "PROBLEM: Codex (the AI consuming skills) silently SKIPS any skill whose id is over 64 chars OR desc over 1024 chars -- no error, just absent. Over-limit skills become invisible to Codex.",
+    "DECISION (link-safe, NO rename): do NOT rename existing over-long ids. A rename breaks every inbound reference (other skills cluster and [[id]] links, CLAUDE.md harness:skill refs, wkappbot skill read of the id, requirements). Make RESOLUTION tolerant instead.",
+    "RESOLUTION RULE: a skill lookup matches when the requested id equals the stored id OR their first 64 chars are equal. So a Codex-truncated 64-char reference still resolves to the full skill and a full id still works -- existing long ids keep functioning with zero link breakage.",
+    "CREATION UNIQUENESS (the 60-char strict check): at contribute, require the first 60 chars of a NEW id to be unique among all existing skills first-60-chars. 60 (not 64) reserves a 4-char budget for a dedup suffix so that even after Codex truncates to 64 there is never a collision. On collision append -2 or -3 within the 60-to-64 window.",
+    "DESC: reject desc over 1024 on BOTH contribute and edit (exit 1, do not save). Desc is not referenced by name so rejecting it is safe.",
+    "EDIT of an existing over-long id: do NOT rename; emit a WARN that Codex skips it and that a deliberate rename plus reference-rewrite (or an alias) is the only safe migration. Otherwise proceed with the edit.",
+    "IMPLEMENTATION targets: SkillCommand.Helpers.cs (prefix-64 resolution plus the unique-check and desc-check helpers), SkillCommand.Contribute.cs (60-char uniqueness plus desc reject), SkillCommand.Edit.cs (desc reject plus warn-no-rename).",
+    "PROCESS: this spec was knowledge-ified the moment it was decided, while implementation was blocked (codex channel locked by an orphaned codex holding wkcodex-lock). Capturing a decided spec immediately means it survives the blocker and any later session can implement it verbatim."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read codex-skill-id-desc-limit-enforcement",
+      "expect": "prefix",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read skill-contribute-edit",
+      "expect": "Codex",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wktest-staging-build-storm-safe-deploy-pipeline",
+      "expect": "storm",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "skill",
+    "codex",
+    "limit",
+    "id",
+    "desc",
+    "prefix",
+    "resolve",
+    "dedup",
+    "link-safe",
+    "t1",
+    "core"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-07T06:05:46.3319488Z",
+  "updated": "2026-06-07T06:05:46.3319572Z",
+  "version": "1.0"
+}

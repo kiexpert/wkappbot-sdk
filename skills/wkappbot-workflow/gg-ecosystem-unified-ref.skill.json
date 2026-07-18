@@ -1,0 +1,38 @@
+{
+  "id": "gg-ecosystem-unified-ref",
+  "app": "wkappbot-workflow",
+  "title": "gg Ecosystem Unified T3 Reference",
+  "title_ko": null,
+  "desc": "T3 ref. Per-repo script paths, CronCreate schedules, 2026-05-29 cycle results.",
+  "steps": [
+    "SCRIPT PATHS: WKAppBot=D:/GitHub/WKAppBot/wk-gg-main.ps1. personal-docs=D:/GitHub/personal-docs/wk-gg-main.cmd. wkappbot-sdk=gg-main-enhanced.ps1. WkAutoQuant=gg_main.py (33-step manual).",
+    "CRON SCHEDULES: WKAppBot */30 (every 30min suggest triage). personal-docs */30 7-19 * * * (office hours only). wkappbot-sdk 0 */3 + extra heals 02:00/08:00/14:00. WkAutoQuant */30 market-hours. Base nightly heal 13 4 * * * all repos.",
+    "PERSONAL-DOCS workflow: Steps 1-7. Step1=mail sync (Naver+Gmail). 2-3=legal deadlines+hearing. 4-5=appeal+job. 6-7=NVIDIA strategy+danger alerts. STEP COUNT CONTRACT enforced at runtime.",
+    "2026-05-29 cycle: 4 urgent + 5 important diagnosed. RuntimeEnable timeout repaired. CommandHelpMap entries fixed (8a864b2c5). IOException skill copy documented. Exit condition (b): all blocked on SDK."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read gg-ecosystem-unified-ref",
+      "expect": "T3",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read gg-ecosystem-unified",
+      "expect": "T1",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read declarative-automation-claude-md-harness-as-scheduler",
+      "expect": "scheduler",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-31T12:49:44.8927147Z",
+  "updated": "2026-05-31T12:49:44.8927239Z",
+  "version": "1.0"
+}

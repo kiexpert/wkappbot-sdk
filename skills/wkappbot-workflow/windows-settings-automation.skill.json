@@ -1,0 +1,27 @@
+{
+  "id": "windows-settings-automation",
+  "app": "wkappbot-workflow",
+  "title": "Windows Settings Automation via UIA + PrintWindow",
+  "title_ko": "Windows 설정 자동화 — UIA + PrintWindow",
+  "description": "Automate Windows 11 Settings (UWP) via a11y UIA. Navigate via ms-settings: URI, capture via PrintWindow API, invoke buttons by UIA name pattern. Includes local account switch flow.",
+  "audience": "operator",
+  "tags": ["windows", "settings", "uwp", "a11y", "local-account", "autologin", "uia", "printwindow"],
+  "steps": [
+    "1. Open settings page via URI: Start-Process 'ms-settings:<page>' — key pages: yourinfo, accounts-youraccount, signinoptions, windowsupdate",
+    "2. Find Settings hwnd: wkappbot a11y find '{title:\"설정\"}' → extract hwnd from grap line",
+    "3. Capture UWP window (a11y screenshot unreliable for UWP): Add-Type PrintWindow DllImport each session → [WC]::Cap([IntPtr]hwnd, 'out.png'). See step 9 for reusable snippet.",
+    "4. Invoke button by UIA name: wkappbot a11y invoke '{hwnd:HWND}#*버튼이름*'",
+    "5. Read UIA tree: wkappbot a11y read '{hwnd:HWND}' --depth 6 (UWP exposes limited tree — most content not in UIA)",
+    "6. GOTCHA — UWP navigation: a11y click/scroll unreliable. Use ms-settings: URI to jump pages directly. Use invoke (not click) for buttons.",
+    "7. Local account switch full flow: (A) Start-Process 'ms-settings:yourinfo' → (B) wkappbot a11y invoke '{hwnd:X}#*대신 로컬 계정으로 로그인*' → (C) UserAccountBroker Shell_Dialog appears (proc=UserAccountBroker, cls=Shell_Dialog) → (D) wkappbot a11y invoke '{hwnd:brokerHwnd}#*다음*' → (E) MS identity verify step — user must enter PIN or MS password interactively → (F) set new local username + password → (G) invoke 다음 → reboot prompt",
+    "8. Find UserAccountBroker hwnd: wkappbot a11y read '{hwnd:settingsHwnd}' --depth 6 → look for Shell_Dialog / proc=UserAccountBroker in grap output. Or: wkappbot a11y find '{title:\"로컬 계정으로 전환\"}' after invoking the switch link.",
+    "9. PrintWindow reusable snippet (must Add-Type each PS session): Add-Type @\"\\nusing System; using System.Drawing; using System.Runtime.InteropServices;\\npublic class WCap {\\n    [DllImport(\"user32.dll\")] public static extern bool GetWindowRect(IntPtr h, out RECT r);\\n    [DllImport(\"user32.dll\")] public static extern bool PrintWindow(IntPtr h, IntPtr hdc, int f);\\n    [StructLayout(LayoutKind.Sequential)] public struct RECT{public int L,T,R,B;}\\n    public static void Cap(IntPtr hwnd,string path){RECT r;GetWindowRect(hwnd,out r);int w=r.R-r.L,h=r.B-r.T;var b=new System.Drawing.Bitmap(w,h);var g=System.Drawing.Graphics.FromImage(b);PrintWindow(hwnd,g.GetHdc(),2);g.ReleaseHdc();g.Dispose();b.Save(path);b.Dispose();}\\n}\\n\"@ -ReferencedAssemblies System.Drawing ; [WCap]::Cap([IntPtr]0xHWND, 'C:\\\\tmp\\\\out.png')",
+    "10. Auto-login setup after local account switch: run netplwiz → '사용자 이름과 암호를 입력해야 함' checkbox appears → uncheck → set local password. Or registry: HKLM:\\\\SOFTWARE\\\\Microsoft\\\\Windows NT\\\\CurrentVersion\\\\Winlogon AutoAdminLogon=1, DefaultUserName, DefaultPassword."
+  ],
+  "requirements": [
+    "Start-Process 'ms-settings:yourinfo' => Settings app opens on Your Info page (계정 > 사용자 정보)",
+    "wkappbot a11y find '{title:\"설정\"}' => returns hwnd in grap field",
+    "wkappbot a11y invoke '{hwnd:X}#*대신 로컬 계정으로 로그인*' => UIA Invoke success, UserAccountBroker Shell_Dialog appears"
+  ],
+  "version": 1
+}

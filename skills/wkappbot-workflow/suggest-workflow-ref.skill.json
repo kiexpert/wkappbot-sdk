@@ -1,0 +1,33 @@
+{
+  "id": "suggest-workflow-ref",
+  "app": "wkappbot-workflow",
+  "title": "Suggest Workflow — Reference (T3)",
+  "title_ko": null,
+  "desc": "History, verified tests, lessons learned. Core rules in suggest-workflow; how-to in suggest-workflow-howto.",
+  "steps": [],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read suggest-workflow",
+      "expect": "Suggest = AI-logged",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read suggest-workflow-howto",
+      "expect": "HowTo",
+      "prompt": null
+    },
+    {
+      "cmd": "bash ev-conhwnd-guard.sh",
+      "expect": "PASS\\|exit 0",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-31T12:03:20.8587849Z",
+  "updated": "2026-05-31T12:03:20.858797Z",
+  "version": "1.0"
+}

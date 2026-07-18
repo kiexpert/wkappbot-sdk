@@ -1,0 +1,19 @@
+{
+  "id": "session-continuity-persist-command-history-and-agent-state",
+  "app": "wkappbot",
+  "title": "Session continuity: persist command history and agent state",
+  "desc": "FEATURE: persist last N commands, AI query sessions (triad/ask results), and agent states across Eye restarts. Enables \u0027resume where you left off\u0027 without losing context after hot-swap or crash.",
+  "steps": [
+    "Persist last 50 commands to runtime/command_history.jsonl (rolling). Eye reads on start, exposes via \u0027eye tick\u0027 response for context injection.",
+    "Persist ask session IDs (Claude conversation IDs, GPT thread IDs) to runtime/ai_sessions.json keyed by session date. Enables resume via \u0027wkappbot ask claude --resume\u0027.",
+    "Agent state (Codex session ID, triad conversation context) to runtime/agent_sessions.jsonl. Eye hot-swap reads these files on restart.",
+    "Verified 2026-04-22: test-eye-tick-design-defer.sh (resolve ts=2026-04-21T06:45:49.0886839Z)"
+  ],
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-22T03:48:35.0931747Z",
+  "updated": "2026-04-22T03:48:57.5377047Z",
+  "version": "1.1"
+}

@@ -1,0 +1,57 @@
+{
+  "id": "reduce-before-refactor-dedup-analyze-rebundle-order",
+  "app": "wkappbot-sdk",
+  "title": "Reduce-before-refactor: dedup -> analyze -> rebundle order",
+  "title_ko": null,
+  "desc": "Refactoring methodology for large/bloated/corrupted source: shrink the file FIRST (mechanical dedup/truncate), then analyze cheaply, re-bundle the problem-free functions into cohesive modules, extract only the common/duplicated logic, and round-trip verify. Split is a temporary analysis state; the end is a clean re-merge, not scattered fragments.",
+  "steps": [
+    "WHEN: a source file is too large/bloated/corrupted to analyze in one context (e.g. the 691K-line wkharness-guards.ps1 append-corruption), or any heavy multi-file refactor. The wrong instinct is to start splitting/extracting immediately on the huge file -- that is the most expensive and riskiest anti-pattern (token explosion, cannot fit context, easy to corrupt).",
+    "PRINCIPLE = REDUCE BEFORE ANALYZE. Refactoring/common-module extraction done on a high-load system + huge file costs the most tokens and carries the most risk. Get to a small, light, analyzable state FIRST, then the analysis is cheap and safe. User-stated 2026-06-06: 'extracting common modules is advantageous after separation, in a low-token state.'",
+    "STEP 1 -- remove runtime load/noise first (kill the storm/lag, free RAM/CPU) so the ANALYSIS ENVIRONMENT itself is light and tools respond fast.",
+    "STEP 2 -- DEDUP / TRUNCATE mechanically. Find the duplication boundary (a repeated header marker or a fixed block stride, e.g. the update-gate block repeating every ~2937 lines x295) and keep exactly ONE clean copy, truncate the rest. This is BYTE-BOUNDARY detection, near-zero LLM tokens -- NOT semantic analysis. A 691K file collapses to ~3K here for almost free.",
+    "STEP 3 -- now it fits in one context: analyze cheaply. Classify functions into problem (buggy/duplicated/needs change) vs problem-free (healthy, leave alone).",
+    "STEP 4 -- RE-BUNDLE the problem-free functions back into one or a few cohesive modules. SPLIT IS A TEMPORARY ANALYSIS STATE, NOT THE GOAL. Shattering into 7067 scattered fragments and stopping is a worse anti-pattern than the original bloat. Healthy code gets regrouped for cohesion.",
+    "STEP 5 -- extract ONLY the common/duplicated logic into a single shared module/function (no-bandaid dedup); fix the problem functions. Everything else stays re-bundled from step 4.",
+    "STEP 6 -- ROUND-TRIP VERIFY: the reassembled output must behave identically to the original (e.g. the harness PreToolUse guards still block/allow correctly; parse/compile gate passes). prototype -> verify -> merge; never write the merged result until the round-trip passes.",
+    "TOOL IMPLICATION: a source-splitter (wksplit) must ROUND-TRIP -- split -> diagnose/fix -> re-merge healthy -> parse gate -- not merely shatter a file into per-function pieces. An AST function-splitter is the WRONG tool for inline-block duplication (it would emit thousands of duplicate function files); use it for genuine per-function modularization AFTER dedup. Cross-link [[haiku-sandbox-problem-solving]] (prototype-verify-merge), [[wksplit-cs-utility]], [[wkdr-emergency-doctor-wkappbot-core-spawn-storm-kill]] (the 691K case), [[skill-migration-3tier]].",
+    "MIN-COST DUP ANALYSIS TECHNIQUE (proven live 2026-06-06 on the 691,245-line wkharness-guards.ps1 -- characterized it for ~ZERO LLM tokens). The trick: a file too big to READ (reading it = token explosion) can still be fully DIAGNOSED by mechanical split + hash grouping in pure shell, no content ever entering the LLM. PROCEDURE: (1) pick a repeating block marker (a comment/header that starts each block, e.g. 'GUARD: update-gate'). (2) split at it: awk '/MARKER/{n++}{fn=sprintf(\"seg/seg_%04d\",n); print >> fn}' file. (3) hash + group: md5sum seg/* | awk '{print $1}' | sort | uniq -c | sort -rn . (4) read the result: total-segments vs unique-hashes = the duplication ratio; the uniq -c frequency column IS the dedup map (how many times each identical block repeats). Also: 'for s in seg/*; do wc -l < $s; done | sort -n | uniq -c' shows the size distribution to tell genuine distinct sections apart from version-copies. LIVE RESULT: 296 segments -> only 17 unique hashes = 94% pure duplication (freq 77x/49x/38x/29x/25x...), all derived without the LLM reading a single line of the 691K file. RECONSTRUCTION SEMANTICS for PowerShell/scripts: the interpreter parses top-to-bottom and the LAST definition of a function WINS, so the effective/correct content = the final complete copy; keep the latest unique definitions, verify the deduped function-name SET is byte-identical to the original's unique set (extract + sort -u + diff = empty) before swapping. This operationalizes the REDUCE/ANALYZE steps of this skill: hash-first, read-never."
+  ],
+  "requirements": [
+    {
+      "cmd": "wc -l bloated.ps1",
+      "expect": "detects abnormal line count before any analysis",
+      "prompt": null
+    },
+    {
+      "cmd": "grep -c repeated-block-marker",
+      "expect": "measures duplication stride",
+      "prompt": null
+    },
+    {
+      "cmd": "round-trip parse check",
+      "expect": "reassembled output behaves identically",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "refactor",
+    "methodology",
+    "dedup",
+    "truncate",
+    "split",
+    "rebundle",
+    "roundtrip",
+    "token-discipline",
+    "large-source",
+    "common-module",
+    "order",
+    "sequencing"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-06T16:37:45.1009815Z",
+  "updated": "2026-06-06T16:44:54.4781648Z",
+  "version": "1.1"
+}

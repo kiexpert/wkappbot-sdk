@@ -1,0 +1,38 @@
+{
+  "id": "a11y-grid-read-clipboard-bridge-for-owner-drawn-hts-grids",
+  "app": "wkappbot",
+  "title": "a11y grid-read: clipboard bridge for owner-drawn grids",
+  "desc": "MFC/GDI owner-drawn grids (HTS realtime tables) have no UIA/MSAA cell nodes. a11y grid-read focuses target, clears clipboard, sends Ctrl+A/Ctrl+C via SendInput, polls clipboard up to 2s, prints TSV verbatim. Override hotkey via --text.",
+  "steps": [
+    "Locate grid via grap (e.g. '*Hero*/Form1101/*grid*')",
+    "a11y grid-read <grap> -- runs default Ctrl+A,Ctrl+C chord",
+    "Custom chord via --text 'ctrl+shift+c' for apps with dedicated 'copy all' binding",
+    "Clipboard polled for up to 2s; TSV dumped to stdout on success",
+    "If empty clipboard after timeout the app did not honor the chord -- probe the right hotkey via the app's menu",
+    "100pct accuracy -- no OCR error, values come from the app's own copy path",
+    "Usage example: wkappbot a11y read '*Hero*/grid-area' returns only container; use wkappbot a11y grid-read '*Hero*/grid-area' for TSV cells",
+    "Verified 2026-04-19: experience/tests/session/test-session-fix-verify-20260419.sh (resolve ts=2026-04-17T21:14)"
+  ],
+  "tags": [
+    "a11y",
+    "grid-read",
+    "hts",
+    "mfc",
+    "owner-drawn",
+    "clipboard",
+    "focusless-first"
+  ],
+  "source_refs": [
+    {
+      "file": "csharp/src/WKAppBot.CLI/Commands.Private/A11yActions.Grid.cs",
+      "line": null,
+      "pattern": "A11yGridRead",
+      "note": null
+    }
+  ],
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-19T07:18:31.2978203Z",
+  "updated": "2026-04-19T07:51:10.4240851Z",
+  "version": 2
+}

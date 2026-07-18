@@ -1,0 +1,39 @@
+{
+  "id": "root-wk-tool-delegation-gate",
+  "app": "wkappbot-workflow",
+  "title": "Root wk-tool delegation gate (conduct vs execute)",
+  "title_ko": null,
+  "desc": "A ROOT session (any tier) may use hands-on wk tools only inside a delegation window; in exchange it gets unlimited skill+markdown+delegate+git. Forces conductor mode, kills solo-flounder block-retry cache_read churn. Subagents exempt (executors).",
+  "steps": [
+    "RULE: a ROOT session (any tier) may use hands-on WillKim tools (wkappbot cdp, file, suggest, eye, mail, a11y, win-click, taskkill) ONLY inside a delegation window. The window OPENS when a delegation (Agent.cmd, wkcodex, codex) completed within the last 5 minutes and CLOSES at the stall-guard threshold. Keep delegating to keep the privilege. Full build spec: memory/sonnet-wk-tool-delegation-gate-spec.md in personal-docs.",
+    "THE BALANCE: in exchange a root session gets an UNLIMITED conductor toolkit, always pace-exempt: all skill read search edit contribute, all markdown edits (CLAUDE.md, memory, AGENTS, any .md doc), the delegation launchers, and git. Root reads and records knowledge and delegates freely; it executes only through delegation. Build note: broaden the Edit Write pace-exemption from CLAUDE.md-only to all .md.",
+    "ROOT vs SUBAGENT axis: the gate keys on ROLE not tier. Opus-root is effectively a no-op (it delegates anyway). Sonnet-root is the real enforcement target (will not delegate without the rule). Haiku-root (token-starved fallback) is also gated. ANY subagent of any tier is EXEMPT because hands-on wk-tool work is its assigned job; subagents get only a soft cheaper-tier-first nudge.",
+    "WHY: Sonnet weekly percent spikes come from solo floundering plus repeated guard blocks, each forcing a full-context cache_read resend. Gating hands-on execution to a delegation window kills that churn and enforces the conductor pattern. Unifies with the Opus busy-fleet rule and the recursive-dialectic evidence gate and can later collapse into the evidence gate.",
+    "BUILD: guards.ps1 edit (the live harness is wkappbot-kih tools wkharness-guards.ps1). Stage soft-warn first then hard block. Reuse Get-WkRecentModelCount session-JSONL reverse-scan plus the existing stall-guard as the window ceiling. Selftest pairs: root plus restricted-wk plus no-recent-delegation fires; plus recent-delegation allows; skill read and Agent.cmd and git always allow; subagent or Opus session exempt."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read root-wk-tool-delegation-gate",
+      "expect": "RULE",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read root-wk-tool-delegation-gate",
+      "expect": "BALANCE",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read root-wk-tool-delegation-gate",
+      "expect": "ROOT vs SUBAGENT",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-04T18:15:57.9375749Z",
+  "updated": "2026-06-04T18:15:57.9375841Z",
+  "version": "1.0"
+}

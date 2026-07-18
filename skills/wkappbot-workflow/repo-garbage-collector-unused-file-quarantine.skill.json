@@ -1,0 +1,56 @@
+{
+  "id": "repo-garbage-collector-unused-file-quarantine",
+  "app": "wkappbot-workflow",
+  "title": "Repo garbage collector: quarantine unused files to a timestamped reversible folder (T1 core)",
+  "title_ko": null,
+  "desc": "Core skill for the repo GC: find UNUSED/UNREFERENCED files+scripts and MOVE (never delete) them to .tmp/unused-<timestamp>/<relpath>/ -- reversible quarantine. Keeps the repo root + tools/ clean of -proto/-demix/-bak orphans. Conservative, dry-run-first, ROOT-reviewed.",
+  "steps": [
+    "CORE CONCEPT (user 2026-06-18): a repo GC finds UNUSED / UNREFERENCED files and SCRIPTS and QUARANTINES them -- MOVES (never deletes) each to .tmp/unused-<YYYYMMDD-HHMMSS>/<original-relative-path>/, a TIMESTAMPED folder per run so each sweep is distinguishable, restorable as a whole, and reversible (restore = move back). WHY: the repo root + tools/ accumulate -proto / -proto-proto / -demix / -bak* / -probe / -prove / -test / -debug / -partial / -minimal / -old orphans that make every future read token-hostile.",
+    "UNUSED DETECTION (conservative -- ALL must hold to quarantine): (a) the file's BASENAME is NOT referenced (grep) anywhere in the repo's tracked source / .md / settings; (b) it matches a throwaway SUFFIX (the list above + .tmp) OR is not git-tracked-and-recently-modified; (c) it is NOT an ENTRY POINT -- wkharness*.ps1 family mains, anything referenced in ~/.claude/settings.json or a family settings.json, the canonical Verify-* / *-classifier / guards / wkharness-* files. FAIL-SAFE: when UNSURE whether a file is referenced, KEEP it -- a false-quarantine of an active file is the only real danger, and it is reversible but noisy.",
+    "SAFETY + WORKFLOW: DRY-RUN by DEFAULT -- print a table (file ",
+    " reason-unused ",
+    " would-move-to) + a summary count; a -Apply switch performs the moves only after ROOT reviews the dry-run. NEVER quarantine: a referenced/git-active file, an entry point, CLAUDE.md / GEMINI.md / AGENTS.md / README, or anything under .git. Timestamped folder makes 'oops, restore that whole run' a one-liner.",
+    "INTEGRATION: a standalone tool (prototype tools/wkgc-proto.ps1, Sonnet-built) does the quarantine; wkdoctor surfaces the unused-file COUNT as a 'repo cleanliness' health check so messiness is visible in the routine checkup. Verify it with the synthetic/live/static method (synthetic temp dir with a referenced file + an entry-point-named file + a -proto orphan -> asserts it keeps the first two, flags only the orphan).",
+    "REVERSIBILITY IS THE WHOLE POINT: because nothing is deleted and the path structure is preserved under unused-<ts>/, a wrong call costs nothing -- move it back. This is why a CONSERVATIVE-but-active GC beats both 'never clean' (token-hostile repo) and 'delete unused' (irreversible, scary). Cluster: [[wkdoctor-system-physician]], [[verify-tool-or-guard-synthetic-live-static]], [[hongik-harness-modular-independence-design]], [[repo-garbage-collector-unused-file-quarantine]]."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read repo-garbage-collector-unused-file-quarantine",
+      "expect": "CORE CONCEPT",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read repo-garbage-collector-unused-file-quarantine",
+      "expect": "UNUSED DETECTION",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read repo-garbage-collector-unused-file-quarantine",
+      "expect": "REVERSIBILITY",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "repo",
+    "garbage-collector",
+    "gc",
+    "cleanup",
+    "unused-files",
+    "quarantine",
+    "reversible",
+    "wkdoctor",
+    "dry-run",
+    "timestamped",
+    "proto-orphans",
+    "t1",
+    "core",
+    "hygiene"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-18T05:35:16.2355245Z",
+  "updated": "2026-06-18T05:35:16.2355339Z",
+  "version": "1.0"
+}

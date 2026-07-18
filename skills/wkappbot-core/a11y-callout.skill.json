@@ -1,0 +1,117 @@
+{
+  "id": "a11y-callout",
+  "app": "wkappbot-core",
+  "title": "a11y callout -- input staging popover",
+  "desc": "a11y type callout -- input staging approval popover before typing. Shows text-to-type in retro green bubble, tail points to caret/text-end in target element. User presses O to approve; typing fires from callout (PendingAction delegate).",
+  "steps": [
+    "[POSITIONING] Body placed UPPER-LEFT of target element. PendingElementRect (element full BoundingRect) sets left boundary -- body right edge must be strictly left of element left (48px gap). Tail tip priority: 1) caret via TextPattern2.GetCaretRange reflection 2) text-end via DocumentRange.GetBoundingRectangles last rect right edge 3) element left\u002B20px fallback. Stored in PendingTargetRect. CalcCalloutGeometry() uses elementLeft for bodyX, tipX/tipY for tail -- the two rects are fully separated.",
+    "[APPROVAL FLOW] A11yCommand sets PendingAction=lambda before Probe(). WaitForUserYield shows callout (30s, O required). OnConfirm: Close() immediately via Dispatcher \u002B background Task: 200ms \u002B SetForegroundWindowRaw \u002B idle gate (500ms/30s max) \u002B action(). ActionExecuted=true blocks legacy type path. ReadinessAdapters forces timeoutSeconds=30 when PendingAction set.",
+    "[KEY FIELDS] PendingContent=text in body, PendingTargetRect=tip rect (caret/text-end), PendingElementRect=element full rect for body placement, PendingAction=Func\u003Cbool\u003E on O-press, ActionExecuted=volatile bool. InspectTargetA11yNode -\u003E A11yNodeInfo(ElementRect, TipRect, DpiScale). Clear all after scope walk.",
+    "[AUTO-SCREENSHOT] On Loaded: TakeElementScreenshotAsync captures PendingElementRect\u002B30px padding via GDI CopyFromScreen -\u003E Desktop/wkappbot-YYYYMMDD-HHmmss.png. Logged as [CALLOUT:SS]. Fallback: full primary monitor.",
+    "[DISPLAY] TextBlock\u002BScrollViewer (not TextBox -- no editable-placeholder). Retro green: bg #041004, text #00FF41, border #00DD33. 380x240px. Confirm=green circle\u002Bcountdown (bottom-right). Deny=red X. Halo rings at tail tip. Chime C5-E5-G5-C6 on Loaded.",
+    "[POSITIONING v2] Body anchored 150px upper-left of current mouse cursor: bodyX = mouseX - 150 - BodyW, bodyY = mouseY - 150 - BodyH (DIP coords). Existing monitor-edge clamping (monL/monR \u002B Margin) handles screen boundaries. Replaces element-left-edge placement that caused body to drift far left on wide elements (VS Code editor, HTS MDI windows). Cross-monitor and anti-overlap logic preserved.",
+    "Verified 2026-04-26: test-a11y-invoke-32770-ancestor-not-blocker.sh (resolve ts=2026-04-26T00:00:33.3498202Z)",
+    "Verified 2026-04-26: test-a11y-restore-focus-elevated-uipi-warn.sh (resolve ts=2026-04-26T00:00:47.6900087Z)",
+    "Verified 2026-04-26: test-a11y-invoke-blocker-grap-emit.sh (resolve ts=2026-04-26T06:08:33.5050192Z)"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot a11y type target text --callout",
+      "expect": "callout window appears near target element before typing",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot newchat prompt --preview",
+      "expect": "callout shows full prompt before delivery to Claude window",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot a11y type target text --no-callout",
+      "expect": "falls back to existing UserInputWaitWindow modal",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot a11y invoke hwnd:0x002A1578",
+      "expect": "OK",
+      "prompt": "self-blocking false positive fixed: IsChild ancestor check --skill a11y-callout --commit 360868b6 --class skill-only"
+    },
+    {
+      "cmd": "wkappbot a11y invoke {proc:\u0027nfrunlite\u0027,cls:\u0027Button\u0027}",
+      "expect": "OK",
+      "prompt": "self-blocking false positive fixed: IsChild ancestor check --skill a11y-callout --commit 360868b6 --class skill-only"
+    },
+    {
+      "cmd": "wkappbot a11y invoke {proc:\u0027nfrunlite\u0027}#But_\uD655\uC778",
+      "expect": "OK",
+      "prompt": "self-blocking false positive fixed: IsChild ancestor check --skill a11y-callout --commit 360868b6 --class skill-only"
+    },
+    {
+      "cmd": "wkappbot a11y restore {proc:\u0027nfrunlite\u0027}",
+      "expect": "restored or WARN:UIPI",
+      "prompt": "UIPI warn on elevated restore/focus --skill a11y-callout --commit dae84a6c --class skill-only"
+    },
+    {
+      "cmd": "wkappbot a11y focus {proc:\u0027nfrunlite\u0027}",
+      "expect": "focused or WARN:UIPI",
+      "prompt": "UIPI warn on elevated restore/focus --skill a11y-callout --commit dae84a6c --class skill-only"
+    },
+    {
+      "cmd": "wkappbot a11y restore hwnd:0x000614FE",
+      "expect": "SW_RESTORE OK",
+      "prompt": "UIPI warn on elevated restore/focus --skill a11y-callout --commit dae84a6c --class skill-only"
+    },
+    {
+      "cmd": "wkappbot a11y restore {proc:nfrunlite}",
+      "expect": "restored or WARN:UIPI (not silent no-op)",
+      "prompt": "Already fixed: UIPI warn \u002B exit 1 --skill a11y-callout --commit dae84a6c --class skill-only"
+    },
+    {
+      "cmd": "wkappbot a11y focus {proc:nfrunlite}",
+      "expect": "focused or WARN:UIPI",
+      "prompt": "Already fixed: UIPI warn \u002B exit 1 --skill a11y-callout --commit dae84a6c --class skill-only"
+    },
+    {
+      "cmd": "wkappbot a11y minimize {proc:nfrunlite}",
+      "expect": "minimized or WARN:UIPI",
+      "prompt": "Already fixed: UIPI warn \u002B exit 1 --skill a11y-callout --commit dae84a6c --class skill-only"
+    },
+    {
+      "cmd": "wkappbot a11y invoke {proc:nfrunlite}#But_OK",
+      "expect": "OK",
+      "prompt": "Fixed: IsChild ancestor check for #32770 popup invoke --skill a11y-callout --commit eb9b52e0 --class skill-only"
+    },
+    {
+      "cmd": "wkappbot a11y invoke {proc:nfrunlite,cls:\u0027#32770\u0027}#But_1",
+      "expect": "OK",
+      "prompt": "Fixed: IsChild ancestor check for #32770 popup invoke --skill a11y-callout --commit eb9b52e0 --class skill-only"
+    },
+    {
+      "cmd": "wkappbot a11y invoke {proc:nfrunlite,cls:32770}#But_1",
+      "expect": "OK",
+      "prompt": "Fixed: IsChild ancestor check for #32770 popup invoke --skill a11y-callout --commit eb9b52e0 --class skill-only"
+    },
+    {
+      "cmd": "wkappbot a11y click {proc:nfrunlite} 480 67",
+      "expect": "BLOCKED retarget:{hwnd:0xXXXX}#But_OK",
+      "prompt": "BLOCKED grap \uCD9C\uB825 \uAD6C\uD604 --skill a11y-callout --commit a48dd91e --class skill-only"
+    },
+    {
+      "cmd": "wkappbot a11y find {proc:nfrunlite}",
+      "expect": "BLOCKED by dialog title=X buttons=[OK]",
+      "prompt": "BLOCKED grap \uCD9C\uB825 \uAD6C\uD604 --skill a11y-callout --commit a48dd91e --class skill-only"
+    },
+    {
+      "cmd": "wkappbot a11y invoke {proc:nfrunlite}#But_trade",
+      "expect": "BLOCKED by {hwnd:0xXXXX}#But_OK",
+      "prompt": "BLOCKED grap \uCD9C\uB825 \uAD6C\uD604: dismiss grap \uD3EC\uD568 --skill a11y-callout --commit a48dd91e --class skill-only"
+    }
+  ],
+  "primary_cmd": "wkappbot a11y invoke hwnd:0x002A1578",
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-23T12:47:05.1714824Z",
+  "updated": "2026-04-26T06:30:55.0271959Z",
+  "version": "1.19"
+}

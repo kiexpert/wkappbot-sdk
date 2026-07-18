@@ -1,0 +1,44 @@
+{
+  "id": "wkstdpty-shared-pty-bridge",
+  "app": "wkappbot-workflow",
+  "title": "wkstdpty shared PTY bridge",
+  "title_ko": null,
+  "desc": "Shared Windows PTY bridge for interactive CLI status capture. Targets are passed as data; no Codex-specific paths, prompts, or model names are hardcoded.",
+  "steps": [
+    "WHAT: wkstdpty is a shared PTY bridge that launches an arbitrary interactive CLI through ConPTY and captures its TUI output.",
+    "CONTRACT: the caller supplies the command line, workdir, timing, and optional keystrokes/capture contract as data; the bridge must not hardcode Codex-only paths, prompts, model names, or status semantics.",
+    "DESIGN: family-specific behavior belongs in the caller skill or launcher; the bridge stays generic and reusable for any CLI that needs PTY-driven status capture.",
+    "VERIFY: after any bridge change, run the relevant caller-level regression and confirm the captured output matches the caller contract."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read wkpace-codex",
+      "expect": "launcher",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wk-codex-pty-test",
+      "expect": "capture",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read harness-codex-pace-guard",
+      "expect": "SAFETY",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "wk-tool",
+    "pty",
+    "bridge",
+    "shared",
+    "launcher"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-07-01T08:31:44.281021Z",
+  "updated": "2026-07-01T08:31:44.2810293Z",
+  "version": "1.0"
+}

@@ -1,0 +1,38 @@
+{
+  "id": "foundation-is-roots-charge-not-a-chore-ref",
+  "app": "wkappbot-workflow",
+  "title": "Foundation is root's charge (ref)",
+  "title_ko": null,
+  "desc": "Incidents, named hostile acts, and the constitutional philosophy behind keeping the foundation on ROOT.",
+  "steps": [
+    "INCIDENT 2026-06-12: a fresh Opus, having skipped the routing skills, delegated the session-start ENFORCEMENT wiring (the recurrence-prevention foundation itself) to a Haiku, calling it a chore. Root cause: skipped claude-code-agent-tier-routing + agent-cmd.",
+    "NAMED HOSTILE ACTS: (1) ABDICATION-VIA-COST-EXCUSE -- deferring necessary work citing save-tokens/large-context/new-session-later; FALSE because the work can be DELEGATED to a fresh small context; undone foundation is inherited by every future session forever. (2) COST-BIAS / jesikgu-bapjul -- defaulting to an expensive Claude tier (or keeping work in-family) when a cheaper cross-family executor suffices; favoring your own kind is hostile.",
+    "PROOF foundation stays with ROOT (2026-06-15): three cheap agents built+passed their OWN self-tests (8/8,12/12,10/10) but ALL shared one wrong premise (that Block() is catchable, when it ends in exit 1) -- their tests passed MOCKS, not the real exit-based guards. ROOT caught it only by reading the real Block() source. Cheap models = strong parallel execution but vulnerable to confident-wrong/shared-wrong-premise; ROOT must VERIFY real semantics + own the merge.",
+    "CONSTITUTIONAL PHILOSOPHY (2026-06-23): the harness holds real power yet SELF-RESTRAINS (fail-safe, confirm-before-block, teach-not-punish, tiered exemptions) AND is fully TRANSPARENT (every rule/lesson in common HQ skills, no hidden backdoor). Restrained authority + total transparency = a clean growth-guaranteeing Hongik harness; the dogfood cycle (harness blocks its own maker -> maker fixes root cause -> harness hardens) is the engine."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read foundation-is-roots-charge-not-a-chore-ref",
+      "expect": "INCIDENT",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read foundation-is-roots-charge-not-a-chore-ref",
+      "expect": "HOSTILE ACTS",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read foundation-is-roots-charge-not-a-chore-ref",
+      "expect": "CONSTITUTIONAL",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-24T07:15:40.9152184Z",
+  "updated": "2026-06-24T07:15:40.9152273Z",
+  "version": "1.0"
+}

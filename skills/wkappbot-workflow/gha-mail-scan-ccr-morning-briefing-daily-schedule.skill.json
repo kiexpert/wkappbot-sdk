@@ -1,0 +1,49 @@
+{
+  "id": "gha-mail-scan-ccr-morning-briefing-daily-schedule",
+  "app": "wkappbot-workflow",
+  "title": "GHA mail scan \u002B CCR morning briefing daily schedule",
+  "title_ko": null,
+  "desc": "Daily 09:00 KST automated pipeline: GHA scans Naver IMAP \u002B Gmail for headhunter emails and posts to GitHub daily issue; CCR remote agent reads committed news files and posts Korean morning briefing comment.",
+  "steps": [
+    "GHA mail_scan.yml: cron 0 0 * * * (00:00 UTC = 09:00 KST). Needs repo secrets: NAVER_APP_PASSWORD, GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN, GH_PAT.",
+    "Naver scan in GHA: inline Python script using imaplib.IMAP4_SSL imap.naver.com:993 \u002B NAVER_APP_PASSWORD secret. Posts headhunter hits as comments on daily-news GitHub issue via wk_issue.post_comment().",
+    "Gmail scan in GHA: inline Python script using OAuth2 refresh_token flow (no websocket, pure urllib). Fetches unread messages, keyword-filters, posts hits to same daily issue.",
+    "CCR routine (claude.ai/code/routines): cron 5 0 * * * (09:05 KST). Reads today news/YYYY-MM-DD.md from repo, posts Korean morning briefing to daily issue via gh CLI. Routine ID: trig_01Y72zJnupSkK3m4JvqjmhhQ.",
+    "daily_news.yml already runs at 0 0 * * * (09:00 KST) via GHA -- news MD committed before CCR briefing fires at 09:05.",
+    "Add GitHub secrets at: github.com/\u003Crepo\u003E/settings/secrets/actions"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot a11y find *Chrome*",
+      "expect": "chrome",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read gmail-oauth2-manager-headhunter-scan-draft-via-gmail-api",
+      "expect": "OAuth2",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read naver-imap-app-password-via-cdp-2fa-imap-enable",
+      "expect": "CDP",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "gha",
+    "schedule",
+    "mail-scan",
+    "morning-briefing",
+    "ccr",
+    "daily-news",
+    "naver",
+    "gmail"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-01T14:31:09.7525075Z",
+  "updated": "2026-05-01T14:31:09.7525171Z",
+  "version": "1.0"
+}

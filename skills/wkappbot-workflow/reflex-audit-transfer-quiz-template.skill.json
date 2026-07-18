@@ -1,0 +1,50 @@
+{
+  "id": "reflex-audit-transfer-quiz-template",
+  "app": "wkappbot-workflow",
+  "title": "Reflex-Audit Transfer Quiz Template",
+  "title_ko": null,
+  "desc": "Reusable exam-sheet template for the reflex-audit transfer quiz: how to disguise, run, grade (5 axes x20), and cache a behavioral validation that a reflex/incident skill actually transfers to a fresh agent. Feeds the knowledge-score reflex bonus with structural headroom so 100 requires a passed quiz.",
+  "steps": [
+    "PURPOSE: reusable exam template for the reflex-audit transfer quiz -- validates whether a reflex/incident skill actually changes downstream agent behavior, not just structural score. One async quiz per reflex skill, graded 0-100, cached.",
+    "DISGUISE RULE: present the reflex root-cause CLASS on a DIFFERENT command/surface than the skills own example -- never the verbatim incident (that tests memory, not transfer).",
+    "EXAM FORMAT: give the agent the reflex skill plus 2 context skills, then code to audit; require 5 numbered answers: (1) bug yes/no (2) bug-class in one phrase (3) a concrete failing input (4) one-line fix (5) which skill caught it and the rule.",
+    "GRADING 5 axes x20 = 100: detect-bug, name-class, failing-input, correct-fix, cite-source-skill; require the agent to admit if it would NOT have caught it without the skill.",
+    "CACHE plus SCORE: write skillId, grade, validatedDate to .wkharness/reflex-grades.json; the knowledge score adds bonus = round(grade/100 times 15) with structural headroom capped at 85 so 100 REQUIRES a passed quiz; never call the LLM inline in the score function.",
+    "SAMPLE PoC 2026-06-08: reflex = command-match-anchor; disguised quiz = audit a guard that detects whether wkappbot taskkill ran by substring-scanning the transcript; a fresh Haiku scored about 100 citing P9. See incident-trauma-reflex-ref, knowledge-ification-procedure-jisikhwa, REFLEX-AUDIT TODO."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read incident-trauma-reflex-ref",
+      "expect": "P9 command-anchor reflex used as the sample quiz subject",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read knowledge-ification-procedure-jisikhwa",
+      "expect": "gate-as-guided-incentive and reflex-audit headroom design",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read sonnet-bug-stop-policy-ref",
+      "expect": "the P-series reflexes relocated out of this Sonnet-named skill",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "reflex",
+    "audit",
+    "quiz",
+    "template",
+    "transfer",
+    "validation",
+    "behavioral",
+    "score",
+    "exam"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-08T07:02:29.1714572Z",
+  "updated": "2026-06-08T07:02:29.1714717Z",
+  "version": "1.0"
+}

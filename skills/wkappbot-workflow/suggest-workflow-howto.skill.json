@@ -1,0 +1,33 @@
+{
+  "id": "suggest-workflow-howto",
+  "app": "wkappbot-workflow",
+  "title": "Suggest Workflow — HowTo (T2)",
+  "title_ko": null,
+  "desc": "How-to guide: merge, resolve, check, evidence script rules, guardrails. See suggest-workflow for core principles.",
+  "steps": [],
+  "requirements": [
+    {
+      "cmd": "wkappbot suggest list",
+      "expect": "Records\\|Timestamp\\|Title",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot suggest list --all",
+      "expect": "Records",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read suggest-workflow",
+      "expect": "Suggest = AI-logged",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-31T12:02:37.8840788Z",
+  "updated": "2026-05-31T12:02:37.8840878Z",
+  "version": "1.0"
+}

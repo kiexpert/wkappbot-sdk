@@ -1,0 +1,42 @@
+{
+  "id": "wkjobs-ai-process-monitor-ref",
+  "app": "wkappbot-sdk",
+  "title": "wkjobs internals + gotchas reference",
+  "title_ko": null,
+  "desc": "T3 reference for wkjobs-ai-process-monitor: implementation internals, gotchas, wrapper/source layout, manual fallback, and dated fix history",
+  "steps": [
+    "INTERNALS: Get-CimInstance Win32_Process for CommandLine+PPID, Win32_PerfFormattedData_PerfProc_Process for CPU% snapshot, Get-Process for WorkingSet64+Threads+SessionId",
+    "GOTCHA: loop variable is apid not pid -- PowerShell PID is a reserved automatic variable for current process ID, using it as a foreach var causes ReadOnly error",
+    "WRAPPER: wkjobs.sh (bash) + wkjobs.cmd (CMD) are relative symlinks to wkwrap.sh in same dir. Run wkwrap.sh --install to add more. See also: wkappbot skill read wkwrap-ai-native-wrappers",
+    "SOURCE: wkjobs.ps1 lives in WKAppBot/bin/wkjobs.ps1 (edit there). scripts/wkjobs.ps1 is a symlink (mode 120000). wkjobs.sh relay uses local wkwrap.sh copy so wkfind.sh keeps SDK-specific wkfind.ps1.",
+    "PATH fix: prepend system dirs before codex exec to avoid PS shim shadowing system shell",
+    "COLUMNS: PID, NAME, CPU%, MEM(MB), THR(threads), STATE, AGE, CWD (native kernel read via NtQueryInformationProcess+ReadProcessMemory), CMD (args only). TERMINAL column: Get-TerminalHost walks parent chain to find the terminal/IDE hosting the AI process.",
+    "MANUAL FALLBACK (when wkjobs hangs): Get-CimInstance Win32_Process filtered on Name -match wkappbot/claude/codex/wkchat -- shows CommandLine per process. Zombie shell chains: wkappbot taskkill --force <pids>.",
+    "LIVE CASE 2026-07-03: wktasklist.ps1's typed param() block replaced with manual $args scanning to accept -FI/-FO/-V (PowerShell form), /FI/FO/V (real tasklist.exe form), and //FI/FO/V (Git-Bash-safe escaped form, same convention as 'taskkill //F //IM'). Also added [Console]::OutputEncoding UTF8 fix so output text including Korean renders correctly instead of mojibaking across the Bash terminal boundary. Root cause: Git Bash mangled a bare /FI into a bogus Windows path before it reached PowerShell, which positionally mis-bound to $FO's ValidateSet."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read wkjobs-ai-process-monitor-ref",
+      "expect": "INTERNALS",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wkjobs-ai-process-monitor-ref",
+      "expect": "LIVE CASE",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wkjobs-ai-process-monitor-ref",
+      "expect": "GOTCHA",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-07-02T15:46:04.7636672Z",
+  "updated": "2026-07-02T15:46:04.7636803Z",
+  "version": "1.0"
+}

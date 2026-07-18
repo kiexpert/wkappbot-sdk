@@ -1,0 +1,50 @@
+{
+  "id": "native-tool-deny-codex-only",
+  "app": "wkappbot-workflow",
+  "title": "Denying native Edit/Write is CODEX-only mechanism",
+  "title_ko": null,
+  "desc": "T1 core: denying native Edit and Write is a CODEX-ONLY mechanism (see codex-tool-wrappers); never inject an Edit or Write deny into a Claude .claude settings file. Hardcoded pace and opus-budget guard logic outranks CLAUDE.md harness:safe rules; guard order puts pace and opus-budget before spec-gate. Implementation: native-tool-deny-codex-only-howto. Incident history: native-tool-deny-codex-only-ref.",
+  "steps": [
+    "CONCEPT: denying native Edit and Write is a CODEX-ONLY mechanism. Codex cannot run the wkharness PreToolUse hook, so its native tools are blocked to FORCE routing through Claude-named cmd wrappers (see codex-tool-wrappers). This deny MUST target Codex config, NEVER the Claude Code per-repo .claude settings file.",
+    "HARD RULE: never inject an Edit or Write deny into a Claude .claude settings file. It disables Claude Code own Edit and Write for the whole repo, for every model including Opus, and cheap models then flail to fake progress. Deny-as-routing backfires on same-family Claude models.",
+    "PRINCIPLE: hardcoded pace and opus-budget guard logic OUTRANKS declarative CLAUDE.md harness:safe rules. A harness:safe rule CANNOT exempt an Edit or Write from the pace guard; the pace guard exempts only memory md files and the rules MD by hardcoded logic. To edit other files while over-target use wkappbot file edit or wkcodex.",
+    "GUARD ORDER: check pace and opus-budget BEFORE spec-gate and agent-brief-guard, so an over-target Opus spawn is denied up front instead of a cheap model satisfying spec-gate to break through the budget. The harness never spawns Opus itself.",
+    "RULES-MD is post-review, never deny-intercept: a rules-MD change fires a NON-blocking Opus review after the fact; blocking it makes cheap models read tool-disabled and flail.",
+    "NAVIGATION: implementation (correct Codex impl, cmd wrappers, guard-order impl, over-target allow-list, rules-MD review) is in native-tool-deny-codex-only-howto. Dated incident history (2026-05-27 settings pollution, 2026-06-25 consume-allow-once, 2026-06-29 approval-loop fix and authoritative Codex deny contract, 2026-07-03 TODO principles, 2026-07 Get-CodexToolName consolidation) is in native-tool-deny-codex-only-ref.",
+    "See also: codex-tool-wrappers (correct Codex routing impl), wkharness-guards (guard reference), claude-md-harness-rules (declarative rule syntax)."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read codex-tool-wrappers",
+      "expect": "<token>",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wkharness-guards",
+      "expect": "<token>",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read claude-md-harness-rules",
+      "expect": "<token>",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "harness",
+    " codex",
+    " deny",
+    " pace-guard",
+    " spec-gate",
+    " opus-budget",
+    " settings-json",
+    " guard-order"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-18T06:03:49.5977322Z",
+  "updated": "2026-07-03T16:54:48.6015516Z",
+  "version": "1.10"
+}

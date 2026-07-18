@@ -1,0 +1,42 @@
+{
+  "id": "chrome-pos-ioe-stale-duplicate",
+  "app": "wkappbot-core",
+  "title": "CHROME:POS InvalidOperationException -- stale-duplicate dedupe",
+  "title_ko": null,
+  "desc": "May-11 bare-title BUG-AUTO suggests for [CHROME:POS] InvalidOperationException are stale duplicates. Current source (b5a1ada35, 921013c3c, 25373b263) emits rich text via AutoSuggestPositionMismatch + Callstack: + ClampBoundsToVisible. Use skill-only dedupe resolve, no code change.",
+  "steps": [
+    "Identify pre-2026-05-12 CHROME:POS BUG-AUTO suggests with bare title and no message/stack.",
+    "Confirm fix commits are ancestors of HEAD: b5a1ada35 (rich BUG-AUTO with callstack), 921013c3c (--window-position override), 25373b263 (Runtime.evaluate/enable retry + ClampBoundsToVisible + caller-detection warn).",
+    "Resolve with --force \"stale duplicate\" --class skill-only -- no code change needed; current AutoSuggestPositionMismatch + posEx.Message already enrich the error path."
+  ],
+  "requirements": [
+    {
+      "cmd": "grep posEx.Message csharp/src/WKAppBot.WebBot/ChromeLauncher.LaunchWindow.cs",
+      "expect": "match",
+      "prompt": null
+    },
+    {
+      "cmd": "grep AutoSuggestPositionMismatch csharp/src/WKAppBot.CLI/Commands/WebCommands.Diagnostics.cs",
+      "expect": "match",
+      "prompt": null
+    },
+    {
+      "cmd": "git merge-base --is-ancestor b5a1ada35 HEAD",
+      "expect": "exit 0",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "chrome",
+    "cdp",
+    "suggest",
+    "dedupe"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-18T05:56:24.1330242Z",
+  "updated": "2026-05-18T05:56:24.1330405Z",
+  "version": "1.0"
+}

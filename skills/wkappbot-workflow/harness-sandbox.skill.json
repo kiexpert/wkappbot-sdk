@@ -1,0 +1,35 @@
+{
+  "id": "harness-sandbox",
+  "app": "wkappbot-workflow",
+  "title": "Harness Sandbox Rising Pattern Reflex",
+  "title_ko": null,
+  "desc": "Reflex for handling [harness-sandbox] trigger rising patterns.",
+  "steps": [
+    "When you trigger [harness-sandbox] and today-count exceeds 7d-avg: read the guard's skill (wkappbot skill read harness-sandbox), identify what changed, and pick a different approach to stay within sandbox limits."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read harness-sandbox",
+      "expect": "Harness Sandbox Rising Pattern Reflex",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill search harness-sandbox",
+      "expect": "harness-sandbox",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill list",
+      "expect": "harness-sandbox",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-13T13:07:07.3874255Z",
+  "updated": "2026-06-13T13:07:07.3874358Z",
+  "version": "1.0"
+}

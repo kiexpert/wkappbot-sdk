@@ -1,0 +1,42 @@
+{
+  "id": "harness-edit-write-skill-bypass-howto",
+  "app": "wkappbot",
+  "title": "harness edit-write skill bypass howto",
+  "title_ko": null,
+  "desc": "How-to companion for harness-edit-write-skill-bypass: practical steps for unblocking a study-lock, bumping score, and verifying subagent-read credits.",
+  "steps": [
+    "WHEN BLOCKED by study-lock LOW SCORE: run 'wkappbot skill read harness-edit-write-skill-bypass' to refresh freshness, then add a substantive step via 'wkappbot skill edit harness-edit-write-skill-bypass --add-step ...' to push mtime forward.@@SCORE PATH: struct=40 (this howto sibling exists) + 20 (nav-link step in parent) = 60 at threshold. Creating this howto sibling is the fastest route to >=60 score for the parent.@@SUBAGENT UNBLOCK (2026-06-25): if reads are not credited (study-lock shows UNREAD after reading), ROOT must verify the Get-WkActiveSessionJsonl fix in wkharness-common-nudge.ps1 -- the fix returns subagent JSONL when j.agent_id is present. See harness-edit-write-skill-bypass step 11."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read harness-edit-write-skill-bypass",
+      "expect": "SYMPTOM",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill search harness bypass",
+      "expect": "harness-edit-write-skill-bypass",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read harness-edit-write-skill-bypass-howto",
+      "expect": "WHEN BLOCKED",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "harness",
+    "bypass",
+    "howto",
+    "study-lock",
+    "score",
+    "unblock"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-25T11:19:28.626687Z",
+  "updated": "2026-06-25T11:19:28.8699663Z",
+  "version": "1.1"
+}

@@ -1,0 +1,41 @@
+{
+  "id": "ocr-usage-howto",
+  "app": "wkappbot",
+  "title": "OCR usage howto: pipeline, language options, subprocess, HTS pattern, coordinates",
+  "title_ko": null,
+  "desc": "Detailed how-to tier for ocr-usage: the screenshot-then-OCR pipeline, --lang options, Python subprocess usage, MFC/HTS owner-drawn fallback pattern, coordinate output, and when to prefer OCR over a11y read.",
+  "steps": [
+    "BASIC USAGE: wkappbot ocr <window-title-or-image.png> [--lang kor+eng] [--save] [-o output.txt]. Runs OCR on a window screenshot OR image file. Prints all recognized text with coordinates. --save: saves annotated screenshot with bounding boxes. Example: wkappbot ocr nfrunlite -o holdings.txt",
+    "PIPELINE -- screenshot then OCR (best for MFC/HTS): two-step: (1) wkappbot a11y screenshot GRAP -o snap.png (focusless, multi-node, cross-root). (2) wkappbot ocr snap.png [-o result.txt]. Separating capture and OCR lets you cache the screenshot, retry OCR with different lang, or preprocess the image.",
+    "COMBINED ONE-LINER for owner-drawn controls: wkappbot ocr nfrunlite reads the active window directly. For specific panels: wkappbot a11y screenshot nfrunlite --form [2000] -o panel.png then wkappbot ocr panel.png. Handles MFC owner-drawn controls that have no UIA text properties.",
+    "LANGUAGE OPTIONS: --lang kor+eng (default), --lang kor (Korean only), --lang eng (English only). HTS apps: use kor+eng for mixed stock codes (Latin) plus Korean labels. The plus separator means Tesseract reads both simultaneously, better for mixed-script screens.",
+    "SUBPROCESS USAGE (Python): r = subprocess.run([WKBOT, ocr, snap_path, -o, txt_path], capture_output=True, timeout=30); text = open(txt_path).read(). Or pipe directly: r = subprocess.run([WKBOT, ocr, snap_path], capture_output=True); text = r.stdout.decode(). No window focus needed for image-based OCR.",
+    "HTS OWNER-DRAWN PATTERN: UIA read returns empty for MFC owner-drawn grids (nfrunlite [2000], [0338] etc). Solution: (1) wkappbot a11y screenshot nfrunlite --form [2000] -o grid.png (2) wkappbot ocr grid.png --lang kor+eng -o grid.txt (3) parse txt for stock codes and values. This is the correct 3-tier fallback: UIA -> a11y read -> screenshot+OCR.",
+    "COORDINATE OUTPUT: OCR output includes per-word bounding box coordinates. Use these to identify which screen region contains specific values (e.g. profit/loss column). Useful for click targeting: find text position -> pass coords to a11y click --abs --x N --y N."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read ocr-usage-howto",
+      "expect": "BASIC USAGE",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read ocr-usage-howto",
+      "expect": "PIPELINE",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill search ocr-usage-howto",
+      "expect": "ocr-usage-howto",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-07-02T13:36:38.5045194Z",
+  "updated": "2026-07-02T13:36:38.5045292Z",
+  "version": "1.0"
+}

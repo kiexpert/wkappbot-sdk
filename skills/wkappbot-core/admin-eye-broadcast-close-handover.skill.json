@@ -1,0 +1,32 @@
+{
+  "id": "admin-eye-broadcast-close-handover",
+  "app": "wkappbot-core",
+  "title": "Admin Eye 2-phase broadcast close for clean hand-over",
+  "desc": "When a new admin Eye spawns, it evicts old admin Eye(s) via 2-phase \u0027broadcast close\u0027 before claiming the wkappbot_elevated pipe. Phase 1 (graceful) signals Global\\WKAppBotAdminEyeBroadcastClose named event; listening admins cancel their CTS and exit. Phase 2 (force kill) enumerates wkappbot-core processes and Process.Kill()s them when pipe still present \u2014 bootstrap path when old admin lacks the listener. Ensures clean gap (no admin Eye window present) before new takes over, eliminating named-pipe contention.",
+  "steps": [
+    "WHY THE PATTERN EXISTS\nAdmin Eye can fall into a state where it accepts pipe connections but hangs on request processing (Bug 1). Without active eviction, simply spawning a new admin Eye fails: the hung one still holds the pipe, new one contends, requests route to the dead one. Plain kill breaks the \u0027NEVER kill Eye\u0027 rule for user Eye \u2014 but admin Eye is separate, has no mutex, and can be replaced.",
+    "PHASE 1 \u2014 GRACEFUL BROADCAST\nNew admin calls AdminEyeBroadcastClose.FireBroadcast().\nUses Global\\WKAppBotAdminEyeBroadcastClose ManualResetEvent.\n  ev.Set() \u2192 sleep 500ms \u2192 ev.Reset()\n  poll File.Exists(\u0027\\.\\pipe\\wkappbot_elevated\u0027) up to 2s\nOld admins with StartListener() active observe the signal, cancel their\nproxyCts, release pipe, exit process. When no admin holds the pipe,\nFile.Exists returns false \u2192 gap confirmed.",
+    "PHASE 2 \u2014 FORCE KILL FALLBACK\nIf pipe still present after the grace period (old admin lacks listener \u2014\ntypical first-upgrade bootstrap), enumerate wkappbot-core processes and\nProcess.Kill(entireProcessTree:false) each one except self.\nCaller is an already-elevated admin Eye so Kill is authorized.\nGuardian respawns user Eye afterward with --sudo marker inherited.",
+    "WIRING INTO ADMIN EYE STARTUP\nIn EyeCommand isElevatedArg branch, immediately after entering the\nelevated proxy path:\n  AdminEyeBroadcastClose.FireBroadcast();   // before any resource claim\n  var proxyCts = new CancellationTokenSource();\n  AdminEyeBroadcastClose.StartListener(proxyCts);  // watch for future successors\nThen start pipe server and enter main loop \u2014 clean slate guaranteed.",
+    "SUBPROCESS TIMEOUT BACKSTOP\nInside admin Eye ExecuteCommand, WaitForExitAsync must have a hard\ntimeout (30s recommended). Without it, a hung subprocess blocks the\nrequest handler forever. With the timeout:\n  proc.Kill(entireProcessTree:true) on timeout\n  return EyeProxyResponse { ExitCode = -1, Error = \u0027Subprocess timeout\u0027 }\nPipe handler always returns, admin Eye keeps servicing new requests.",
+    "CALLER-SIDE FAST-FAIL PAIRING\nIn Core --sudo proxy-route, ExecuteViaProxy should use a short timeout\n(e.g. 1500ms) for the first attempt. If -1 returned, call\nLaunchElevatedEye to trigger the spawn \u2192 FireBroadcast \u2192 fresh admin.\nThis keeps the user-visible round-trip under ~3s even in worst case.",
+    "OBSERVABILITY MARKERS (PULSE \u002B stderr)\nExpect to see these during hand-over:\n  [EYE:ADMIN-CLOSE] broadcast close fired \u2014 waiting for old admin Eye(s) to drain\n  [EYE:ADMIN-CLOSE] graceful close did not free pipe \u2014 escalating to force kill\n  [EYE:ADMIN-CLOSE] force-killed N other wkappbot-core process(es)\n  [EYE:ADMIN-CLOSE] pipe cleared after force kill \u2014 clean gap\nAbsence of these while [SUDO] Routing appears means a hand-over never\ntriggered \u2014 hung admin is still live. Investigate subprocess timeouts.",
+    "REGRESSION TESTS\nbin/wkappbot.hq/experience/tests/sudo/test-mcp-sudo-gate.sh (T1\u2013T10)\n  T7 covers admin Eye round-trip; T7d budget 8s verifies fast-fail \u002B recovery path total.\n  If T7c/d fail repeatedly across sessions, root cause is inside admin Eye\n  ExecuteCommand subprocess spawn \u2014 NOT the broadcast-close layer."
+  ],
+  "tags": [
+    "project",
+    "admin",
+    "eye",
+    "ipc",
+    "named-pipe",
+    "recovery",
+    "broadcast",
+    "hand-over"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-16T10:43:03.8891454Z",
+  "updated": "2026-04-16T10:43:03.8891545Z",
+  "version": "1.0"
+}

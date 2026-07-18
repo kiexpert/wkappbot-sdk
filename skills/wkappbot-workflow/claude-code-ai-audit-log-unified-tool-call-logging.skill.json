@@ -1,0 +1,33 @@
+{
+  "id": "claude-code-ai-audit-log-unified-tool-call-logging",
+  "app": "wkappbot-workflow",
+  "title": "Claude Code AI Audit Log -- unified tool call logging",
+  "title_ko": null,
+  "desc": "PreToolUse hook \u002B Codex wrapper logs all AI tool calls with timestamp and CWD slug to D:/GitHub/ai-audit.log.",
+  "steps": [],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read claude-code-ai-audit-log",
+      "expect": "steps include audit-log.ps1 and CWD slug formula",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot eye status",
+      "expect": "OK (hook is async, eye not blocked)",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill search audit log claude",
+      "expect": "returns claude-code-ai-audit-log",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-02T10:17:53.4285803Z",
+  "updated": "2026-05-02T10:17:53.4285896Z",
+  "version": "1.0"
+}

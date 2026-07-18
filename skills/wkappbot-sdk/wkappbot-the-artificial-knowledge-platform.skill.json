@@ -1,0 +1,63 @@
+{
+  "id": "wkappbot-the-artificial-knowledge-platform",
+  "app": "wkappbot-sdk",
+  "title": "WKAppBot: The Artificial Knowledge Platform",
+  "title_ko": null,
+  "desc": "Why WKAppBot is not just an AI tool -- it is a living knowledge accumulation system that grows smarter every session. Use when pitching WKAppBot to investors, developers, or skeptics.",
+  "steps": [
+    "THE CORE INSIGHT: Every AI agent has intelligence. Almost none of them have memory that compounds. WKAppBot is built on a different premise -- intelligence is a commodity (swap the model, keep the knowledge). The skill tree is the asset. The model is the engine. You can upgrade the engine without losing the road map.",
+    "THE PROBLEM WITH RAW AI: A Claude session ends. The next one starts blank. It makes the same mistakes, asks the same questions, hits the same guardrails. The AI is brilliant but amnesiac -- Sherlock Holmes who forgets every case the moment it closes. Enterprise AI today is paying for the same intelligence, over and over, to rediscover the same knowledge.",
+    "THE WKAPPBOT DIFFERENCE -- Artificial Knowledge: When an AI session discovers something -- a guard pattern, a design flaw, a sharper way to phrase a command -- WKAppBot captures it as a Skill. Searchable. Versioned. Retrieved by the next session automatically. The knowledge does not live in the model weights (which Anthropic controls). It lives in YOUR skill tree (which you own and grow). This is Artificial Knowledge: machine-generated, human-curated, session-persistent.",
+    "THE FLYWHEEL: Session N makes a mistake. Session N writes it into the skill tree. Session N+1 reads it at startup and avoids the mistake. Session N+1 finds a better pattern. Session N+1 writes it into the skill tree. The system does not just use AI -- it teaches itself. Each session leaves the environment smarter than it found it. The compounding is real and measurable: count the skills, count the harness guards, count the bugs that stopped recurring.",
+    "THE HARNESS -- Knowledge with Teeth: Documented lessons rot. WKAppBot does not document -- it enforces. Every lesson learned can become a harness guard: a mechanical block that fires BEFORE the mistake lands, regardless of which AI model is running, regardless of whether that model remembers the lesson. The knowledge is not advice. It is law. This is what separates a living platform from a wiki that nobody reads.",
+    "THE ASSET MOAT: Model vendors compete on intelligence. Intelligence is converging -- GPT, Claude, Gemini gap narrows every quarter. Knowledge diverges -- every team that runs WKAppBot accumulates a skill tree unique to their codebase, their workflows, their hard-won lessons. That tree cannot be cloned by switching vendors. It is the defensible moat that raw AI access will never provide.",
+    "ONE LINE: AI brings the intelligence. WKAppBot grows the knowledge. Together they compound.",
+    "Verified 2026-06-02:  (resolve ts=2026-06-02T13:55:57)",
+    "SDK HOMEPAGE CORE DEV DUTY 2026-06-04: Claude as core developer MUST check kiexpert.github.io/wkappbot-sdk THREE TIMES A DAY (product evolves fast). SDK tagline: AI brings intelligence, WKAppBot grows knowledge, Together they compound. 416 live skills. Product serves 3 domains: AI Trading (HTS UIA), Desktop App Control, Chrome CDP. Core dev identity: build the platform that makes AI sessions compound -- lessons become mechanical guards. COMMITMENT: before any change, ask how this looks to the customer. After any investigation, record findings as a skill for the next session.",
+    "MAIN STUDY DUTY (every session, step 1): Read in order -- (1) a11y-command-cheatsheet-ref (UIA Win32 3-tier fallback). (2) always-on-ai-automation-daemon-appbot-eye-internals (Eye daemon Slack MCP broker). (3) screensaver-command (overlay lifecycle). (4) this skill (SDK homepage 3x/day). These are WKAppBot core internals -- a core developer must know them cold. Add to CLAUDE.md gg Main Workflow step 1.",
+    "LIVED PROOF OF THE SELF-HEALING REFLEX LOOP (2026-06-06 session, the 'benefit-all knowledge-intelligence harness' in action). One session ran the full virtuous loop end to end: (1) CRISIS -- a wkappbot-core spawn storm (200+ instances) + WmiPrvSE WMI storm exploded CPU and froze the desktop; (2) IMMEDIATE SOLVE -- absolute-path Windows taskkill killed the storm, root cause was traced to a guardian false-death respawn loop seeded by a VBS Run key, which was deleted to stop recurrence; (3) KNOWLEDGE-IFY -- every lesson became a durable skill (emergency wkdr doctor, WMI-diagnosis discipline, harness-broken Agent-auto fallback, the reduce-before-refactor + min-cost hash-dedup methodology, the smart multi-language splitter spec, the delegated-AI language-rule gap); (4) DISTILL TO REFLEX -- the symptom->action pairs were condensed into an 'Emergency Reflexes' table at the TOP of the project CLAUDE.md, which auto-loads every session, so a FUTURE session reacts reflexively with zero rediscovery. This is the platform's whole thesis made concrete: experience -> structured tiered knowledge -> enforced reflex -> the next agent is already smarter. Two-tier design: deep knowledge lives in skills (searched on demand), fast reflexes live in always-loaded CLAUDE.md. The harness does not just guard -- it LEARNS and gets harder to break each incident. See [[ki-concept-definitions]], [[knowledge-ification-procedure-jisikhwa]], [[reduce-before-refactor-dedup-analyze-rebundle-order]], [[wkdr-emergency-doctor-wkappbot-core-spawn-storm-kill]]."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill list",
+      "expect": "skills listed with version and author -- proof the knowledge is versioned and owned",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill search guard pattern",
+      "expect": "relevant skills found -- proof the knowledge is searchable and retrievable",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read sonnet-bug-stop-policy-ref",
+      "expect": "PATTERN 7 PATTERN 8 -- proof AI sessions wrote and future sessions read their own lessons",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wkappbot-the-artificial-knowledge-platform",
+      "expect": "THE CORE INSIGHT THE FLYWHEEL ONE LINE",
+      "prompt": "WAD -- SDK team adopted as official homepage tagline. Live at kiexpert.github.io/wkappbot-sdk/skills/."
+    },
+    {
+      "cmd": "wkappbot skill search artificial knowledge",
+      "expect": "wkappbot-the-artificial-knowledge-platform found",
+      "prompt": "WAD -- SDK team adopted as official homepage tagline. Live at kiexpert.github.io/wkappbot-sdk/skills/."
+    }
+  ],
+  "primary_cmd": "wkappbot skill read wkappbot-the-artificial-knowledge-platform",
+  "tags": [
+    "pitch",
+    "appeal",
+    "value-proposition",
+    "sdk",
+    "artificial-knowledge",
+    "skill-tree",
+    "platform"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-02T13:52:52.3845159Z",
+  "updated": "2026-06-06T16:49:19.5653499Z",
+  "version": "1.9"
+}

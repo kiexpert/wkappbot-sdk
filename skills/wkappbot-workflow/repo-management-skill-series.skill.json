@@ -1,0 +1,51 @@
+{
+  "id": "repo-management-skill-series",
+  "app": "wkappbot-workflow",
+  "title": "Repo management skill series (cluster anchor): hygiene as enforced knowledge",
+  "title_ko": null,
+  "desc": "Cluster anchor for the repo-management series -- one skill per repo-hygiene concern (GC, 400-line splitting, ASCII-only source, sandbox-suffix naming, file placement, commit hygiene). Repo cleanliness is enforced knowledge, not vibes. Grows one-by-one as each concern is hit.",
+  "steps": [
+    "PHILOSOPHY (user 2026-06-18): repo MANAGEMENT itself deserves a SKILL SERIES -- one skill per concern -- because a messy repo is token-hostile to every future AI session and silent drift (orphans, oversized files, encoding traps) compounds. Treat repo hygiene as ENFORCED knowledge (a wkdoctor check + a tool), never a one-off cleanup. The series grows ONE-BY-ONE as each concern is encountered.",
+    "SERIES MEMBERS (so far): (1) [[repo-garbage-collector-unused-file-quarantine]] -- quarantine UNUSED files to .tmp/unused-<ts>/ (reversible); (2) [[ascii-only-source-no-decorative-unicode]] -- .ps1/source must be pure ASCII (no box-drawing/bullet/smart-quote), the pre-commit gate blocks them; (3) [[wksplit-cs-utility]] -- the 400-line soft cap + 0-token deterministic splitter; cluster also touches sandbox-suffix naming (-proto/-demix/-bak/-probe), file placement (one canonical home + shim, see [[willkim-tool-harness-independence-install-location]]), and encoding (UTF-8 canonical, ASCII for .ps1).",
+    "HOW THE SERIES IS USED: each member is (a) a wkdoctor health CHECK that surfaces the problem in the routine checkup, AND (b) a TOOL/discipline that fixes it conservatively + reversibly. Verify every tool with synthetic/live/static ([[verify-tool-or-guard-synthetic-live-static]]).",
+    "ADDING A MEMBER: when you hit a new repo-hygiene concern (a trap, a mess, a drift), capture it as a NEW skill, add a member line here, and -- if mechanizable -- a wkdoctor check + a tool. Keep this anchor the single index. Cluster: [[wkdoctor-system-physician]], [[hongik-harness-modular-independence-design]].",
+    "SERIES MEMBER (4) added 2026-06-18: [[commit-push-hook-policy-overview]] -- the single index of the git commit/push hook policy (pre-commit ASCII + cheap-source + model-tag + todo gates; pre-push model-tier + no-verify; harness PreToolUse --no-* / hooksPath / gpgsign / WKHARNESS_AGENT_MODEL blocks; and the un-bypassable teeth = server-side CI + branch protection). It consolidated ~8 scattered skills that had no overview."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read repo-management-skill-series",
+      "expect": "PHILOSOPHY",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read repo-management-skill-series",
+      "expect": "SERIES MEMBERS",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read repo-management-skill-series",
+      "expect": "ADDING A MEMBER",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "repo",
+    "management",
+    "hygiene",
+    "series",
+    "cluster",
+    "anchor",
+    "cleanup",
+    "index",
+    "t1",
+    "core",
+    "conventions"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-18T05:36:20.3594353Z",
+  "updated": "2026-06-18T05:42:58.0908678Z",
+  "version": "1.2"
+}

@@ -1,0 +1,35 @@
+{
+  "id": "harness-edit-write-skill-bypass-ref",
+  "app": "wkappbot",
+  "title": "Edit/Write Bypass Ref",
+  "title_ko": null,
+  "desc": "Incident log and history for harness:skill bypass behavior in Edit/Write tool path",
+  "steps": [
+    "2026-05-26: bypass found, safe-rule early-exit fixed (d3fba1b). 2026-06-24: shell-API write hole confirmed (Set-Content bypasses freeze). 2026-06-25: subagent-read bug fixed in Get-WkActiveSessionJsonl. 2026-06-27: ROOT Edit bypasses on-load gate but study-lock score<60 still blocks edits."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read harness-edit-write-skill-bypass-ref",
+      "expect": "bypass",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read harness-edit-write-skill-bypass-ref",
+      "expect": "Incident log",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read harness-edit-write-skill-bypass-ref",
+      "expect": "2026-05-26",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-27T03:49:32.8362249Z",
+  "updated": "2026-06-27T03:49:32.8362338Z",
+  "version": "1.0"
+}

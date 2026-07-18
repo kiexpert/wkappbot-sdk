@@ -1,0 +1,35 @@
+{
+  "id": "harness-source-edit-requires-skill-lock-howto",
+  "app": "wkappbot-workflow",
+  "title": "Skill-lock registration howto",
+  "title_ko": null,
+  "desc": "Execution detail for the source-edit skill-lock. Missed write-vectors to block, glob-pattern registration rules, gate-comment clarity, and the repo-root wk-launcher edit-exempt extension. Core principle is harness-source-edit-requires-skill-lock.",
+  "steps": [
+    "MISSED SOURCE-WRITE VECTORS TO BLOCK (scope ALL to the source-ext regex, EXEMPT .tmp, remedy is the Edit tool or wkappbot file edit). Vectors are in-place stream editors sed -i perl -i awk inplace, binary hex writers dd of= and xxd -r and base64 -d to source, overwrite-by-copy cp mv install ln -f with a source-ext destination, truncate -s and the colon-redirect, inline interpreter writes python -c open-w node -e fs.writeFileSync ruby php, PowerShell .NET writers IO.File WriteAllText Out-File Set-Content Add-Content to source-ext, interactive editors vim vi nano emacs ed that hang a non-interactive shell, and patch source. Proto-first plus test that each does NOT false-block non-source or .tmp before landing."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read harness-source-edit-requires-skill-lock-howto",
+      "expect": "returns registration howto",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read harness-source-edit-requires-skill-lock",
+      "expect": "core default-deny principle",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read claude-md-harness-rules",
+      "expect": "harness rule and glob syntax",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-07-01T07:59:31.6102615Z",
+  "updated": "2026-07-01T07:59:31.6102702Z",
+  "version": "1.0"
+}

@@ -1,0 +1,45 @@
+{
+  "id": "ai-agent-desktop-automation-landscape-competitor-and-pattern-reference-2026-04",
+  "app": "wkappbot-core",
+  "title": "[UI Automata / OculOS / DirectShell / Talon] AI Desktop Automation Competitors — 2026-04 HN Survey",
+  "title_ko": null,
+  "desc": "ARCHIVED: moved to ai-agent-automation-patterns",
+  "steps": [
+    "UI AUTOMATA (https://automata.visioncortex.org): Windows UIA-based AI agent automation. Direct WKAppBot competitor. WKAppBot advantages: self-healing DYN-A11Y, 5-tier fallback (UIA->Vision->OCR->Claude->Coordinate), MCP integration, Slack loop. Benchmark when evaluating automation reliability claims.",
+    "AGENT-DESKTOP (https://github.com/lahfir/agent-desktop, seen 2026-05-06): Native Rust CLI for desktop automation over OS accessibility trees. Compare against WKAppBot a11y/grap on deterministic refs, progressive shallow snapshot plus drill-down, AX-first action fallback chain, structured JSON error codes with recovery hints, and FFI option to avoid fork-per-call overhead.",
+    "OCULOS UPDATE (https://github.com/huseyinstif/oculos, seen 2026-05-06): REST API + MCP desktop automation over OS accessibility trees, session-scoped element IDs, dashboard inspector/recorder/WebSocket events, and Windows/macOS/Linux backends. Compare against WKAppBot on fallback tiers, command surface, dashboard recorder, and MCP setup friction."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot suggest show 2026-05-06T02:05:43",
+      "expect": "lahfir/agent-desktop",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read hn-self-healing-browser-harness-via-direct-cdp-ai-computer-use-pattern-reference",
+      "expect": "agent-desktop",
+      "prompt": null
+    },
+    {
+      "cmd": "Get-Content skills\\wkappbot-core\\ai-agent-desktop-automation-landscape-competitor-and-pattern-reference-2026-04.skill.json",
+      "expect": "deterministic refs",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "competitive",
+    "automation",
+    "mcp",
+    "computer-use",
+    "uia",
+    "research",
+    "2026"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-22T10:14:39.3035926Z",
+  "updated": "2026-05-31T07:49:12.8342805Z",
+  "version": "1.5"
+}

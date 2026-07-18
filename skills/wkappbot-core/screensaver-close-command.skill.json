@@ -1,0 +1,59 @@
+{
+  "id": "screensaver-close-command",
+  "app": "wkappbot-core",
+  "title": "screensaver close: kill all running screensaver processes",
+  "title_ko": null,
+  "desc": "wkappbot screensaver close finds every wkappbot-core process whose command line contains 'screensaver' and sends WM_CLOSE (or Kill if windowless). Eye will respawn screensaver when idle conditions are met again.",
+  "steps": [
+    "Command: wkappbot screensaver close",
+    "Dispatch: Program.cs screensaver case checks restArgs[0]==close -> ScreenSaverCloseCommand(). No args -> ScreenSaverStandaloneCommand() (existing behavior unchanged).",
+    "Close logic: GetProcessesByName(wkappbot-core) -> GetProcessCommandLine -> Contains(screensaver) -> PostMessageW(WM_CLOSE) if main window exists, else p.Kill(). Reports count closed.",
+    "Eye respawn: Eye (AppBotEyeGlobalMode.cs) auto-respawns screensaver when humanIdleMs >= 10000ms. Closing via this command is equivalent to user becoming active -- Eye restarts it next idle cycle.",
+    "Use case: force-close stuck screensaver overlay, test screensaver lifecycle, or dismiss before automation that requires clean screen state.",
+    "SEE ALSO: screensaver-close-command-ref for dated bug fixes, the false-positive-is-worse-than-false-negative detection principle, and the (0,0) pixel-check snippet used in the gg session-start screen-health check."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot eye tick",
+      "expect": "healthy",
+      "prompt": "Fixed acc845bef -- WipeBlockingOverlays safe-list + RGB(0,0,0) exact check. False-positive on browser windows eliminated."
+    },
+    {
+      "cmd": "wkappbot windows",
+      "expect": "chrome listed with normal state not minimized",
+      "prompt": "Fixed acc845bef -- WipeBlockingOverlays safe-list + RGB(0,0,0) exact check. False-positive on browser windows eliminated."
+    },
+    {
+      "cmd": "wkappbot a11y find proc:chrome",
+      "expect": "chrome window found visible",
+      "prompt": "Fixed acc845bef -- WipeBlockingOverlays safe-list + RGB(0,0,0) exact check. False-positive on browser windows eliminated."
+    }
+  ],
+  "primary_cmd": "wkappbot screensaver close",
+  "tags": [
+    "screensaver",
+    "close",
+    "overlay",
+    "wkappbot-core",
+    "process-management"
+  ],
+  "source_refs": [
+    {
+      "file": "csharp/src/WKAppBot.CLI/Commands/ScreenSaverStandaloneCommand.cs",
+      "line": null,
+      "pattern": null,
+      "note": null
+    },
+    {
+      "file": "csharp/src/WKAppBot.CLI/Program.cs",
+      "line": null,
+      "pattern": null,
+      "note": null
+    }
+  ],
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-03T09:30:00Z",
+  "updated": "2026-07-03T05:42:33.441255Z",
+  "version": "1.24"
+}

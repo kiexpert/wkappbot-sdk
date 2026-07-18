@@ -1,0 +1,39 @@
+{
+  "id": "haiku-sandbox-problem-solving-howto",
+  "app": "wkappbot-workflow",
+  "title": "Haiku Sandbox Problem Solving T2 HowTo",
+  "title_ko": null,
+  "desc": "T2 domain tier. Brief templates for Haiku prototype + wkcodex apply. When to prototype vs direct apply. Anti-patterns.",
+  "steps": [
+    "HAIKU BRIEF TEMPLATE: 'Problem: [1 sentence]. Write new file /tmp/proof-X.ps1 (or .cs). Input: [exact values]. Expected output: [exact values]. Print PASS/FAIL. Do NOT touch existing source.' Short, unambiguous, sandboxed.",
+    "WKCODEX BRIEF TEMPLATE (after Haiku confirms PASS): 'File: csharp/src/.../X.cs. Change: old=[exact text] new=[exact text]. Build: wkappbot-pub build.cmd. Smoke: wkappbot cdp open https://example.com. Commit with keyword [X].'",
+    "WHEN TO PROTOTYPE FIRST: algorithm uncertain, multiple approaches possible, subtle timing/race condition, logic spans 3+ conditions. WHEN TO APPLY DIRECTLY: Sonnet already understands fix from reading source, change <= 5 lines, trivial rename/constant change.",
+    "ANTI-PATTERNS: (A) 'Haiku, find bug in CdpClient.cs and fix it' = diagnose+edit = context overload. (B) 'wkcodex, fix the retry bug' = vague = wrong result. (C) Sonnet uses Edit tool directly on complex source = PATTERN 6 violation.",
+    "PARALLEL PATTERN: when solution has 2 candidate approaches, fire Haiku × 2 simultaneously (each builds different proof). Sonnet picks winner. Faster than sequential and no risk to original source."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read haiku-sandbox-problem-solving-howto",
+      "expect": "T2 brief templates",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read haiku-sandbox-problem-solving",
+      "expect": "T1 pattern",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wkappbot-build-verify-workflow",
+      "expect": "build steps after apply",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-31T14:42:25.9529134Z",
+  "updated": "2026-05-31T14:42:25.9529241Z",
+  "version": "1.0"
+}

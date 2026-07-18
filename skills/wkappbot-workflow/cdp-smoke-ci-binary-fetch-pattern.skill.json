@@ -1,0 +1,35 @@
+{
+  "id": "cdp-smoke-ci-binary-fetch-pattern",
+  "app": "wkappbot-workflow",
+  "title": "cdp-smoke-ci-binary-fetch-pattern",
+  "title_ko": null,
+  "desc": "cdp-smoke CI fails when core-* releases share identical createdAt timestamp: sort-by-createdAt is non-deterministic, and the bin cache skip condition can serve a stale binary. Canonical fix: gh release download --latest + no if-condition.",
+  "steps": [
+    "ROOT CAUSE A (2026-06-28): Two core-* releases with IDENTICAL createdAt -- the PowerShell Sort-Object createdAt -Descending picks non-deterministically. Sometimes CI gets the fix binary, sometimes not. Diagnosis: gh release list --json tagName,createdAt,isLatest.@@ROOT CAUSE B: Fetch step has 'if: hashFiles(bin/wkappbot-core.exe) == empty' -- bin cache restores old binary so the Fetch step is SKIPPED entirely. CI runs with stale binary permanently.@@FIX in cdp-smoke.yml: (1) Remove the 'if:' condition line from Fetch step. (2) Replace the 8-line PowerShell sort/select/download block with one line: gh release download --latest --repo env:CORE_REPO --pattern wkappbot-core.exe --dir bin --clobber.@@IMMEDIATE TRIAGE (no yml edit needed): delete the ambiguous release without the fix -- gh release delete TAGNAME --repo kiexpert/WKAppBot --yes. This leaves only the correct Latest release for the sort to find.@@ALWAYS-VERIFY release timestamps when CI binary behavior is flaky: gh release list --repo REPO --json tagName,createdAt,isLatest -- identical createdAt = non-deterministic.@@INCIDENT DATE: 2026-06-28. Releases involved: core-ci-headless-20260626 (with fix, isLatest=true) vs core-20260625-2219-7dbba19 (without fix, same createdAt). Deleted the latter as immediate fix."
+  ],
+  "requirements": [
+    {
+      "cmd": "gh release list --repo kiexpert/WKAppBot --json tagName,createdAt,isLatest --limit 5",
+      "expect": "isLatest shown",
+      "prompt": null
+    },
+    {
+      "cmd": "gh release download --latest --repo kiexpert/WKAppBot --pattern wkappbot-core.exe --dir /tmp --clobber",
+      "expect": "wkappbot-core.exe downloaded",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read cdp-smoke-ci-binary-fetch-pattern",
+      "expect": "ROOT CAUSE A found",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-28T20:22:15.8449481Z",
+  "updated": "2026-06-28T20:22:16.0314791Z",
+  "version": "1.1"
+}

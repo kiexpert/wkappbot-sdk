@@ -1,0 +1,33 @@
+{
+  "id": "claude-code-kill-guard-hook-block-taskkill-stop-process-for-out-of-cwd-processes",
+  "app": "wkappbot-workflow",
+  "title": "Claude Code Kill Guard Hook -- block taskkill/Stop-Process for out-of-CWD processes",
+  "title_ko": null,
+  "desc": "PreToolUse hook intercepts taskkill and Stop-Process. Processes outside CWD require user approval; inside CWD allowed silently.",
+  "steps": [],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read claude-code-kill-guard-hook",
+      "expect": "steps include kill-guard.ps1 and CWD check logic",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot eye status",
+      "expect": "OK (kill-guard hook does not block eye processes)",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill search kill guard hook",
+      "expect": "returns claude-code-kill-guard-hook",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-02T10:18:12.9498379Z",
+  "updated": "2026-05-02T10:18:12.9498472Z",
+  "version": "1.0"
+}

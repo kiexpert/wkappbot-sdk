@@ -1,0 +1,33 @@
+{
+  "id": "declarative-automation-claude-md-harness-as-scheduler",
+  "app": "wkappbot-workflow",
+  "title": "Declarative Automation: CLAUDE.md + Harness as Scheduler",
+  "title_ko": null,
+  "desc": "CLAUDE.md CronCreate declarations + harness auto-detection replaces custom scheduler. Recording execution in CLAUDE.md guarantees periodic execution without deployment.",
+  "steps": [],
+  "requirements": [
+    {
+      "cmd": "wkappbot cron list",
+      "expect": "{\"cron\":",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read declarative-automation",
+      "expect": "Principle.*주기적 실행",
+      "prompt": null
+    },
+    {
+      "cmd": "grep '## Nightly Schedules' $(cd /d D:\\GitHub\\WKAppBot && echo CLAUDE.md)",
+      "expect": "## Nightly Schedules",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-28T04:38:51.2092208Z",
+  "updated": "2026-05-28T04:38:51.20923Z",
+  "version": "1.0"
+}

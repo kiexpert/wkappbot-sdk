@@ -1,0 +1,40 @@
+{
+  "id": "codex-cli-wkappbot-usage-howto",
+  "app": "wkappbot-workflow",
+  "title": "Codex CLI in WKAppBot (howto)",
+  "title_ko": null,
+  "desc": "Operate Codex CLI inside WKAppBot: install, modes, sandbox/config, the wkcodex wrapper.",
+  "steps": [
+    "INSTALL: prefer repo-local bin codex.exe; smoke-check codex --help and codex --version; if auth stale run codex login (creds under ~/.codex). RC-SENSITIVE: rc=0 success, rc=1 handled failure, any other rc = investigate even if the terminal looked quiet.",
+    "MODES: codex [PROMPT] interactive; codex exec non-interactive automation; codex review for review jobs; codex resume --last / fork --last to continue/branch (resumed runs are separate executions).",
+    "REPRODUCIBILITY: -c key=value, --model MODEL (codex-mini cheap / gpt-5 strong), -p PROFILE; config files for defaults, CLI overrides for one-offs.",
+    "EXECUTION INTENT: -s read-only / workspace-write / danger-full-access, -a on-request, --full-auto; -C DIR anchors the tree, --add-dir for extra writable roots; --search only when web grounding needed; codex apply to apply the last diff.",
+    "WKCODEX WRAPPER (primary method): wkcodex.ps1 'skill-read A. skill-read B. skill-read C. task' -- pre-checks 3+ skill refs + forbidden kill/skill-edit patterns, auto-injects sandbox bypass, post-checks git diff + CP949.",
+    "STREAMING: codex exec --json prints JSONL events live; SPEC-GATE: non-mini codex exec needs a SPEC block + 3 skill refs, codex-mini skips both."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read codex-cli-wkappbot-usage-howto",
+      "expect": "MODES",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read codex-cli-wkappbot-usage-howto",
+      "expect": "WKCODEX WRAPPER",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read codex-cli-wkappbot-usage-howto",
+      "expect": "EXECUTION INTENT",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-24T07:24:45.2444633Z",
+  "updated": "2026-06-24T07:24:45.2444752Z",
+  "version": "1.0"
+}

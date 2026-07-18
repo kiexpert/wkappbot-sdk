@@ -1,0 +1,43 @@
+{
+  "id": "cdp-port-block-foreign-chrome-clear",
+  "app": "wkappbot-workflow",
+  "title": "cdp-port-block-foreign-chrome-clear",
+  "title_ko": null,
+  "desc": "Fix: CDP port 9612-9615 occupied by foreign Chrome processes -- find and kill the blockers",
+  "steps": [
+    "SYMPTOM: wkappbot cdp open fails with 'CDP port block 9612-9615 fully occupied by foreign processes'.",
+    "CAUSE: ports are SHA256-derived per CWD (D:/GitHub/personal-docs -> 9612-9615). Another Chrome instance grabbed them before wkappbot.",
+    "DIAGNOSE: netstat -ano ",
+    " findstr '961[2-5]' -> note PIDs. Then tasklist /FI 'PID eq <pid>' to confirm they are chrome.exe.",
+    "CHECK tabs on port: curl -s http://127.0.0.1:9612/json ",
+    " python3 -c \"import json,sys; [print(t['url'][:80]) for t in json.load(sys.stdin)]\"",
+    "KILL foreign Chrome: Stop-Process -Id <pid> -Force (safe -- these are NOT wkappbot-owned instances). OR close all Chrome windows manually if unsure.",
+    "VERIFY clear: wkappbot cdp open <url> => OK {hwnd:..., cdp:9612}",
+    "NOTE: wkappbot-owned Chrome (launched by cdp open) appears in wkappbot a11y windows. Foreign = not in that list. Never kill wkappbot-owned Chrome -- use wkappbot cdp close instead."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read cdp-port-block-foreign-chrome-clear",
+      "expect": "SYMPTOM",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill search cdp port block",
+      "expect": "cdp-port-block",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill search chrome foreign port",
+      "expect": "cdp",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-09T03:37:26.0906696Z",
+  "updated": "2026-05-09T03:37:26.0906784Z",
+  "version": "1.0"
+}

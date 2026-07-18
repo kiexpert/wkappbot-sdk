@@ -1,0 +1,47 @@
+{
+  "id": "nvidia-overlay-blackscreen-kill-howto",
+  "app": "wkappbot-core",
+  "title": "NVIDIA overlay black-screen kill (howto)",
+  "title_ko": null,
+  "desc": "T2 howto for nvidia-overlay-blackscreen-kill: detect/kill commands, permanent GeForce Share fix, integrated auto-kill, screensaver self-wipe.",
+  "steps": [
+    "DETECT: wkappbot screensaver close logs '[SCREENSAVER] wiped ... NVIDIA GeForce Overlay'. Or PowerShell: Get-Process 'NVIDIA Overlay' where CPU greater-than 50.",
+    "KILL SESSION manually if needed: Get-Process 'NVIDIA Overlay' -EA SilentlyContinue then Stop-Process -Force; Get-Process nvcontainer sort CPU desc select first 2 then Stop-Process -Force.",
+    "PERMANENT FIX: GeForce Experience to Settings to Share to toggle OFF -- stops respawn at OS level.",
+    "INTEGRATED (v7.3.193+): screensaver close auto-kills NVIDIA Overlay + nvsphelper64 + nvcontainer when a fullscreen black HWND is detected; knownOverlayProcs covers all three, no manual kill needed (code 66a4f31a5).",
+    "WKAPPBOT_NO_SCREENSAVER=1 disables the periodic Eye screensaver scan; unset to re-enable the 2s auto-scan.",
+    "SCREENSAVER SELF-WIPE: ScreenSaverOverlay.Lifecycle.cs calls WipeBlockingOverlays() every 30s while visible -- auto-wipes fullscreen non-own windows + known overlay procs by name."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot screensaver close",
+      "expect": "SCREENSAVER",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read nvidia-overlay-blackscreen-kill",
+      "expect": "overlay",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read screensaver-close-command",
+      "expect": "close",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "nvidia",
+    "overlay",
+    "blackscreen",
+    "screensaver",
+    "howto",
+    "t2"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-12T10:59:21.491252Z",
+  "updated": "2026-06-12T10:59:21.4912609Z",
+  "version": "1.0"
+}

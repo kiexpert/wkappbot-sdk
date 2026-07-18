@@ -1,0 +1,44 @@
+{
+  "id": "wk-ptybuild",
+  "app": "wkappbot-workflow",
+  "title": "wk-ptybuild: ConPTY helper build launcher",
+  "title_ko": null,
+  "desc": "Repo-root pace-exempt launcher (./wk-ptybuild.cmd) that runs tools/wkstdpty.ps1 -BuildOnly to csc-compile wkstdpty/wkcodex-status-pty.cs into .tmp/wkharness/wkstdpty.exe. Use to compile-verify the ConPTY C# helper after any edit. Created 2026-06-30.",
+  "steps": [
+    "WHAT: ./wk-ptybuild.cmd runs tools/wkstdpty.ps1 -BuildOnly, which invokes csc.exe (.NET FW 4.0) on wkstdpty/wkcodex-status-pty.cs and writes .tmp/wkharness/wkstdpty.exe, printing the exe path on success or csc errors on failure. wk-prefixed repo-root WillKim tool = PACE-EXEMPT (runs at pace-95).",
+    "USE: compile-verify the ConPTY helper after any edit to wkcodex-status-pty.cs -- a clean build is the gate before relying on it. After build, capture is driven by wk-codex-pty-test / wkpace-codex.cmd -RefreshCli.",
+    "CONTEXT: the .cs implements the Win32 ConPTY wrapper (harness-codex-pace-guard-howto step 7) that captures codex boot status bar (5h/weekly percent) for codex_balance.json. Source now lives COMMITTED at wkstdpty/ (was lost as .tmp-only). Cross: harness-codex-pace-guard-howto, wkpace-codex, verify-tool-or-guard-synthetic-live-static."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read wk-ptybuild",
+      "expect": "build",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read harness-codex-pace-guard-howto",
+      "expect": "ConPTY",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read verify-tool-or-guard-synthetic-live-static",
+      "expect": "run-verify",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "wk-tool",
+    "build",
+    "conpty",
+    "csc",
+    "wkstdpty",
+    "launcher"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-30T01:52:00.3786367Z",
+  "updated": "2026-06-30T01:52:00.3786448Z",
+  "version": "1.0"
+}

@@ -1,0 +1,42 @@
+{
+  "id": "write-location-floor-spec-non-source-writes-go-only-under-tmp",
+  "app": "wkappbot-workflow",
+  "title": "Write-location floor spec -- non-source writes go only under .tmp",
+  "title_ko": null,
+  "desc": "The write-side counterpart to the shell-read floor: a write-capable op whose target is non-source must land under .tmp/ (scratch zone). Composes with the existing source guards; thorough output-path resolution. The 2026-06-20 spec.",
+  "steps": [
+    "POLICY (user 2026-06-20): a NON-SOURCE write must target ONLY a .tmp/ location (or the session TEMP, which the harness redirects to <cwd>/.tmp/wkharness). Anywhere else = block. This stops agents littering the repo (the codex err.txt/out.txt/test.ps1 repo-root dump) and stops a write escaping to a dangerous location. It is the write-side mirror of the shell-read floor.",
+    "DECISION TABLE (per resolved write target): SOURCE file by extension -> DEFER (the existing study-lock + cheap-source-guard own source writes; do NOT double-gate or block a legit source edit). .md / .markdown doc (CLAUDE.md/AGENTS.md/README.md/CHANGELOG.md) -> ALLOW (docs are the knowledge surface, never .tmp-blocked). Non-source non-md under .tmp/ or session TEMP -> ALLOW. Everything else -> see the next two steps.",
+    "THOROUGH OUTPUT-PATH RESOLUTION (the path verification): extract EVERY write target before judging -- tool  (Edit/Write/...); shell redirects > and >> (NOT 2>&1 / 2> / 2>/dev/null = stderr, not a file write); tee [-a] PATH; Out-File -FilePath/-Path/-LiteralPath; Set/Add/Clear-Content -Path/-LiteralPath; New-Item -Path (file); Export-* -Path; cp/mv DEST; and generic output flags --output/-o/--out/-OutFile/--out-file VALUE (and the =VALUE form). Resolve relative and dot-dot; check the literal too. ALL targets must pass; one bad target blocks.",
+    "BARE FILENAME = BLOCK: a write target that is a bare filename with NO directory component (e.g. out.txt, test.ps1) is BLOCKED with a -specify-a-folder message -- an ambiguous root-relative write is exactly the litter pattern. Force an explicit path (which forces .tmp/).",
+    "REPO-ROOT ALLOWLIST: a non-source non-md write AT the repo root is allowed ONLY for (a) a WillKim wk-tool form (the write performed by wk* tooling -- wkappbot/wkedit/wkhippo/etc.) OR (b) a small whitelisted config set (.gitignore, LICENSE, and the .md docs already allowed). Any other repo-root non-source write -> block.",
+    "FAIL-CLOSED: a write-capable op (.isWriteCapable) whose output target CANNOT be resolved (unknown location) -> BLOCK -- you cannot verify it lands in .tmp, and an unverifiable write location is the dangerous case (this mirrors the heart-v2 write-target P50 UNRESOLVED block). A non-write-capable op -> defer (not this guard's concern). Reads are untouched (the shell-read floor handles those).",
+    "COMPOSITION (do not duplicate): this is a NEW heart-v2 module (write-location, ~Priority 55) that runs ALONGSIDE -- not instead of -- study-lock (P25, protected-source edits need skills), cheap-source-guard (cheap model + source-ext), and write-target (P50, UNRESOLVED). Source targets DEFER here so those guards remain authoritative for source. Deny-by-default, quote-aware, fail-closed -- verify with a real run, not just a parse (parse-clean != runtime-correct).",
+    "NAV / base skills: this spec sits on harness-guard-exemption-ladder-spec (the single early-exit ladder) and wkharness-guards (guard impl). It is the symmetric partner of the SHELL-READ floor in wkharness.ps1. Lessons behind it: harness-hardening-playbook (ROOT-runs-the-suite, deny-by-default, the litter incident) and verify-tool-or-guard-synthetic-live-static (run-verify). Reuse Test-WkIsSourceFile /  for the source check."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read write-location-floor-spec",
+      "expect": "POLICY",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read harness-guard-exemption-ladder-spec",
+      "expect": "ladder",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read verify-tool-or-guard-synthetic-live-static",
+      "expect": "run-verify",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-20T13:13:02.0914178Z",
+  "updated": "2026-06-20T13:13:02.091426Z",
+  "version": "1.0"
+}

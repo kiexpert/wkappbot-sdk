@@ -1,0 +1,61 @@
+{
+  "id": "a11y-screenshot-usage",
+  "app": "wkappbot",
+  "title": "a11y screenshot: focusless capture, multi-node, cross-root, subprocess",
+  "title_ko": null,
+  "desc": "wkappbot a11y screenshot is fully focusless -- never steals keyboard focus or changes z-order. Supports multi-node composite, cross-root windows, UIA scope crop, MDI form mode, subprocess usage. Use this instead of any manual PrintWindow/mss/click approach.",
+  "steps": [
+    "BASIC USAGE: wkappbot a11y screenshot GRAP [-o output.png]. Focusless -- NO click, NO SetForegroundWindow, NO z-order change. Just pass the window grap. Output last stdout line: SAVED:PATH. Example: wkappbot a11y screenshot nfrunlite -o snap.png",
+    "FOCUSLESS GUARANTEE: screenshot NEVER steals keyboard focus or changes window z-order. Safe during live trading, real-time feeds, any latency-sensitive context. If your code calls SetForegroundWindow or a11y click before capturing -- REMOVE IT. wkappbot handles occlusion internally via PrintWindow PW_RENDERFULLCONTENT.",
+    "MULTI-NODE MODE: pass 2+ grap args OR single grap with UIA #scope. Captures each target independently, composites to union bounding box, masks pixels outside any target rect to alpha=0. Cross-root windows work. Example: wkappbot a11y screenshot TAB_GRAP GRID_GRAP -o combined.png",
+    "SINGLE vs MULTI: Single grap no scope -> full-window capture (fastest). Single grap + #scope (UIA element) -> crops to that element. Two or more graps -> union composite of all targets.",
+    "FORM MODE for MDI apps: wkappbot a11y screenshot GRAP --form FORM_ID -- captures a specific MDI child form e.g. nfrunlite [2000] holdings panel.",
+    "OCCLUSION HANDLING: PrintWindow PW_RENDERFULLCONTENT renders the window even when partially or fully occluded -- no need to bring it to front. GPU/DirectX windows fall back to screen-coordinate capture.",
+    "SUBPROCESS USAGE (Python): use subprocess.run with args WKBOT a11y screenshot GRAP --out path, capture_output True, timeout 15 seconds; success is returncode equal 0. NEVER add SetForegroundWindow or click before this.",
+    "SEE ALSO: a11y-screenshot-usage-ref for dated LIVE CASE fix history (GDI+ capture retry, OCR image-load retry, the major OCR Vision-restore fix)."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read a11y-screenshot-usage",
+      "expect": "FOCUSLESS",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read a11y-screenshot-usage",
+      "expect": "MULTI-NODE",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill search screenshot",
+      "expect": "a11y-screenshot-usage",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "screenshot",
+    "a11y",
+    "focusless",
+    "capture",
+    "multi-node",
+    "cross-root",
+    "mdi",
+    "form",
+    "subprocess",
+    "hts",
+    "trading",
+    "safe",
+    "noclick",
+    "nofocus",
+    "composite",
+    "printwindow",
+    "occlusion",
+    "snap"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-08T19:37:27.6467139Z",
+  "updated": "2026-07-02T14:21:04.2876162Z",
+  "version": "1.6"
+}

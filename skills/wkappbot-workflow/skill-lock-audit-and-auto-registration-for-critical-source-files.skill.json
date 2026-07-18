@@ -1,0 +1,36 @@
+{
+  "id": "skill-lock-audit-and-auto-registration-for-critical-source-files",
+  "app": "wkappbot-workflow",
+  "title": "Skill-Lock Audit and Auto-Registration for Critical Source Files",
+  "title_ko": null,
+  "desc": "Auto-detect .cs source changes, map to required skills, verify harness:skill registration in CLAUDE.md, alert on missing protection. Runs via wk-skilllock-audit.ps1.",
+  "steps": [
+    "DRIFT FALSE-POSITIVE (2026-07-03): wk-skilllock-audit.ps1 keeps its OWN hardcoded required-skill map (RequiredSkills hashtable) separate from CLAUDE.md's actual harness:skill text. When someone updates ONE side (e.g. swaps a skill in the audit map) without updating CLAUDE.md's matching harness:skill block, the audit reports MISSING even though a registration exists -- it is really a SKILL-SET MISMATCH, not zero-protection. Fix applied: for EyeCmdPipeClient*.cs (3rd skill wkfind-caller-hwnd-validation-3tier-pattern -> caller-window-rect-dpi-piping-ipc-extension-for-precise-chrome-placement) and *AppBotEye*.cs (2nd skill elevated-eye-admin-pipe-server -> eye-health-mousecca-storm), edited CLAUDE.md to match the audit's map. Before assuming a MISSING finding means truly unregistered, grep CLAUDE.md for the filename pattern first -- if a harness:skill block already exists, the fix is aligning the skill SET, not adding a fresh 3-skill block.",
+    "ROOT CAUSE FOUND 2026-07-04 (separate from the earlier SKILL-SET drift): Test-SkillLockInClaude (wk-skilllock-audit.ps1 ~line 64-89) builds its CLAUDE.md search regex by reusing the hardcoded map's raw file-path regex KEY verbatim (e.g. 'EyeCmdPipeClient\\.cs' expects the name and .cs adjacent), but a CLAUDE.md registration written as a GLOB (e.g. 'csharp/**/EyeCmdPipeClient*.cs') inserts a literal star between the name and extension -- so the reused regex never matches and the audit falsely reports MISSING for an already-registered file. Fix: strip the '\\.cs' suffix from the map key before building the CLAUDE.md search pattern, searching only for the base name substring instead of requiring name+extension adjacency."
+  ],
+  "requirements": [
+    {
+      "cmd": "pwsh -File ./wk-skilllock-audit.ps1 -DaysBack 1",
+      "expect": "timestamp.*needsSkillLock",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read skilllock-audit-and-register",
+      "expect": "Overview.*Critical Source",
+      "prompt": null
+    },
+    {
+      "cmd": "grep 'harness:skill.*AppBotEye' CLAUDE.md",
+      "expect": "always-on-ai-automation-daemon",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-28T04:55:06.7011031Z",
+  "updated": "2026-07-04T10:08:49.0327724Z",
+  "version": "1.3"
+}

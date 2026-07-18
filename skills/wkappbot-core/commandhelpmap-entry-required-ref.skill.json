@@ -1,0 +1,41 @@
+{
+  "id": "commandhelpmap-entry-required-ref",
+  "app": "wkappbot-core",
+  "title": "CommandHelpMap entry required -- ref",
+  "title_ko": null,
+  "desc": "T3 reference for commandhelpmap-entry-required-for-every-dispatched-command: dated audits, verified evidence scripts, alias registration edge cases, and the source_refs relocation history",
+  "steps": [
+    "ALIAS RULE: top-level aliases such as close, kill, and window must also have CommandHelpMap entries when they are user-facing dispatch targets, even if they mirror a11y or taskkill help text.",
+    "EXEC ALIAS PATTERN (2026-05-26): if a CommandHelpMap entry describes an alias (e.g. --exec is an alias for exec), the alias MUST also be registered as a dispatch entry in Program.Dispatch.cs with an or --exec clause, AND the CMD execution guard will require the alias to actually succeed in evidence scripts.",
+    "VERIFIED evidence scripts: ev-exec-cmdhelp.sh (2026-05-25), ev-exec-commandhelp-entry.sh (2026-05-25), ev-schedule-commandhelp.sh (2026-06-02), ev-commandhelpmap-present-2026-06-06.sh (2026-06-06).",
+    "AUDIT 2026-06-03: source_refs became stale, pattern CommandHelpMap no longer matched at the recorded line.",
+    "AUDIT 2026-06-06: PATTERN-NOT-FOUND -- 'CommandHelpMap = new' moved from CommandHelp.cs line 235 to a partial file (CommandHelp.Map.cs or Entries.*.cs) after a partial-class refactor; always grep for the current location rather than trusting a stale line number.",
+    "TANGENTIAL 2026-05-20 (unrelated to CommandHelpMap itself, filed under the same skill): wkask.ps1 wrong-tab response capture -- a domain-only grap like domain=chatgpt.com picks the wrong ChatGPT tab when multiple tabs exist; fix is to parse hwnd from cdp open output and use an hwnd-scoped grap for response reads.",
+    "LIVE CASE 2026-07-02: a cluster of 10 urgent BUG-AUTO suggests (TypeInitializationException/FileNotFoundException/FileLoadException, all in Program.A11yCommandImpl dispatch, ts 2026-06-11T02:04-02:06) turned out to be ONE repeated root cause: commit 7e6f93df4 extracted HTS commands (hts-stress/prompt-test/prompt-probe) to a plugin but left dead dispatch arms in Program.Dispatch.cs referencing now-nonexistent methods, causing a <Module> static-initializer failure on every a11y dispatch. Already fixed ~15h later by commit f4cfdcaf6 (removed dead arms, added PluginLoader.IsPluginCommand() fallthrough). LESSON: after any command-to-plugin extraction, grep Program.Dispatch.cs for the extracted command's dispatch arm BEFORE merging -- a dangling arm crashes the WHOLE dispatch table (Module init failure), not just that one command."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read commandhelpmap-entry-required-ref",
+      "expect": "ALIAS RULE",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read commandhelpmap-entry-required-ref",
+      "expect": "VERIFIED evidence scripts",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read commandhelpmap-entry-required-ref",
+      "expect": "AUDIT 2026-06-06",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-07-02T05:18:37.6928855Z",
+  "updated": "2026-07-02T06:30:02.5188109Z",
+  "version": "1.1"
+}

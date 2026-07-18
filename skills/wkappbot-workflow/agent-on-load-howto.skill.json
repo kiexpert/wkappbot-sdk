@@ -1,0 +1,38 @@
+{
+  "id": "agent-on-load-howto",
+  "app": "wkappbot-workflow",
+  "title": "Subagent on-load (howto)",
+  "title_ko": null,
+  "desc": "Operational traps + patterns a subagent needs: skill/cmd gotchas, symlink reality, repoint, background delegation.",
+  "steps": [
+    "SKILL/CMD TRAPS (avoid a blocked retry): skill text English-ONLY (encoding-guard fires over 0.1pct non-ASCII); never echo a LITERAL WKHARNESS env-var NAME in a command (security-guard false-positives even on docs -- use a variable); --requirement takes a wkappbot SUBCOMMAND + expected pattern, NO launcher --flags; the double-at separates --steps, never inside step text.",
+    "SYMLINK-REALITY (Windows/Git-bash): a WKAppBot bin .cmd that looks like a POSIX symlink via ls -la is EITHER (a) a plain TEXT file containing the target path (cmd.exe runs it as a call-chain) OR (b) a real git symlink. BEFORE ln -sf or New-Item SymbolicLink, check git ls-files -s bin/Name.cmd -- mode 120000 = git symlink (ln -sf works in MSYS2), mode 100644 = text-path-stub (repoint by WRITING the new target path string; ln -sf would CORRUPT the stub).",
+    "REPOINT PATTERN for mode-120000 git symlinks: overwrite the file content with the new target path string via the Write tool (pure path, LF only, no CRLF/trailing newline); verify git diff shows only the path changed; commit.",
+    "DELEGATION-FOREGROUND: from an Opus/Sonnet session a foreground Bash Agent.cmd is blocked by the -delegation guard -- use run_in_background=true; the bg task ID returns and the agent runs concurrently."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read agent-on-load-howto",
+      "expect": "SKILL/CMD TRAPS",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read agent-on-load-howto",
+      "expect": "SYMLINK-REALITY",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read agent-on-load-howto",
+      "expect": "DELEGATION-FOREGROUND",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-24T07:26:13.5615298Z",
+  "updated": "2026-06-24T07:26:13.5615386Z",
+  "version": "1.0"
+}

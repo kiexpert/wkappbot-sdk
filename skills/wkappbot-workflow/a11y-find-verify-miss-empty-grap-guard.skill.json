@@ -1,0 +1,19 @@
+{
+  "id": "a11y-find-verify-miss-empty-grap-guard",
+  "app": "wkappbot-workflow",
+  "title": "A11y Ambiguity Guard: Skip Verify MISS for Empty {} Grap",
+  "desc": "When BuildCompactWinGrap returns {} (WPF overlays, Eye window), PrintMultiWindowTargets skips AutoRegisterBug for verify MISS. hwnd: form works as fallback; {} is unfilterable so MISS is expected.",
+  "steps": [
+    "Root cause: WPF overlay windows (AppBotEye, WhisperRing, ScreenSaver) have no proc/title/domain that BuildCompactWinGrap can use for a portable pattern, so it returns {}. FindWindows({}) behavior is undefined/matches-all, causing verify MISS false-positive.",
+    "Fix in AmbiguityGuard.cs: if hitCompact is \u0027{}\u0027 or \u0027{ }\u0027, skip the verify\u002Bheal path entirely. Use hwnd:0x... grap directly for these windows. The AutoRegisterBug suppression prevents noisy bug-auto suggests from Eye\u0027s own UI windows.",
+    "If auto-find verify MISS appears for a real application window (not Eye/WPF overlay), investigate BuildCompactWinGrap return value. The guard only suppresses reports for the exact \u0027{}\u0027 and \u0027{ }\u0027 patterns.",
+    "Verified 2026-04-22: test-a11y-find-verify-miss-empty-grap.sh (resolve ts=2026-04-21T15:44)"
+  ],
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-22T02:46:20.346139Z",
+  "updated": "2026-04-22T02:46:47.2971476Z",
+  "version": "1.4"
+}

@@ -1,0 +1,51 @@
+{
+  "id": "wkappbot-speak-tts-bugs-harness-95-auto-speak-loop-karaoke-drift",
+  "app": "wkappbot-core",
+  "title": "WKAppBot speak/TTS bugs: harness 95% auto-speak loop + karaoke drift",
+  "title_ko": null,
+  "desc": "The harness ITSELF auto-speaks a 95-percent-of-pace courtesy TTS; a broken once-gate marker makes it loop into voice spam. Separately the speak karaoke overlay drifts on long text (timer estimate instead of SpeakProgress) and closes on a safety timer not SpeakCompleted.",
+  "steps": [
+    "WHO speaks: the harness auto-speaks at 95 percent of pace target via Invoke-WkPace95Breaker in wkappbot-kih/tools/wkharness-guards-pace.ps1 around line 367 -- a courtesy TTS 'entered 95 percent ... Paused for your decision'. It is NOT a user, cron, or Eye timer.",
+    "INFINITE-SPAM bug (FIXED 2026-06-11): the speak was gated ONLY by absence of marker pace95_<Family>.json in WKHARNESS_HOME (USERPROFILE/.claude/wkharness); that marker is Remove-Item'd when usage drops below 95 percent, so oscillation around 95 percent re-created the marker and re-fired the TTS every blocked call. FIX: debounce lives in a SEPARATE persistent file pace95_spoken_<Family>.json storing lastSpokeAt; the speak runs only if missing or elapsed greater than 1800s (30 min). Immediate silence: write pace95_<Family>.json with acked true. Pause/acked logic untouched, all fail-open.",
+    "Karaoke DRIFT real cause (FIXED 2026-06-11): SpeakOverlayWindow KaraokeTick correctly indexes karaoke markers by _stopwatch.Elapsed vs marker.AudioPos, BUT the stopwatch was started via System.Media.SoundPlayer.Play() plus a fixed Thread.Sleep(50) guess in SpeakCommand.cs around L144-146 -- that 50ms estimate diverges from real audio-device latency so the highlight drifts on long text. FIX: replace SoundPlayer with NAudio.Wave.WaveOutEvent plus AudioFileReader (NAudio already a dep) and start the stopwatch the instant PlaybackState flips to Playing (real DMA start, spin-wait), not a fixed sleep.",
+    "END-MISMATCH real cause (FIXED 2026-06-11): both the overlay (last marker + 1.5s) and the main thread (totalMs = lastMarker + 1500) closed on SYNTHESIS-time estimates, never actual playback end. FIX: wire NAudio PlaybackStopped to stopSignal.Set so the overlay closes aligned to ACTUAL speech end; widen the safety timeout to lastMarker + 5000ms as fallback only; extend the overlay post-last-marker fallback fade from 1.5s to 3.0s so the real PlaybackStopped-driven close wins over the 30ms animation timer.",
+    "STATUS: both fixes applied + parse/compile verified (pace.ps1 parses 0 errors; C# build 0 CS errors, storm-safe PASS) but UNCOMMITTED and NOT yet promoted -- wkbuild smoke withheld auto-promote only on a pre-existing catalog-count check (78 vs 700+), fix with wkappbot skill sync then re-run wkbuild. Done via pace-exempt Haiku/Sonnet subagents while root was pace-locked."
+  ],
+  "comments": null,
+  "requirements": [
+    {
+      "cmd": "grep -l 'wkappbot speak' D:/GitHub/wkappbot-kih/tools/wkharness-guards-pace.ps1",
+      "expect": "pace",
+      "prompt": null
+    },
+    {
+      "cmd": "grep -l SpeakProgress csharp/src/WKAppBot.CLI/Commands/SpeakCommand.cs",
+      "expect": "SpeakCommand",
+      "prompt": null
+    },
+    {
+      "cmd": "grep -l KaraokeTick csharp/src/WKAppBot.CLI/Commands/SpeakOverlayWindow.cs",
+      "expect": "SpeakOverlayWindow",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "speak",
+    "tts",
+    "karaoke",
+    "pace",
+    "harness",
+    "sync",
+    "drift",
+    "pace95",
+    "debounce",
+    "speakprogress"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-11T07:46:55.2059709Z",
+  "updated": "2026-06-11T08:06:51.5983028Z",
+  "version": "1.2"
+}

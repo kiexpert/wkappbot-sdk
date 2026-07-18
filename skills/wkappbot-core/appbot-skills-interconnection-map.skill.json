@@ -1,0 +1,51 @@
+{
+  "id": "appbot-skills-interconnection-map",
+  "app": "wkappbot-core",
+  "title": "WKAppBot Skills Interconnection and Relationship Map",
+  "title_ko": null,
+  "desc": "Systematic dependency and workflow interconnection map between AppBot load, environment permission, self-healing diagnostics, and knowledge-loop skills.",
+  "steps": [
+    "T1 CORE (Decision Rules): AppBot skills form a closed-loop system of three layers: (1) Infrastructure (on-load, harness-settings-reinstall-bypass-bug) for permission stability. (2) Self-Healing (wkdoctor-system-physician, hongik-harness-emergency-reflex-protocol, spawn-storm-kill) to mitigate lag and UAC blocks. (3) Knowledge (suggest-workflow, skill-contribute-edit, skill-readability-optimization-and-healing) to capture bugs and update skills.",
+    "T2 HOWTO (Procedure): When facing environmental failures: (1) Check on-load sync. (2) If auth blocks, run 'wkdoctor' directly. (3) If resource storms occur, check cached 'wktasklist' and trigger '! wkdoctor nuke' reflex. (4) Log root causes via 'wkappbot suggest' and document the permanent fix by contributing/editing skills via the CLI.",
+    "T3 REF (History): Incident 2026-06-09: Direct python health checks blocked by token pace limits, resolved using 'wk' wrapper check. Harness settings reinstall wiped user approvals, resolved by merging existing 'permissions.allow' arrays. Connected these workflows into a unified skill-graph to improve cross-session context."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read appbot-skills-interconnection-map",
+      "expect": "appbot-skills-interconnection-map",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wkdoctor-system-physician",
+      "expect": "wkdoctor-system-physician",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read harness-settings-reinstall-bypass-bug",
+      "expect": "harness-settings-reinstall-bypass-bug",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read skill-readability-optimization-and-healing",
+      "expect": "skill-readability-optimization-and-healing",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "map",
+    "relationship",
+    "architecture",
+    "healing",
+    "doctor",
+    "harness",
+    "suggest",
+    "english-only"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-09T06:41:20.0728801Z",
+  "updated": "2026-06-09T06:41:20.0729231Z",
+  "version": "1.0"
+}

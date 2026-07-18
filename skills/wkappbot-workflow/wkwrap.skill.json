@@ -1,0 +1,51 @@
+{
+  "id": "wkwrap",
+  "app": "wkappbot-workflow",
+  "title": "wkwrap universal symlink resolver",
+  "title_ko": null,
+  "desc": "Universal symlink-resolver wrapper: one wkwrap.ps1 brain that all per-extension thin shims (wkwrap.cmd/sh/exe) forward into. Dispatches by invocation basename to a per-tool runtime resolver (codex first) and execs the real binary with stdio passthrough. Version-independent (no pinned symlinks), DRY, retires scattered per-tool wrappers.",
+  "steps": [
+    "WHY: VS Code openai.chatgpt extension bumps its codex.exe path every release, so version-pinned symlinks break each update. A RUNTIME resolver that scans newest-first is version-proof. Centralize it in ONE place so every tool invocation (shell + .NET Process.Start) stays version-resilient.",
+    "ARCHITECTURE: thin per-context shims -> one brain. tool-name symlink (codex, ...) -> wkwrap.{cmd|sh|exe} (one-line forwarder per calling context) -> wkwrap.ps1 (all logic). Each shim forwards its OWN invocation basename as first arg + original args. wkwrap.exe is a real PE so Process.Start(UseShellExecute=false) can launch it (kills the codex.cmd-not-launchable bug at root). cmd/sh/ps1 are text; exe needs a tiny C# build (Phase 2).",
+    "wkwrap.ps1 SPEC: param tool name + ValueFromRemainingArguments Rest. Resolver TABLE = hashtable name->scriptblock returning exe path or null (entry: codex -> Find-CodexExe). Unknown name -> stderr + exit 2. Null resolve -> exit 127 clear message. Exec: amp exe Rest then exit LASTEXITCODE. PS5.1 compatible (no ternary), English only, under 120 lines.",
+    "codex resolver (mirror wkappbot-sdk/bin/codex.ps1 Find-CodexExe): search ~/.vscode/extensions/openai.chatgpt-* newest-first for bin/windows-x86_64/codex.exe WITH sibling codex-windows-sandbox-setup.exe; else ~/.codex/.sandbox-bin/codex.exe (same helper sibling); else null. Real exe currently at ~/.codex/.sandbox-bin/codex.exe.",
+    "PHASE 1 (build now): create tools/wrappers/wkwrap.ps1 + wkwrap.cmd + wkwrap.sh ONLY. Do NOT touch existing codex.cmd/codex.ps1/wkcodex, do NOT rewire symlinks, do NOT build wkwrap.exe (leave a TODO comment). Opus reviews then wires symlinks + retires old wrappers. PHASE 2: wkwrap.exe PE shim + symlink cutover + retire codex.cmd/ps1.",
+    "wkwrap.exe BUILD (Phase 2): source tools/wrappers/wkwrap.cs is written (C# thin forwarder: derives argv0 basename, execs powershell -File wkwrap.ps1 NAME ARGS with UseShellExecute=false, returns child exit). Compile with the Framework C# compiler (C# 5 ok): C:/Windows/Microsoft.NET/Framework64/v4.0.30319/csc.exe -nologo -target:exe -out:wkwrap.exe wkwrap.cs. GOTCHA: do NOT compile from Git-Bash with forward-slash flags/paths -- MSYS mangles -nologo into a Git path and truncates D:/.../tools/wrappers/ middle segments. Compile via the PowerShell tool with native backslash paths, OR cd into the dir and use bare filenames. Verify: running wkwrap.exe with no tool symlink (basename=wkwrap) must reach wkwrap.ps1 and print \"[wkwrap] no resolver registered for wkwrap\" exit 2 = forwarder wiring proven.",
+    "RESOLVER TABLE grows = wkwrap collects useful-but-NOT-on-PATH binaries. Added csc (newest Framework64 vX csc.exe, version-proof scan) 2026-05-29 -- so wkwrap csc ... compiles cleanly (PowerShell-native exec, no MSYS mangling), and wkwrap can dogfood-build its own wkwrap.exe. FUTURE OPTION (user idea): an opt-in relay mode that execs the resolved binary via wkappbot exec <progpath> ... to gain wkappbot relay/streaming/observability (even window-movement streaming) for testing. Keep it OPT-IN (e.g. WKWRAP_RELAY=1 or a -Relay switch) -- default stays standalone & dependency-free & fast. Not the default exec path.",
+    "PHASE 2 = wkdoctor self-healing wrapper FLEET (user 2026-05-29, replaces manual cutover/reconcile). Add a wkdoctor check (sibling to 50-codex-symlink.ps1) that idempotently REBUILDS the whole wrapper fleet from canonical truth: (1) ensure wkwrap.ps1 (brain) + wkwrap.cmd/sh exist; (2) rebuild wkwrap.exe from wkwrap.cs via Framework csc if missing/stale; (3) for each resolver-table tool (codex, csc, ...) regenerate its per-context wrapper (e.g. codex.cmd/.sh/.exe = copies or symlinks of the wkwrap shims); (4) DELETE stale/divergent copies (WKAppBot/bin/wkwrap.* that diverge from canonical, old codex.cmd/codex.ps1 once cutover). Philosophy: delete-all-and-regenerate-from-canonical = deterministic, zero drift, idempotent -- no diff/merge logic. Safe because wkdoctor runs at session-init/health-check (not mid-task) and wrappers are derived artifacts. Subsumes Phase 2b (symlink cutover + retire old + bin reconcile) into one doctor check.",
+    "TOOL: wkagent-name -- resolver points to D:/GitHub/personal-docs/tools/wkagent-name.ps1. Add to resolver table in wkwrap.ps1. wkdoctor creates WKAppBot/bin/wkagent-name.cmd symlink. See wkappbot skill read wkagent-name-tool for full spec.",
+    "WILLKIM TOOL DESIGN LAW (2026-06-18): a tool wired here via the .cmd/.sh/.exe shim + sibling .ps1 quartet MUST be harness-INDEPENDENT (or tier-fallback) so the bare command works on a machine without the kih harness. See [[willkim-tool-harness-independence-install-location]]. Gate/log data-integrity traps when wiring harness-consumed logs: [[harness-gate-log-data-integrity]]."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read wkwrap",
+      "expect": "wkwrap",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill search wkwrap",
+      "expect": "wkwrap",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill list",
+      "expect": "wkwrap",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "wrapper",
+    "codex",
+    "launcher",
+    "symlink",
+    "resolver",
+    "wkwrap"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-29T12:59:31.9411649Z",
+  "updated": "2026-06-18T01:56:18.9275888Z",
+  "version": "1.8"
+}

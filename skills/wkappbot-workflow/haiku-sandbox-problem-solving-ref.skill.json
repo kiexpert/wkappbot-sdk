@@ -1,0 +1,39 @@
+{
+  "id": "haiku-sandbox-problem-solving-ref",
+  "app": "wkappbot-workflow",
+  "title": "Haiku Sandbox Problem Solving T3 Reference",
+  "title_ko": null,
+  "desc": "T3 ref. Real session examples (successes + failures), failure mode analysis, evolution notes.",
+  "steps": [
+    "SUCCESS 2026-05-31 wkjobs: Haiku diagnosed  reserved-var collision (line 118) + / scope bug (lines 264-265) without touching original. Sonnet verified. Haiku applied fix. Clean commit 089b4d095.",
+    "SUCCESS 2026-05-31 EndMarker: Sonnet analyzed git grep output, identified EyeCmdPipeServer.Pipe.cs:278 catch{} swallowing EndMarker. Haiku applied 2-line fix + 200ms retry. No prototype needed (Sonnet certain). Commit 7ab1ae533.",
+    "FAILURE 2026-05-31 skill T1 split: Haiku sent to read fat suggest-workflow (36 steps) then split T1/T2/T3. Context overload -> dropped all steps from T1 (empty). Fix: Sonnet writes T1 content from own context, Haiku only executes skill contribute CLI commands.",
+    "FAILURE MODE: 'find and fix' brief = Haiku reads source + diagnoses + edits = triple context load = unreliable. Always split into 3 separate calls: (1) Haiku diagnose, (2) Sonnet judge, (3) Haiku/wkcodex apply.",
+    "EVOLUTION: pattern emerged from observing that Haiku succeeds on clean canvas (new file, specific task) and fails on open-ended exploration of existing complex code. Prototype = bounded problem space."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read haiku-sandbox-problem-solving-ref",
+      "expect": "T3 examples",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read haiku-sandbox-problem-solving",
+      "expect": "T1 pattern",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read haiku-as-qa-canary",
+      "expect": "Haiku strengths + limits",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-31T14:42:21.9215339Z",
+  "updated": "2026-05-31T14:42:21.921546Z",
+  "version": "1.0"
+}

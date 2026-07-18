@@ -1,0 +1,51 @@
+{
+  "id": "ask-web-chrome-launch-focusless-guard-allowlist",
+  "app": "wkappbot-core",
+  "title": "ask/web Chrome launch: AppBotPipe focusless guard allowlist",
+  "title_ko": null,
+  "desc": "ChromeLauncher uses UseShellExecute=true+WindowStyle.Minimized so Chrome opens minimized (taskbar only, no focus theft). AppBotPipe.StartTracked's focusless guard used to block every Verb-less UseShellExecute, killing Chrome startup and breaking ask/web/triad paths. Guard now allowlists WindowStyle=Minimized/Hidden since they're inherently non-focus-stealing.",
+  "steps": [
+    "AppBotPipe.StartTracked blocks UseShellExecute=true unless Verb=runas OR WindowStyle is Minimized/Hidden",
+    "ChromeLauncher uses UseShellExecute=true+WindowStyle.Minimized + --window-size/--window-position so Chrome starts minimized at known bounds",
+    "Focus stays on user's current app; CDP port 9222 comes up; ask/web/triad work without Chrome stealing foreground",
+    "If Chrome fails to launch again check the AppBotPipe guard logs for 'focusless violation' message",
+    "5. 2026-05-03 (commit 9db2e112): LaunchAsync now retries once after KillChromeOnPortAsync + KillStaleChromesAsync + 500ms profile-lock release on transient 'Chrome process exited' / 'CDP endpoint not ready' errors. Catches the BUG-AUTO cluster where a stale profile lock or slow renderer boot would propagate as InvalidOperationException up to ask/web callers.",
+    "5. 2026-05-03 (commit 9db2e112): LaunchAsync now retries once after KillChromeOnPortAsync + KillStaleChromesAsync + 500ms profile-lock release on transient 'Chrome process exited' / 'CDP endpoint not ready' errors. Catches the BUG-AUTO cluster where a stale profile lock or slow renderer boot would propagate as InvalidOperationException up to ask/web callers.",
+    "[AUDIT 2026-05-29] ChromeLauncher.cs split into ~30 partial classes. AppBotPipe.Start ref now in ChromeLauncher.LaunchCore.cs / LaunchPreparation.cs.",
+    "[AUDIT 2026-06-03] source_refs broken: stale pattern AppBotPipe.Start in ChromeLauncher.cs.",
+    "[AUDIT 2026-06-04] AppBotPipe.Start ref broken -- ChromeLauncher.cs refactored. Ref stale.",
+    "[AUDIT 2026-06-04] ChromeLauncher.cs partials split; 'AppBotPipe.Start' pattern moved -- AppBotPipe.cs:357 WindowStyle=Minimized anchor stable.",
+    "[AUDIT 2026-06-06] PATTERN-NOT-FOUND: 'AppBotPipe.Start' in ChromeLauncher.cs -- moved to partial after ChromeLauncher refactor; stable anchor Shared/AppBotPipe.cs:357 WindowStyle=Minimized intact",
+    "[AUDIT 2026-06-06] PATTERN-NOT-FOUND: 'AppBotPipe.Start' moved from ChromeLauncher.cs to Shared/AppBotPipe.cs. Verify AppBotPipe.cs location before editing focusless Chrome launch guards."
+  ],
+  "requirements": null,
+  "primary_cmd": null,
+  "tags": [
+    "ask",
+    "web",
+    "chrome",
+    "cdp",
+    "focusless-first",
+    "appbotpipe",
+    "guard"
+  ],
+  "source_refs": [
+    {
+      "file": "csharp/src/Shared/AppBotPipe.cs",
+      "line": null,
+      "pattern": "WindowStyle=Minimized",
+      "note": null
+    },
+    {
+      "file": "csharp/src/WKAppBot.WebBot/ChromeLauncher.cs",
+      "line": null,
+      "pattern": "AppBotPipe.Start",
+      "note": null
+    }
+  ],
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-19T07:19:31.7027418Z",
+  "updated": "2026-06-05T20:02:38.0132805Z",
+  "version": "1.13"
+}

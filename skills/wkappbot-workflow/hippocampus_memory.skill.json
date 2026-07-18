@@ -1,0 +1,15 @@
+{
+  "id": "hippocampus-memory",
+  "app": "wkappbot",
+  "title": "해마 메모 저장·조회",
+  "desc": "사용자가 add·query 명령으로 기억을 저장하고 유사도 기반 검색할 수 있는 스킬. 내부적으로 scripts/hippocampus_tool.py 를 호출합니다.",
+  "steps": [
+    "wkappbot skill read suggest-workflow",
+    "python scripts/hippocampus_tool.py add   --content \"<내용>\"   --tags <태그들>",
+    "python scripts/hippocampus_tool.py query  --q \"<검색어>\"   --top 5"
+  ],
+  "requirements": [
+    { "cmd": "python scripts/hippocampus_tool.py --help", "expect": "MANDATORY" }
+  ],
+  "tags": ["memory","hippocampus","korean","utility"]
+}

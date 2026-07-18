@@ -1,0 +1,38 @@
+{
+  "id": "ask-suggest-priority-batching-ref",
+  "app": "wkappbot-workflow",
+  "title": "Ask Suggest Priority Batching T3 Reference",
+  "title_ko": null,
+  "desc": "T3 reference tier. Canonical rules 2026-05-20, duplicate step archive, calibration history.",
+  "steps": [
+    "CANONICAL RULES 2026-05-20: TIMEOUT=20s. NO RESPONSE=proceed immediately. DELEGATION=Sonnet fires+briefs Opus. PIPELINE HEALTH=ping before triage.",
+    "DUPLICATE ARCHIVE: original steps 15-24 were repeated patterns. All superseded by canonical rules.",
+    "HISTORY: timeout 20s added 2026-05-20. STOP-and-WAIT discipline added. Blocking patterns removed.",
+    "LESSON: Duplicate steps from session-by-session additions without pruning. 3-tier split removes accumulated cruft permanently."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read ask-suggest-priority-batching-ref",
+      "expect": "T3",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read ask-suggest-priority-batching-howto",
+      "expect": "T2",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read ask-suggest-priority-batching",
+      "expect": "T1",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-31T12:04:08.145942Z",
+  "updated": "2026-05-31T12:17:48.5710533Z",
+  "version": "1.1"
+}

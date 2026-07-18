@@ -1,0 +1,55 @@
+{
+  "id": "agent-failure-reflection-gate",
+  "app": "wkappbot-workflow",
+  "title": "agent-failure-reflection-gate: force ROOT to update a model reflection on clear delegation failure",
+  "title_ko": null,
+  "desc": "When a delegated subagent CLEARLY fails its mission, the harness blocks the next Agent dispatch until ROOT updates THAT model reflection skill -- recurrence-prevention that ROOT authors and the harness forces. Twin of cheap-commit-todo-gate.",
+  "steps": [
+    "DESIGN (user 2026-06-30): mirror cheap-commit-todo-gate but for agent failures. TRIGGER = a delegated subagent CLEARLY failed its mission. On the NEXT Agent dispatch, a PreToolUse gate checks: is there an un-reflected clear-failure? If yes -> BLOCK until ROOT updates that model reflection.",
+    "DETECTION (clear-only, HIGH precision; ambiguous = not-a-failure so reflection skills are not polluted): scan the newest subagents/agent-*.jsonl last assistant message for markers -- could not complete/proceed, unable to complete, failed to, gave up, I cannot, permission denied, blocked by clean-baseline|busy-fleet|write-freeze, OR a leaf re-delegation tell (a leaf agent claiming it launched/dispatched an agent = it did NOT do the work), OR rc!=0.",
+    "MODEL -> REFLECTION RESOLUTION: hardcoded map for haiku/sonnet/codex|gpt/codex-mini|gpt-mini/gemini|flash/opus, plus a loose keyword-search fallback for anything else (covers compound names like agy-gemini-flash, agy-gemini-pro) and a create-then-record path for a model with no resolvable skill at all. No bare agy entry -- agy never runs with a modelless identity in practice. Full resolution order + mechanics: agent-failure-reflection-gate-howto.",
+    "RELEASE: ROOT runs wkappbot skill edit <model>-reflection --add-step <the failure reflex + escape>; the gate detects that recent edit and clears (mirrors Test-RecentClaudeMdEdit).",
+    "REFLECTION STEP TAGGING CONVENTION (user directive 2026-07-03, MANDATORY -- follow this every time this gate forces a reflection step): prefix the step text with one of three tags. BUG: for a genuine harness/tool/model-integration bug (something objectively broken in the tooling, not the model's own mistake). TODO: for a known gap or fix not yet implemented. IMPROVEMENT: for a nice-to-have polish idea surfaced while investigating a failure. Leave a step UNTAGGED for an ordinary behavioral lesson (a mistake the MODEL itself made). Net effect: wkappbot skill read <model>-reflection lets ROOT skim for BUG: and TODO: at a glance.",
+    "NAVIGATION: implementation mechanics (module file location, resolution order, record-check, self-test, env overrides) -> agent-failure-reflection-gate-howto. Incident history and dated lessons (build status, bugs found, the agy false-premise correction) -> agent-failure-reflection-gate-ref.",
+    "PARTIAL FIX 2026-07-03 (still not fully working, live-tested by user directive): found and fixed a REAL bug -- Get-WkNewestAgentFailureJsonl looked for subagents/ directly next to the session .jsonl file, but real transcripts live nested under a <sessionId>-named subfolder (verified: the flat subagents/ dir never existed, the nested one did). Fixed the path construction; in ISOLATION (extracting the function and calling it directly against the real failed-Haiku transcript file) it now correctly returns IsFailure=True with the right model/reason. HOWEVER: 2 live end-to-end tests (dispatch a deliberately-failing Haiku, immediately dispatch a follow-up Agent call) BOTH show the follow-up dispatch going through UNBLOCKED, meaning the LIVE gate still does not fire even with the path fix landed. ROOT CAUSE NOT YET FOUND for this second layer -- candidates to check next: (a) does the real PreToolUse hook's CWD/session context match what Get-WkActiveSessionJsonl resolves in isolation (the hook runs via an explicit powershell.exe -File launch, which may have a different CWD than expected); (b) is the Agent-dispatch guard chain in wkharness-guards-agent.ps1 actually being reached for a NATIVE Agent tool call (as opposed to an Agent.cmd CLI dispatch) -- toolName may not literally equal 'Agent' for the native tool; (c) an earlier fast-path/short-circuit in the guard chain may exit before this check runs. NEEDS a fresh, deeper investigation (recommend Opus or dedicated debugging) rather than further guesswork -- do NOT assume the gate works just because the subagents-path bug is fixed.",
+    "RESOLVED 2026-07-04 (supersedes step 7 'ROOT CAUSE NOT YET FOUND'): the live non-firing root cause was Test-WkRecentReflectionEdit (the RELEASE check), NOT the detection or path layer. It scanned every session-log LINE for the raw substring 'skill edit ID --add-step' and returned true on ANY match. But that needle is present in almost every real session for reasons OTHER than an actual reflection edit: FIRST, EVERY skill dump ends with the help line 'wkappbot skill edit ID --add-step what-you-learned', and agent-on-load explicitly tells every subagent to READ its model-reflection skill, so that line lands in the transcript. SECOND, the gate's OWN block message contains 'wkappbot skill edit ID --add-step', self-satisfying after the first block. So detection worked (IsFailure true, model and skill resolved) but the release check falsely returned true, giving verdict allow, so the gate never blocked. FIX: anchor the match on the UNESCAPED JSON key command-colon-quote with the needle INSIDE the command value (an actual executed Bash or PowerShell command). Skill-dumps and block-messages carry the needle in a tool_result content field, and file-reads and fixture-writes embed it as ESCAPED backslash-quote-command, both excluded; only a genuine executed skill edit or skill contribute matches. LIVE-PROVEN end-to-end through the real hook: failed-Haiku plus polluted-no-edit session yields BLOCK exit 2 with the agent-failure-reflection-gate message; failed-Haiku plus genuine-edit session releases. Self-test now 9 of 9 including a regression case 3b for the false-positive shape. Cross: verify-tool-or-guard-synthetic-live-static TEST-FIXTURE-SHAPE-MISMATCH; the old self-test used a bare tool_use command fixture with no realistic false-positive shape, so it could never catch this.",
+    "SECOND BUG FOUND 2026-07-04 (after Opus's step 8 fix, own live re-test): Test-WkRecentReflectionEdit has NO time-anchoring relative to the CURRENT failure -- it just asks 'was <skillId> EVER genuinely edited anywhere in this session transcript', with no check that the edit happened AFTER the detected failure. LIVE REPRO: this session had already run ONE genuine 'wkappbot skill edit haiku-reflection --add-step' command hours earlier (an ordinary lesson, unrelated to any gate test). From that point onward, EVERY subsequent haiku failure in the SAME session incorrectly resolves to allow, because the old edit satisfies the raw existence check forever -- confirmed via 2 more live dispatch-then-follow-up tests, both went through unblocked despite genuine new failures. FIX NEEDED (not yet implemented): Test-WkRecentAgentFailure must also capture the failure's timestamp, and Test-WkRecentReflectionEdit must only count a reflection edit whose OWN timestamp is AFTER the failure's timestamp -- mirroring the same post-compaction time-anchoring pattern already used elsewhere in this codebase for other mandatory-skill checks (on-load, agent-cmd, etc: an old read does not satisfy a fresh requirement). Until this lands, treat the gate as STILL only partially fixed: it correctly detects a failure and correctly blocks on a genuinely FRESH skill with no prior edit ever, but a skill edited even once earlier in a long session will falsely allow every later failure for that same model.",
+    "TIME-ANCHOR FIX LANDED 2026-07-04 (closes step 9's second bug): Test-WkRecentAgentFailure now captures the failure's own Timestamp, and Test-WkRecentReflectionEdit only counts a reflection-edit line whose OWN timestamp is AFTER the failure's timestamp (a missing/unparseable timestamp fails open to the old any-match behavior, never turning into an unconditional block). Self-test extended to 10/10 with a new regression case (3c: a genuine edit BEFORE the new failure must still leave the gate blocking). Live end-to-end re-test pending.",
+    "FULLY VERIFIED END-TO-END 2026-07-04 (both bugs closed, do not re-open without new evidence): live-tested the complete cycle through the real hook -- (1) a deliberately-failing Haiku dispatch, (2) an immediate follow-up Agent dispatch correctly BLOCKED with the [agent-failure-reflection-gate] message naming haiku-reflection, (3) a genuine wkappbot skill edit haiku-reflection --add-step recording the reflex, (4) a further follow-up dispatch correctly RELEASED (no block). This is the gate working exactly as originally designed, in a real long-running session with prior unrelated skill-edit history. Three bugs fixed total across this investigation: subagents-path resolution (step 8), false-positive substring match on skill-dump/block-message text (step 8), and missing time-anchoring in the release check (step 10). Self-test 10/10."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read agent-failure-reflection-gate",
+      "expect": "force",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read foundation-is-roots-charge-not-a-chore",
+      "expect": "reflex",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read verify-tool-or-guard-synthetic-live-static",
+      "expect": "synthetic",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "harness",
+    "gate",
+    "delegation",
+    "reflection",
+    "recurrence",
+    "agent-failure",
+    "foundation",
+    "reflex",
+    "model-scoped"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-30T06:06:45.9219923Z",
+  "updated": "2026-07-03T19:27:26.7275617Z",
+  "version": "1.29"
+}

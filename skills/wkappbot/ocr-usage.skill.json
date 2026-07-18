@@ -1,0 +1,56 @@
+{
+  "id": "ocr-usage",
+  "app": "wkappbot",
+  "title": "wkappbot ocr: screenshot-to-text, HTS owner-drawn, pipeline usage",
+  "title_ko": null,
+  "desc": "wkappbot ocr runs OCR on a window or image file. Pairs with a11y screenshot for focusless MFC/HTS owner-drawn control text extraction. Covers language options, subprocess usage, coordinate output, pipeline patterns.",
+  "steps": [
+    "WHAT: wkappbot ocr <window-title-or-image.png> runs OCR on a window screenshot or an image file, prints recognized text with per-word coordinates. Pairs with a11y screenshot for focusless MFC/HTS owner-drawn control text extraction.",
+    "WHEN TO USE OCR vs a11y read: prefer a11y read (fast, exact, no image processing). Use OCR when a11y read returns empty for owner-drawn controls, text is rendered as image/bitmap, layout/position info is needed, or MFC HTS panels expose no UIA tree.",
+    "NAVIGATION: full usage detail (pipeline pattern, --lang options, Python subprocess usage, HTS owner-drawn fallback, coordinate-output click targeting) -> ocr-usage-howto. Dated live-fix incidents and restore-session harness escape-hatch notes -> ocr-usage-ref.",
+    "MAJOR FIX 2026-07-02: wkappbot ocr was returning 0 words for EVERY image because SimpleOcrAnalyzer had been a permanent no-op stub since commit d4efb8198 -- a 2026-04-21 IP-stripping commit deleted the whole WKAppBot.Vision project. Restored via commit 8d57caa04, v7.6.97: surgically brought back only the OCR-relevant subset from pre-strip commit 7ce85bcd1 -- SimpleOcrAnalyzer.cs, the real Windows.Media.Ocr WinRT engine not Tesseract, plus OcrSegmentCache.cs, OcrCorrectionDb.cs, VisionCache.cs, VisionCacheEntry.cs -- as a new minimal WKAppBot.Vision.csproj targeting net8.0-windows10.0.22621.0 with only a ProjectReference to WKAppBot.Win32, no Anthropic or SkiaSharp packages. ChartAnalyzer, VisionAnalyzer with its Claude Vision API fallback, CcaUiaFusedMatcher, TooltipCalibrator, DynamicA11yAnalyzer, and the entire WKAppBot.Android namespace remain stubbed, out of scope. Live-verified: 132 words on an agent test image, 184 words on a real terminal screenshot with mixed Korean and English text, via both wkappbot ocr directly and the new file read image auto-route. No Windows OCR language-pack blocker on this machine.",
+    "STDOUT/STDERR SPLIT 2026-07-02: OcrCommand output was restructured so extracted TEXT prints to stdout (clean, pipeable) while the Image header, OCR Results header, word count, and per-word coordinate lines all print to stderr -- mirrors the existing SaveCaptureResult convention in the same file (SAVED:path to stdout, [CAPTURE] diagnostics to stderr). Now 'wkappbot ocr img.png 2>/dev/null' or 'wkappbot file read img.png 2>/dev/null' yields pure extracted text with zero noise, matching Unix tool conventions (like pdftotext). Also extended the recognized-image-extension list from png/jpg/bmp to png/jpg/jpeg/bmp/gif/tif/tiff in BOTH OcrCommand's own file-type check and the file-read auto-router (they must stay in sync -- a mismatch here was found and fixed same session, where file-read routed .jpeg to ocr but OcrCommand's own check didn't recognize .jpeg as an image, which would have misrouted it as a window-title lookup).",
+    "EXTENSION+HELP UPDATE 2026-07-02 v7.6.99: commit lands the .jpeg/.gif/.tif/.tiff extension fix + stdout/stderr output split + updated ocr --help / CommandHelpMap text documenting both."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read ocr-usage",
+      "expect": "BASIC USAGE",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read ocr-usage",
+      "expect": "PIPELINE",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill search ocr",
+      "expect": "ocr-usage",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "ocr",
+    "text",
+    "read",
+    "screenshot",
+    "hts",
+    "mfc",
+    "owner-drawn",
+    "pipeline",
+    "tesseract",
+    "korean",
+    "kor",
+    "eng",
+    "capture",
+    "extract",
+    "parse"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-08T19:38:36.1963186Z",
+  "updated": "2026-07-02T14:49:10.8664682Z",
+  "version": "1.27"
+}

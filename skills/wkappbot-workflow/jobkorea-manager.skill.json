@@ -1,0 +1,43 @@
+{
+  "id": "jobkorea-manager",
+  "app": "wkappbot-workflow",
+  "title": "JobKorea Manager (T1 Core)",
+  "title_ko": null,
+  "desc": "T1 Core Policy: Scrape JobKorea pages via CDP. (<=400 tokens)",
+  "steps": [
+    "1. POLICY: Always use -o file.html for encoding safety. ",
+    " 2. DOMAIN: Focus on /User/PositionOffer and /User/ResumeMng. ",
+    " 3. LAZY: next: jobkorea-manager-howto for execution steps."
+  ],
+  "requirements": [
+    {
+      "cmd": "curl -s http://localhost:9222/json",
+      "expect": "jobkorea",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot web open https://www.jobkorea.co.kr/User/PositionOffer --no-launch --port 9222",
+      "expect": "Navigating",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot web html --port 9222 -o /tmp/jk.html",
+      "expect": "(no error)",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "jobkorea",
+    "cdp",
+    "scraper",
+    "resume",
+    "career"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-30T02:59:54.5595478Z",
+  "updated": "2026-05-31T21:13:35.7068191Z",
+  "version": "1.25"
+}

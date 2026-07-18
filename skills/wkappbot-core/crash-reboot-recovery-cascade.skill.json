@@ -1,0 +1,45 @@
+{
+  "id": "crash-reboot-recovery-cascade",
+  "app": "wkappbot-core",
+  "title": "Crash reboot recovery: cascading failure pattern and full recovery checklist",
+  "desc": "After system crash/Kernel-Power 41 reboot, Windows component startup order breaks causing cascading failures: Korean IME dead in all consoles, MouseCCA spawn storm (100+ zombies), CPU spike, lag. Root cause: all components assume normal boot order. Permanent fixes applied 2026-05-05.",
+  "steps": [
+    "[CRASH REBOOT CASCADE] 1) ctfmon starts late/missing -> IME context not registered for consoles. 2) Windows Terminal starts before ctfmon -> TSF registration fails silently -> Korean IME permanently dead in all WT tabs even after ctfmon starts later. 3) MouseCCA analyze-hack server returns non-JSON -> pre-2026-05-05: Eye respawns every 300ms with no backoff -> 100+ zombie wkappbot-core -> CPU pegged -> full system lag.",
+    "[SYMPTOMS CHECKLIST] Korean input (한/영 key) zero response in any console but works in VS Code. wkappbot-core process count >10 in tasklist. CPU >200% from wkappbot-core. Eye health 34% or lower. System lag/freeze.",
+    "[WHY VS CODE WORKS BUT CONSOLE DOESNT] VS Code is a Win32 GUI app using TSF directly. Console apps use ConPTY/IMM32 path which requires ctfmon to be present at Windows Terminal startup time. After crash, ctfmon arrives too late for WT TSF registration window -> consoles broken, GUI apps fine.",
+    "[RECOVERY 1 - Korean IME + encoding] powershell -ExecutionPolicy Bypass -File C:\\Users\\kiexp\\.codex\\skills\\recover-korean-console\\scripts\\recover-korean-console.ps1 -- restarts ctfmon+TextInputHost, sets UTF-8 InputEncoding/OutputEncoding, patches all live cmd.exe consoles via AttachConsole+SetConsoleCP API, registers ctfmon+chcp in registry.",
+    "[RECOVERY 2 - Windows Terminal IME still dead] Run: wkappbot skill read repair-korean-ime-running-wt-tsf-rebind -- injects msctf.dll into WT via CreateRemoteThread, calls TF_InvalidAssemblyListCacheIfExist, posts WM_INPUTLANGCHANGE to all CASCADIA_HOSTING_WINDOW_CLASS windows. No WT restart needed (preserves wkchat sessions).",
+    "[RECOVERY 3 - MouseCCA spawn storm] (Get-Process wkappbot-core).Count > 10 = storm. Fix: $ep = Eye PID from logs/eye.pid=*.log; Get-Process wkappbot-core | Where-Object Id -ne $ep | Stop-Process -Force; [System.Environment]::SetEnvironmentVariable('WKAPPBOT_EYE_MOUSECCA','0','User'). Post-2026-05-05 builds auto-protect via CAS guard.",
+    "[WHAT WORKED 2026-05-05] Korean IME: recover-korean-console.ps1 fixed encoding+ctfmon. WT IME: msctf.dll injection + TF_InvalidAssemblyListCacheIfExist + WM_INPUTLANGCHANGE worked without WT restart. MouseCCA storm: killed 135 zombies, WKAPPBOT_EYE_MOUSECCA=0 stopped respawn, CAS guard code fix committed.",
+    "[WHAT DIDNT WORK 2026-05-05] ImmAssociateContextEx cross-process -> Windows blocks from external process. skill edit/contribute on existing file -> IOException conflict (need to delete project copy first). Hot-swap stuck on admin Eye pipe (>20min). Windows Terminal IME fix via ImmAssociateContextEx on CASCADIA windows returned 0 (CAS gate + WT internal restriction).",
+    "[PERMANENT FIXES APPLIED] (1) HKCU\\Run: ctfmon.exe auto-starts on every login. (2) HKCU\\Run: recover-korean-console.ps1 runs silently on login. (3) HKCU\\Command Processor AutoRun: chcp 65001 on every cmd.exe. (4) ps-profile.ps1: InputEncoding+OutputEncoding UTF-8 + ctfmon auto-start guard. (5) AppBotEyeHoverAnalyzer.cs: Interlocked CAS gate + exponential backoff 300ms->30s cap + auto-disable after 10 failures. (6) Windows auto-login via HKLM Winlogon registry.",
+    "[LONG-TERM IMPROVEMENT NEEDED] Eye startup self-diagnosis: check ctfmon running, TSF registered, console encoding, MouseCCA server health -> auto-heal before user notices. Suggest filed."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot eye tick",
+      "expect": "health percent shown (not 34% or lower)",
+      "prompt": null
+    },
+    {
+      "cmd": "powershell -Command \"(Get-Process wkappbot-core).Count\"",
+      "expect": "process count under 10 (no spawn storm)",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": "powershell -ExecutionPolicy Bypass -File C:\\Users\\kiexp\\.codex\\skills\\recover-korean-console\\scripts\\recover-korean-console.ps1",
+  "tags": [
+    "crash-reboot", "recovery", "korean-ime", "ctfmon", "tsf", "mousecca",
+    "spawn-storm", "conpty", "cascade-failure", "stability", "utf8", "encoding",
+    "windows-terminal", "wkappbot-core"
+  ],
+  "source_refs": [
+    { "file": "csharp/src/WKAppBot.CLI/Commands/AppBotEyeHoverAnalyzer.cs", "line": 184, "pattern": "_hackServerSpawning" },
+    { "file": "scripts/recover-korean-console.ps1", "line": 1, "pattern": "recover" }
+  ],
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-05T16:03:00.000000Z",
+  "updated": "2026-05-05T16:03:00.000000Z",
+  "version": "1.0"
+}

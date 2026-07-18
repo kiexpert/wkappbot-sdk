@@ -1,0 +1,47 @@
+{
+  "id": "pre-push-orphan-gc-quarantine-full-mark-and-sweep",
+  "app": "wkappbot-workflow",
+  "title": "Pre-Push Orphan GC Quarantine (full mark-and-sweep)",
+  "title_ko": null,
+  "desc": "Pre-push harness guard that runs a FULL GC mark-and-sweep: roots = all .md docs + entry configs + tracked list; transitively mark file-to-file reference edges to a fixpoint; sweep unmarked files to .tmp/unused-DATE/; friendly notice; push always exits 0 (never blocks). Over-mark safety bias keeps runtime-referenced files alive.",
+  "steps": [
+    "PURPOSE: a pre-push harness guard that auto-quarantines orphan (unreferenced) files so the repo stays clean WITHOUT blocking the push. Non-destructive, transparent, always exit 0.",
+    "MODEL is GC mark-and-sweep run FULLY each push. ROOTS = every .md doc PLUS entry configs (settings.json, csproj, sln, package.json, harness entry scripts) PLUS the tracked file list. Unmarked-after-mark = garbage.",
+    "MARK is TRANSITIVE: from each root follow file-to-file reference edges, then follow the references of THOSE files, to a fixpoint. The doc is only the root; a referenced source that references another source keeps that one alive too.",
+    "EDGE EXTRACTION is language-aware per extension: ps1 dot-source and Import-Module and -File; cs via csproj Compile Include and project membership; py import and from; sh source and dot; js and ts import and require; generic = any path-like string literal. Build a directed graph.",
+    "OVER-MARK SAFETY BIAS: when an edge is ambiguous TREAT IT AS AN EDGE and keep the file. A spurious edge means a file survives (safe); a missed edge means a false quarantine (recoverable but bad). Always fail toward KEEPING, never under-mark.",
+    "ALGORITHM: BFS or DFS from roots with a visited-set for cycle safety (A to B to A), iterate to fixpoint (no new marks added).",
+    "SWEEP: move each unmarked file to .tmp/unused-DATE/ preserving its relative path. MOVE not delete (recoverable). Never touch .git or anything already under .tmp.",
+    "RUNTIME-CRITICAL BACKSTOP: never quarantine known-config (.gitignore, csproj, sln, LICENSE, lock files); the entry-config roots plus transitive mark should already cover these.",
+    "NOTIFY then PASS: print a friendly stderr line listing each moved file plus destination plus how to recover from .tmp/unused-DATE/. The guard NEVER blocks: exit 0 always. It cleaned, it did not deny.",
+    "ROLLOUT: ship as dry-run LIST mode first (log candidates, move nothing) to calibrate edge extraction on real repos; promote to live-move only after the candidate list is verified accurate. Scope: AI-session pushes.",
+    "BUILD FLOW: haiku prototypes the mark-sweep plus edge extraction in a sandbox proto; sonnet architects and implements; ROOT verifies synthetic plus live plus static then merges. See haiku-sandbox-problem-solving and verify-tool-or-guard-synthetic-live-static.",
+    "SIMPLIFICATION (user 2026-06-19, recoverability lets the mark be approximate): full fixpoint is NOT required. Bound the transitive traversal to about 3 hops from roots -- because any false quarantine is recoverable from .tmp/unused-DATE/, exhaustive marking is over-engineering. Prefer the simpler bounded walk. EDGE FOCUS: primarily follow references that involve ROOT SCRIPTS (a file referencing a root script, plus that root script own references); do not chase every generic path string to infinity. NOTE: a root script referencing ANOTHER root script is a mild code-smell (not beautiful) -- tolerated, but flat cross-references among roots are a sign to flatten and clarify, not to deepen the walk.",
+    "ACTION POLICY (user 2026-06-19, TWO-TIER by location): an UNREFERENCED file at the REPO ROOT (top-level) is IMMEDIATELY QUARANTINED -- moved to .tmp/unused-DATE/ (the root must stay clean). An unreferenced file in a SUBFOLDER gets a WARN ONLY -- listed in the notice, NOT moved. WHY: root cruft is most visible and the root candidate set is small and controlled so auto-move is safe there; subfolder auto-move is risky because dynamic loaders cause false-positives (e.g. tools/ harness modules that static edge-extraction misses -- a real calibration run flagged 249/505 incl live harness), so warn-not-move avoids any brick. BOTH paths: push still exits 0, never blocks. Enumeration may recurse (to WARN on subfolders), but the MOVE action applies to TOP-LEVEL files only."
+  ],
+  "requirements": [
+    {
+      "cmd": "pre-push dry-run on a repo with an orphan file not in any md",
+      "expect": "orphan listed as quarantine candidate",
+      "prompt": null
+    },
+    {
+      "cmd": "a ps1 dot-sourced by an md-referenced script but absent from every md",
+      "expect": "NOT a candidate (kept via transitive mark)",
+      "prompt": null
+    },
+    {
+      "cmd": "live mode with an orphan",
+      "expect": "file moved under .tmp/unused-DATE/ AND recovery notice printed AND push exits 0",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-19T05:20:24.6911097Z",
+  "updated": "2026-06-19T06:19:02.7147752Z",
+  "version": "1.4"
+}

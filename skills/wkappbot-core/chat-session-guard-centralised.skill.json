@@ -1,0 +1,43 @@
+{
+  "id": "chat-session-guard-centralised",
+  "app": "wkappbot-core",
+  "title": "ChatSessionGuard centralises wkchat sparing",
+  "title_ko": null,
+  "desc": "Single source of truth for chat-session detection used by all wkappbot-core kill sweeps. Cmdline \u002B parent-pid layers stay in lockstep across Eye hot-swap, SUDO admin hot-swap, and a11y kill paths.",
+  "steps": [
+    "Add new sweep that scans wkappbot-core processes",
+    "Call ChatSessionGuard.IsChatSession(pid, cmdLine, out reason) before any kill",
+    "Spare any process where IsChatSession returns true",
+    "Log the reason for spare/kill so [GUARD] traces stay diagnosable"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot validate ChatSessionGuard",
+      "expect": "spares chat/wkchat/claude/codex/mcp \u002B parent-pid",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot eye --replace-pid \u003Cchat-pid\u003E",
+      "expect": "Sparing wkchat session log line, chat survives",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot suggest list",
+      "expect": "no chat-die suggest in last 24h",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "eye",
+    "hotswap",
+    "chat",
+    "guard"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-07T05:15:40.6484174Z",
+  "updated": "2026-05-07T05:15:40.6484259Z",
+  "version": "1.0"
+}

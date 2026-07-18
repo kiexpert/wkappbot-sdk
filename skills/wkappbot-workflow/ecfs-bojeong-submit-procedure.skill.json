@@ -1,0 +1,46 @@
+{
+  "id": "ecfs-bojeong-submit-procedure",
+  "app": "wkappbot-workflow",
+  "title": "ECFS Bojeong Submit Procedure",
+  "title_ko": null,
+  "desc": "Haiku worker procedure for ECFS court correction document filing on ecfs.scourt.go.kr. CDP automation steps with status reporting pattern.",
+  "steps": [
+    "ENV: CDP port 9612 hwnd 0x140078. eval-js syntax: wkappbot a11y read \"{hwnd:0x140078,cdp:9612}#document\" --eval-js \"JS\". After each step: wkappbot skill edit ecfs-bojeong-submit-procedure --add-step STATUS_N_done",
+    "STEP1 VERIFY: eval-js check body.innerText for form 2026guhap52557. If not found: navigate admin-docs > bojeong link, input 2026/guhap/52557, click id=mf_pfwork_btn_confirm.",
+    "STEP2 FIX TYPO: fix wrong char in textarea id=mf_pfwork_wfm_file_txa_hangsoInfo. Wrong word is nak-bu (unicode: \\uB099\\uBD80\\uD558\\uC600\\uAE30\\uC5D0), correct is nap-bu (unicode: \\uB0A9\\uBD80\\uD558\\uC600\\uAE30\\uC5D0). Run: ta.value=ta.value.replace('\\uB099\\uBD80\\uD558\\uC600\\uAE30\\uC5D0','\\uB0A9\\uBD80\\uD558\\uC600\\uAE30\\uC5D0');",
+    "STEP3 ATTACH FILE: eval-js find input[type=file] ids. Then wkappbot a11y type on file input node path: D:\\GitHub\\personal-docs\\.tmp\\epost_delivery_proof.png",
+    "STEP4 TEMP SAVE: eval-js click id=mf_pfwork_btnTmpSave. Read popup. If success text found, click OK button in popup.",
+    "STEP5 MANDATORY STOP: do NOT click final submit/register. Report back: typo_fixed, file_attached, save_success, next_action_needed."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read ecfs-bojeong-submit-procedure",
+      "expect": "STEP1 VERIFY FORM",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot a11y read {hwnd:0x140078,cdp:9612}#document --eval-js document.getElementById('mf_pfwork_btnTmpSave')",
+      "expect": "[object HTMLInputElement]",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill edit ecfs-bojeong-submit-procedure --add-step STATUS_step_done",
+      "expect": "skill updated",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "ecfs",
+    "cdp",
+    "court",
+    "haiku",
+    "bojeong"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-27T06:21:20.7159504Z",
+  "updated": "2026-06-27T06:21:20.7159592Z",
+  "version": "1.0"
+}

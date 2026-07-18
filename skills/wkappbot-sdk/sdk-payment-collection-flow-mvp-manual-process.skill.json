@@ -1,0 +1,36 @@
+{
+  "id": "sdk-payment-collection-flow-mvp-manual-process",
+  "app": "wkappbot-sdk",
+  "title": "SDK payment collection flow (MVP manual process)",
+  "title_ko": null,
+  "desc": "How to receive payment and activate a customer license at MVP stage before Stripe automation. Korean market focus: Toss or bank transfer. Steps cover payment receipt, GitHub invite send, and record keeping.",
+  "steps": [
+    "RECEIVE PAYMENT: accept Kakao Pay, Toss, or domestic bank transfer (Shinhan/Kookmin). Share account number in onboarding email. Amount: 100,000 KRW/mo (CDP/Pro) or 500,000 KRW/mo (Sudo/Business). No receipt system at MVP -- manual bank statement verification.",
+    "PENDING INVITE UX: before acceptance, wkappbot shows blue toast bottom-right (non-blocking, 15s auto-dismiss, CDP works immediately). LicenseManager checks GET /repos/invitations when permission=none."
+  ],
+  "requirements": [
+    {
+      "cmd": "gh api repos/kiexpert/wkappbot-sdk/collaborators/testuser -X PUT -f permission=read",
+      "expect": "201 or 204",
+      "prompt": null
+    },
+    {
+      "cmd": "gh api repos/kiexpert/wkappbot-sdk/collaborators/testuser",
+      "expect": "shows read permission for active customer",
+      "prompt": null
+    },
+    {
+      "cmd": "gh api repos/kiexpert/wkappbot-sdk/collaborators/testuser -X DELETE",
+      "expect": "204 on cancel",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-28T18:25:43.8169484Z",
+  "updated": "2026-04-28T18:35:21.9169259Z",
+  "version": "1.1"
+}

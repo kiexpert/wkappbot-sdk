@@ -1,0 +1,34 @@
+{
+  "id": "skill-audience-taxonomy",
+  "app": "wkappbot-core",
+  "title": "Skill Audience Taxonomy",
+  "desc": "A standard taxonomy for splitting wkappbot skills by audience and responsibility. Use it to decide whether a skill should be operator-facing, developer-facing, project-specific, or end-user-facing, and when to split one skill into multiple variants.",
+  "steps": [
+    "Classify every skill by its primary audience: operator, developer, project, or user.",
+    "Operator skills are for running and verifying existing systems: inspect, find, verify, audit, dry-run, review, install.",
+    "Developer skills are for changing code, refactoring, testing, and shipping implementation details.",
+    "Project skills capture repository-specific rules, exceptions, and local conventions that do not generalize well.",
+    "User skills explain what a user can do in product terms without exposing internal implementation details.",
+    "If one skill mixes operator and developer responsibilities, split it into separate skills and keep only the shared core in the parent skill.",
+    "If one skill serves multiple audiences, prefer a shared base plus small audience-specific variants instead of one oversized document.",
+    "Use short suffixes when needed: operator, developer, project, user."
+  ],
+  "tags": [
+    "skill",
+    "taxonomy",
+    "audience",
+    "operator",
+    "developer",
+    "project",
+    "user",
+    "standard",
+    "split",
+    "selection"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-08T16:44:46.374397Z",
+  "updated": "2026-04-08T16:49:20.0723527Z",
+  "version": "1.4"
+}

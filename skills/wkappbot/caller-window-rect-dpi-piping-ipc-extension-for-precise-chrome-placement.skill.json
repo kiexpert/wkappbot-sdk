@@ -1,0 +1,44 @@
+{
+  "id": "caller-window-rect-dpi-piping-ipc-extension-for-precise-chrome-placement",
+  "app": "wkappbot",
+  "title": "Caller Window RECT + DPI Piping: IPC Extension for Precise Chrome Placement",
+  "title_ko": null,
+  "desc": "Extend IPC protocol to send caller window RECT and DPI from EyeCmdPipeClient to Launcher. Eliminates ResolveCallerTerminalHwnd failures by trusting caller's direct measurement of its own window geometry and monitor DPI. Enables exact pixel-perfect Chrome placement without GA_ROOTOWNER ancestor walk fallbacks.",
+  "steps": [
+    "PROBLEM: ResolveCallerTerminalHwnd fails to find PseudoConsoleWindow in some ancestor chains (IDE integrated terminals, dead PIDs, ConPTY host confusion). Fallback to EnumWindows zMatch (Z-order first = foreground terminal, wrong project). Solution: bypass ancestor walk entirely. Let caller measure and send its own window RECT + DPI directly via IPC.",
+    "CURRENT IPC (EyeCmdPipeClient.TryDelegate lines 56-61): prepend __hwnd:0xHHHHHHHH to JSON args array. Wire format: json.Insert(0, '__hwnd:0x'+hwnd.ToInt64().ToString('X8')).",
+    "EXTENDED IPC (proposed): add three new prefix fields: (1) __hwnd_rect:{left},{top},{right},{bottom} = caller window RECT in physical pixels (GetWindowRect unscaled). (2) __hwnd_dpi:{dpi_x},{dpi_y} = monitor DPI where window is located (GetDpiForWindow or GetMonitorDpiFromWindow). (3) __hwnd_root:{root_hwnd} = GA_ROOTOWNER result (optional; for validation only). Each on separate line or semicolon-delimited in single field.",
+    "IMPLEMENTATION in EyeCmdPipeClient.WindowDetection.cs (AFTER ResolveCallerTerminalHwnd returns hwnd): (1) If hwnd != Zero: GetWindowRect(hwnd, out RECT r) -> __hwnd_rect. (2) GetDpiForWindow(hwnd) or MonitorFromPoint + GetMonitorDpiFromWindow -> __hwnd_dpi. (3) Optional: attempt GA_ROOTOWNER(hwnd) -> __hwnd_root for validation.",
+    "WIRE FORMAT (3 variants, pick one): Variant A (multiline): __hwnd:0xABC / __hwnd_rect:100,50,900,700 / __hwnd_dpi:96,96 / rest of args. Variant B (single-field): __hwnd:0xABC;rect=100,50,900,700;dpi=96,96 (semicolon-delimited). Variant C (named JSON fields if moving to richer IPC format): {hwnd:'0xABC', rect:{l:100,t:50,r:900,b:700}, dpi:{x:96,y:96}, ...}.",
+    "LAUNCHER RECEIVER (MyCdpContext.Placement.cs CallerPlacementResolver): (1) Parse __hwnd_rect and __hwnd_dpi from args before dropping them from array. (2) TryGetCallerRect: if __hwnd_rect provided, use it directly (trust caller measurement). Skip EnumWindows, skip ancestor walk. (3) DPI-aware SetWindowBounds: scale Chrome size by (targetDpi / 96) to match caller monitor's DPI. Position Chrome relative to caller window RECT.",
+    "FALLBACK CHAIN (if piping absent): If __hwnd_rect not found: try GetWindowRect(hwnd) directly (Launcher fallback, no ancestor chain). If GetWindowRect fails: use zero-rect (placement skip). NEVER fall back to foreground or Z-order EnumWindows.",
+    "VALIDATION: (1) RECT bounds check: ensure right > left, bottom > top, within reasonable screen bounds. (2) DPI range: 96 (1x) to 576 (6x). Out-of-range = skip placement. (3) __hwnd_root (if provided): match hwnd value to verify integrity (optional, for diagnostics only).",
+    "BENEFITS: (1) Eliminates ResolveCallerTerminalHwnd complexity + failures. (2) No more GA_ROOTOWNER ancestor walk, no foreground fallback. (3) DPI already measured by caller (more accurate than launcher's remote MonitorFromPoint). (4) Caller window RECT already computed (no need for Launcher to query it again). (5) Exact pixel-perfect placement because all inputs are ground truth from caller's process context.",
+    "BACKWARD COMPAT: Launcher continues to support old __hwnd-only path (no piping extension). If __hwnd_rect absent, falls back to GetWindowRect(hwnd) locally or zero (skip). Existing Eye/Launcher binaries work unmodified during rollout. New behavior activated only when both sides send+receive extended fields."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read eye-ipc-caller-hwnd-resolution",
+      "expect": "__hwnd:",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read standard-appbot-window",
+      "expect": "DEFINITION",
+      "prompt": null
+    },
+    {
+      "cmd": "grep -n 'GetWindowRect\\|GetDpiForWindow' D:/GitHub/WKAppBot/csharp/src/WKAppBot.Launcher/EyeCmdPipeClient.WindowDetection.cs",
+      "expect": "WindowDetection",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-27T20:25:46.120363Z",
+  "updated": "2026-05-27T20:25:46.1203763Z",
+  "version": "1.0"
+}

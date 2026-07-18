@@ -1,0 +1,39 @@
+{
+  "id": "sdk-find-stable-build-green-verification",
+  "app": "wkappbot-sdk",
+  "title": "sdk-find-stable: build green verification",
+  "title_ko": null,
+  "desc": "Evidence that dev repo build is green after 2026-04-28 instability. CLI and Launcher both build with 0 errors. Stable RC selection unblocked.",
+  "steps": [
+    "CLI build: dotnet build WKAppBot.CLI.csproj -c Release =\u003E 0 errors (verified 2026-04-29)",
+    "Monitor: run dotnet build on both projects before any suggest resolve that touches .cs files -- build green is a hard prerequisite for RC",
+    "Launcher build: dotnet build WKAppBot.Launcher.csproj -c Release =\u003E 0 errors (verified 2026-04-29)",
+    "wkappbot --version =\u003E v6.5.34 confirmed running after hot-swap",
+    "Stable RC selection unblocked: 3 consecutive green builds with no new error suggests satisfies sdk-release-playbook gate"
+  ],
+  "requirements": [
+    {
+      "cmd": "dotnet build csharp/src/WKAppBot.CLI/WKAppBot.CLI.csproj -c Release --no-restore -v q",
+      "expect": "\uC624\uB958 0\uAC1C",
+      "prompt": null
+    },
+    {
+      "cmd": "dotnet build csharp/src/WKAppBot.Launcher/WKAppBot.Launcher.csproj -c Release --no-restore -v q",
+      "expect": "\uC624\uB958 0\uAC1C",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot --version",
+      "expect": "v6.",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-28T18:33:31.1808842Z",
+  "updated": "2026-04-28T18:34:12.4250093Z",
+  "version": "1.4"
+}

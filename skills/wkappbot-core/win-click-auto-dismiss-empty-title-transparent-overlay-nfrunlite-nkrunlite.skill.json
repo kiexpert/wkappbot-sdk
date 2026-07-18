@@ -1,0 +1,19 @@
+{
+  "id": "win-click-auto-dismiss-empty-title-transparent-overlay-nfrunlite-nkrunlite",
+  "app": "wkappbot-core",
+  "title": "win-click: auto-dismiss empty-title transparent overlay (nfrunlite/nkrunlite)",
+  "desc": "Physical click path: empty-title non-#32770 blocker overlays (e.g. nfrunlite transparent guard window) are auto-dismissed silently. Only named dialogs prompt error; transparent overlays get TryDismissBlocker \u002B 200ms wait.",
+  "steps": [
+    "Detect empty-title transparent overlay: string.IsNullOrEmpty(blocker.Title) \u0026\u0026 blocker.ClassName != \u0027#32770\u0027.",
+    "Auto-dismiss silently: physReadiness.TryDismissBlocker(hWnd, blocker) \u002B Thread.Sleep(200). Log [WIN] empty-title overlay [className] auto-dismissed.",
+    "Named dialogs (title present or className==#32770) still return error unless --dismiss-blocker flag passed.",
+    "Verified 2026-04-23: experience/tests/win/click/test-win-click-transparent-overlay-autodismiss.sh (resolve ts=2026-04-23T04:06:49.2911611Z)"
+  ],
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-23T04:35:48.4264832Z",
+  "updated": "2026-04-23T04:36:57.1416948Z",
+  "version": "1.1"
+}

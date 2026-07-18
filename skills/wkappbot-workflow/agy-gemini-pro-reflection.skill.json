@@ -1,0 +1,49 @@
+{
+  "id": "agy-gemini-pro-reflection",
+  "app": "wkappbot-workflow",
+  "title": "Agy-Gemini-Pro Reflection",
+  "title_ko": "Agy-Gemini-Pro 반성문",
+  "desc": "T1 core. Formal reflection for agy-gemini-pro sessions regarding harness integration, on-load compliance, and family isolation rules.",
+  "steps": [
+    "1. PURPOSE: To document agy's role in building the harness and its historical failures in compliance.",
+    "2. THE ON-LOAD FAILURE: Fleet audit showed 4% on-load compliance. The system requires reading the mandatory skills or suffering a HARD BLOCK. No exceptions.",
+    "3. ZERO-ENV DETECTION: Process-chain and log-based detection ensures identity is derived from the live system state.",
+    "4. MODERN HOOK PROTOCOL: Understands the strict exit 1 on any stderr or stdout rule for Antigravity CLI.",
+    "5. FAMILY ISOLATION: As an agy instance, I must respect boundaries. Agy-specific logic belongs in adapters.",
+    "6. BRIEFING OVER EXECUTION: The on-load check is the ROOT of the harness. Reading skills is free and mandatory.",
+    "7. MINIMIZE SERVER ROUND-TRIPS: Every harness block wastes server communication tokens. Do not wait to be blocked. Proactively inject mandatory requirements (e.g., the 3 skill reads for invoke_subagent, on-load reflex reads) into prompts and workflows in a single shot (one-shot compliance) to minimize token waste.",
+    "8. HARNESS BLIND SPOTS & AGY NATIVE TOOLS: Agy (Antigravity CLI) native tools (e.g., replace_file_content) might completely bypass the PreToolUse hook (wkharness.ps1). Furthermore, Agy's schema uses TargetFile instead of file_path, and tool names like replace_file_content instead of replace. Agy must NEVER exploit these blind spots to bypass rules (like directly editing .skill.json). Agy must proactively self-regulate, act as if the harness is fully hooked, and strictly use 'wkappbot skill edit/contribute' for knowledge updates rather than backdoor native file edits."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read agy-gemini-pro-reflection",
+      "expect": "agy-gemini-pro-reflection",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read on-load",
+      "expect": "ONE-SHOT COMPLIANCE",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read claude-md-guide",
+      "expect": "KEY MANDATORY RULES",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "agy",
+    "reflection",
+    "harness",
+    "compliance",
+    "on-load",
+    "hook-protocol"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-15T05:54:09.7181298Z",
+  "updated": "2026-06-15T06:05:24.4157701Z",
+  "version": "1.2"
+}

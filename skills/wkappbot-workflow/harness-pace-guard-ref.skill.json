@@ -1,0 +1,41 @@
+{
+  "id": "harness-pace-guard-ref",
+  "app": "wkappbot-workflow",
+  "title": "Harness pace-guard REF: dated incidents + escapes",
+  "title_ko": null,
+  "desc": "T3 ref tier of harness-pace-guard: dated pace-guard bug fixes, exemption incidents, and the over-pace canonical-edit escape. Core actionable rules live in harness-pace-guard.",
+  "steps": [
+    "WK-LAUNCHER HYPHEN EXEMPTION BUG (fixed d7a3ddba 2026-06-23): Test-WkPaceVerdict inline exemption regex matched wk+word-chars only (no hyphen), so ./wk-cdp.cmd and any hyphenated WillKim launcher was wrongly over-pace-blocked; fix = body class wk then one-or-more hyphen-or-word. ROOT-CLASS = duplicate exemption lists that drift; unify via the Get-WkSafePrefixRegex single source.",
+    "TASK-KILL-SWITCH MUST BE PACE-EXEMPT (2026-06-24): at 94pct over-pace with three token-hippo Sonnet agents, ROOT could NOT stop them -- TaskStop is deferred (needs ToolSearch) and ToolSearch was pace-blocked. FIX: add TaskStop + ToolSearch to Test-WkPaceExempt. A token-saving guard must never block the most token-saving action. Also: parallel agents each git-stashing on a shared tree clobbered ROOTs staged edit -- cap parallelism or worktree-isolate.",
+    ".tmp WRITE EXEMPTION PROPOSED THEN REVERSED (2026-06-27): do NOT blanket-exempt writes under .tmp/ from pace/write-freeze/study-lock; a .tmp file can be a concurrent sessions in-use scratch (clobber risk). Keep study-lock SIMPLE -- no Test-WkIsSandboxWrite. Principle: simple independent gates beat piled special-case exemptions.",
+    "OVER-PACE CANONICAL-EDIT ESCAPE = a FRESH NON-CLAUDE PRO agent (2026-06-28): a delegate is a fresh small session so it is pace-95-exempt, but a canonical edit also needs PRO (write-freeze) and both Claude pro paths are gated over-pace (Opus subagent to opus-budget, Sonnet subagent to non-pro write-freeze). Escape: agy (Gemini-pro) has its OWN pace pool AND is pro; dispatch Agent.cmd --model agy run_in_background, single-line brief (heredoc trips the knowledge-op guard), agy is CWD-sandboxed so set CWD to the target repo, verify the diff.",
+    "KOREAN ARG EXEMPTION BUG (2026-06-28; NOTE 2026-06-29 ROOT-verified ALREADY FIXED in HEAD -- onload-enforce.ps1 L91/L92 already use backslash-S-plus, grep finds zero of the old char-class; historical): the bug was [A-Za-z0-9._/-]+ could not match a Unicode arg so wkappbot skill search/edit with a Korean arg was on-load-gate-blocked; fix was to backslash-S-plus.",
+    "wkpace -Family NAME forces a specific family pace display (claude/codex/agy/gemini/groq/cerebras); without it auto-detects the running session family. File: WKAppBot/bin/wkpace.ps1 L6 param.",
+    "GUARD MESSAGES MUST PREFIX A REPO-ROOT WILLKIM LAUNCHER WITH ./ (user 2026-06-29). When a block message points the AI at a repo-root script (wk-test, wk-codex-pty-test, any ./wk-*.cmd diagnostic), write it as ./wk-test.cmd -- NOT bare wk-test.cmd. WHY: the ./ prefix signals it is a REPO-LOCAL script (run from the repo root) rather than a global PATH tool; a bare name reads as an installed command the AI may not find, while ./wk-test.cmd tells it exactly where to look and that it is this-repo-specific. The good model is the pace-sonnet-haiku pace-95 message which already says 'bare wk* names or ./wk-<tool>.cmd launchers'. Fixed the codex-main pace-95 message (wk-test.cmd -> ./wk-test.cmd) on this basis. RELATED: a repo-root ./wk-*.cmd must be MENTIONED in that repo CLAUDE.md or the pre-push cleanup auto-prunes it (pace-deadlock-escapes step 9) -- and verify-agent found wk-parsecheck.cmd had already been pruned (only a .bak remained), a live instance of that gap. Cross: pace-deadlock-escapes-harness-editable-and-jisikhwa-free step 9, wkwrap-important-tool-connection-doctor-reconnect, harness-pace-guard step 5 (WillKim tools pace-exempt)."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read harness-pace-guard-ref",
+      "expect": "dated incidents",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read harness-pace-guard",
+      "expect": "core escape rules",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill search pace-guard",
+      "expect": "finds both tiers",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-29T10:28:07.7092491Z",
+  "updated": "2026-06-29T10:52:34.1869953Z",
+  "version": "1.3"
+}

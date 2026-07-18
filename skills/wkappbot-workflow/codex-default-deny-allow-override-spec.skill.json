@@ -1,0 +1,70 @@
+{
+  "id": "codex-default-deny-allow-override-spec",
+  "app": "wkappbot-workflow",
+  "title": "Codex Default Deny With Allow Override",
+  "title_ko": null,
+  "desc": "Codex-family hook architecture for global default deny with explicit file, tool, stage, and one-shot allow overrides, while sacred surfaces remain hard-denied and adapter failures fail closed.",
+  "steps": [
+    "Use a Codex-only adapter as the policy entry point. Do not implement this first in shared Claude or Gemini harness code.",
+    "Policy order: emergency hard-deny first, explicit allow second, stage allow third, global default deny fourth, audit logging last.",
+    "Emergency hard-deny always wins over allow overrides for sacred surfaces such as .skill.json direct edits, harness core files without study-lock compliance, credentials, token caches, and destructive process commands.",
+    "Explicit allow records should include family, tool name, target path or command pattern, stage, reason, issuer, expiry, and one-shot flag. Avoid environment-variable based approval because it is spoofable.",
+    "Stage allow records let the harness open only the tools needed for the current bootstrap or repair phase, then add or remove safe patterns as the phase advances.",
+    "One-shot allow records must be consumed after first matching use. Expiring allow records must be ignored after expiry and should be garbage-collected by the harness.",
+    "Allow matching should be narrow by default: exact path before glob, exact tool before family-wide tool class, command prefix before regex. Regex allow rules require a reason and short expiry.",
+    "Deny behavior for Codex PreToolUse should be fail-closed: emit the reason on stderr and exit 2. Allow behavior should exit 0 with empty stdout.",
+    "Audit every override decision with timestamp, session id, family, tool, target, matched rule id, and final decision. Audit records make the dynamic Sura pattern growth reviewable.",
+    "Implementation joseki: start with a read-only allowlist file, prove deny and allow smoke tests with representative stdin JSON, then connect dynamic stage mutation only after the static rule path is verified.",
+    "All non-knowledge tools start denied under the Codex default-deny profile. The harness must grant them through narrow explicit allow records, stage allow records, or one-shot approvals. Absence of a matching allow means deny, not prompt or best-effort execution.",
+    "Knowledge-support tools are normally always allowed: wkappbot skill read/search/list/edit/contribute/news, knowledge publication git or gh commands, and approved documentation updates. However, this allowance is conditional on zero trick syntax. If even one character of trick syntax, command smuggling, mixed non-knowledge work, destructive intent, or sacred-surface bypass appears, emergency hard-deny wins immediately.",
+    "2026-06-14 implementation: Codex session-init reinstalls the standard hook profile through wkharness-codex-install.ps1. The installed hooks.json uses a single PreToolUse catch-all matcher routed to CodexPreToolUseAdapter.ps1. CodexPreToolPolicy.ps1 owns knowledge fast-allow, trick hard-deny, explicit allow, one-shot consumption, default deny, and audit JSONL.",
+    "2026-06-14 reinstall hygiene: when the Codex hook profile changes, remove stale hooks.state sections during session-init reinstall. Approval state belongs to the installed hook shape; old state must not survive a matcher or command rewrite.",
+    "2026-06-14 knowledge command chain refinement: multi-command knowledge chains are allowed to reduce server communication tokens, but every segment must match a registered knowledge pattern. Single pipe is blocked by default. The only redirection exception is stderr merge 2>&1. Output hiding such as Out-Null, redirecting to null, Tee-Object, encoded or eval payloads, and any unregistered syntax hard-deny immediately.",
+    "2026-06-14 guidance routing fix: Codex default deny must not hide shared harness guidance. Policy decisions may route read-only tools to the shared harness and allow them if the harness allows. Other unmatched tools route to the harness for guidance, then deny if the harness is silent or permissive without an explicit Codex allow.",
+    "2026-06-14 Codex family hint fix: CodexPreToolUseAdapter sets WKHARNESS_CODEX_HOOK for the child harness, and wkharness.ps1 maps that to codex-mini before family detection. On-load must honor an explicit ModelFamily and not overwrite it from stale session logs, or Codex sees Haiku or Claude reflex prompts.",
+    "PermissionRequest must be allow-first for permitted targets and must not pre-emit deny before policy evaluation, otherwise Codex keeps reopening approval prompts even when the request is already authorized.",
+    "PermissionRequest on Codex hooks must be allow-first; never emit deny before policy evaluation, or approval popups can loop.",
+    "Codex PermissionRequest should route allow-first, then fallback deny after policy evaluation; pre-policy deny reopens approval loops.",
+    "External wkappbot-kih PermissionRequest fix: remove the pre-policy deny line and add PermissionRequest registration in wkharness-codex-install so Codex no longer loops approval popups.",
+    "PermissionRequest fix is now being applied in wkappbot-kih: allow-first in CodexHookAdapter and PermissionRequest registration in installer are the only required code changes.",
+    "The external hook patch can be applied with a single regex replace on the PermissionRequest block plus a one-line hook-map insertion in the installer; no broader refactor is needed.",
+    "When external wkappbot-kih PermissionRequest edits are blocked by busy-fleet, retry after a knowledge edit and keep the patch ASCII-safe with wkedit single-quoted here-strings.",
+    "Apply the external wkappbot-kih PermissionRequest fix with exact literal block replacement: keep the latest-harness-allow fast path, remove the pre-policy deny, then register PermissionRequest in the installer hook map.",
+    "PermissionRequest must not emit a local deny before CodexPreToolPolicy.ps1 runs; the policy result should be mirrored directly, and the installer must register PermissionRequest explicitly so the deny/allow path stays consistent with the policy source.",
+    "The approval popup loop is fixed by removing the pre-policy local deny in PermissionRequest and registering PermissionRequest in the installer; do not keep the adapter's deny-before-policy behavior."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read codex-default-deny-allow-override-spec",
+      "expect": "Default Deny With Allow Override",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read harness-guard-exemption-ladder-spec",
+      "expect": "TIER0",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read codex-cli-wkappbot-usage",
+      "expect": "Codex CLI usage",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "codex",
+    "harness",
+    "pretooluse",
+    "default-deny",
+    "allowlist",
+    "override",
+    "stage",
+    "fail-closed"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-14T11:51:27.271276Z",
+  "updated": "2026-07-03T11:19:50.394838Z",
+  "version": "1.27"
+}

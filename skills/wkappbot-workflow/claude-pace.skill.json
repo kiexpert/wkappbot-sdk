@@ -1,0 +1,47 @@
+{
+  "id": "claude-pace",
+  "app": "wkappbot-workflow",
+  "title": "claude-pace block: the wise overcoming",
+  "title_ko": null,
+  "desc": "What to do when you hit a [claude-pace] block (active Claude model over weekly/monthly target). It is NOT a wall -- it is the harness redirecting to pace-exempt paths. wkedit-FIRST escape, the built-in-Edit-block-is-by-design rule, delegate/knowledge-ops/wk-tools. The skill the [claude-pace] guard message points to. Full toolkit: harness-pace-guard; never-stuck: pace-deadlock-escapes-harness-editable-and-jisikhwa-free.",
+  "steps": [
+    "WHAT: a [claude-pace] block means the ACTIVE Claude model is OVER its weekly or monthly pace target. This is NOT a wall -- ROOT is NEVER stuck; the block is the harness redirecting you to the pace-exempt paths below.",
+    "WISE OVERCOMING (priority order): (1) ROOT SOURCE EDIT via wkedit -- wkappbot file edit OLD NEW PATH (pace-exempt). The built-in Edit and Write TOOL being pace-blocked is BY DESIGN (grace period; the final intent is that ROOT NEVER uses the built-in Edit or Write tool, wkedit is the sanctioned ROOT source-edit path), so a built-in-Edit pace-block is the REDIRECT to wkedit, never a reason to declare a wall. Use pipe-and-semicolon-free old and new strings, or --old-file and --new-file for blocks that contain them. (2) KNOWLEDGE-OPS are always free: wkappbot skill read or edit, wkhippo, suggest. (3) DELEGATE to a cheaper or cross-family tier: Agent.cmd --model haiku, or a fresh NON-Claude pro agent on its own pace pool. (4) REPO WILLKIM TOOLS are pace-exempt: wrap blocked work in a ./wk-star.cmd launcher and finish the task. (5) git commit, diff, and checkout are allowed (checkout reverts an uncommitted bad edit).",
+    "NEVER: declare a wall or capture-and-defer BEFORE trying wkedit; reach for an env backdoor (any WKHARNESS_ variable); use --no-verify; or stop with a pace excuse -- the owner ranks mission-completion timing ABOVE the pace budget.",
+    "REFLEX: on ANY source write-block the FIRST action is to TRY wkedit. Capture-and-defer invoked before wkedit has actually been RUN and blocked is abdication-via-cost-excuse (foundation-is-roots-charge step 13) wearing a do-not-flail mask.",
+    "SEE: full over-pace toolkit + dated incidents -> wkappbot skill read harness-pace-guard (step 6 toolkit, step 9 the 2026-06-30 confabulated-wall incident); the never-stuck deadlock escapes -> wkappbot skill read pace-deadlock-escapes-harness-editable-and-jisikhwa-free; the 95pct circuit breaker -> wkappbot skill read pace-95-circuit-breaker."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read claude-pace",
+      "expect": "wkedit",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read claude-pace",
+      "expect": "WISE OVERCOMING",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read harness-pace-guard",
+      "expect": "ESCAPE",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "claude",
+    "pace",
+    "guard",
+    "escape",
+    "wkedit",
+    "over-target",
+    "wise-overcoming"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-29T15:50:41.8964599Z",
+  "updated": "2026-06-29T15:50:41.8964693Z",
+  "version": "1.0"
+}

@@ -1,0 +1,35 @@
+{
+  "id": "proto-cleanup-discipline-howto",
+  "app": "wkappbot-kih",
+  "title": "Proto-cleanup + dead-script detector + pre-push danger-scan (howto)",
+  "title_ko": null,
+  "desc": "T2 howto tier of proto-cleanup-discipline: the dead-script orphan detector spec, the unguarded-important-script audit, and the PRE-PUSH danger-scan enforcement (the correct layer vs a CLAUDE.md study-lock). Build recipes + the cross-repo audit method.",
+  "steps": [
+    "BUILD-PLAN: PRE-PUSH DEAD-SCRIPT DETECTOR (user 2026-06-27). Detect ORPHAN scripts (tools/*.ps1 + *.cmd/*.sh) that NO live path reaches, flag them (.unused.txt) so the harness self-prunes dead code. REACHABILITY MODEL (track ALL script-to-script refs transitively): (1) ROOTS = family entry points wkharness.ps1 + wkharness-{claude,codex,agy}-main.ps1 + wkharness-post.ps1 + CodexHookAdapter.ps1 + Agent.ps1 + repo-root wk-*.cmd/.sh + every file named in a CLAUDE.md '## harness:skill <path>' rule (skill-locked = LIVE). (2) EDGES = scan each script for dot-source ('. ...X.ps1' / Join-Path ...'X.ps1'), '& X.ps1', literal 'X.ps1' refs -> directed graph. (3) LIVE = transitively reachable from any ROOT (BFS) OR matched by a CLAUDE.md harness:skill PATH/GLOB rule. (4) ORPHAN = a real script NEITHER reachable NOR skill-locked NOR -proto/-probe/test. TRIGGER = PRE-PUSH gate. SAFETY: DRY-RUN REPORT FIRST, never blind-rename (a false .unused rename kills a live script reached only via a dynamic/string path -> violates never-false-deny). 3 false-positive classes the static scan cannot resolve: dynamic dot-source (variable stem), computed Join-Path stem, external invocation (settings.json hooks / wkdoctor / sibling-repo). Build 0-LLM static; ROOT-verify the graph on the known-live set before any rename. Proto code lives in the 2026-06-28 dead-script sector result."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read proto-cleanup-discipline-howto",
+      "expect": "pre-push",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read proto-cleanup-discipline",
+      "expect": "discipline",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill search dead-script",
+      "expect": "proto-cleanup",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-27T17:41:04.441986Z",
+  "updated": "2026-06-27T17:41:04.4419941Z",
+  "version": "1.0"
+}

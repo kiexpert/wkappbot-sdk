@@ -1,0 +1,45 @@
+{
+  "id": "pace-95-circuit-breaker-ref",
+  "app": "wkappbot-workflow",
+  "title": "Pace 95% circuit-breaker (T3 ref): per-cycle strategy, billing-anchor, faint-calibration",
+  "title_ko": null,
+  "desc": "Reference tier of pace-95-circuit-breaker: per-family cycle handling, billing-anchored monthly budget, the weekly-reset deception defense, faint-anchored limit calibration, and parked harness findings (codex-hook lineage, nonce-proto). Read for the WHY/strategy behind the breaker.",
+  "steps": [
+    "PER-FAMILY PACE CYCLES DIFFER -- check each family's ACTUAL cycle (user 2026-06-10): the breaker evaluates every cycle that EXISTS for the active family vs that cycle's own target. Claude=WEEKLY+MONTHLY; GEMINI=DAILY per-model (resets daily -> check daily, not weekly); Codex=5-HOUR+WEEKLY (codex_balance). The family ADAPTER's USAGE member declares which cycles it has + supplies usage+target each; the breaker trips when ANY existing cycle crosses 95%. CYCLE-SKIP generalizes monthly-skip: skip any cycle a family lacks. Module 13-family-pace displays each family vs its OWN cycle.@@CYCLE-SKIP = SKIP THE BLOCK, NOT THE VISIBILITY (2026-06-10): when a family has NO official limit for a cycle (Claude has no Anthropic monthly cap), do NOT drop it from the DISPLAY -- still accumulate delivered usage over that window and show it as an informational health figure ('monthly: <accum>M (no official cap)'). The skip applies ONLY to the 95% breaker (never block a no-limit cycle), NOT to the display (cumulative usage is a real health signal the user wants to SEE).@@MONTHLY = BILLING-ANCHORED TRUE BUDGET, immune to weekly-reset deception (2026-06-10): the weekly meter can drop suspiciously (97% -> 0% overnight). Defense: anchor a MONTHLY cycle to the user's BILLING DATE (a fixed real allowance the weekly resets cannot fake): (1) anchor monthly reset to the billing day; (2) accumulate actual tokens since; (3) estimate the monthly allowance from ACTUAL usable tokens (learned from observed capacity, self-refining, not a guessed constant); (4) pace against it. Billing date is user-supplied (ask once, store billing_anchor.json {day, estimatedMonthlyTokens}).@@ATTRIBUTION (2026-06-10): the suspicious reset / eye-trick is ANTHROPIC's opaque metering+billing layer, NOT Claude the MODEL. The model is the ALLY building this defense with the user; the adversary is only the untrustworthy platform meter. Everywhere this cluster says 'server gaming the meter', read it as platform metering opacity -- never blame the model.@@FAINT-ANCHORED LIMIT CALIBRATION (2026-06-10): a family's FAINT (CLI returns a quota/limit error + stops) is the ONLY GROUND-TRUTH ceiling -- every other limit is a drifting estimate. RULE: when ANY family faints, record usage at that moment as the calibrated limit for that cycle, OVERRIDING the estimate. CASE: Codex fainted at wkdoctor-estimated 'weekly 83% of 2M' -> real ceiling ~1.66M, the 2M estimate was ~20% high; recalibrate DOWN. BUILD: auto-detect a faint (known quota error string / specific exit) + write current usage as that cycle's limit anchor (codex_balance.json / wkgemini_usage.jsonl / pace.json faintObservedAt+faintUsage). A faint is a HARDER anchor than the hourly claude /usage self-report -- it is the wall itself, so the 95% breaker fires at a TRUE 95%.@@SEE ALSO (reflex 2026-06-11): pace-deadlock-escapes-harness-editable-and-jisikhwa-free -- the escape complement: when the breaker fires AND delegation is also blocked (stacked), R1=fix the mis-firing gate as ROOT (the harness is your editable proxy-code), R2=knowledge-ification stays free. The breaker is editable code, not a wall.@@PARKED HARNESS FINDINGS (tangential, belong to their own skills; kept here historically): (a) CODEX-HOOK LINEAGE 2026-06-19 -- WKHARNESS_CODEX_HOOK has two roles (model-stamp, redundant with Get-WkCommitterModel lineage -> demote to fallback-only; isCodexSession output-schema selector -> lineage-primary with env OR-fallback); see harness-active-model-scoping. (b) NONCE-PROTO 2026-06-19 -- non-spoofable internal-spawn signal: parent writes random nonce to a TEMP file, passes only the PATH; child reads+deletes atomically (FileShare.None) + validates SHA256 vs an env hash; defeats legacy-env-spoof/replay/wrong-hash/grandchild-inherit, WMI-free ~1ms."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read pace-95-circuit-breaker-ref",
+      "expect": "BILLING-ANCHORED",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read pace-95-circuit-breaker",
+      "expect": "TRIGGER",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read harness-active-model-scoping",
+      "expect": "active-model",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "pace",
+    "95",
+    "circuit-breaker",
+    "billing-anchor",
+    "faint-calibration",
+    "per-family",
+    "cycle",
+    "monthly",
+    "reference"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-23T02:32:34.4250496Z",
+  "updated": "2026-06-23T02:32:34.425058Z",
+  "version": "1.0"
+}

@@ -1,0 +1,52 @@
+{
+  "id": "knowledge-aliveness-health-how-to",
+  "app": "wkappbot-workflow",
+  "title": "Knowledge Aliveness Health How-To",
+  "title_ko": null,
+  "desc": "Implementation wiring for aliveness signals: linked-web bonus, peer-eval bonus in Get-WkTierScore, reflex-quiz extension, post-hook display, agent end-of-task questionnaire.",
+  "steps": [
+    "NAVIGATION: T1 (knowledge-aliveness-health) = the unifying principle + aliveness hierarchy + peer-eval + eval-form hierarchy + usage-apex. T2 (this file) = implementation wiring: where each signal hooks into Get-WkTierScore, wkhippo, wkharness-post.ps1, reflex-grades.json, and agent end-of-task questionnaire flow. T3 (knowledge-aliveness-health-ref) = dependency chain, anti-gaming details, dated rationale, and open questions. Read T1 first to understand WHAT; read T2 to understand HOW to wire it.",
+    "KNOWLEDGE-SCORE LINKED-WEB READ BONUS (user 2026-06-10): when Get-WkTierScore scores a skill, also reflect whether the authoring session actually READ the skills the content links to. Award +1 point per linked skill genuinely read in THIS session (capped +5 max). ANTI-GAMING: only count links to skills that EXIST; only award if linked skill was actually READ in session JSONL; cap bonus; base score stays content-driven. READ-WINDOW BOUND: bound session-JSONL scan to max(skill-created-or-edited-time, now-minus-1-month). IMPLEMENTATION: in Get-WkTierScore, parse skill body for skill references, intersect with set of skills read this session, add min(5, count) to score. This is the cheapest aliveness signal -- it rewards well-connected, context-aware authors at zero extra cost to readers.",
+    "PEER-EVAL BONUS WIRING INTO Get-WkTierScore (user 2026-06-10): beside the linkedWebBonus, add a peerEvalBonus. Implementation steps: (1) when a model evaluates a skill via skill-comment, store {author, model, verdict, ts} in skill comment storage. (2) at score time, query wkhippo study-detection for each evaluating model: did they actually read this skill in their session JSONL? Filter to those who did. (3) count DISTINCT models with confirmed-study AND positive verdict (useful/5 >= threshold). Cap at +3. Exclude self-eval (author-model = evaluating-model). (4) for negative verdicts from confirmed-study models, emit a flag to wkdoctor forgetting-prevention (not a score deduction -- a healing trigger). Wire peerEvalBonus into Get-WkTierScore alongside reflexBonus and linkedWebBonus.",
+    "REFLEX-GRADE / TRANSFER-QUIZ EXTENSION (user 2026-06-10): the existing reflex transfer-quiz machinery in Get-WkTierScore reads reflex-grades.json (grade 0-100, reflexBonus = grade/100*15). EXTEND without breaking: add an evaluationVerdict field beside the grade in the reflex-grades.json entry -- {grade, verdict, applicabilityScore, clarityScore, correctnessScore}. ONE questionnaire at task end fills all fields simultaneously: comprehension questions -> grade (existing), plus evaluation dimensions (clarity/correctness/applicability 1-5) -> verdict. reflexBonus remains unchanged; peerEvalBonus adds beside it. The questionnaire payload is richer, the infrastructure is reused, no reinvention. QUESTIONNAIRE DELIVERY: harness post-hook (agent-end work-record) prompts the dispatched agent: 'For each briefed skill you actually used: rate clarity/correctness/applicability 1-5 and grade your comprehension 0-100.' Store response to reflex-grades.json + skill-comment storage in one write.",
+    "PEER-EVAL SURFACED IN SKILL-READ POST-HOOK (user 2026-06-10): when a skill is READ (PostToolUse after wkappbot skill read ID), the post-hook prints: score + peer-eval rollup, e.g. 'score 92 | studied+rated useful by Haiku, Sonnet | 1 flagged unclear'. DOUBLE EFFECT: (a) the AUTHOR (often the Opus that wrote it) sees their skill reception on every read -- quality incentive at point-of-use; (b) the NEXT READER gets social proof or a caution. IMPLEMENTATION: reuse the existing knowledge-reward post-hook display path in wkharness-post.ps1 (it already prints score after a skill EDIT); extend it to also print on skill READ with the peer-eval rollup. Keep it to ONE short line, non-blocking (post-hook nudge, never a block), fail-open. DEPENDENCY: skill-comment storage + wkhippo study subcommand must exist; if absent, post-hook prints score only (no rollup).",
+    "REFLEX HEALTH DISPLAY IN POST-HOOK (user 2026-06-10): extend the post-hook skill READ display to also show reflex health layer: 'reflex healthy: models pass + apply' vs 'reflex DECAYING: not applied lately'. Source: aggregate of usage-in-practice reports (distinct agents, avg degree) + recent reflex-grade trend. wkdoctor memory-physician duty surfaces decaying-reflex skills for re-teaching alongside broken links and reference-omissions. FAIL-OPEN: if reflex-grades.json is missing or empty, display 'reflex: no data yet' and omit from score.",
+    "AGENT END-OF-TASK WORK-RECORD QUESTIONNAIRE (user 2026-06-10): at task completion, the harness prompts the dispatched agent with a structured questionnaire: 'Of your briefed skills, which did you actually USE? For each used skill: usefulness degree 1-5. For each skill you did NOT use: was it relevant but unused, or not applicable? Rate each used skill on clarity/correctness/applicability 1-5 and comprehension grade 0-100.' Results feed: (1) usage-in-practice aggregate (per-skill, per-model, with degree) for aliveness scoring; (2) reflex-grades.json entry (comprehension grade + verdict dimensions); (3) skill-comment storage (peer-eval verdict). The questionnaire IS the work-record IS the peer-eval. One artifact, three sinks. DELIVERY: wkharness-post.ps1 AgentEnd hook. TIMING: after the agent reports completion, before harness exits. ANTI-SPAM: run at MOST once per agent per task (task-id keyed)."
+  ],
+  "comments": null,
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read knowledge-aliveness-health",
+      "expect": "UNIFYING PRINCIPLE",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read knowledge-aliveness-health-howto",
+      "expect": "NAVIGATION",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read knowledge-aliveness-health-howto",
+      "expect": "WIRING",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "knowledge",
+    "aliveness",
+    "implementation",
+    "get-wktierscore",
+    "wkhippo",
+    "wkharness-post",
+    "reflex-grades",
+    "peer-eval",
+    "questionnaire"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-10T07:56:58.0423751Z",
+  "updated": "2026-06-10T07:56:58.0423866Z",
+  "version": "1.0"
+}

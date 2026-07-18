@@ -1,0 +1,38 @@
+{
+  "id": "hongik-harness-modular-independence-design",
+  "app": "wkappbot-kih",
+  "title": "Hongik Harness: Modular Architecture & Repo-Aagnostic Verification",
+  "title_ko": null,
+  "desc": "Design patterns for decoupling AI agent harnesses from document repositories, enabling shippable and verifiable engine independence.",
+  "steps": [
+    "1. DECOUPLING: parameterized all hardcoded paths with dynamic variables like testRepoRoot or env:WKHARNESS_REPO_ROOT.",
+    "2. MODULARIZATION: broke monolithic guards.ps1 into 9 targeted modules (guards-shell, guards-write, guards-agent, etc.) dot-sourced by a lightweight hub.",
+    "3. VERIFICATION: implemented repo-agnostic selftests using a sandbox to ensure 100% engine pass regardless of host repo.",
+    "4. SECURITY: integrated model-spoof protection and bypass evasion detection as core guards."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill list",
+      "expect": "wkharness-guards-shell.ps1",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot wkharness.ps1 -Test",
+      "expect": "100% passed",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill search modular",
+      "expect": "design patterns",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-07T13:33:12.2424073Z",
+  "updated": "2026-06-07T13:33:12.2424199Z",
+  "version": "1.0"
+}

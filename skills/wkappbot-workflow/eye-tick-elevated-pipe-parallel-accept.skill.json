@@ -1,0 +1,19 @@
+{
+  "id": "eye-tick-elevated-pipe-parallel-accept",
+  "app": "wkappbot-workflow",
+  "title": "ElevatedEyeProxy: 32 Parallel Acceptors Prevent HANDSHAKE-MISS Burst",
+  "desc": "ListenAsync spawns 32 concurrent AcceptLoop workers each owning a NamedPipeServerStream. Burst of parallel --sudo ConnectAsync calls are accepted immediately instead of serializing through one listener with an accept-gap.",
+  "steps": [
+    "Root cause: single WaitForConnectionAsync loop created an accept-gap between connections. 26 parallel --sudo calls saturated the 1500ms budget. Fix: ElevatedEyeProxy.ListenAsync spawns AcceptWorkers=32 AcceptLoop tasks, each owning its own NamedPipeServerStream instance ready in WaitForConnectionAsync.",
+    "Each AcceptLoop(workerId, ct) independently waits, accepts, dispatches to Task.Run(HandleClient), then immediately loops back to arm a new NamedPipeServerStream. ~32 acceptors are always armed in parallel, absorbing bursts up to 32 simultaneous ConnectAsync without any gap.",
+    "If HANDSHAKE-MISS reappears with burst\u003E32, increase AcceptWorkers constant in ElevatedEyeProxy.cs (max=255 per MaxAllowedServerInstances). Also ensures connectedPipe.Dispose() in HandleClient finally to close the prior connection leak.",
+    "Verified 2026-04-21: test-eye-tick-handshake-miss-parallel.sh (resolve ts=2026-04-21T17:52)"
+  ],
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-21T18:46:05.1895799Z",
+  "updated": "2026-04-21T18:46:43.0042184Z",
+  "version": "1.4"
+}

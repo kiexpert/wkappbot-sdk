@@ -1,0 +1,35 @@
+{
+  "id": "codex-opus-agent-delegation-ref",
+  "app": "wkappbot-workflow",
+  "title": "Codex to Opus Agent Delegation (T3 ref)",
+  "title_ko": null,
+  "desc": "T3 reference: Agent.cmd implementation history, known bugs, metachar fixes, wkclaude positional parameter bug, and build status log for Codex-to-Opus delegation chain.",
+  "steps": [
+    "METACHAR FIX (2026-05-26): Agent.ps1 called wkclaude.cmd which re-parsed prompts through cmd.exe; colons/slashes broke with 'unexpected at this time'. Fix: call wkclaude.ps1 directly (PS-to-PS, no cmd re-parse).|WKCLAUDE POSITIONAL BUG (2026-05-26): wkclaude.ps1 bound the prompt as OutputFormat positionally. Fix: give AllArgs Position=0. Applied to bin/wkclaude.ps1 (local install).|SUBAGENT LOCK NOTE: Opus subagent Edit/Write triggers PostToolUse skill-update-pending in parent -- must clear lock after each Agent() delegation that involves file edits.|KNOWN LIMITATION: Agent.cmd prompts containing cmd.exe metacharacters (parens, colons, slashes) must be piped via stdin JSON or written to a file -- never passed as bare shell args.|CROSS: codex-opus-agent-delegation (T1 core), codex-opus-agent-delegation-howto (T2 howto)"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read codex-opus-agent-delegation-ref",
+      "expect": "T3 ref",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read codex-opus-agent-delegation",
+      "expect": "Agent.cmd",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read codex-opus-agent-delegation-howto",
+      "expect": "T2 howto",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-25T02:46:37.9133061Z",
+  "updated": "2026-06-25T02:46:37.9133149Z",
+  "version": "1.0"
+}

@@ -1,0 +1,45 @@
+{
+  "id": "harness-sed-guard",
+  "app": "wkappbot-workflow",
+  "title": "harness: sed-guard (sed modifies files directly, prefer wkedit)",
+  "title_ko": null,
+  "desc": "Warns when sed -i or sed redirect modifies source files. wkedit is the safe alternative with UTF-8 and encoding guarantees.",
+  "steps": [
+    "SAFETY: Catches 'sed -i' or 'sed ... > file.ext' on source files (ps1, sh, py, cs, md, json, txt). sed bypasses UTF-8 encoding enforcement, skips backup creation, and can corrupt files on CRLF/LF mixed endings or multibyte characters.",
+    "SOLUTION: Use 'wkedit' instead: wkedit.sh --old-file old.txt --new-file new.txt target.file. wkedit creates a .bak backup, preserves encoding, and is harness-safe.",
+    "PREVENTION: Never use sed -i on repository source files. Use wkedit for any file replacement that touches source code or configuration. wkedit handles encoding, backup, and diff display correctly."
+  ],
+  "comments": null,
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read harness-sed-guard",
+      "expect": "sed modifies files directly",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wkharness-guards",
+      "expect": "GUARD CLUSTER",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read harness-active-model-scoping",
+      "expect": "P6",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "harness",
+    "guard",
+    "sed",
+    "file-edit",
+    "encoding",
+    "wkedit"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-11T08:09:34.6756928Z",
+  "updated": "2026-06-11T08:09:34.6757015Z",
+  "version": "1.0"
+}

@@ -1,0 +1,54 @@
+{
+  "id": "wktest-staging-build-storm-safe-deploy-pipeline",
+  "app": "wkappbot-core",
+  "title": "wktest staging build + storm-safe deploy pipeline",
+  "title_ko": null,
+  "desc": "T1 core. Build, smoke, and deploy wkappbot through wktest-* staging so Windows Defender (which quarantines the canonical unsigned exe by name) and spawn storms cannot brick it. Covers wkbuild single-file publish, the smoke gate, copy-promote, and the storm reflexes. Cluster: defender-dev-exclusions, wkdoctor-system-physician, wkdr-emergency-doctor-wkappbot-core-spawn-storm-kill, crash-reboot-recovery-cascade, wkappbot-build-verify-workflow.",
+  "steps": [
+    "WHY: canonical wkappbot.exe and wkappbot-core.exe are unsigned single-file exes; Windows Defender realtime QUARANTINES them by name within ~0ms of any write (copy AND rename both deleted), while a wktest-prefixed copy of the SAME bytes survives. So build and validate under a wktest-* name and deploy the canonical name only after a Defender exclusion exists (see defender-dev-exclusions).",
+    "BUILD: wkbuild.cmd calls wktest-build.sh which runs dotnet publish with -p:SkipDeployCore=true (single-file self-contained, NO loose dll; SkipDeployCore disables the csproj DeployToSdkBin AfterTargets=Publish target that would auto-copy the canonical exe AND run eye tick). Stage name is wktest-core-(model)-v(version).exe: model from env WKHARNESS_AGENT_MODEL (else manual), version computed from git (base plus rev-list count) NOT by running the 247MB exe.",
+    "SMOKE GATE: wktest-smoke.sh runs version, skill list (junk-excluded count), skill read on-load (FULL body no developer-only truncation), skill search, single-file integrity (no loose core dll), and a spawn-storm check (delta of wkappbot-core processes at most 10, NOT any-spawn, because a live deploy legitimately spawns a core or two). It doubles as GC (retention keep N per model plus age-gated sweep). Promotion is refused unless smoke exits 0.",
+    "AUTO-DEPLOY after smoke PASS: COPY the staging exe to wkappbot-core.exe ONLY. Do NOT create wkappbot-core.new.exe: that .new file is the FSW hot-swap marker a residual Eye or guardian watches and respawns from, which with Defender deleting results cascaded into a 2261-process spawn storm. Build and deploy the launcher (self-contained trimmed, no dll) co-located with the core.",
+    "REFLEX A Defender: if the canonical name keeps vanishing, Defender is quarantining it; run wkdoctor -DefenderFix (admin, one UAC) or add the bin to Defender exclusions, then redeploy (see defender-dev-exclusions and wkdoctor-system-physician).",
+    "REFLEX B harness fork-bomb: the brief-guard once validated each skill ref by SPAWNING wkappbot skill read per ref on every tool call; under a missing or broken binary these pile up into a carpet-bomb of skill-read core processes. Fix: validate refs by FILE EXISTENCE of the id.skill.json under the HQ catalog, never by spawning (see wkdr-emergency-doctor-wkappbot-core-spawn-storm-kill and crash-reboot-recovery-cascade).",
+    "REFLEX C skill discipline: a skill command CHAINED with another command means intent NOT to read the skill; the harness exempts only a SINGLE non-chained wkappbot skill or speak, wkhippo, wktest, or wkbuild command (Test-WkSingleCmdExempt). Read skills standalone. An Opus that does not read skills performs at Haiku level.",
+    "EMERGENCY: a live spawn storm is killed by the harness-immune doctor (wkdr nuke, absolute-path taskkill) kill-only, never deleting the binaries. Do NOT re-promote until the spawn source is identified or it re-accumulates."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read wktest-staging-build-pipeline",
+      "expect": "storm",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read defender-dev-exclusions",
+      "expect": "exclusion",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wkdr-emergency-doctor-wkappbot-core-spawn-storm-kill",
+      "expect": "storm",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "build",
+    "deploy",
+    "defender",
+    "storm",
+    "wktest",
+    "wkbuild",
+    "smoke",
+    "single-file",
+    "reflex",
+    "t1",
+    "core"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-07T05:58:31.8588721Z",
+  "updated": "2026-06-07T05:58:31.8588814Z",
+  "version": "1.0"
+}

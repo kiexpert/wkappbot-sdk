@@ -1,0 +1,60 @@
+{
+  "id": "on-load-ref",
+  "app": "wkappbot-workflow",
+  "title": "T3 Reference: on-load history",
+  "title_ko": null,
+  "desc": "T3 reference tier of on-load. Historical session-start fixes, dated incidents, accumulated bug notes. Read only when archaeology needed -- T1 on-load and T2 on-load-howto cover live use.",
+  "steps": [
+    "WHY v100+ VERSION. on-load source skill hit v1.102 with 28 steps because every session-start fix accumulated as a new step. The 3-tier split preserves that history here in T3 while keeping T1 and T2 small enough to actually be read.",
+    "SCOPE FILTER incident. SKIP wkappbot core infra bugs (CDP, Chrome targets, CWD mismatch, grep perf, No Chrome targets) regardless of urgency -- those belong to the wkappbot team. Example: personal-docs domain = resume/mail/job-application. Acting outside scope wastes triage cycles.",
+    "TODO SYNC duplicate. Former on-load steps 13 and 14 were intentional emphasis -- TODO sync hit twice because losing it cost a full debugging session. Kept as single rule in howto step 9; this ref note preserves the doubled-rule history.",
+    "CronCreate nightly history. Former on-load step 16: Session start CronCreate nightly (13 4 * * *) before wk-only-gate. Add gg todo to Pending before Agent calls (claude-md-sync-guard). Promoted to howto step 11.",
+    "Gmail sync step history. Former step 17: after naver sync run python tools/gmail_mail_sync.py from personal-docs. Promoted to howto step 12.",
+    "Gmail sync completion note. Former step 18: Gmail sync completed successfully via wkcodex. Outputs in resume/drafts/gmail/. One-time observation, archived here.",
+    "Dated naver scan procedure. Former step 19: cp naver_mail/inbox.md to YYYYMMDD_naver_inbox_scan.md after sync.",
+    "JobKorea scan procedure. Former step 20: wkappbot cdp open -> navigate to mypage -> save findings.",
+    "Fetch Naver email bodies. Former step 21: use naver_mail_sync.py or imap directly to get body of specific emails by subject.",
+    "print_naver_jobkorea_bodies.py history. Former step 22: created by codex to fetch email bodies by subject filter.",
+    "SMS monitor v1. Former step 23: sms_monitor.py and sms_monitor_naver.ps1 to be created in tools/ for Naver IMAP polling and messages.google.com CDP watch.",
+    "SMS monitor v2 Option2+3. Former step 24: sms_monitor.py naver-poll and cdp-watch modes, sms_monitor_naver.ps1 launcher.",
+    "SMS monitor scripts created. Former step 25: sms_monitor.py and sms_monitor_naver.ps1 in tools/.",
+    "messaging_sync.py unified pipeline. Former step 26: unified SMS+KakaoTalk+LINE sync pipeline to resume/drafts/messages/.",
+    "messaging_sync.py KakaoTalk schema bug. Former step 27: SMS via ADB (12886 msgs), KakaoTalk/LINE via SQLite copy. KakaoTalk schema uses different column names - pick_col heuristic may miss them.",
+    "gg 2026-05-27 incident. Former step 28: Naver+Gmail scan + KakaoTalk web CDP sync + cross-repo achievement scan started.",
+    "ON-LOAD GATE FALSE-STALE SAGA (2026-06-24..28, consolidated from on-load T1 during the 2026-06-28 slim -- moved here because it is HISTORY, not a session-start decision rule). SYMPTOM: the on-load reflex-read enforcement gate (wkharness-guards-onload-enforce.ps1 + -demix.ps1) false-blocked real work with 'reflex reads BEFORE last compaction -- stale' even when the mandatory reads WERE done this session. TIMELINE: (1) 06-24 first reported, same class as the study-lock false-UNREAD-after-compaction; (2) 06-26 timing-fix v1 + v2 inserted a studied-index re-query (T1 since=MAX(compaction,session-start), T2 no-since) before the stale-return; (3) 06-27 found v2 INOPERATIVE -- Get-WkStudiedFromIndex is not loaded in the guard runtime scope (lazy dot-source fails), so control falls to the same-turn-only Get-WkSessionSkillReadIds which cannot see prior-turn reads -> cross-turn reads look stale; (4) interim FIX = fail-OPEN at the stale-block INSIDE if(haveAll) (non-demix L387 cfa327c6, demix L338) -- the reads provably exist this session, so never false-deny on positive evidence; (5) 06-27 also fixed Test-WkIsPureKnowledgeOpChain L91 to allow 'add' (read|search|contribute|edit|add) so 'wkappbot skill add' is not on-load-blocked. REAL ROOT CAUSE (06-27 Sonnet sector, REAL JSONL evidence, supersedes the 'type==summary too loose' hypothesis): '\"type\":\"summary\"' is DEAD CODE (matches ZERO real entries -- Claude never emits it); real compaction = a compact_boundary system entry + an isCompactSummary user entry ~15s skew. The false-stale was ENTIRELY the unwired Get-WkStudiedFromIndex. TWO-PART REAL FIX (pending): (A) safe-delete the dead 'type -eq summary' arm in both files; (B) wire Get-WkStudiedFromIndex into guard scope (the SQLite studied-index endgame, hippocampus-living-memory-howto step 21-22) OR add a 'wkhippo studied --ids --since --jsonl' subprocess re-query so it does not depend on in-process function availability. CALIBRATION LESSON: the predecessor and successors all HYPOTHESIZED type==summary; an investigation sector with real JSONL proved it dead -- investigate-with-evidence before fixing a hypothesis. Cross: harness-gate-log-data-integrity, hippocampus-living-memory-howto step 21-22, verify-tool-or-guard-synthetic-live-static."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read on-load-ref",
+      "expect": "SCOPE FILTER",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read on-load-ref",
+      "expect": "messaging_sync",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read on-load-ref",
+      "expect": "gg 2026-05-27",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "session",
+    " on-load",
+    " 3tier",
+    " t3",
+    " ref",
+    " history",
+    " incidents",
+    " archive"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-31T08:14:03.9882989Z",
+  "updated": "2026-06-28T12:32:35.9568016Z",
+  "version": "1.2"
+}

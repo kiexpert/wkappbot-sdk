@@ -1,0 +1,37 @@
+{
+  "id": "stall-guard-wk-exemption-howto",
+  "app": "wkappbot-workflow",
+  "title": "Stall-guard wk-exemption (howto)",
+  "title_ko": null,
+  "desc": "How the stall-guard exempts wk-tools and delegation launchers: the exempt set, the hyphen-allowing regex, and the shared Test-WkPaceExempt decision.",
+  "steps": [
+    "HOW it works: the stall-guard fires when a ROOT session goes too long without a successful delegation, so it must EXEMPT commands that ARE delegation or wk-tool work -- the launcher/tool call itself must not be counted against the stall window.",
+    "EXEMPT SET: wk-prefixed tools (wkappbot, wkedit, wkcodex, wkagy, wkhippo, and repo-root ./wk-<name>.cmd launchers), git, gh, Agent.cmd, codex, and delegation launchers. The recognition regex MUST allow a hyphen after wk (wk then hyphen-or-word) so a hyphenated launcher like ./wk-cdp.cmd is recognized, matching the _WkRelWkPattern convention.",
+    "SHARED DECISION: the single source is Test-WkPaceExempt in wkharness-common-classify.ps1 (the one decision used by stall-guard plus wk-only-gate). The stall-guard, wk-only-gate, and pace verdict should ALL consult it rather than each inline-duplicating the exemption regex, which is how the hyphen drift happened."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read stall-guard-wk-exemption-howto",
+      "expect": "EXEMPT SET",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read stall-guard-wk-exemption-howto",
+      "expect": "SHARED DECISION",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read stall-guard-wk-exemption-howto",
+      "expect": "HOW it works",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-23T16:50:33.8373568Z",
+  "updated": "2026-06-23T16:50:33.8373659Z",
+  "version": "1.0"
+}

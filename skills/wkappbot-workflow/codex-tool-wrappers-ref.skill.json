@@ -1,0 +1,39 @@
+{
+  "id": "codex-tool-wrappers-ref",
+  "app": "wkappbot-workflow",
+  "title": "Codex tool wrappers (ref)",
+  "title_ko": null,
+  "desc": "The codex does-nothing diagnoses and the dated fixes behind the wrapper/launcher stack.",
+  "steps": [
+    "DOES-NOTHING DIAGNOSIS 2026-05-29: wkcodex appeared dead but the real cause was the skill-update LOCK file (.wkappbot/harness/code_changed_skill_not_updated...lock) which wkcodex.sh checks at startup and exits 1 ('prior work not recorded') -- the 'exit 0 but does nothing' was a measurement artifact (probe piped to tail, captured tail's exit 0 not wkcodex's 1). Lock is set on non-skill-edit work, cleared by any wkappbot skill edit/contribute. wkcodex.sh ALSO blocks on uncommitted tools/ harness files.",
+    "PROCESS.START FIX 2026-05-29: wkharness-wkcodex.ps1 launched codex via Process.Start FileName=codex; after codex.exe became codex.cmd, .NET cannot launch a .cmd -> Start throws -> caught -> silent exit 0 (the does-nothing). Fixed by resolving the real codex.exe (Find-CodexExe). Proper fix = wkwrap.exe real PE resolver.",
+    "SHADOW-WRAPPER FIX 2026-06-13: a corrupted shadow Agent.cmd earlier on PATH dropped all %* args -> every --model silently ran haiku; found via 'type -a Agent.cmd' (which-file-actually-runs), missed by code analysis. LESSON: confirm WHICH file executes before editing a dispatcher.",
+    "SANDBOX BUGS: codex exec -s workspace-write fails on Windows (sandbox disabled) -- omit -s; wkappbot cmds hang in codex subprocess (Eye IPC stall > 34s timeout).",
+    "ARGS-PATH CORRUPTION: bash -> cmd.exe %* -> powershell corrupts non-ASCII (OEM codepage) + mangles metachars + cannot carry newlines; stdin heredoc is canonical for multiline."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read codex-tool-wrappers-ref",
+      "expect": "DOES-NOTHING DIAGNOSIS",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read codex-tool-wrappers-ref",
+      "expect": "PROCESS.START",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read codex-tool-wrappers-ref",
+      "expect": "SHADOW-WRAPPER",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-24T07:16:36.6158464Z",
+  "updated": "2026-06-24T07:16:36.6158552Z",
+  "version": "1.0"
+}

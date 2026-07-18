@@ -1,0 +1,40 @@
+{
+  "id": "claude-audit-log-hook",
+  "app": "wkappbot-workflow",
+  "title": "claude-audit-log-hook",
+  "title_ko": null,
+  "desc": "Claude Code PreToolUse hook: log ALL tool calls (async) to D:/GitHub/ai-audit.log for traceability",
+  "steps": [
+    "PURPOSE: every tool call Claude makes is appended to a shared audit log. No blocking, no slowdown -- runs async.",
+    "SCRIPT: C:/Users/kiexp/.claude/hooks/audit-log.ps1. Reads stdin JSON, extracts tool_name and first non-null of command/file_path/pattern, writes timestamped line.",
+    "LOG FORMAT: 'yyyy-MM-dd HH:mm:ss <short-cwd> [ToolName]> <command>'. short-cwd = first char of each ancestor component + dash + leaf dir name (e.g. D/G/p-personal-docs).",
+    "HOOK ~/.claude/settings.json: PreToolUse / NO matcher (fires for all tools) / async:true / powershell audit-log.ps1. No timeout needed (async).",
+    "COEXISTENCE: lives alongside kill-guard-hook in the same PreToolUse array. Kill-guard has matcher=PowerShell; audit-log has no matcher, so both fire for PowerShell (guard first, then audit).",
+    "REVIEW: tail D:/GitHub/ai-audit.log to see recent Claude tool activity across all projects."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read claude-audit-log-hook",
+      "expect": "PURPOSE",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill search audit log hook",
+      "expect": "audit",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill search kill guard",
+      "expect": "claude-kill-guard-hook",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-09T03:37:10.2587338Z",
+  "updated": "2026-05-09T03:37:10.2587425Z",
+  "version": "1.0"
+}

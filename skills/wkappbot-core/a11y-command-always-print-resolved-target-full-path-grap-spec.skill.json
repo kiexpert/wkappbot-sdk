@@ -1,0 +1,42 @@
+{
+  "id": "a11y-command-always-print-resolved-target-full-path-grap-spec",
+  "app": "wkappbot-core",
+  "title": "a11y command always-print resolved target full-path grap spec",
+  "title_ko": null,
+  "desc": "MANDATE for every a11y command processor (invoke click press inspect screenshot --target etc) in WKAppBot.CLI: must print the resolved target node full-path grap on stdout regardless of the input grap argument shape (literal wildcard or partial), and regardless of action success or failure exit code.",
+  "steps": [
+    "Folder: D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/ contains A11yCommand.cs and related action processors",
+    "MANDATE: every code path that resolves a target node via grap pattern matching must emit one line Console.WriteLine Ansi.TargetLine pound TARGET space resolved-leaf-grap on stdout BEFORE the action call (invoke click etc)",
+    "The resolved leaf grap is the AppendFocusPath result against the matched node Handle not the input argument that may be a wildcard or partial",
+    "Must fire even when --force is used and even when action fails or returns nonzero exit code",
+    "If multiple actions resolve nodes in a single command emit one TARGET line per resolved node",
+    "Verification yt_assistant log should show invoked equals plus full path grap after first successful skip-button match",
+    "Status 2026-05-30: UIA success path patched at A11yCommand.cs lines 1914-1935 (uncommitted, build PASS). CDP fallback path (TryWebViewCdpAction->CdpClick) still has 0 # TARGET prints. Next: extend patch to A11yCommand.Cdp.cs CDP methods.",
+    "IMPL STATUS 2026-05-30 ~18:00 KST: UIA-success path in csharp/src/WKAppBot.CLI/Commands/A11yCommand.cs (~lines 1914-1935) patched but UNCOMMITTED in working tree (carries over from prior session). CDP fallback path (TryWebViewCdpAction in A11yCommand.Cdp.cs + CdpClick/CdpInvoke/CdpPress/CdpSendInput in Cdp.cs) still emits ZERO # TARGET — wildcard graps like #*skip-button* fall through to CDP silently. Re-dispatching Codex to patch the CDP path and commit BOTH UIA + CDP together. Exit criterion: grep -n '# TARGET' on the 3 files shows >=4 hits in CDP files plus existing UIA hit."
+  ],
+  "requirements": [
+    {
+      "cmd": "grep -n pound TARGET D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/A11yCommand.cs",
+      "expect": "match present at action processors not only inspect path",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot a11y invoke msedge youtube wildcard skip-button force timeout 3",
+      "expect": "stdout contains a TARGET line with resolved leaf grap even on rc nonzero",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot a11y click any wildcard match force",
+      "expect": "stdout contains TARGET line before click directed at the resolved leaf path",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-30T07:40:54.1576549Z",
+  "updated": "2026-05-30T08:17:02.5421571Z",
+  "version": "1.4"
+}

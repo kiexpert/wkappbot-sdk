@@ -1,0 +1,38 @@
+{
+  "id": "wktasklist-cached-process-snapshot",
+  "app": "wkappbot-sdk",
+  "title": "wktasklist: cached process snapshot + lightweight Task Manager replacement",
+  "title_ko": null,
+  "desc": "A cached (9-second TTL) global process snapshot WITH command lines. A lightweight terminal superset of Windows tasklist plus Task Manager, usable exactly when the system is under RAM load and the real Task Manager is too heavy to open. Shared by wkjobs, wkdoctor/watchdog, and taskkill so they stop each running their own expensive Win32_Process query.",
+  "steps": [
+    "ROOT-CAUSE INSIGHT (why this exists): the ONLY way to get a process CommandLine is Get-CimInstance Win32_Process, which is EXPENSIVE and spawns a WmiPrvSE worker. The watchdog runs it on EVERY tool call, so it spawns a WmiPrvSE storm that drives RAM up and re-fires the watchdog = a self-reinforcing loop. A 9-second SHARED cache collapses N per-call queries into 1 per window, breaking the storm at the root. Missing piece of the RAM-storm self-healing loop: cheap cached snapshot then identify leaks by cmdline then safe reap then RAM drops then watchdog stops thrashing.",
+    "ARCHITECTURE + LAYERED BUILD + CONSOLIDATION. SEPARATION OF CONCERNS: wktasklist is READ-ONLY (snapshot only); the KILLING lives in the reaper (wkdoctor/watchdog) which CONSUMES the snapshot. Never mix snapshot and kill in one tool. LAYERS (build incrementally, not one monolith): L0 core = one Get-CimInstance Win32_Process pass (PID, Name, CommandLine, ParentProcessId) enriched by Get-Process, atomic 9s-TTL cache to a TEMP json (write temp then rename so a concurrent reader never sees a partial file), a dot-sourceable Get-WkTaskList helper, plus a Json switch and a Force switch. L1 = Windows tasklist option compatibility (the /FO CSV TABLE LIST format flag, /V verbose, /FI IMAGENAME filter, /SVC services). L2 = Task-Manager modes (a Watch live-refresh that RESPECTS the 9s cache, a Sort by CPU or MEM, a Tree parent-child view, a Kill that spares PROTECTED AI sessions and routes through the safe kill path). L3 = leak reap, done in the reaper not here: wkdoctor consumes the snapshot to reap orphaned WmiPrvSE and dead helper daemons by cmdline and parent, never AI sessions. CONSOLIDATION (no-bandaid): wkjobs already has Watch/Tree/Kill -- do NOT duplicate; rewire wkjobs as an AI-process PRESET over wktasklist, and point wkdoctor, watchdog, and taskkill at the same shared snapshot. ONE engine, many presets. WHY a terminal replacement: Windows Task Manager is a heavy GUI with per-second full refresh and live graphs, so opening it during a RAM storm makes the storm worse (it becomes the culprit); wktasklist is text-only with a 9s cache, light enough to run exactly when you need it under load to see the culprit cmdline and reap it. SHIMS: wktasklist.cmd and wktasklist.sh via the wkwrap relay (like wkjobs); the bare name fails in Git Bash so callers use the .sh form. CLUSTER: wkjobs-ai-process-monitor, watchdog-harness-keep-build, wkdoctor-sdk-environment-health-check, wkwrap.",
+    "POST-KILL CACHE SYNC (taskkill integration). When a process is killed, REMOVE its PID from the shared snapshot cache so a just-killed process is not reported as alive within the 9s window. Provide a Remove-WkTaskListEntry helper (invalidate by Pid) that ATOMICALLY rewrites the cache json minus the given PID or PIDs (write temp then rename, same as the snapshot write). ALL of OUR kill paths call it: wktasklist own Kill mode (L2) and the wkdoctor or watchdog reaper (L3). For the wkappbot taskkill core command (which we do not own), the 9-second TTL self-corrects within seconds; optionally wrap it, or file a core suggest so taskkill also drops killed PIDs from the shared cache. BONUS self-heal: on a cache READ, optionally verify each cached PID still exists (cheap Get-Process by id) and drop the vanished ones, so the snapshot never reports a dead process even before its TTL expires.",
+    "STORM CONFIRMED LIVE 2026-06-06: WmiPrvSE cimwin32 provider hit ThreadCount 286/256 -> Windows Event 5612 quota-exceeded kill+respawn loop (desktop crash + emergency-kill symptom). Confirmed the self-reinforcing loop described in step 1 is ACTIVE in production: watchdog/wkdoctor issues a live Get-CimInstance Win32_Process per tool call. The 9s shared cache here is the fix but is NOT yet wired into wkdoctor/watchdog/wkjobs/taskkill. ACTION: rewire all live per-call Win32_Process queries across D:\\GitHub\\WKAppBot\\bin + D:\\GitHub\\wkappbot-kih\\tools to consume the shared Get-WkTaskList snapshot; exit criterion = grep Win32_Process shows zero live per-call queries outside the single snapshot fn. Diagnosing via cached wktasklist (not live WMI) avoids worsening the storm."
+  ],
+  "requirements": [
+    {
+      "cmd": "wktasklist.sh",
+      "expect": "process table with PID NAME MEM CMD columns showing real command lines",
+      "prompt": null
+    },
+    {
+      "cmd": "wktasklist.ps1 -Json",
+      "expect": "valid JSON snapshot array with CommandLine and ParentProcessId populated",
+      "prompt": null
+    },
+    {
+      "cmd": "wktasklist.ps1 -Force",
+      "expect": "bypasses the 9-second cache and re-queries fresh",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-05T13:16:47.4131194Z",
+  "updated": "2026-06-06T14:39:20.66247Z",
+  "version": "1.5"
+}

@@ -1,0 +1,47 @@
+{
+  "id": "guard-feeding-cache-confirm-before-block",
+  "app": "wkappbot-sdk",
+  "title": "Confirm-before-block + canary: a safe cache in front of any correctness-critical decision",
+  "title_ko": null,
+  "desc": "General runtime-engine pattern (not harness-specific): how to put a cache/index/fast-path in front of ANY correctness-critical decision (a guard/gate, auth, billing, safety check) WITHOUT ever causing a false-deny, and have it monitor its own drift. For every intelligence + every project.",
+  "steps": [
+    "SCOPE: applies anywhere a FAST approximation (cache/index/memoization/sampling) sits in front of a decision whose WRONG answer is costly -- a permission/auth check, a billing/quota gate, a safety interlock, a harness guard. Any intelligence family (Claude/Codex/Gemini/Agy) building or reviewing such an optimization should follow these 4 layers. The wkhippo studied study-lock is one instance; the pattern is general.@@LAYER 1 -- FAIL-SAFE != FAIL-OPEN: 'fall back to the full/authoritative computation on error' is FAIL-SAFE (the authoritative result is correct + complete, so an error path preserves correctness). Do NOT mislabel it 'fail-open' -- fail-open/closed is the decision's allow/deny default, a different axis. Naming it right keeps the safety reasoning clear.@@LAYER 2 -- ASYMMETRIC FAST/SLOW: optimize the COMMON outcome (usually allow/pass) with the fast path; accept that the RARE outcome (deny) may cost more. Never optimize symmetrically -- the deny path is exactly where a wrong answer hurts.@@LAYER 3 -- CONFIRM-BEFORE-BLOCK: the instant the fast path yields a result that would DENY/BLOCK, do not trust it -- re-run the AUTHORITATIVE full check ONCE to confirm before acting on the deny. Outcome: ZERO false-denies (a stale/ambiguous cache can never false-deny -- every would-block is re-verified) AND perf preserved (the expensive check runs only on the rare deny path). A RUNTIME guarantee on every call, stronger than an offline output-diff at review time.@@LAYER 4 -- MISMATCH = SELF-MONITORING CANARY: when fast and authoritative DISAGREE (fast said deny, authoritative said allow), that divergence PROVES the cache is wrong = a real bug. Use the authoritative result, AND auto-file a deduped top-priority bug report (signature = key+context+window, so a systematically-wrong cache files ONE report not thousands). Fail-open the REPORTING (never block if telemetry fails) -- correctness first. The optimization now monitors + reports its own drift.@@ORIGIN: distilled from wkhippo studied Phase-2 (a study-lock-feeding indexer) where a silent under-count would have false-blocked a legit edit. See verify-tool-or-guard-synthetic-live-static, hippocampus-living-memory-ref, wkharness-guards.",
+    "LANDED 2026-06-30 (design#2 display-honesty, the confirm-before-block pattern in production): the anomaly-trigger scaffold is now MERGED into canonical tools/wkharness-codex-pace/Get-WkCodexPaceInfo.ps1. When the fast cache (sqlite-auto snapshot) yields an IMPOSSIBLE pace reading -- remainingPct is null AND usedPct over 100 (the garbage 344pct from dividing tokM by the hardcoded 2M fallback) -- the code now (1) sets an anomaly flag, (2) calls Invoke-WkCodexBalanceRefreshFromCli if present (the confirm-step: re-scrape the authoritative source before trusting; graceful no-op until the ConPTY writer lands), and (3) shows Weekly X.XXM used, limit UNVERIFIED (codex /status refresh pending) instead of the bogus percent. This is exactly LAYER 3 confirm-before-block + LAYER 4 self-monitoring applied to pace display: an impossible % means do NOT trust the fast cache. FAIL-SAFE: the remainingPct-present path is byte-unchanged. Verified parse-clean by the harness syntax-rollback (no -syntax-err produced on merge). Cross: harness-codex-pace-guard-howto (the 7-change spec), verify-tool-or-guard-synthetic-live-static."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read guard-feeding-cache-confirm-before-block",
+      "expect": "CONFIRM-BEFORE-BLOCK",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill search confirm before block",
+      "expect": "guard-feeding-cache",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read verify-tool-or-guard-synthetic-live-static",
+      "expect": "OUTPUT-IDENTITY",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "runtime",
+    "cache",
+    "guard",
+    "fail-safe",
+    "confirm-before-block",
+    "canary",
+    "performance",
+    "correctness",
+    "pattern",
+    "cross-family"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-22T14:46:06.3489182Z",
+  "updated": "2026-06-29T16:17:09.8517917Z",
+  "version": "1.2"
+}

@@ -1,0 +1,37 @@
+{
+  "id": "codex-cli-wkappbot-usage-ref",
+  "app": "wkappbot-workflow",
+  "title": "Codex CLI in WKAppBot (ref)",
+  "title_ko": null,
+  "desc": "Battle scars and Codex hook-install hygiene from real sessions.",
+  "steps": [
+    "BATTLE SCARS: (1) SILENT READ-ONLY TRAP -- omitting -s workspace-write makes codex run read-only and report success while writing NOTHING; always pin -s workspace-write for file-editing tasks. (2) RC=0 IS NOT ENOUGH -- even on rc=0, parse the last 5 lines for 'Everything up-to-date' / '0 errors' / 'I cannot write'; codex sometimes reports success while the operation failed silently. (3) EXIT CRITERION MANDATORY -- include one self-verifiable line per prompt (e.g. 'verify: git diff --stat shows N files'); without it codex stops when it THINKS it is done. (4) CODEX FIRST, OPUS SECOND for mechanical edits/refactors (codex-mini cheaper/faster; reserve Opus for judgment). (5) BRIEFING QUALITY = OUTPUT QUALITY -- imperative DO steps, absolute paths, one exit criterion; vague goals cause early exit.",
+    "WINDOWS: if Codex works in VS Code but not CMD/PowerShell, inspect PATH, ~/.codex, the VS Code extension, repo-local bin codex.exe, and --no-alt-screen scrollback BEFORE assuming the binary is broken.",
+    "HOOK INSTALL (2026-06-14): use [features].hooks = true (NOT the deprecated codex_hooks); session init runs wkharness-codex-install.ps1 (writes features.hooks=true, installs catch-all PreToolUse -> CodexPreToolUseAdapter.ps1, creates .codex/wkharness-allow.json). REINSTALL HYGIENE: the installer removes stale hooks.state sections so old per-hook approval state does not survive a matcher-set change. VALIDATE adapters directly with representative stdin JSON: rc 2 for deny, empty stdout for allow, no invalid JSON."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read codex-cli-wkappbot-usage-ref",
+      "expect": "BATTLE SCARS",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read codex-cli-wkappbot-usage-ref",
+      "expect": "WINDOWS",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read codex-cli-wkappbot-usage-ref",
+      "expect": "HOOK INSTALL",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-24T07:24:59.7970596Z",
+  "updated": "2026-06-24T07:24:59.7970692Z",
+  "version": "1.0"
+}

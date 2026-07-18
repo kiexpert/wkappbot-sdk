@@ -1,0 +1,39 @@
+{
+  "id": "codex-tool-wrappers-howto",
+  "app": "wkappbot-workflow",
+  "title": "Codex tool wrappers (howto)",
+  "title_ko": null,
+  "desc": "How the Claude-named cmd wrappers route Codex tool calls through the harness, and the calling conventions.",
+  "steps": [
+    "ARCHITECTURE: Codex native write_file/read_file are blocked (config.toml hook exit 2); Codex must shell out to cmd wrappers named after Claude built-ins -- Edit.cmd Write.cmd Read.cmd Glob.cmd Grep.cmd. Each reads stdin JSON matching the Claude tool_input shape (Edit: {tool_name:Edit,tool_input:{file_path,old_string,new_string}}) and pipes it UNCHANGED to wkharness.ps1, so every existing guard fires identically -- zero harness changes.",
+    "INSTALL: wkwrap --install mklinks WKAppBot/bin/Edit.cmd -> personal-docs/tools/Edit.cmd (symlinks, no wk prefix).",
+    "CLI-ARG FALLBACK: all shims detect [Console]::IsInputRedirected; when false (Codex subprocess, empty stdin) positional args are promoted to JSON (args-first inversion avoids the ReadToEnd hang).",
+    "MULTILINE CONVENTION: from BASH/Claude-Code use a single-quoted heredoc (Agent.cmd --model X << QUOTE-EOF ... EOF); from CODEX/PowerShell use a PS here-string (@' ... '@ at column 0) -- a bash heredoc fails inside PowerShell. Single-line ASCII may be a quoted arg.",
+    "MODEL ALIASES stay DISTINCT: codex / gpt-mini / codex-mini / gpt are DIFFERENT models, not synonyms -- verify modelUsage after a cross-family dispatch (codex may silently fall back to haiku when the CLI is absent)."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read codex-tool-wrappers-howto",
+      "expect": "ARCHITECTURE",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read codex-tool-wrappers-howto",
+      "expect": "MULTILINE CONVENTION",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read codex-tool-wrappers-howto",
+      "expect": "MODEL ALIASES",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-24T07:15:54.741329Z",
+  "updated": "2026-06-24T07:15:54.7413426Z",
+  "version": "1.0"
+}

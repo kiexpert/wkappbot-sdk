@@ -1,0 +1,31 @@
+{
+  "id": "skill-coverage-ranking-news",
+  "app": "wkappbot",
+  "title": "skill search/news: coverage-based ranking + skill news command",
+  "title_ko": null,
+  "desc": "skill search ranks by SkillCoverageScore (sum of tok.Length/field.Length per match). skill news shows recently updated skills; accepts optional query for coverage-ranked filtering. Shared SkillCoverageScore() helper also used by PrintSkillHintOnError.",
+  "steps": [
+    "wkappbot skill search <keyword>  -- returns all matches ranked by coverage score (cov=X.XX shown per result)\nwkappbot skill news [query] [--days N]  -- lists skills updated in last N days (default 7). With query: coverage-ranked. Without: sorted by LastActivity.\nCoverage score = sum over all (token, field) pairs where field.Contains(token): tok.Length / field.Length. Fields: id, title, desc, best-matching tag. Higher = token covers larger fraction of matched field.\nPrintSkillHintOnError (on non-zero exit) also uses SkillCoverageScore() -- same ranking for error-time skill hints (threshold >= 0.3).",
+    "MULTI-WORD = PHRASE SEARCH: 'session start' matches literal substring, not split into two tokens. For multi-word discoverability, add each word as a separate single-word tag. See: wkappbot skill read skill-search-coverage-guide",
+    "MULTI-WORD = PHRASE SEARCH: 'session start' matches literal substring, not split into two tokens. For multi-word discoverability, add each word as a separate single-word tag. See: wkappbot skill read skill-search-coverage-guide",
+    "[SPEC 2026-06-06: Get-WkLivingScore -- living-knowledge 100-pt rubric] Beyond SkillCoverageScore (search relevance) and Get-WkTierScore (tier structure), a normalized quality rubric measures 'will this skill save a successor under pressure'. FIXED per-dimension maxes summing to 100; final score = sum of actuals = inherent 0-100 ratio. Dimensions: (1) 3-tier structure 25 (T1/T2/T3 + next:/cluster:; fat monolith like a 108-step skill scores ~0); (2) cross-link + discoverability 20 ([[links]] to siblings + tag/keyword coverage so future sessions find it); (3) new-knowledge density 15 (distinct new tokens this edit; duplicate steps penalized); (4) EMERGENCY FAST-REFERENCE 20 (action-first first step, runnable command within first 2 steps, scannable <220 chars, explicit WHEN/trigger); (5) INCIDENT SEQUENCE 20 (the canonical safety->fix->prevention phases present ~4 each PLUS a correct-ORDER bonus = monotonic step-index idx_safety<idx_fix<idx_prevent). Crisis-readiness (4+5) = 40pct; durable quality (1+2+3) = 60pct. All deterministic (regex + step-index, no LLM). ROLLOUT: implement as separate Get-WkLivingScore; wire stall-reset (>=70) to it first; keep update-gate on Get-WkTierScore (80) until score distribution observed across the 780-skill catalog, then converge. Threshold recalibration required when migrating update-gate. Cross-ref: stall-guard-wk-exemption (the >=70 stall-reset reward this score powers). Vision: each high-scoring skill becomes living knowledge = a reflex for everyday incident response.",
+    "SKILL-COMMAND PROFILING (measured live 2026-06-06 under system load). Every 'wkappbot skill <verb>' invocation has a FIXED ~600ms baseline -- read 0.592s, read --if-newer 0.608s, search 0.661s, list 0.671s, AND even --help 0.668s. KEY FINDINGS: (1) the ~600ms is process cold-start + Eye-pipe handshake + license/identity load, NOT the catalog -- proven because --help (no catalog touch) costs the same as search. (2) the O(n) catalog disk-scan adds only ~70ms (search/list minus --help), so it is NOT the bottleneck people assume; do not micro-optimize the scan first. (3) 'skill read --if-newer' gives NO speedup over a full read (0.608 vs 0.592) -- the cache fast-path is not actually short-circuiting; likely bug, candidate fix. (4) skill EDIT/CONTRIBUTE additionally runs a FULL catalog SYNC on every save ('[SKILL:SYNC] done -- up-to-date=765 CONFLICTS=158'), which is the visible slowness during authoring, compounded by 158 unresolved split-brain conflicts (see CLAUDE.md Pending split-brain-cleanup). Under a WmiPrvSE storm the 600ms baseline balloons because .NET startup competes with the thrashing provider. OPTIMIZATION ORDER: fix --if-newer fast-path + cache the Eye/license handshake first; clear the 158 SYNC conflicts; the catalog scan is last. Cross-link [[skill-read-if-newer]] [[wktasklist-intelligent-management]]."
+  ],
+  "requirements": null,
+  "primary_cmd": null,
+  "tags": [
+    "skill",
+    "search",
+    "news",
+    "ranking",
+    "coverage",
+    "operator",
+    "project"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-20T08:11:20.2665528Z",
+  "updated": "2026-06-06T14:45:32.0410266Z",
+  "version": "1.5"
+}

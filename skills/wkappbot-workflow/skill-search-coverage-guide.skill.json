@@ -1,0 +1,54 @@
+{
+  "id": "skill-search-coverage-guide",
+  "app": "wkappbot-workflow",
+  "title": "skill search: coverage scoring formula and optimization guide",
+  "title_ko": "스킬 검색 커버리지 공식·최적화 가이드",
+  "desc": "How wkappbot skill search ranks results: GlobCoverageScore formula, which fields count, why steps are invisible, and how to write tags/title/desc for maximum discoverability.",
+  "steps": [
+    "WHEN TO USE: apply when (A) creating a skill and want it discoverable, (B) existing skill not appearing in results, (C) choosing tag forms. If search returns nothing: keyword is probably only in steps, or try fewer/simpler words.",
+    "COVERAGE FORMULA (verified from source, SkillCommand.Helpers.cs): cov = sum over each search token of GlobCoverageScore(tok,id) + GlobCoverageScore(tok,title) + GlobCoverageScore(tok,title_ko) + GlobCoverageScore(tok,desc) + max(GlobCoverageScore(tok,tag) for all tags). GlobCoverageScore = tok.Length / field.Length when field.Contains(tok). Score is unbounded (can exceed 1.0). Note: GlobCoverageScore is optimized for ASCII/Latin; Korean/CJK may score 0 even when matched -- OR filter still includes the skill, just with low cov.",
+    "FILTER vs SCORE fields: FILTER (OR inclusion) uses compressed JSON of entire skill record -- catches ALL fields including steps, requirements, author, and any future fields. SCORE uses id + title + title_ko + desc + best-tag. Steps match for inclusion but do not boost cov score.",
+    "TAG SCORING RULES: (1) Only the BEST matching tag counts per token -- adding more tags does not stack score. (2) Short exact tag = max score: tag 'gg'(2 chars) -> 2/2 = 1.0. Tag 'gg-trigger'(10 chars) -> 2/10 = 0.2. Use SHORT single-word tags for every likely search term. (3) Hyphen vs space: tag 'session-start' and query 'session start' -- query is tokenized to ['session','start'] so both match separately. Good.",
+    "SEARCH TIERS -- automatic, no extra syntax: (1) PHRASE: all tokens appear in original order -> score x2.5. (2) AND: all tokens present somewhere -> score x1.5. (3) OR: any token matches -> score x1.0. Results always sorted by final score. More words = more precise AND/phrase bonus.",
+    "TOKEN EXTRACTION: query words are always split on Unicode non-letter/non-digit chars. 'Runtime.evaluate' -> tokens ['runtime.evaluate','runtime','evaluate']. 'CDP 발생! 실패?' -> ['cdp 발생! 실패?','cdp','발생','실패']. Original token kept alongside sub-tokens so exact match (e.g. 'runtime.evaluate' verbatim in skill text) also gets phrase bonus.",
+    "TITLE_KO FIELD: skills have a separate Korean title. Set with --title-ko on contribute/edit: wkappbot skill contribute --title 'English' --title-ko '한글 제목'. Shown as 'Title KO:' in skill read. Searched for OR filter inclusion. Scored by GlobCoverageScore (may be 0 for Korean due to ASCII optimization -- use Korean tags for reliable score boost). Korean tags work well: tag '세션' scores 1.0 for query '세션'.",
+    "OPTIMAL SKILL WRITING: (1) Short single-word tags for every likely search term (English AND Korean). (2) Key term early in title, keep title short. (3) Concise desc. (4) Steps are invisible to scoring but visible to OR filter. (5) Test: wkappbot skill search <term> -- cov>1.0 strong, cov<0.1 weak but still found via OR.",
+    "RELEVANCE SCORE (error hints only, not search results): tag exact=10, id-starts=6, id-contains=3, title=2, desc=1. Threshold>=5. Separate from coverage. Used by PrintRelatedSkills on command error.",
+    "Cross-referenced 2026-07-02 during a wkharness-guards 3-tier split: a fat T1 skill (220+ steps, mostly dated incident narration) hurts BOTH search coverage (steps are OR-filter-only, invisible to score) and study-lock tax -- splitting into T1 catalog + T3 dated-incidents keeps T1 short (helps score density) while T3 still full-text-searchable via OR filter."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read skill-search-coverage-guide",
+      "expect": "COVERAGE FORMULA",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill search coverage",
+      "expect": "skill-search-coverage-guide",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill search discoverability",
+      "expect": "skill-search-coverage-guide",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "skill",
+    "search",
+    "coverage",
+    "ranking",
+    "tags",
+    "discoverability",
+    "cov",
+    "optimization",
+    "guide"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-08T10:27:42.5267345Z",
+  "updated": "2026-07-02T11:19:51.6857813Z",
+  "version": "1.11"
+}

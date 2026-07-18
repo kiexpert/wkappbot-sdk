@@ -1,0 +1,37 @@
+{
+  "id": "a11y-screenshot-usage-ref",
+  "app": "wkappbot",
+  "title": "a11y screenshot ref: dated fix history",
+  "title_ko": null,
+  "desc": "T3 reference for a11y-screenshot-usage: dated LIVE CASE fix history for GDI+ capture, OCR image-load, and related ScreenCapture.Utilities.cs bugs",
+  "steps": [
+    "LIVE CASE 2026-07-02 FIXED: commit 09ab7d3f5 added a DriveInfo free-space precheck (10MB threshold) before bmp.Save() in ScreenCapture.Utilities.cs SaveToFile, throwing a clear InvalidOperationException naming available space instead of the opaque GDI+ generic error. Also wraps bmp.Save() with ONE 100ms-delayed retry on ExternalException to absorb a transient file lock before failing for real. Resolves ts=2026-06-26T13:09:29.",
+    "LIVE CASE 2026-07-02 FIXED: commit 5af8d31bf (v7.6.93) added ScreenCapture.LoadFromFile(filePath) -- the read-side mirror of SaveToFile's disk-lock retry. Verifies file exists and is non-empty, retries once after 100ms if zero-byte, wraps new Bitmap(filePath) with one 100ms-delayed retry on ArgumentException before failing with an actionable message. OcrCommand now calls this helper instead of constructing Bitmap directly. Resolves ts=2026-07-02T09:15:55.",
+    "LIVE CASE 2026-07-02 MAJOR FIX: commit 8d57caa04 (v7.6.97) restored the real Windows.Media.Ocr SimpleOcrAnalyzer (previously a permanent stub since commit d4efb8198, 2026-04-21 IP strip) -- see ocr-usage skill for full detail, this was the actual reason OCR always returned 0 words."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read a11y-screenshot-usage-ref",
+      "expect": "LIVE CASE",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read a11y-screenshot-usage-ref",
+      "expect": "GDI+",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read a11y-screenshot-usage-ref",
+      "expect": "OCR",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-07-02T14:20:22.5109863Z",
+  "updated": "2026-07-02T14:20:22.5109978Z",
+  "version": "1.0"
+}

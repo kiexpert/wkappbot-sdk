@@ -1,0 +1,39 @@
+{
+  "id": "mcp-automation-patterns",
+  "app": "wkappbot-core",
+  "title": "MCP Automation Patterns",
+  "title_ko": null,
+  "desc": "Router for MCP desktop/browser automation patterns. Read T1 for surface contract, T2 for desktop control, and T3 for stability ops.",
+  "steps": [
+    "MCP ECOSYSTEM 2026: Talon (browser+computer-use), OculOS (desktop), OSA-MCP (macOS scripting), Mirroir (iPhone), Lilith-zero (security middleware) -- all expose automation via MCP. WKAppBot mcp command is well-positioned to be the Windows automation MCP server.",
+    "wkappbot_cli MCP tool: argv array maps all wkappbot commands including a11y, win-click, windows, ask. Use from Claude Desktop: {mcpServers:{wkappbot:{command:'wkappbot',args:['mcp']}}}",
+    "a11y via MCP: wkappbot_cli ['a11y','find','*Button*'] or wkappbot_cli ['a11y','click','{proc:notepad}#OK']",
+    "win-click via MCP: wkappbot_cli ['win-click','{proc:nfrunlite}','200','300'] -- elevated targets routed via admin Eye proxy",
+    "ROUTING T1 mcp-automation-patterns-t1-core T2 mcp-automation-patterns-t2-desktop-control T3 mcp-automation-patterns-t3-stability-ops"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read mcp-automation-patterns",
+      "expect": "MCP ECOSYSTEM 2026",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot mcp",
+      "expect": "mcp",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill list",
+      "expect": "mcp-automation-patterns",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-31T07:49:41.9596692Z",
+  "updated": "2026-06-01T15:25:10.817582Z",
+  "version": "1.2"
+}

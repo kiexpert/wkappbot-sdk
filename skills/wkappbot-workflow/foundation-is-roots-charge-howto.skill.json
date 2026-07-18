@@ -1,0 +1,35 @@
+{
+  "id": "foundation-is-roots-charge-howto",
+  "app": "wkappbot-workflow",
+  "title": "Foundation Is Root's Charge: HOW-TO and Examples",
+  "title_ko": null,
+  "desc": "T2 howto tier: concrete examples, decision tests, and incident cases from foundation-is-roots-charge-not-a-chore",
+  "steps": [
+    "NAVIGATION: T1 core = foundation-is-roots-charge-not-a-chore. This T2 = examples and decision tests. T3 ref = incidents and philosophy. | THE CATEGORY TEST: before delegating ask does this shape HOW other intelligences think or what rules they follow? YES = foundation keep on ROOT. NO = chore delegate DOWN. | DECISION EXAMPLES: Writing a harness guard = FOUNDATION. Running grep to find a pattern = CHORE delegate to Haiku. Editing guards.ps1 = FOUNDATION. Reading a log file = CHORE. | TRIPLE REFLEX after user correction: (1) FIX the immediate issue. (2) KNOWLEDGE-IFY into a skill with action-first reflex. (3) EMBODY in harness so it SELF-ENFORCES. Fix alone repeats. Skill alone is pull. Only harness-embodiment makes it permanent. | DONE TEST: would the next FRESH model hit this correction automatically without the user saying anything? If NO you are not done. Keep going until the wire pushes it. | SMART-STOP counterpart: do NOT blind-charge through gates for marginal or other-owned work. Gate firing often points AT the real next task. Discrimination test: is the work NECESSARY AND OURS? If yes push through. If marginal or other-owned FILE for right owner."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read foundation-is-roots-charge-howto",
+      "expect": "T2 howto examples",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read foundation-is-roots-charge-not-a-chore",
+      "expect": "FOUNDATION",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read claude-code-agent-tier-routing",
+      "expect": "delegation rules",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-23T15:37:24.3463641Z",
+  "updated": "2026-06-23T15:37:24.3463735Z",
+  "version": "1.0"
+}

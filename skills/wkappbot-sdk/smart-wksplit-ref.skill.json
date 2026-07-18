@@ -1,0 +1,35 @@
+{
+  "id": "smart-wksplit-ref",
+  "app": "wkappbot-sdk",
+  "title": "Smart Wksplit Ref",
+  "title_ko": null,
+  "desc": "Incident log and dated lessons for multi-language dedup round-trip splitter",
+  "steps": [
+    "2026-06-06: 691K corruption sparked spec. 2026-06-10: Flash broke wkhippo via param() bug. 2026-06-23: Python backend proto 4/4 gates. 2026-06-24: procedural PS block-split backend spec added."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read wksplit-smart-multi-language-dedup-round-trip-spec-ref",
+      "expect": "Incident log",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wksplit-smart-multi-language-dedup-round-trip-spec-ref",
+      "expect": "2026-06",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wksplit-smart-multi-language-dedup-round-trip-spec-ref",
+      "expect": "corruption",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-27T03:49:07.0054417Z",
+  "updated": "2026-06-27T03:49:07.0054506Z",
+  "version": "1.0"
+}

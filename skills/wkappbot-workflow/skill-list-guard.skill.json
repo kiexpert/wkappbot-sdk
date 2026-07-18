@@ -1,0 +1,49 @@
+{
+  "id": "skill-list-guard",
+  "app": "wkappbot-workflow",
+  "title": "skill-list-guard",
+  "title_ko": null,
+  "desc": "Guard that warns on Edit/Write if skill news or skill list was not run in the last 60 minutes this session.",
+  "steps": [
+    "TRIGGER: fires on Edit/Write tool call when session has no recent skill news/list run (stale >60 min). Warn-only, exit 0.",
+    "CHECK: reads session JSONL last 300 lines for wkappbot skill (list",
+    "news) pattern. Uses per-session marker file in TEMP (claude_skill_list_checked_<sid>.lock).",
+    "MESSAGE: recommends wkappbot skill news (primary, shows NEW/UPD last 7 days) or wkappbot skill list (full catalog).",
+    "SOURCE: wkharness-guards.ps1 line ~535. Stderr output via [Console]::Error.WriteLine."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill news",
+      "expect": "shows recent skills; satisfies skill-list-guard for 60 min",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill list",
+      "expect": "shows all skills; also satisfies guard",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wkharness-guards",
+      "expect": "shows guard source and line number",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "skill-list",
+    "skill-news",
+    "guard",
+    "edit",
+    "write",
+    "warn",
+    "session",
+    "harness",
+    "pretooluse"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-23T04:42:10.2215296Z",
+  "updated": "2026-05-23T04:42:10.2215405Z",
+  "version": "1.0"
+}

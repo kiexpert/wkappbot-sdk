@@ -1,0 +1,37 @@
+{
+  "id": "wk-tool-first-use-skill-nudge-howto",
+  "app": "wkappbot-workflow",
+  "title": "wk-tool first-use nudge (howto)",
+  "title_ko": null,
+  "desc": "How the per-session first-use nudge maps a wk tool to its skill and blocks first use until read.",
+  "steps": [
+    "MECHANISM: on the FIRST use of a wk-prefixed tool in a session, the nudge blocks the call once and requires reading that tool's skill, so the operator studies the tool before relying on it.",
+    "TOOL-TO-SKILL MAP: strip the leading wk from the tool name, then a skill whose id contains that token (token-boundary or prefix) satisfies it -- wkcodex by codex-tool-wrappers, wkagy by antigravity-cli-agy-integration-guide, wkhippo by hippocampus-living-memory. Genuinely-semantic names with no shared token need an explicit tool-to-skill map entry.",
+    "SCOPE: wk tools ONLY (the nudge is gated to the wk namespace); git/gh/Agent are not nudged. Reading the mapped skill once clears the nudge for the rest of the session."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read wk-tool-first-use-skill-nudge-howto",
+      "expect": "MECHANISM",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wk-tool-first-use-skill-nudge-howto",
+      "expect": "TOOL-TO-SKILL MAP",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wk-tool-first-use-skill-nudge-howto",
+      "expect": "SCOPE",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-24T03:33:03.0821858Z",
+  "updated": "2026-06-24T03:33:03.0822027Z",
+  "version": "1.0"
+}

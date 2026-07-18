@@ -1,0 +1,26 @@
+{
+  "id": "partial-class-file-splitting-400-line-soft-cap",
+  "catalog": "wkappbot-workflow",
+  "name": "C# Partial Class File Splitting (400-Line Soft Cap)",
+  "description": "Pattern for splitting large C# source files into partial classes while keeping each under 400 lines per CLAUDE.md soft cap",
+  "tags": ["source-split", "refactor", "csharp", "400-line-cap", "partial-class"],
+  "steps": [
+    "Identify problem: Source file exceeds ~400 lines. Per CLAUDE.md: split via partial class (C#), module split, or extract helper.",
+    "Categorize methods by domain: Group into logical units — main business logic vs. helper utilities vs. internal plumbing. Extract helpers (fewest dependencies).",
+    "Create secondary file: Name pattern OriginalFile.Helpers.cs or OriginalFile.Part2.cs. Both declare partial class ClassName in same namespace.",
+    "Move helper methods: Cut methods from original, paste into new file. Include used namespaces (may duplicate).",
+    "Verify line counts: wc -l OriginalFile.cs OriginalFile.Helpers.cs. Original <400, new 50-200 typical. Total ≈ original + 5 lines.",
+    "Build verification (MANDATORY): dotnet build path/to/project.sln -c Release → 0 errors (warnings OK). Must complete in <300 seconds.",
+    "Commit (single): Both files in one commit. Message includes split reason + 'partial-class' keyword for suggest resolve.",
+    "Example: fix(taskkill): split TaskkillCompatCommand into partial classes for parent-process-ancestry validation",
+    "Recursive splitting: If secondary file still >400 lines, apply pattern again (Part2.cs, Part3.cs).",
+    "Avoid mistakes: (1) Moving only 10 lines (too small). (2) Splitting cohesive group (defeats clarity). (3) Missing using statements (undefined types). (4) No build check (errors hide). (5) Changing namespace (breaks partial class)."
+  ],
+  "requirements": [
+    "wc -l csharp/src/WKAppBot.CLI/Commands/TaskkillCompatCommand.cs csharp/src/WKAppBot.CLI/Commands/TaskkillCompatCommand.Helpers.cs",
+    "dotnet build csharp/WKAppBot.sln -c Release 2>&1 | grep -E '(error|succeeded)'",
+    "grep namespace csharp/src/WKAppBot.CLI/Commands/TaskkillCompatCommand.{cs,Helpers.cs}"
+  ],
+  "skills_ref": ["wkappbot-build-verify-workflow", "claude-md-harness-rules"],
+  "notes": "Applied 2026-05-28: TaskkillCompatCommand 580→370+90 lines. Build 0 errors. Commit 0ed077fbc. Use case: parent-process-ancestry validation requires multiple helpers — extract to Helpers.cs to keep main file focused."
+}

@@ -1,0 +1,43 @@
+{
+  "id": "mcp-automation-patterns-t2-desktop-control",
+  "app": "wkappbot-core",
+  "title": "MCP Automation T2 Desktop Control",
+  "title_ko": null,
+  "desc": "Desktop control tier for WKAppBot MCP. Covers a11y, win-click, caller HWND routing, and the Standard AppBot Window rules that keep desktop automation stable.",
+  "steps": [
+    "Use a11y and win-click as the primary desktop automation surfaces through wkappbot_cli.",
+    "Respect Standard AppBot Window rules for caller HWND, ancestor walk, and IPC forwarding.",
+    "Prefer focusless or admin-proxy routes when elevated targets or hidden windows are involved."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read standard-appbot-window",
+      "expect": "DEFINITION",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read mcp-admin-core-swap-elevation-triggered-graceful-cutover",
+      "expect": "UAC",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read mcp-automation-patterns-t1-core",
+      "expect": "wkappbot_cli",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "mcp",
+    "desktop",
+    "a11y",
+    "window",
+    "ipc"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-01T15:24:44.9080883Z",
+  "updated": "2026-06-01T15:24:44.9080994Z",
+  "version": "1.0"
+}

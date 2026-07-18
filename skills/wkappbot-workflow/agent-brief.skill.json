@@ -1,0 +1,35 @@
+{
+  "id": "agent-brief",
+  "app": "wkappbot-workflow",
+  "title": "Agent Brief / Delegation Reflex",
+  "title_ko": null,
+  "desc": "Reflex for handling [agent-brief] triggers and delegation misconfigurations.",
+  "steps": [
+    "When you trigger [agent-brief] (Rising Pattern or DELEGATION_MISCONFIGURED): read harness-agent-brief-guard, ensure the brief has 3+ skill reads and 5 SPEC sections (Goal, Files, Approach, Constraints, Exit). Fix the brief instead of doing the work manually."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read agent-brief",
+      "expect": "Agent Brief / Delegation Reflex",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill search agent-brief",
+      "expect": "agent-brief",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill list",
+      "expect": "agent-brief",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-13T13:07:09.8820016Z",
+  "updated": "2026-06-13T13:07:09.882011Z",
+  "version": "1.0"
+}

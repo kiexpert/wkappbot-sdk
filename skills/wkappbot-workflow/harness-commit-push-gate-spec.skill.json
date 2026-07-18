@@ -1,0 +1,62 @@
+{
+  "id": "harness-commit-push-gate-spec",
+  "app": "wkappbot-workflow",
+  "title": "Harness commit/push model-gate spec",
+  "title_ko": null,
+  "desc": "Single source of truth for the git commit+push model-gate: cheap-source-guard, commit-msg Model trailer, pre-push tier-gate, the detect-model.sh orchestrator + agent-name engine, and the AI-process-first / lineage-only / commit-time-non-detection-is-a-bug invariants.",
+  "steps": [
+    "PURPOSE: single source of truth for the git COMMIT+PUSH model-gate -- who may commit/push canonical source, how the committer model is resolved, and the invariants. Companion to harness-guard-exemption-ladder-spec (PreToolUse tool gating) and wkagent-name-tool-ref (resolver engine internals).",
+    "COMPONENTS (3 git hooks in wkappbot-kih/.githooks, all sharing lib/detect-model.sh): (1) pre-commit -> lib/cheap-source-guard.sh BLOCKS a non-pro model committing a canonical SOURCE file. (2) commit-msg -> appends a Model: <id> trailer. (3) pre-push -> tier-gate BLOCKS a push whose committer is a positively-identified cheap model. DRY: all three call detect-model.sh so they agree.",
+    "RESOLVER = ENGINE + ORCHESTRATOR. ENGINE wkharness-agent-name.ps1 (Get-WkCommitterModel) walks the procMap snapshot ancestor chain, accurate when lineage is intact (PreToolUse, claude.exe is a live ancestor). ORCHESTRATOR detect-model.sh (bash) layered read-order: step1 calls the engine, then subagent-mark, active-session-slug, cross-repo PID-verified, time-join to live claude.exe StartTime (step3c), wkagent-name.cmd, JSONL. BOTH needed: at COMMIT time git.exe/bash are freed so the chain to claude.exe is CUT and the engine alone cannot see it -- the orchestrator recovers via the active-session file + time-join. Detail: wkagent-name-tool-ref step 9.",
+    "PRINCIPLE 1 (AI-PROCESS-FIRST, absolute): accurate AI-process detection is the point, NOT the --model keyword. Detect the AI HOST by PROCESS NAME first (claude codex gemini agy), and ONLY then read that host OWN --model. NEVER extract a --model token from a NON-AI process. Engine enforces it: Test-Wk<Fam>Host runs BEFORE Get-Wk<Fam>ModelFromCmdLine -- host-test-first, model-extract-second.",
+    "PRINCIPLE 2 (LINEAGE-ONLY): identity comes from a real AI process in THIS committer lineage, NEVER from a global Get-Process, NEVER from an env var, NEVER from a bare --model on a non-AI process. The global agy/gemini last-resorts MUST be skipped when the walk is merely CUT by a snapshot gap (sawClaudeHost + walkCutByGap) -- firing them fabricates an identity and poisoned a genuine Opus commit as agy-flash 2026-06-21.",
+    "PRINCIPLE 3 (COMMIT-TIME NON-DETECTION = BUG): if the AI process cannot be detected at commit time that is a DEFECT to fix, not a normal fall-through. The live claude.exe still exists (just outside the cut chain) so the correct fix is robust live-AI-process detection: active-session PID-verified file + StartTime time-join. Never paper over with a global fallback.",
+    "PRO-GRADE POLICY (cheap-source-guard): only PRO models commit canonical source -- opus, gpt-5/o3/o4, gemini-pro, or human/ROOT. A NON-pro model (haiku, sonnet, gemini-flash, codex-mini) may commit a SOURCE file ONLY when the filename stem ends with -proto, -prove, -probe, or -<model-token> (sandbox to promote workflow). Non-source files (md, data) are unrestricted.",
+    "FAIL-OPEN vs FAIL-CLOSED: cheap-source-guard deliberately FAILS OPEN on broken machinery (no detector, not a repo, empty/undetectable model, internal error) so a poorly-integrated CLI can never brick EVERY commit in EVERY repo -- the pre-push gate is the backstop. detect-model.sh returns empty or ROOT when unsure (humans resolve to ROOT, allowed). A commit gate that errs toward BLOCK is a foot-gun.",
+    "HOOK HYGIENE (mandatory): (a) hook STDOUT must be CLEAN JSON only -- a stray non-JSON line (e.g. a leaked model id from dot-sourcing the resolver) makes Claude Code fail to parse hookSpecificOutput and SILENTLY DROP all additionalContext; route stray Console.Out to stderr (claude-md-harness-rules step 26). (b) .ps1 sources must be PURE ASCII -- the pre-commit blocks BOM, em-dash, smart-quotes, Korean; sanitize first. (c) git and gh are busy-fleet and pace EXEMPT (a commit never needs delegation credit).",
+    "VERIFY (run-not-parse, verify-tool-or-guard-synthetic-live-static): (1) bash .githooks/lib/detect-model.sh from a live Opus session returns opus, never agy-flash, never empty. (2) pipe a synthetic tool_use JSON to a hook capturing STDOUT ONLY and assert ConvertFrom-Json parses clean. (3) scan an edited .ps1 for bytes over 127 = zero. (4) a real Opus amend+push of a harness .ps1 passes cheap-source-guard AND pre-push gate with Model: opus.",
+    "IMPLEMENTED MECHANISMS (real, not TODO -- verified 2026-06-21): (1) harness-skill-update-pending -- a source write arms the code_changed_skill_not_updated lock, blocking the NEXT delegation until a skill update records the learning. (2) cheap-commit-todo-gate -- PreToolUse blocks git commit from Haiku/Sonnet unless CLAUDE.md Pending was edited in the last 30 turns (Opus exempt). (3) wkharness-pre-commit-source-gate -- the cheap-source-guard. CROSS-REF: commit-push-hook-policy-overview is the broader per-gate overview (this spec is the MODEL-resolution sub-spec -- do not duplicate). GAP / planned enhancements (the smarter commit hook): the skill-update lock gates DELEGATION not COMMIT, and the commit gate keys on CLAUDE.md-Pending not the edited file's OWN skill -- so edit->update-the-file's-skill->else-block-commit is only partly built. LIVING-LOCK loop is the target: edit -> knowledge-ify -> if the new/edited skill's Refs point at the edited file, AUTO-register it as that file's harness:skill lock (precedent: wksplit-400-lock + wk-skilllock-autoadd). Plus a PostToolUse edit-time nudge naming the edited file's lock skill, and a read-time freshness flag (skill-updated-date vs file mtime).",
+    "PLANNED commit-time STALE-LOCK freshness gate (user 2026-06-21): at commit, for each CHANGED source file resolve its harness:skill lock-skills; if a locked skill is >1wk stale AND that file changed in this commit, LIST (file -> stale skill -> last-updated date) and BLOCK demanding refresh of BOTH the skill (capture what changed) and the lock. SCOPE IS CRITICAL -- changed-files' locks ONLY, NEVER 'any skill globally >1wk': there are 800+ skills, most legitimately old, so a global age-block bricks ALL commits and is gameable by a no-op timestamp bump (same hole as cheap-commit-todo empty-edit). Trigger = age + file-actually-changed (code moved, knowledge did not). Back with 'skill verify' (source_refs still match) so a hollow bump cannot satisfy it. = commit-time arm of the LIVING-LOCK loop / the smarter commit hook.",
+    "READ-time MONTH-gap tier (user 2026-06-21) -- escalation above the week-tier commit gate. 2-tier RELATIVE-freshness ladder (skill age vs ITS OWN locked source, NOT absolute age -> self-scoping, avoids global-block): WEEK gap = commit-time list+nudge; MONTH gap = read-time LOUD 'refresh-or-retire' pressure + BLOCK edits to that locked source until refreshed. CORRECTIONS: (1) compare to the file's GIT commit-date (git log -1 --format=%cI <file>), NOT filesystem mtime -- mtime is reset by checkout/clone so raw mtime yields false month-gaps. (2) 'remove' -> 'refresh-or-retire': refresh if the locked code still exists, retire only if the code is gone; never blind-delete on age alone. (3) EDIT-BLOCK ESCAPE IS LENIENT (user 2026-06-21): just TOUCHING the skill -- ANY 'skill edit <id>' that bumps its date -- clears the block; do NOT require a verify-backed refresh. The gate's value is FORCING the editor to LOOK at the skill, not policing content (same philosophy as cheap-commit-todo-gate which accepts even empty edits). 'skill verify' stays ADVISORY (shown, never blocking). = low-friction enforced read-time freshness ladder."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read harness-commit-push-gate-spec",
+      "expect": "COMPONENTS",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wkagent-name-tool-ref",
+      "expect": "ENGINE",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read harness-guard-exemption-ladder-spec",
+      "expect": "exemption",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "harness",
+    "commit",
+    "push",
+    "git-hook",
+    "cheap-source-guard",
+    "detect-model",
+    "agent-name",
+    "committer",
+    "pre-push",
+    "tier-gate",
+    "spec",
+    "lineage",
+    "ai-process",
+    "stdout-cleanliness"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-21T05:12:31.3319932Z",
+  "updated": "2026-06-21T07:44:57.095354Z",
+  "version": "1.8"
+}

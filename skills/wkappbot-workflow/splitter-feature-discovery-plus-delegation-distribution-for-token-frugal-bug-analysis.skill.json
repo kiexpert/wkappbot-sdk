@@ -1,0 +1,51 @@
+{
+  "id": "splitter-feature-discovery-plus-delegation-distribution-for-token-frugal-bug-analysis",
+  "app": "wkappbot-workflow",
+  "title": "Splitter feature-discovery plus delegation distribution for token-frugal bug analysis",
+  "title_ko": null,
+  "desc": "The desirable workflow for analyzing/fixing bugs in huge patchwork source without burning tokens: token-0 split (mine the existing partial-file fragments and their descriptive filenames as the splitter index), grep-only feature discovery (matching lines, never whole-file reads), pace-exempt parallel Haiku survey, Opus judges and catches agent flaws, parallel non-conflicting dispatch by file, and mandatory git-diff verification of Haiku edits.",
+  "steps": [
+    "TOKEN-0 SPLIT FIRST: never read huge or patchwork source into context. The existing partial-class fragments PLUS their descriptive filenames (e.g. Entry.Part2_AskClaudeCli,GetClassNameHelper,...) ARE the token-0 splitter output -- be grateful and MINE them as an index. For a still-fat fragment, run wksplit-cs / wksplit to split it before analyzing. Reading the spaghetti whole is the anti-pattern that wastes tokens.",
+    "GREP-ONLY FEATURE DISCOVERY: find characteristics with the Grep tool in count or matching-line mode ONLY -- never whole-file reads. Bandaid smells to count: Thread.Sleep or Task.Delay (reactive sleeps), empty catch braces (swallowed errors that make failures silent), retry/attempt loops, OVERLAPPING reconnect/heal/watchdog files (one job spread over many partials = pile-up from per-suggest fixes), competing parsers. The filename proliferation plus grep counts alone map the bandaids at near-zero token cost.",
+    "DELEGATION DISTRIBUTION when root is pace-locked: Haiku and sonnet SUBAGENTS are pace-EXEMPT even when the root session is hard-blocked. Fan out READ-ONLY survey to parallel Haiku Explore agents, one per independent cluster, each returning file:line plus a precise removal plan. Then Opus (root) JUDGES the output -- trust-but-verify: cheap agents miss subtleties (a plan that replaces X with Y can reintroduce recursion or break an invariant). Catch the flaw BEFORE applying. This is exactly why Opus orchestrates and agents execute.",
+    "PARALLEL NON-CONFLICTING DISPATCH: partition the fix by FILE so two agents never edit the same file (parallel edits are safe, parallel builds are not). Give each agent a UNIQUE wkbuild tag and the instruction: if wkbuild reports a build lock, wait 60s and retry once. Every Agent brief MUST carry 3 skill reads plus the labels Goal / Files / Approach / Constraints / Exit as exact words with NO parenthetical between a label and its colon, or the agent-brief guard blocks the dispatch.",
+    "VERIFY HAIKU EDITS WITH GIT DIFF (mandatory reflex): Haiku silently DROPS content on complex edits. After ANY Haiku/cheap-agent edit, git diff the touched files: small balanced diffs (a few plus/minus lines) = clean targeted change; large deletions or fewer steps than before = content drop -> git checkout the file and redo with Opus or a careful re-brief. git is harness-exempt so this verification works even when the root session is pace-locked.",
+    "EXHAUSTIVE-SURVEY-FIRST for multi-site symptoms (2026-06-12): when a symptom (e.g. a window getting folded) can come from MANY scattered call sites, grep-survey EVERY candidate site FIRST (delegate to Haiku -- its strength) before fixing one. Fixing a single guessed path and assuming = repeated mis-diagnosis; the Edge-fold bug took 2 wrong fixes (screensaver, LgOverlay) before the survey found the real third site (SuppressFullscreenOpaqueOverlays)."
+  ],
+  "requirements": [
+    {
+      "cmd": "grep -c 'Grep' D:/GitHub/WKAppBot/CLAUDE.md",
+      "expect": "0",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read haiku-sandbox-problem-solving",
+      "expect": "Haiku",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read claude-code-agent-tier-routing",
+      "expect": "Haiku",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "delegation",
+    "splitter",
+    "feature-discovery",
+    "grep",
+    "parallel",
+    "haiku-verify",
+    "token-frugal",
+    "bandaid",
+    "pace-exempt",
+    "reflex"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-11T16:57:31.922047Z",
+  "updated": "2026-06-12T10:42:17.492842Z",
+  "version": "1.2"
+}

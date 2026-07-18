@@ -1,0 +1,19 @@
+{
+  "id": "grap-hwnd-volatility-hwnd-stale-between-find-and-use",
+  "app": "wkappbot",
+  "title": "grap hwnd volatility: hwnd stale between find and use",
+  "desc": "hwnd returned by a11y find becomes invalid if the window is destroyed/recreated between find and use. When this happens, the runtime falls through to title wildcard \u002B --nth 1 fallback. Document the lifecycle and the correct usage pattern.",
+  "steps": [
+    "a11y find returns \u0027hwnd:0xXXXXXXXX\u0027 which is valid at query time. If the process recreates the window (common in WPF, Chrome, HTS), the hwnd is stale within seconds.",
+    "Best practice: use hwnd: form only for immediate single-step operations. For multi-step sequences (find -\u003E click -\u003E type), re-query at each step or use title-based grap which re-resolves dynamically.",
+    "Mitigation in runtime: IsWindow() check before each operation; if stale, falls back to title-wildcard \u002B --nth 1. This fallback is visible in logs as [A11Y] hwnd stale -\u003E retry with pattern. Consider using wkappbot a11y find directly before each step in automation scripts.",
+    "Verified 2026-04-22: test-a11y-find-focus-steal-guard.sh (resolve ts=2026-04-20T12:25:00.0052832Z)"
+  ],
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-22T03:45:29.8964134Z",
+  "updated": "2026-04-22T03:47:14.3840814Z",
+  "version": "1.1"
+}

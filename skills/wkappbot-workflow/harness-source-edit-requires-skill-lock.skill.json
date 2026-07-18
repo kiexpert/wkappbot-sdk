@@ -1,0 +1,54 @@
+{
+  "id": "harness-source-edit-requires-skill-lock",
+  "app": "wkappbot-workflow",
+  "title": "Editing source requires a skill-lock (default-deny)",
+  "title_ko": null,
+  "desc": "The harness CORE purpose: BLOCK editing any source file that has no harness:skill registration. No skill-lock = no edit (default-deny). Editing source first requires reading the registered skills. harness-source (wkharness star ps1) is PACE-exempt but the skill-lock STILL fires.",
+  "steps": [
+    "CORE PRINCIPLE: blocking unregistered source edits IS the harness reason to exist. If a source file matches NO harness:skill rule, the catch-all DENIES the edit (default-deny) and prints the exact section to add. Blocking the edit is the point, not an accident.",
+    "FLOW: edit a source file -> harness looks for a matching harness:skill rule -> (a) no rule = BLOCK with the suggested section; (b) rule present but its skills not read this session = BLOCK listing the unread ids; (c) rule present and all skills read = ALLOW. Reads/greps never trigger it; only Edit/Write/wkedit/wkappbot-file-edit do.",
+    "HARNESS-SOURCE EXCEPTION: editing wkharness star ps1 is PACE-exempt (emergency harness fixes must not be pace-blocked) but the skill-lock MUST still fire -- read claude-md-harness-rules plus wkharness-guards first. pace-exempt YES, skill-lock-exempt NO.",
+    "REGRESSION ROOT (2026-06-07): this lock silently did NOT fire for a long stretch because wkharness-gemini.ps1 was never dot-sourced, so the harness crashed fail-OPEN on every tool call and ALL guards (including this one) were off. Fixed by adding the dot-source. Cross-ref harness-robustness-user-dist-appbot-absent and harness-edit-write-skill-bypass.",
+    "VERIFY: try to Edit an UNREGISTERED source file via the real Edit tool -- it MUST return a block (RC 2, no skill rule), not pass. If it passes, the harness is failing open -- investigate the load chain.",
+    "SKILL-LOCK COUNT IS A SPLIT SIGNAL (user 2026-06-21 insight): if one source file accumulates MANY distinct harness:skill locks, that is itself a SPLIT candidate -- each distinct lock roughly maps to one concern/subsystem the file touches, so a high lock-count means the file is doing too much (separation-of-concerns debt). The study-lock union count is a cheap deterministic proxy for that debt. RULE OF THUMB: when a file needs 4+ DISTINCT FILE-SPECIFIC skills (exclude the generic wksplit-* and global common locks, which every big file gets), split it (partial class for .cs, module split for .ps1) so each unit carries only 1-2 focused locks. This COMPLEMENTS the 400-line wksplit cap: line-count measures SIZE, lock-count measures CONCERN-SPREAD -- both are independent split triggers, and a file that is both >400 lines AND >4 distinct locks is a strong split target. Also lowers edit friction: after splitting, editing one concern only requires reading its 1-2 locks, not the whole union. Cross: wksplit-cs-utility (the 0-token splitter), claude-md-harness-rules (study-lock union).",
+    "MISSED SOURCE-WRITE VECTORS TO BLOCK (user 2026-06-21: cheap AIs occasionally try these and CORRUPT source files; the current guard only catches >/>>/tee to source-ext). Add scoped harness:block patterns -- ALL scoped to the source-ext regex, EXEMPT .tmp/, remedy = the Edit/Write tool or 'wkappbot file edit'. Vectors: (1) in-place stream editors: sed -i / perl -i / awk -i inplace on a source file. (2) binary/hex writers: dd of=<source>, xxd -r redirected to source, base64 -d redirected to source, printf piped to dd of=source. (3) overwrite-by-copy: cp / mv / install / ln -f with a source-ext DESTINATION. (4) truncate -s <source>, and the ':' builtin redirected to source. (5) inline interpreter writes: python -c with open('x.cs','w'), node -e with fs.writeFileSync('x.cs'), ruby -e, php -r. (6) PowerShell .NET writers to source-ext: [IO.File]::WriteAllText/WriteAllBytes/WriteAllLines/AppendAllText, Out-File, Set-Content/Add-Content (currently only CLAUDE.md is covered). (7) interactive editors that HANG a non-interactive shell: vim/vi/nano/emacs/ed/ex/pico/joe/micro -- block regardless of target, remedy = Edit tool. (8) patch <source>. IMPL = proto-first in kih + TEST each pattern does NOT false-block legit non-source or .tmp usage (cp to .tmp ok, sed -i on a .tmp file ok, dd for disk imaging ok) BEFORE landing. Goal: AIs are bad at these and wreck files; force them through the reviewed Edit / file-edit path.",
+    "GLOB PATTERN (2026-06-22, confirmed): harness:skill glob MUST use ** prefix relative to the actual file path. python/**/filename.py does NOT match scripts/filename.py -- the python/ prefix is wrong. Use **/filename.py to match any directory, or scripts/**/filename.py if scoped. Regex format (?i)[/\\]filename\\.py$ also works but glob is cleaner. Always verify after adding a lock -- read the file and check PostToolUse:Read shows [study-lock] notice with your skills listed.",
+    "GATE COMMENT CLARITY (2026-06-22, lesson): comment text must NOT imply 'once per day' frequency. BAD: '# GATE: daily 1-token rule' -- reads as 'read skill daily'. GOOD: '# GATE (read every edit) -- Hantoo API 1-token/day policy:' -- makes clear the gate fires on every edit AND explains what policy it protects. Rule: separate WHEN the gate fires from WHAT RULE it enforces in the comment text.",
+    "JISIKHWA REFLEX (2026-06-22): whenever you discover a new skill-lock registration pattern -- wrong glob, comment ambiguity, verification method, union behavior -- add it here immediately as a step. This skill IS the living record of lock registration lessons. Discovery => edit this skill, same turn, no deferral. Cross: knowledge-ification-procedure-jisikhwa, harness-source-edit-requires-skill-lock.",
+    "EXTEND THE EDIT-EXEMPT CLASS TO REPO-ROOT ./wk-*.cmd WILLKIM LAUNCHERS (user 2026-06-29: exempt them from write/pace/freeze restrictions, keep ONLY the study-lock -- so editing a bug-tracking WillKim tool never pace/freeze-PANICS, same model as wkharness star .ps1 which is pace-exempt-but-skill-lock per step 3). DESIGN: in wkharness-guards-write.ps1 isExemptWrite (~L135, the list that already exempts wkharness star .ps1 / memory/ / CLAUDE.md / AGENTS.md / wkedit.sh / skills/), ADD a pattern for the repo-root WillKim launcher quartet -- a filePath whose BASENAME matches wk-<name>.(cmd|ps1|sh|exe) i.e. regex [/\\]wk-[^/\\]+\\.(cmd|ps1|sh|exe)$ . EFFECT: isExemptWrite -> exit 0 -> SKIPS the pace + wk-only + emergency-write-freeze blocks for that write, but the STUDY-LOCK is a SEPARATE gate that STILL FIRES (so the editor must still read the tool's registered skills -- skill-lock only, exactly the user ask). WHY SAFE-ish: these are git-tracked repo-root WillKim diagnostics WillKim wants freely fixable; study-lock + syntax-rollback + the no-cmdline-coding block still govern HOW they are edited. SECURITY NOTE (this is a write-FREEZE relaxation -> proto-verify, do NOT rush-merge, per the write-freeze-hole audit discipline harness-edit-write-skill-bypass step 9-10 + restrained-authority never-false-exempt): build wkharness-guards-write-proto.ps1 + SYNTHETIC TEST MATRIX = (a) ./wk-test.cmd edit by non-pro => write-freeze EXEMPT (allowed) BUT study-lock still lists unread skills; (b) a random non-wk source (foo.ps1) => still write-freeze BLOCKED for non-pro (no over-exempt); (c) a deep-path wk-*.ps1 (tools/wk-foo.ps1) => decide scope (repo-root-only vs any-depth -- recommend any-depth since all wk-* are WillKim tools); (d) the wk-*.cmd still hits study-lock (skill-lock fires). Land ONLY after the matrix passes. Cross: step 3 (wkharness pace-exempt-but-skill-lock), harness-pace-guard step 5 (WillKim tools pace-exempt to RUN -- this adds pace/freeze-exempt to EDIT), harness-edit-write-skill-bypass step 9-10 (write-freeze hole audit discipline), willkim-tool-harness-independence-install-location.",
+    "SKILL-LOCK ALSO PROTECTS FROM DELETION, not just edits (user 2026-06-30): an UNGUARDED source file (no harness:skill lock) is liable to be SWEPT/deleted -- by git clean of untracked, proto-cleanup, or a GC pass -- and silently VANISH. LIVE CASE: ./wk-parsecheck.cmd (a ROOT pace-exempt parse-check launcher) went MISSING entirely while its wk-parsecheck skill still advertised it as usable -- a dangling tool ref, because it was never locked and likely untracked. RULE: to make an important tool or source PERSIST, leave a harness:skill lock for it in THAT FILE OWN repo-root CLAUDE.md (and commit it so git tracks it). The lock marks it a KNOWN protected artifact so cleanup respects it, AND forces study-before-edit. So a skill-lock has TWO jobs: (1) block unstudied or unregistered EDITS (the original purpose), (2) protect the file from being SWEPT or DELETED. Any wk-star tool or harness source worth keeping MUST have a lock. Cross: claude-md-harness-rules (lock syntax), proto-cleanup-discipline (the sweep), verify-tool-or-guard-synthetic-live-static."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read harness-source-edit-requires-skill-lock",
+      "expect": "default-deny",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read claude-md-harness-rules",
+      "expect": "harness",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read harness-edit-write-skill-bypass",
+      "expect": "bypass",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "harness",
+    "skill-lock",
+    "source-edit",
+    "default-deny",
+    "catch-all",
+    "policy",
+    "t2"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-07T12:11:18.4758524Z",
+  "updated": "2026-06-29T16:08:32.2479313Z",
+  "version": "1.14"
+}

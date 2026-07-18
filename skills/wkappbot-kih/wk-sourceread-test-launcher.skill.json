@@ -1,0 +1,35 @@
+{
+  "id": "wk-sourceread-test-launcher",
+  "app": "wkappbot-kih",
+  "title": "wk-sourceread-test launcher",
+  "title_ko": null,
+  "desc": "Runs the source-read detection proto synthetic test from the wkappbot-kih repo",
+  "steps": [
+    "Run wk-sourceread-test.cmd from repo root to verify source-read (Read tool + Get-Content) detection proto (tools/wkharness-source-read-test-proto.ps1). Expected output: VERDICT: PASS with all cases passing."
+  ],
+  "requirements": [
+    {
+      "cmd": "wk-sourceread-test.cmd",
+      "expect": "VERDICT",
+      "prompt": null
+    },
+    {
+      "cmd": "wk-sourceread-test.cmd",
+      "expect": "PASS",
+      "prompt": null
+    },
+    {
+      "cmd": "wk-sourceread-test.cmd",
+      "expect": "CASE",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-26T08:32:38.8750943Z",
+  "updated": "2026-06-26T08:32:39.0030437Z",
+  "version": "1.1"
+}

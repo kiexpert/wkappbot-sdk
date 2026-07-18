@@ -1,0 +1,46 @@
+{
+  "id": "launcher-direct-core-routing-for-critical-cmds",
+  "app": "wkappbot-core",
+  "title": "Launcher direct-core routing for critical commands",
+  "title_ko": "\uB7F0\uCC98 \uD06C\uB9AC\uD2F0\uCEEC \uBA85\uB839 Core \uC9C1\uC811 \uB77C\uC6B0\uD305",
+  "desc": "Commands like suggest, skill, eye bypass normal launcher pipe and route directly to Core for reliability.",
+  "steps": [
+    "Critical commands (suggest, skill, eye) route directly to Core process bypassing the Launcher IPC pipe to avoid deadlocks.",
+    "Direct routing: Launcher detects critical commands and spawns Core with DETACHED_PROCESS \u002B direct stdio instead of pipe relay.",
+    "Why: pipe relay has IOCP overhead and ConPTY LPC deadlock risk. Direct Core ensures commands complete even when Eye is unhealthy."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot suggest list",
+      "expect": "suggest",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill list",
+      "expect": "skills",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read launcher-direct-core-routing-for-critical-cmds",
+      "expect": "routing",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "launcher",
+    "routing",
+    "suggest",
+    "skill",
+    "encoding",
+    "iocp",
+    "direct-core",
+    "critical"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-28T07:16:42.5377851Z",
+  "updated": "2026-05-04T07:54:21.1994852Z",
+  "version": "1.2"
+}

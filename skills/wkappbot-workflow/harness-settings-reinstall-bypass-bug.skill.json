@@ -1,0 +1,58 @@
+{
+  "id": "harness-settings-reinstall-bypass-bug",
+  "app": "wkappbot-workflow",
+  "title": "Agy and Claude Settings Reinstall Bypass Bug and Fine-grained Approval Setup",
+  "title_ko": null,
+  "desc": "Resolves settings.json mtime bypass bug during session init for Antigravity-cli (Agy), and configures fine-grained wildcard approvals (e.g., Bash(*)) for Claude Desktop to prevent security prompts without breaking tool safety.",
+  "steps": [
+    "T1 CORE (Decision Rules): In Claude and Gemini, bypassing security/confirmation prompts for command executions requires explicit prefix-based rules like \"command(git)\" and \"command(powershell)\" in the permissions.allow array. The global installer must proactively configure these wildcard prefix targets.",
+    "T2 HOWTO (Procedure): Overhaul Test-HarnessNeedsReinstall in wkharness-session-init.ps1 and 08-harness-connection.ps1 to verify that all required command prefixes (command(git), unsandboxed(git), command(powershell), command(bash), command(cmd), command(sh), command(gh), command(wkappbot) and their unsandboxed equivalents) are fully present. If any required entry is missing, trigger a reinstall of settings.json immediately.",
+    "T3 REF (History): Incident 2026-06-09: The installer failed to update settings.json because it only checked for \"Bash(*)\" or \"*\", leaving specific git/shell command executions prompting. After updating the validation logic, run \"wkdoctor\" to trigger the auto-installer to self-heal. NOTE: The running agent session loads permissions at startup and does not hot-reload settings.json; a session restart is required to activate new settings.",
+    "CASING FIX (2026-06-14, edc737f): Claude Code REQUIRES UPPERCASE permission tool names -- Command(...) / Unsandboxed(...) / Mcp(...). A LOWERCASE rule (command(*), unsandboxed(git), mcp(*)) is silently SKIPPED at startup with 'Invalid permission rule command(*) was skipped: Use Command'. Antigravity-cli (Gemini) uses the lowercase form -- keep that ONLY in its own settings file, never in ~/.claude/settings.json. Step 1 above (which says rules like command(git)/command(powershell)) describes the AGY lowercase form and is WRONG for Claude. Root cause of recurrence: wk-approval-sync.ps1 WROTE lowercase into the Claude file, re-breaking what wkdoctor module 20 (20-claude-settings-validation.ps1) had just capitalized -- a heal/reinject ping-pong. Fix: writer wk-approval-sync.ps1 + validator wkharness-session-init-infra.ps1 Test-HarnessNeedsReinstall now both emit/expect UPPERCASE for Claude and lowercase only for antigravity-cli. wkdoctor module 20 already DETECTS+HEALS lowercase rules (capitalize first letter, .wkdoctor-bak backup, verify-reparse, atomic UTF-8 write) -- run wkdoctor to self-heal a live file."
+  ],
+  "requirements": [
+    {
+      "cmd": "powershell Get-Content C:\\Users\\kiexp\\.gemini\\antigravity-cli\\settings.json",
+      "expect": "approvalMode",
+      "prompt": null
+    },
+    {
+      "cmd": "powershell Get-Content C:\\Users\\kiexp\\.claude\\settings.json",
+      "expect": "bypassPermissions",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read harness-settings-reinstall-bypass-bug",
+      "expect": "harness-settings-reinstall-bypass-bug",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wkdoctor-system-physician",
+      "expect": "wkdoctor-system-physician",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read hongik-harness-emergency-reflex-protocol",
+      "expect": "hongik-harness-emergency-reflex-protocol",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "harness",
+    "approval",
+    "agy",
+    "claude",
+    "bypass",
+    "settings",
+    "wildcard",
+    "session-init",
+    "hotfix"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-09T06:06:48.6184594Z",
+  "updated": "2026-06-14T04:52:48.8137284Z",
+  "version": "1.9"
+}

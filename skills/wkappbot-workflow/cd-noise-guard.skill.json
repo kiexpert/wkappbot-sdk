@@ -1,0 +1,38 @@
+{
+  "id": "cd-noise-guard",
+  "app": "wkappbot-workflow",
+  "title": "cd-noise-guard: cd to current dir is a no-op",
+  "title_ko": null,
+  "desc": "Blocks commands that cd/Set-Location to the current working directory. This is a no-op that wastes a command slot.",
+  "steps": [
+    "SAFETY: Catches 'cd X', 'Set-Location X', or 'sl X' where X resolves to the current working directory. This is a no-op command -- it does nothing but consume tokens and a tool call slot.",
+    "SOLUTION: Remove the 'cd <current-dir>' prefix from your command. The shell is already in the correct directory. Use absolute paths if you need to reference files in another location, but never prepend cd to git/wkappbot commands.",
+    "PREVENTION: Always use absolute paths in tool calls. Never prepend cd to a command -- set CWD on the tool call itself or use absolute paths. The harness CWD is already correct at every tool invocation."
+  ],
+  "comments": null,
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read cd-noise-guard",
+      "expect": "cd to current dir is a no-op",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wkharness-guards",
+      "expect": "GUARD CLUSTER",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read harness-active-model-scoping",
+      "expect": "P6",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-11T07:31:23.9328705Z",
+  "updated": "2026-06-11T07:31:23.9328797Z",
+  "version": "1.0"
+}

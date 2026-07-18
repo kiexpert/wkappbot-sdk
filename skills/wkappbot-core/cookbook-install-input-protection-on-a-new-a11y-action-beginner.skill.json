@@ -1,0 +1,88 @@
+{
+  "id": "cookbook-install-input-protection-on-a-new-a11y-action-beginner",
+  "app": "wkappbot-core",
+  "title": "Cookbook: Install Input Protection on a New A11y Action (Beginner)",
+  "desc": "Unified guide: why user-input protection exists, how FocusStealSentinel + ResolveA11yTarget work conceptually, and the step-by-step recipe for adding a new a11y action with full protection. Beginner-friendly copy-paste snippets plus a smoke-test checklist. Supersedes the older sentinel concept skill.",
+  "steps": [
+    "WHY THIS EXISTS. Every a11y action runs on behalf of the user but can accidentally grab the foreground window (SetForegroundWindow, UIA activation on Chromium/Electron, SendInput). If it does, the user loses their typing / dialog / mouse context. Two complementary tools solve this: (1) InputReadiness.Probe shows the magnifier and yields to active user input BEFORE the action fires; (2) FocusStealSentinel watches the foreground during the action and restores + self-reports if theft happened. Find is the only exempt action -- it is legitimate foreground exploration."
+  ],
+  "tags": [
+    "cookbook",
+    "beginner",
+    "focus-steal",
+    "sentinel",
+    "readiness",
+    "checklist",
+    "a11y-action",
+    "probe",
+    "magnifier",
+    "auto-bug-report"
+  ],
+  "source_refs": [
+    {
+      "file": "csharp/src/WKAppBot.CLI/Commands/ReadinessBridges.cs",
+      "line": null,
+      "pattern": "FocusStealSentinel",
+      "note": null
+    },
+    {
+      "file": "csharp/src/WKAppBot.CLI/Commands/ReadinessBridges.cs",
+      "line": null,
+      "pattern": "ResolveA11yTarget",
+      "note": null
+    },
+    {
+      "file": "csharp/src/WKAppBot.CLI/Commands/ReadinessBridges.cs",
+      "line": null,
+      "pattern": "EnsureA11yReadiness",
+      "note": null
+    },
+    {
+      "file": "csharp/src/WKAppBot.CLI/Commands/ReadinessBridges.cs",
+      "line": null,
+      "pattern": "public bool Peek",
+      "note": null
+    },
+    {
+      "file": "csharp/src/WKAppBot.CLI/Commands/InspectionCommands.cs",
+      "line": null,
+      "pattern": "ResolveA11yTarget",
+      "note": null
+    },
+    {
+      "file": "csharp/src/WKAppBot.CLI/Commands/A11yCommand.Kill.cs",
+      "line": null,
+      "pattern": "killSentinel.Peek",
+      "note": null
+    },
+    {
+      "file": "csharp/src/WKAppBot.CLI/A11yHackOverlay.cs",
+      "line": null,
+      "pattern": "focusSentinel.Checkpoint",
+      "note": null
+    },
+    {
+      "file": "csharp/src/WKAppBot.CLI/Commands/AppBotEyeHoverAnalyzer.cs",
+      "line": null,
+      "pattern": "fgBeforeProbe",
+      "note": null
+    },
+    {
+      "file": "csharp/src/WKAppBot.CLI/Program.cs",
+      "line": null,
+      "pattern": "AutoBugReport",
+      "note": null
+    },
+    {
+      "file": "csharp/src/WKAppBot.Win32/Input/InputReadiness.cs",
+      "line": null,
+      "pattern": "Probe",
+      "note": null
+    }
+  ],
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-17T14:09:48.2040787Z",
+  "updated": "2026-04-17T14:11:26.9106269Z",
+  "version": 2
+}

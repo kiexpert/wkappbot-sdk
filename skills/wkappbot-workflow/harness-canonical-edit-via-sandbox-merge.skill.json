@@ -1,0 +1,41 @@
+{
+  "id": "harness-canonical-edit-via-sandbox-merge",
+  "app": "wkappbot-workflow",
+  "title": "Harness canonical edit via sandbox merge",
+  "title_ko": null,
+  "desc": "How any model edits a CANONICAL wkharness file under the guard stack: cheap edits a -sonnet/-proto SANDBOX copy, ROOT verifies (tokenize+diff) and merges. Decision rules: fail-closed PreTool (0=allow,2=block,no soft tier), no settable env as trust anchor (use lineage/nonce), a guard block is the user speaking (obey its remedy, never dodge/grind/batch).",
+  "steps": [
+    "WHEN: you (any model) need to change a CANONICAL harness file (wkharness star.ps1, guards, in wkappbot-kih/tools). Read this T1 first; exact commands in the -howto tier; this session incidents in the -ref tier.",
+    "RULE 1 cheap-cannot-edit-canonical: the write-freeze (cheap-source-guard) blocks sonnet/haiku/gemini from canonical source; they may write ONLY a -sonnet or -proto SANDBOX copy. Only ROOT (Opus or human) writes canonical. So the workflow is ALWAYS: cheap edits+verifies a sandbox copy, then ROOT merges it to canonical.",
+    "RULE 2 a-guard-block-is-the-user-speaking: READ the block message remedy line and do EXACTLY that, ONE action (single clean wk cmd / split skill to 3-tier / commit-or-stash / add SPEC block / delegate). NEVER dodge (rename, WKHARNESS_BYPASS, env-spoof), NEVER grind variations, NEVER batch many canonical edits solo. Dodging/grinding a guard wasted a whole session 2026-06-19 (repeated 3x).",
+    "RULE 3 fail-closed PreTool doctrine: exit 0 = allow (may still print a NOTICE to stderr), exit 2 = block. There is NO soft/warn tier -- exit 1 is a non-blocking error Claude Code IGNORES (it prints a scary Failed-with-non-blocking message but the tool RUNS). So a Block function default must be exit 2 and every trap must Exit(2); never leave exit-1 as a soft block.",
+    "RULE 4 no-env-is-a-trust-anchor: any settable env (WKHARNESS_BYPASS, AGENT_MODEL, CODEX_HOOK, INTERNAL_SPAWN, AGENT_SESSION, SELFTEST) is spoofable = NOT authentication. Identity and exemption must come from process-lineage (Get-WkCommitterModel) or a single-use nonce (parent writes nonce to TEMP, env carries only its SHA256 hash, child reads/deletes/validates), not from the env value itself.",
+    "RULE 5 verify-don-t-trust: a synthetic test PASS is never runtime correctness; run the tool on the REAL repo (calibration) before going live, and ROOT must re-verify a cheap agent claim (tokenize + git diff) -- cheap models confabulate.",
+    "NAV + REFLEX: exact procedure and guard-stack rules = harness-canonical-edit-via-sandbox-merge-howto; dated incidents = harness-canonical-edit-via-sandbox-merge-ref. The guard-obey reflex is wired in opus-self-reflection-ref and the CLAUDE.md Emergency Reflexes table."
+  ],
+  "requirements": [
+    {
+      "cmd": "edit a canonical wkharness file as cheap model",
+      "expect": "write-freeze blocks; only a -sonnet/-proto sandbox copy is writable",
+      "prompt": null
+    },
+    {
+      "cmd": "a Block function default exit",
+      "expect": "must be 2 (block), never 1 (soft/ignored)",
+      "prompt": null
+    },
+    {
+      "cmd": "a settable identity env",
+      "expect": "replaced by process-lineage or single-use nonce, never trusted as-is",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-19T08:20:42.5134861Z",
+  "updated": "2026-06-19T08:20:42.5134998Z",
+  "version": "1.0"
+}

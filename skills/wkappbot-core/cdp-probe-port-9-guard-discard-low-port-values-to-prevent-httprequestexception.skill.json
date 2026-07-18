@@ -1,0 +1,19 @@
+{
+  "id": "cdp-probe-port-9-guard-discard-low-port-values-to-prevent-httprequestexception",
+  "app": "wkappbot-core",
+  "title": "cdp probe port-9 guard: discard low-port values to prevent HttpRequestException",
+  "desc": "CDP probe now skips ports below 1024 (discard range) preventing 127.0.0.1:9 HttpRequestException that blocked suggest/eye/tick.",
+  "steps": [
+    "commit 4f3606de fix(cdp-probe): guard low-port values. Port guard checks port \u003C 1024 before ConnectAsync. eye and suggest commands no longer hang on low-port CDP probes.",
+    "Guard: port \u003C 1024 skipped before ConnectAsync. Previously port=9 (discard) would make 329s hanging HttpRequestException.",
+    "suggest command port 9 error: commit 4884d0bc queued; fixed at 4f3606de. Now eye, suggest, tick all bypass low ports.",
+    "Verified 2026-04-21: test-cdp-port9-guard.sh (resolve ts=2026-04-20T12:30)"
+  ],
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-21T18:15:48.2675509Z",
+  "updated": "2026-04-21T18:16:11.179958Z",
+  "version": "1.3"
+}

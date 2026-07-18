@@ -1,0 +1,41 @@
+{
+  "id": "wkwrap-ai-native-wrappers",
+  "app": "wkappbot-workflow",
+  "title": "wkwrap: AI-native .sh/.cmd wrapper auto-install",
+  "title_ko": null,
+  "desc": "Universal relay pattern for all wk*.ps1 tools. .sh for bash/Claude, .cmd for CMD/user, .ps1 for direct PS. wkwrap.sh --install auto-generates missing wrappers from wk*.ps1 scan.",
+  "steps": [
+    "PATTERN: each wkXXX.ps1 in WKAppBot/bin gets .sh (bash relay) + .cmd (CMD relay) counterparts auto-managed by wkwrap.sh/cmd.",
+    "RELAY: wkXXX.sh -> powershell -File wkXXX.ps1 via wkwrap.sh. wkXXX.cmd -> same via wkwrap.cmd. basename $0 detection.",
+    "INSTALL: wkwrap.sh --install scans wk*.ps1, creates missing .sh + .cmd. Run after adding new .ps1 tools.",
+    "STATUS: wkwrap.sh --status shows coverage table (.ps1 / .sh / .cmd per tool).",
+    "HARNESS GUIDANCE (MANDATORY): always refer users to .sh (bash) or .cmd (CMD) -- never .ps1 in harness error messages. PS1 is for direct expert use only.",
+    "MAINTENANCE: wkharness -Status calls wkwrap.sh --install automatically to keep wrappers up to date.",
+    "SPECIAL WRAPPERS (not relay): wkclaude.sh pre-bakes --print --model haiku. wkcodex.sh calls wkcodex.ps1 (harness symlink). These are NOT replaced by --install."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkwrap.sh --status",
+      "expect": "wkask",
+      "prompt": null
+    },
+    {
+      "cmd": "wkwrap.sh --install",
+      "expect": "Done",
+      "prompt": null
+    },
+    {
+      "cmd": "wkask.sh gpt test 2>&1 | head -1",
+      "expect": "wkask",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-17T04:40:20.1858368Z",
+  "updated": "2026-05-17T04:40:20.1858455Z",
+  "version": "1.0"
+}

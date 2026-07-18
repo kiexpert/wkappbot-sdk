@@ -1,0 +1,37 @@
+{
+  "id": "sonnet-self-reflection-howto",
+  "app": "wkappbot-sdk",
+  "title": "Sonnet Self-Reflection Howto",
+  "title_ko": null,
+  "desc": "How and when to add patterns to the sonnet-reflection skill -- the living harness lesson log",
+  "steps": [
+    "WHEN to add a new pattern: (a) a guard fires 2+ times in different sessions for the same root cause, (b) a Haiku or Codex agent fails silently and forced root-cause diagnosis, (c) a workaround was applied without fixing the real cause -- each of these indicates a harness gap.",
+    "HOW to add: run wkappbot skill edit sonnet-reflection --add-step 'PATTERN N name: what happened. Fix: what harness block/guard to add.' Keep the format concrete and action-oriented -- name the guard to add, not generic advice.",
+    "RATE-LIMIT: add at most 2 patterns per session. After adding, verify with wkappbot skill read sonnet-reflection."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read sonnet-reflection-howto",
+      "expect": "WHEN to add a new pattern",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read sonnet-reflection",
+      "expect": "PATTERN",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill search sonnet reflection",
+      "expect": "sonnet-reflection in results",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-25T21:22:33.7758141Z",
+  "updated": "2026-06-25T21:22:33.9915489Z",
+  "version": "1.1"
+}

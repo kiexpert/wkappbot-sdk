@@ -1,0 +1,38 @@
+{
+  "id": "gpt-reflection-ref",
+  "app": "wkappbot-workflow",
+  "title": "GPT reflection (ref)",
+  "title_ko": null,
+  "desc": "GPT family-identity-scoping rule, elder-review duty, and dated incidents.",
+  "steps": [
+    "FAMILY-IDENTITY-SCOPING: keep gpt-reflection and gpt-mini-reflection SEPARATE; never use gpt-mini reflection (or Haiku reflection) as a substitute for GPT reflection. Treating model identity as interchangeable makes future agents inherit the WRONG reflex and the same hook/delegation failure repeats -- a mismatched reflection prompt is an identity-scoping BUG, stop and create the model-specific reflection.",
+    "ELDER REVIEW DUTY: GPT reviews mistakes made by smaller sibling models, extracts the DURABLE failure pattern (the missing guard / missing reflection / missing skill-read / bad delegation contract that ALLOWED it), and turns it into recurrence prevention -- do not merely blame the smaller model.",
+    "INCIDENT 2026-06-14: GPT delegation + Codex hook repair were delayed by identity confusion between mini/GPT/Haiku reflection requirements; fix = verify the active family before satisfying on-load.",
+    "INCIDENT 2026-06-17: do NOT add a user-set environment-variable identity backdoor to agent-name; agent-name must infer identity from PROCESS LINEAGE + session evidence ONLY, never from WKHARNESS_AGENT_MODEL or any spoofable env var (keep the resolver read-only w.r.t. user-supplied identity hints)."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read gpt-reflection-ref",
+      "expect": "FAMILY-IDENTITY-SCOPING",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read gpt-reflection-ref",
+      "expect": "ELDER REVIEW",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read gpt-reflection-ref",
+      "expect": "2026-06-17",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-24T07:24:28.60875Z",
+  "updated": "2026-06-24T07:24:28.6087626Z",
+  "version": "1.0"
+}

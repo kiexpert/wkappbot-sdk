@@ -1,0 +1,37 @@
+{
+  "id": "wkdoctor",
+  "app": "wkappbot-sdk",
+  "title": "wkdoctor",
+  "title_ko": null,
+  "desc": "wkdoctor: standalone PS health-check tool. NOT a wkappbot subcommand (too frequently updated to bundle). Runs plugins in wkappbot-sdk/bin/wkappbot.hq/doctor/*.ps1 via admin Eye.",
+  "steps": [
+    "wkdoctor -- full health check (17+ ok = healthy)",
+    "wkdoctor -DefenderFix -- add exclusions, self-elevates via admin Eye",
+    "wkdoctor -EmergencyKill -- OOM emergency process kill"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkdoctor",
+      "expect": "ok checks reported",
+      "prompt": null
+    },
+    {
+      "cmd": "wkdoctor -DefenderFix",
+      "expect": "Already optimized or Defender exclusions added",
+      "prompt": null
+    },
+    {
+      "cmd": "wkdoctor -Json",
+      "expect": "JSON output with check array",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-13T14:24:43.8165319Z",
+  "updated": "2026-06-13T14:24:43.8165431Z",
+  "version": "1.0"
+}

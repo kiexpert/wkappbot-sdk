@@ -1,0 +1,42 @@
+{
+  "id": "orchestrate-sectors-parallel-while-knowledgeifying-howto",
+  "app": "wkappbot-workflow",
+  "title": "Orchestrate sectors parallel: howto",
+  "title_ko": null,
+  "desc": "T2 howto for orchestrate-sectors-parallel-while-knowledgeifying: step-by-step parallel sector dispatch recipes, disjoint-file rules, verify-on-return patterns.",
+  "steps": [
+    "SECTOR DISPATCH RECIPE: (1) identify all independent work units; (2) verify disjoint file-sets; (3) dispatch all via Agent tool or Agent.cmd with run_in_background=true; (4) knowledge-ify during wait; (5) on each return, verify actual-vs-expected (diffstat + git show --stat)."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read orchestrate-sectors-parallel-while-knowledgeifying-howto",
+      "expect": "T2 howto",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill search orchestrate-sectors-parallel-while-knowledgeifying-howto",
+      "expect": "found",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read orchestrate-sectors-parallel-while-knowledgeifying",
+      "expect": "next: orchestrate-sectors-parallel-while-knowledgeifying-howto",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "orchestration",
+    "parallel",
+    "sectors",
+    "howto",
+    "delegation",
+    "t2"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-25T15:04:49.7832772Z",
+  "updated": "2026-06-25T15:04:49.7832868Z",
+  "version": "1.0"
+}

@@ -1,0 +1,43 @@
+{
+  "id": "a11y-focus-steal-user-active-silent-yield-howto",
+  "app": "wkappbot-workflow",
+  "title": "a11y focus-steal user-active silent yield: verification log (howto)",
+  "title_ko": null,
+  "desc": "T2 howto for a11y-focus-steal-user-active-silent-yield. Usage context across a11y and ask/CDP commands, plus the running list of dated verification test runs proving the silent-yield guard holds.",
+  "steps": [
+    "USAGE CONTEXT: wkappbot a11y invoke / a11y find / a11y inspect / a11y windows / a11y hack paths all go through the RestoreFocusWithRetryAsync sentinel; user-active yield prevents spam during intentional focus switches",
+    "ASK/CDP COVERAGE: also covers ask gpt / ask claude / ask gemini / ask triad / ask-* CDP flows -- prior sessions saw UIA focus steal (hwnd attach, SetForegroundWindow) during ChromeLauncher->CDP attach, same sentinel bailout applies",
+    "VERIFICATION LOG: Verified 2026-04-19 experience/tests/session/test-session-fix-verify-20260419.sh (resolve ts=2026-04-19T05:52:09). Verified 2026-04-21 test-focus-steal-user-active-silent-yield.cmd (resolve ts=2026-04-21T03:33). Verified 2026-04-21 test-a11y-find-focus-steal-guard.sh (resolve ts=2026-04-21T18:24). Verified 2026-04-22 test-a11y-find-focus-steal-close-guard.sh (resolve ts=2026-04-22T02:08). Verified 2026-04-28 test-a11y-type-read-wm-gettext-elevated.cmd (resolve ts=2026-04-27T12:41). Verified 2026-05-10 test-a11y-focusless-fl.sh (resolve ts=2026-05-01T18:22:09 a11y-screenshot)"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read a11y-focus-steal-user-active-silent-yield-howto",
+      "expect": "USAGE CONTEXT",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read a11y-focus-steal-user-active-silent-yield-howto",
+      "expect": "ASK/CDP COVERAGE",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read a11y-focus-steal-user-active-silent-yield-howto",
+      "expect": "VERIFICATION LOG",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "a11y",
+    "focus-steal",
+    "silent-yield",
+    "howto",
+    "verify"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-07-02T07:24:01.4814936Z",
+  "updated": "2026-07-02T07:24:01.4815121Z",
+  "version": "1.0"
+}

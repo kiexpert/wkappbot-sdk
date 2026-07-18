@@ -1,0 +1,36 @@
+{
+  "id": "show-hn-and-producthunt-launch-strategy",
+  "app": "wkappbot-sdk",
+  "title": "Show HN and ProductHunt launch strategy",
+  "title_ko": null,
+  "desc": "One-shot launch plan for WKAppBot public release. Show HN is primary channel (HN audience = developers \u002B power users = target). ProductHunt as secondary same-day post. Includes title, description, timing, and comment strategy.",
+  "steps": [
+    "SHOW HN TITLE (updated): \u0027Show HN: WKAppBot -- give AI agents eyes and hands on Windows (open-core)\u0027. This framing beats the previous version -- \u0027eyes and hands\u0027 is visceral and specific, \u0027open-core\u0027 signals business model immediately. Avoid \u0027self-healing\u0027 in title (sounds defensive). Keep for body text.",
+    "MARKETING CHECKLIST (pre-launch): (1) 90sec demo video: fresh clone -\u003E first bot run on Notepad. (2) awesome-dotnet PR \u002B awesome-windows PR. (3) Blog post on kivilab.co.kr. (4) Show HN post ready. All needed before public launch. SDK issue #1 items 9.1-9.6."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read show-hn-launch-strategy",
+      "expect": "returns title and timing steps",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill search launch",
+      "expect": "includes this skill in results",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wkappbot-public-launch-checklist",
+      "expect": "show-hn referenced or complementary",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-28T18:25:56.1311835Z",
+  "updated": "2026-04-29T00:30:52.2005663Z",
+  "version": "1.2"
+}

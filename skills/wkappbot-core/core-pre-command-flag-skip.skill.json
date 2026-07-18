@@ -1,0 +1,46 @@
+{
+  "id": "core-pre-command-flag-skip",
+  "app": "wkappbot-core",
+  "title": "Core skips leading launcher flags (--sudo etc.) before computing subcommand",
+  "title_ko": null,
+  "desc": "Core's DispatchCommand walks past pre-command flags (--sudo, --stderr, --only-eye, --only-core) when locating the subcommand verb. Fixes 'Unknown command: --sudo' when user types wkappbot --sudo <subcmd>. --sudo preserved in restArgs for SudoHandler / ElevatedEyeProxy.",
+  "steps": [
+    "1. Symptom: wkappbot --sudo a11y invoke X -> Unknown command: --sudo (also a11y read, win-click).",
+    "2. Cause: Program.Dispatch.cs computed command = args[0].ToLowerInvariant() without skipping --sudo.",
+    "3. Fix: Program.Args.cs adds IsPreCommandFlag() allowlist; Program.Dispatch.cs walks until non-flag.",
+    "4. --sudo retained in restArgs so downstream SudoHandler.EnsureAdminForSudo / ElevatedEyeProxy still routes elevation.",
+    "5. Verify: wkappbot --sudo a11y invoke / read / win-click all reach proper handlers post-fix.",
+    "BUG REPORT cmds: a11y invoke / a11y inspect / a11y read / win-click ALL routed correctly post-fix when --sudo prefixes the subcommand verb."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot --sudo a11y invoke {proc:'nonexistent'}#Close",
+      "expect": "a11y",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot --sudo a11y read {proc:'nonexistent'}",
+      "expect": "a11y",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot --sudo win-click {hwnd:0x9999} 100 100",
+      "expect": "win-click",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "wkappbot-core",
+    "launcher",
+    "sudo",
+    "dispatch",
+    "args"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-09T04:37:14.7343013Z",
+  "updated": "2026-05-09T04:38:59.5956568Z",
+  "version": "1.2"
+}

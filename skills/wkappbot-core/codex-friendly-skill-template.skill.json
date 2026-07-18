@@ -1,0 +1,39 @@
+{
+  "id": "codex-friendly-skill-template",
+  "app": "wkappbot-core",
+  "title": "Codex-Friendly Skill Template",
+  "title_ko": null,
+  "desc": "A reusable template for writing wkappbot skills that are useful to both Claude and Codex. Use short, orthogonal options only when they improve safety, verification, or debugging.",
+  "steps": [
+    "Write the skill in English only and keep the steps short, executable, and testable.",
+    "State the primary job in one sentence: what task the skill helps the agent do.",
+    "Classify the skill first using the Skill Audience Taxonomy: operator, developer, project, or user.",
+    "Add only the minimal operator options that actually help execution: verify, audit, dry-run, review, inspect, list, export, import, or install.",
+    "Prefer safety and reproducibility over cleverness: every option should reduce ambiguity, not increase it.",
+    "Include one explicit verification step whenever the skill changes state or affects output.",
+    "If the skill affects target selection or automation, state the output contract first and the search/execute flow second.",
+    "If both Claude and Codex will use the skill, write the steps so they work for either one without tool-specific jargon unless it is necessary.",
+    "HARD LIMITS (Codex skips silently on violation): ID <= 64 chars, Description <= 1024 chars. Verify before contribute: echo -n 'id' | wc -c. Budget 58 chars in base slug if 3-tier split planned (-howto suffix = +6)."
+  ],
+  "requirements": null,
+  "primary_cmd": null,
+  "tags": [
+    "skill",
+    "template",
+    "codex",
+    "claude",
+    "operator",
+    "verify",
+    "dry-run",
+    "review",
+    "automation",
+    "audience",
+    "developer"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-08T16:39:01.1121401Z",
+  "updated": "2026-05-31T07:11:13.5758394Z",
+  "version": "1.4"
+}

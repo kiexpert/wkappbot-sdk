@@ -1,0 +1,43 @@
+{
+  "id": "wksplit-multi-language-dedup-round-trip-howto",
+  "app": "wkappbot-sdk",
+  "title": "wksplit multi-language dedup round-trip (howto)",
+  "title_ko": null,
+  "desc": "Howto: wksplit multi-language dedup round-trip -- gate execution, backend invocation, encoding safety. T2 satellite of wksplit-smart-multi-language-dedup-round-trip-spec.",
+  "steps": [
+    "Run universal first-pass analysis before any split: wksplit analyze <file> for hash-dup map + size distribution (zero LLM tokens). Confirm dup ratio then decide: dedup only, split, or rebundle."
+  ],
+  "requirements": [
+    {
+      "cmd": "wksplit analyze big.ps1",
+      "expect": "dup ratio + segment table",
+      "prompt": null
+    },
+    {
+      "cmd": "python bin/wksplit-cs.py <file.cs>",
+      "expect": "split + [Parser]::ParseFile 0 errors + symbol-set identity",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wksplit-smart-multi-language-dedup-round-trip-spec",
+      "expect": "round-trip spec + POWERSHELL param() trap + argless-self-test-equivalence loop",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "wksplit",
+    "howto",
+    "multilang",
+    "roundtrip",
+    "dedup",
+    "gates",
+    "encoding"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-23T06:54:16.0858527Z",
+  "updated": "2026-06-23T06:54:16.1362746Z",
+  "version": "1.1"
+}

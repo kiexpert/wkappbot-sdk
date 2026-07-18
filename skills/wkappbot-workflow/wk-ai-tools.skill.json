@@ -1,0 +1,60 @@
+{
+  "id": "wk-ai-tools",
+  "app": "wkappbot-workflow",
+  "title": "wk AI Tools",
+  "title_ko": null,
+  "desc": "Index for wk AI routing, budgets, and recovery. Read T1/T2/T3 as needed.",
+  "steps": [
+    "Read these in order when you need the full set:;wk-ai-tools-routing for model and wrapper routing.;wk-ai-tools-budget for budget, stall, and usage rules.;wk-ai-tools-recovery for wrapper recovery, cache, and rebuild notes."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkopus task",
+      "expect": "runs claude with model opus",
+      "prompt": null
+    },
+    {
+      "cmd": "wkgpt task",
+      "expect": "runs codex with model gpt-5.5",
+      "prompt": null
+    },
+    {
+      "cmd": "wkgpt-mini task",
+      "expect": "runs codex with model gpt-5.4-mini",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "wk",
+    "ai",
+    "routing",
+    "model",
+    "claude",
+    "gpt",
+    "codex",
+    "groq",
+    "opus",
+    "sonnet",
+    "haiku",
+    "wrapper",
+    "stall",
+    "wkopus",
+    "wksonnet",
+    "wkhaiku",
+    "wkgpt",
+    "wkgpt-mini",
+    "wkcodex",
+    "wkclaude",
+    "wkgroq",
+    "wkcerbras",
+    "wkask",
+    "wkask-gpt"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-22T12:30:47.2003698Z",
+  "updated": "2026-06-01T10:34:13.9876392Z",
+  "version": "1.16"
+}

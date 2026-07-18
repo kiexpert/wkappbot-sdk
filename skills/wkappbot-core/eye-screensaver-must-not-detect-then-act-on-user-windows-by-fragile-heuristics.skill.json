@@ -1,0 +1,49 @@
+{
+  "id": "eye-screensaver-must-not-detect-then-act-on-user-windows-by-fragile-heuristics",
+  "app": "wkappbot-core",
+  "title": "Eye screensaver must not detect-then-act on user windows by fragile heuristics",
+  "title_ko": null,
+  "desc": "The Eye screensaver closed/minimized the user's movie for months because it acted on fragile signals: a perfect-black-pixel probe (dark movie = RGB000 = WM_CLOSE) and input-only idle (no keyboard/mouse = idle, blind to media playback). The fix is to DELETE the fragile detection and gate on REAL activity (audio peak, focused browser/media) -- not to keep adding safe-list exceptions.",
+  "steps": [
+    "ROOT FLAW: ScreenSaverStandaloneCommand.cs AreVisibleWindowSamplesPerfectBlack sampled a window for RGB(0,0,0) and WipeBlockingOverlays sent it WM_CLOSE as a 'blocking black overlay'. A dark or fullscreen MOVIE scene reads as perfect black, so the user's Edge window got CLOSED. A detector that closes someone's window on a perfect-black pixel sample is fundamentally wrong -- any dark content trips it.",
+    "FIX 1 (delete, do not patch): set AreVisibleWindowSamplesPerfectBlack to return false first, so no window is ever wiped as a black overlay. Predecessors had spent months ADDING browser/media names to safeListProcs (band-aid exceptions) instead of removing the broken detect-black-then-close design. 'Can not fix the detection cleanly? Delete it.'",
+    "ROOT FLAW 2: idle detection was input-only (GetUserIdleMs via GetLastInputInfo + WH_KEYBOARD_LL). No keyboard/mouse during a movie = counted as idle = screensaver spawns and MINIMIZES the foreground to show its overlay. It was blind to media playback.",
+    "FIX 2 (gate on real activity): add IsMediaActive() -- WASAPI IAudioMeterInformation peak > 0.001 (audio playing) OR the FOREGROUND window's process is a browser/media player (focus-based, NOT a >=90% fullscreen requirement -- a windowed or paused player still counts). Gate the show-trigger and the 30s WipeBlockingOverlays with && !IsMediaActive(). Keep the input-idle check for GENUINE idle.",
+    "GENERAL LESSON: a guard that closes/minimizes the user's windows on a fragile heuristic (perfect-black pixels, input-only idle) is a band-aid GENERATOR -- each false-positive spawns another allow-list exception, and over months the tool becomes user-hostile. Delete the heuristic or gate on a real signal (audio, focus). Also: the ~9s idle-to-screensaver threshold is far too aggressive for an actively-watching user. See [[feedback-bandaid-accretion-movie-close]]."
+  ],
+  "requirements": [
+    {
+      "cmd": "grep -c 'return false' D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/ScreenSaverStandaloneCommand.cs",
+      "expect": "1",
+      "prompt": null
+    },
+    {
+      "cmd": "grep -l IsMediaActive D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/ScreenSaverOverlay.PInvoke.cs",
+      "expect": "PInvoke",
+      "prompt": null
+    },
+    {
+      "cmd": "grep -l safeListProcs D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/ScreenSaverStandaloneCommand.cs",
+      "expect": "ScreenSaver",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "screensaver",
+    "eye",
+    "detection",
+    "bandaid",
+    "black-pixel",
+    "idle",
+    "media-active",
+    "window-close",
+    "root-fix"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-11T20:35:30.0032592Z",
+  "updated": "2026-06-11T20:35:30.0032699Z",
+  "version": "1.0"
+}

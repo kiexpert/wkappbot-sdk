@@ -1,0 +1,64 @@
+{
+  "id": "web-to-cdp-rename",
+  "app": "wkappbot-webbot",
+  "title": "web command renamed to cdp -- web kept as deprecated alias",
+  "title_ko": null,
+  "desc": "The browser-control command `wkappbot web` was renamed to `wkappbot cdp` 2026-05-05 (commit 4ddcd5a4) so the help text and skill docs match the actual transport (Chrome DevTools Protocol). `wkappbot web ...` still works but emits a deprecation warning to stderr and routes to the same handler. CommandHelp.cs --help text and AskCommands.Loop.Persona prompt both refer to `cdp` as primary and `web` as deprecated alias.",
+  "steps": [
+    "[NAMING RATIONALE] `web` was ambiguous (HTTP fetch? webbrowser? web server?). Actual transport is Chrome DevTools Protocol websocket. New name `cdp` is unambiguous and matches the existing CdpClient/CdpConnection/EnsureCdpConnection naming throughout the codebase. Help text now reads `cdp open [url]`, `cdp list`, `cdp eval`, etc.",
+    "[ALIAS BEHAVIOR] Top-level dispatcher accepts both `cdp` (primary) and `web` (deprecated). When `web` is used, stderr prints a one-line warning '[CDP] note: \"web\" is now \"cdp\"; please update scripts' but execution continues normally on the same handler. No breaking change for existing scripts/skills/agents.",
+    "[HELP TEXT UPDATED] CommandHelp.cs:506 lists `cdp open [url] [--port N] [--headless] [--no-launch]` as the canonical form. The Skills+News surface, suggest evidence scripts, and AskCommands persona prompt (AskCommands.Loop.Persona.cs:242 'CDP TOOLS (was \"web\" -- now \"cdp\"; \"web\" still accepted as deprecated alias):') were all updated in the same commit.",
+    "[SKILL DOCS UPDATED] All wkappbot-webbot skills referring to the `web` command were updated to `cdp` (e.g. cdp-port-isolation-window-property.skill.json, ask-web-chrome-launch-focusless-guard-allowlist.skill.json). Search the project for 'wkappbot web ' and update any remaining occurrences when adding new skills/docs.",
+    "[CALLER MIGRATION] Update local scripts: replace `wkappbot web open ...` -> `wkappbot cdp open ...`. Replace `wkappbot web list` -> `wkappbot cdp list`. Replace `wkappbot web eval ...` -> `wkappbot cdp eval ...`. Persona prompt change is automatic (next AI session reads new persona). The deprecation warning gives a window for migration; there is currently no removal date.",
+    "[VERIFY] Run `wkappbot --help | grep cdp` -- should show cdp commands. Run `wkappbot web list` -- should print a deprecation note then succeed. Run `wkappbot cdp list` -- should succeed without any warning.",
+    "[AUDIT 2026-06-03] source_refs broken: empty source_refs file entries."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot cdp open https://example.com",
+      "expect": "Chrome launches/attaches; CDP transport ok",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot cdp list",
+      "expect": "tabs listed via CDP without deprecation warning",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot eye tick",
+      "expect": "health percent shown",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "rename",
+    "web-to-cdp",
+    "cdp",
+    "command-alias",
+    "deprecation",
+    "chrome-devtools-protocol",
+    "v6.8",
+    "backward-compat",
+    "naming"
+  ],
+  "source_refs": [
+    {
+      "file": "",
+      "line": 242,
+      "pattern": "CDP TOOLS",
+      "note": null
+    },
+    {
+      "file": "",
+      "line": 506,
+      "pattern": "cdp open",
+      "note": null
+    }
+  ],
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-05T00:00:00",
+  "updated": "2026-06-02T19:49:22.1588939Z",
+  "version": "1.1"
+}

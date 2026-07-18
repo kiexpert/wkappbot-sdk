@@ -1,0 +1,41 @@
+{
+  "id": "cdp-geturlasync-uses-target-gettargetinfo-to-bypass-busy-renderer",
+  "app": "wkappbot-core",
+  "title": "CDP GetUrlAsync uses Target.getTargetInfo to bypass busy renderer",
+  "title_ko": null,
+  "desc": "GetUrlAsync/GetTitleAsync now hit Target.getTargetInfo first (browser-side, ~ms) so heavy SPA pages cannot block Runtime.evaluate past the 10s timeout.",
+  "steps": [
+    "Primary: SendAsync(\u0027Target.getTargetInfo\u0027, {targetId}, 3000) -- returns targetInfo.url and targetInfo.title from the browser process directly",
+    "Fallback: EvalAsync(\u0027window.location.href\u0027) / EvalAsync(\u0027document.title\u0027) -- legacy path with 3-retry/backoff in EvalAsync",
+    "Trigger case: ChatGptSendAndWait Phase 0 URL-drift check on jobkorea.co.kr loaded with Criteo \u002B LogAnalytics \u002B kakaoPixel scripts blocked the renderer JS thread for 10s\u002B",
+    "File: csharp/src/WKAppBot.WebBot/CdpClient.Actions2.cs (GetUrlAsync, GetTitleAsync)",
+    "Lesson: any read-only CDP operation that the browser knows directly (URL, title, target list, window bounds) should never go through Runtime.evaluate -- use the Browser/Target/Page domain commands",
+    "Affected commands: wkappbot ask gpt / wkappbot ask gemini / wkappbot ask claude -- any call site that uses GetUrlAsync or GetTitleAsync (ChatGptSendAndWait Phase 0 URL drift, AskCommands.Loop.SendWait, AskCommands.Gemini.Helpers, AskCommands.Claude).",
+    "Reproducing the original suggest: wkappbot ask gpt \u0027long question on a heavy SPA tab\u0027 -- before the fix, BUG-AUTO suggest fires with TimeoutException. After the fix, the URL drift check returns instantly. Use wkappbot speak \u0027verified\u0027 --bg to acknowledge resolution. The suggest workflow tracks this fix via wkappbot suggest show 2026-05-08T10:35:31."
+  ],
+  "requirements": [
+    {
+      "cmd": "grep -q \u0027Target.getTargetInfo\u0027 csharp/src/WKAppBot.WebBot/CdpClient.Actions2.cs",
+      "expect": "match",
+      "prompt": null
+    },
+    {
+      "cmd": "grep -q \u0027public async Task\u003Cstring?\u003E GetUrlAsync()\u0027 csharp/src/WKAppBot.WebBot/CdpClient.Actions2.cs",
+      "expect": "match",
+      "prompt": null
+    },
+    {
+      "cmd": "grep -q \u0027public async Task\u003Cstring?\u003E GetTitleAsync()\u0027 csharp/src/WKAppBot.WebBot/CdpClient.Actions2.cs",
+      "expect": "match",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-08T11:14:53.6393706Z",
+  "updated": "2026-05-08T11:15:33.0468777Z",
+  "version": "1.2"
+}

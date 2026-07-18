@@ -1,0 +1,68 @@
+{
+  "id": "repair-korean-ime-running-wt-tsf-rebind",
+  "app": "wkappbot-core",
+  "title": "Repair Korean IME inside running Windows Terminal",
+  "title_ko": null,
+  "desc": "Re-arm Korean IME (TSF) inside an already-running Windows Terminal WITHOUT restarting WT. Use after crash reboot when ctfmon was not running at WT start time and WT tabs hold long-lived sessions you cannot lose. Strategy: CreateRemoteThread \u002B LoadLibraryW msctf.dll, remote TF_InvalidAssemblyListCacheIfExist, then post WM_INPUTLANGCHANGE(REQUEST) to all CASCADIA_HOSTING_WINDOW_CLASS windows \u002B children.",
+  "steps": [
+    "Run powershell -ExecutionPolicy Bypass -File scripts/repair-korean-ime-running-wt.ps1 from repo root.",
+    "Click into a Windows Terminal tab and press the Hangul/English toggle key to test.",
+    "If still no toggle: focus a tab, then run the script again (TSF rebinds on focus event in some configs).",
+    "Use ONLY when WT tabs hold long-lived sessions; for fresh post-reboot recovery use recover-korean-console.ps1 instead."
+  ],
+  "requirements": [
+    {
+      "cmd": "powershell -ExecutionPolicy Bypass -File scripts/repair-korean-ime-running-wt.ps1",
+      "expect": "Repair complete",
+      "prompt": null
+    },
+    {
+      "cmd": "powershell -ExecutionPolicy Bypass -File scripts/repair-korean-ime-running-wt.ps1",
+      "expect": "TF_InvalidAssemblyListCacheIfExist returned 0x0",
+      "prompt": null
+    },
+    {
+      "cmd": "powershell -ExecutionPolicy Bypass -File scripts/repair-korean-ime-running-wt.ps1",
+      "expect": "Posted WM_INPUTLANGCHANGE",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "korean",
+    "hangul",
+    "ime",
+    "tsf",
+    "windows-terminal",
+    "createremotethread",
+    "wm-inputlangchange",
+    "no-restart",
+    "crash-reboot",
+    "ctfmon"
+  ],
+  "source_refs": [
+    {
+      "file": "scripts/repair-korean-ime-running-wt.ps1",
+      "line": null,
+      "pattern": "TF_InvalidAssemblyListCacheIfExist",
+      "note": null
+    },
+    {
+      "file": "scripts/repair-korean-ime-running-wt.ps1",
+      "line": null,
+      "pattern": "CASCADIA_HOSTING_WINDOW_CLASS",
+      "note": null
+    },
+    {
+      "file": "scripts/repair-korean-ime-running-wt.ps1",
+      "line": null,
+      "pattern": "WM_INPUTLANGCHANGE",
+      "note": null
+    }
+  ],
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-05T06:15:26.5772967Z",
+  "updated": "2026-05-05T06:15:26.577307Z",
+  "version": "1.0"
+}

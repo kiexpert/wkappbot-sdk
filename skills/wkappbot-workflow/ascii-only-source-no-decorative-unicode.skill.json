@@ -1,0 +1,52 @@
+{
+  "id": "ascii-only-source-no-decorative-unicode",
+  "app": "wkappbot-workflow",
+  "title": "Source files must be pure ASCII -- no box-drawing / bullet / smart-quote (repo series)",
+  "title_ko": null,
+  "desc": "Repo-management series entry: .ps1 (and other source) must be PURE ASCII -- the pre-commit gate hard-blocks non-ASCII bytes. Decorative unicode in COMMENTS (box-drawing, bullets, em-dash, smart quotes) is the silent culprit. Hit twice 2026-06-18.",
+  "steps": [
+    "RULE: source files (.ps1/.psm1/.cs/.py...) must be PURE ASCII -- the pre-commit gate ('non-ASCII bytes in <f> (.ps1 must be pure ASCII)') HARD-BLOCKS the commit otherwise. Korean prose belongs in .md/docs only (the harness:block Korean-in-source rule); but the SNEAKY failure is DECORATIVE UNICODE in English comments.",
+    "THE SILENT CULPRITS (caught 2026-06-18, TWICE in one session): a bullet 'U+25CF' written in a comment like \"the bullet Bash(...) MD pattern\", and box-drawing 'U+2500' in a decorative self-test header like '# ---- SELF-TEST ----'. Also watch: em-dash U+2014, smart quotes U+2018/2019/201C/201D, non-breaking space U+00A0, ellipsis U+2026, arrows. Agent-generated protos LOVE to insert these in headers/comments.",
+    "DETECT before commit: grep -nP '[^\\x00-\\x7F]' <file>  (lists the exact offending lines). FIX: replace with ASCII -- bullet -> '-' or 'o' or the word 'bullet'; box-drawing -> '-' or '='; em-dash -> '--'; smart quotes -> straight ' \". Re-grep to confirm zero.",
+    "WHEN MERGING AGENT PROTOS: agents (esp. sonnet/haiku) decorate comment headers with unicode. ALWAYS grep -P '[^\\x00-\\x7F]' an agent-built .ps1 BEFORE git add -- the pre-commit will block you otherwise and you will re-debug it. This belongs in the agent-proto merge checklist. Cluster: [[repo-management-skill-series]], [[repo-garbage-collector-unused-file-quarantine]]."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read ascii-only-source-no-decorative-unicode",
+      "expect": "RULE",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read ascii-only-source-no-decorative-unicode",
+      "expect": "SILENT CULPRITS",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read ascii-only-source-no-decorative-unicode",
+      "expect": "DETECT",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "repo",
+    "management",
+    "series",
+    "ascii",
+    "encoding",
+    "pre-commit",
+    "unicode",
+    "box-drawing",
+    "bullet",
+    "smart-quote",
+    "ps1",
+    "source",
+    "hygiene"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-18T05:36:21.2546975Z",
+  "updated": "2026-06-18T05:36:21.2547103Z",
+  "version": "1.0"
+}

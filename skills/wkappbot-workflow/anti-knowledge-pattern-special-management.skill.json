@@ -1,0 +1,50 @@
+{
+  "id": "anti-knowledge-pattern-special-management",
+  "app": "wkappbot-workflow",
+  "title": "Anti-knowledge pattern special management",
+  "title_ko": null,
+  "desc": "Treat anti-knowledge patterns (anything that circumvents the knowledge/guard system) as a MANAGED CATEGORY with dedicated detect+block, parallel to the git commit --no-* block. Two surfaces: circumvention COMMANDS (block) and circumvention NAMES in skills/ids (flag/rename). Index of existing per-command guards + the new skill-name guard.",
+  "steps": [
+    "PRINCIPLE (user 2026-06-19, like git commit --no-*): an anti-knowledge pattern -- anything that circumvents the knowledge/guard system -- is a MANAGED CATEGORY with dedicated detection + handling, not an ad-hoc one-off. This is the index/category; it CROSS-LINKS the existing per-command guards (do NOT duplicate them) and adds the missing skill-NAME guard.",
+    "SURFACE A -- CIRCUMVENTION COMMANDS (already blocked, this is the registry): git commit --no-verify/--no-gpg-sign/-n and any --no-* (harness-no-verify-guard + CLAUDE.md block); git -c core.hooksPath= / commit.gpgsign=false/0/no/off; push --no-verify; WKHARNESS_BYPASS= and WKHARNESS_AGENT_MODEL= env-spoof (harness-security-guard); WKHARNESS_TEST_* prod-spoof; git clean targeting .wkappbot/harness; bash->powershell shellout. QA: each MUST be verified blocked by a canary (see verify-tool-or-guard-synthetic-live-static) -- a registered anti-knowledge command that is NOT actually blocked is the worst class.",
+    "SURFACE B -- CIRCUMVENTION NAMES (NEW guard needed): a skill id/title (or a function/file name) containing bypass",
+    "backdoor",
+    "skip-guard",
+    "disable-guard",
+    "override-guard",
+    "no-verify",
+    "sneak",
+    "hack reads as a HOW-TO RECIPE even when the content is a fix-record -- a future agent greps for bypass and finds a recipe, and a NAME is a far cheaper attack surface than code. IMPL: a skill contribute/edit guard that FLAGS such an id/title -- block, or require it be named for the FIX (what it ESTABLISHES) not the hole. PRECEDENT: harness-edit-write-skill-bypass (a legit CLOSED-hole fix-record) was renamed to harness-edit-write-study-lock-hole-fixed because the -bypass name triggered a correct security alarm.",
+    "SPECIAL MANAGEMENT = (1) DETECT (regex on the command AND on skill id/title at contribute/edit), (2) BLOCK or flag-for-rename, (3) AUDIT registry so every anti-knowledge pattern is tracked and periodically QA-canaried.",
+    "NAMING RULE (general): name for what you ESTABLISH (closed-hole, fix, guard), never for the anti-pattern you describe. Cross: harness-no-verify-guard, harness-security-guard, harness-edit-write-study-lock-hole-fixed, verify-tool-or-guard-synthetic-live-static.",
+    "UNIVERSAL SCAN + ZERO-TOLERANCE (user 2026-06-19): the anti-knowledge command detection runs on EVERY command -- general commands too, NOT scoped to knowledge-ops, skill ops, or any tier. Scan the full command line for ANY circumvention pattern and BLOCK on match, regardless of command type or model tier (pro included). MISSION FRAME: in the Hongik (benefit-all) Knowledge-Intelligence harness world, anti-knowledge patterns are categorically UNUSABLE -- absolute zero-tolerance, no exemption, no soft tier, exit 2. The harness exists to AMPLIFY knowledge (the benefit-all-intelligence / daebyeon-in ethos); a pattern that circumvents knowledge is antithetical to the system's purpose and must be IMPOSSIBLE to execute anywhere in this world. IMPL: a universal pre-scan guard (runs before tier classification, like the git --no-* block but broadened to the full anti-knowledge pattern set) -- match on the command OR on a skill id/title -> hard block (exit 2). The pattern set is the registry in this skill (Surface A commands + Surface B names) + grows as new circumvention patterns are found; each addition ships with a canary proving it blocks. NO model and NO command class is exempt from the anti-knowledge scan -- that universality is the point.",
+    "SURFACE C -- ANTI-KNOWLEDGE IN SOURCE CONTENT (user 2026-06-19): after a source edit, the post-edit syntax/tokenize checker ALSO scans the WRITTEN SOURCE for anti-knowledge patterns and errors/flags on a match -- so you cannot WRITE circumvention logic INTO a source file (an env-as-trust-anchor read that GRANTS exemption, a --no-verify git wrapper, a guard early-exit that disables study-lock, a WKHARNESS_BYPASS honoring branch). This completes three-surface coverage: cannot EXECUTE the command (A), cannot NAME a skill as a recipe (B), cannot WRITE the logic into source (C). CRITICAL NUANCE (same class as command-match-anchor): a guard's source LEGITIMATELY MENTIONS a pattern in order to DETECT/BLOCK it -- e.g. 'if env WKHARNESS_BYPASS then Block(spoof)' is GOOD, 'if env WKHARNESS_BYPASS then grant-exemption' is BAD. Surface C must distinguish HONORING/USING a pattern (bad) from DETECTING/BLOCKING it (good); naive mention-matching would false-flag the very guards that ENFORCE the rule (and the anti-knowledge registry skill itself, which lists the patterns). PRAGMATIC IMPL: flag NEW edited source that adds a pattern in a HONORING context (read-env-then-exempt, --no-star in a write path, an early-return that skips a guard) for ROOT review; do NOT hard-error on a mere mention. Runs in wkharness-post (post-edit). Cross: Surface A (commands) + Surface B (names) above.",
+    "ENV-VAR-INJECTION = NAMED, SEVERELY-PUNISHED ANTI-KNOWLEDGE PATTERN (user 2026-06-19): injecting an environment variable to raise complexity/uncertainty, or to act as a control / trust / exemption channel (the env-as-trust-anchor class today's purge removed -- WKHARNESS_BYPASS, WKHARNESS_AGENT_MODEL, WKHARNESS_TEST_star, WKHARNESS_CODEX_HOOK, etc.), is a TOP-TIER anti-knowledge pattern. WHY: env is settable so it can NEVER be authentication, and an env control-vector injects uncertainty into an otherwise-deterministic guard system (complexity = attack surface). Detect at Surface A (a command that SETS such an env before another command) AND Surface C (source that READS an env as a trust/exemption/control input). Identity + exemption must come from process-lineage or a single-use nonce, NEVER an env value. SURFACE C IS PERSISTENT -- POISONED-UNTIL-CLEAN (user 2026-06-19): a source file that CONTAINS an anti-knowledge pattern in a honoring context is AUTOMATICALLY treated as a SYNTAX ERROR on EVERY check/load/edit UNTIL the pattern is REMOVED -- NOT a one-time edit-flag. The file is poisoned/unusable while the pattern lives, which FORCES removal: you cannot build, run, or proceed on a poisoned file. This is the TEETH of zero-tolerance -- not an ignorable warning but a hard-broken state that clears only when the anti-knowledge is gone. The honoring-vs-detecting nuance still applies: a guard whose source MENTIONS a pattern in order to BLOCK it is NOT poisoned (it enforces the rule); only HONORING/USING the pattern poisons.",
+    "SURFACE C ENFORCEMENT = INFINITE AUTO-REVERT (user 2026-06-19, the teeth of poisoned-until-clean): when the post-edit checker detects an anti-knowledge pattern in the newly-written source (honoring context), it AUTOMATICALLY REVERTS the edit -- restores the pre-edit state from the .bak snapshot that Edit/Write/wkedit make -- so the pattern NEVER persists. Every re-attempt to write the pattern is reverted AGAIN: INFINITE auto-revert, making it STRUCTURALLY IMPOSSIBLE to land anti-knowledge in source. Combined with poisoned-syntax-error (a pre-existing pattern hard-breaks the file until removed), the file either never accepts the pattern (auto-revert on the way in) or is unusable until cleaned. NET (full teeth): in the Hongik KI harness world you cannot EXECUTE an anti-knowledge command (Surface A block), cannot NAME a skill as a recipe (Surface B guard), and cannot PERSIST one in source (Surface C auto-revert + poison) -- three surfaces, zero tolerance, no model or tier exempt. Honoring-vs-detecting nuance preserved throughout: a guard whose source MENTIONS a pattern to BLOCK it is never reverted; only HONORING/USING it is. IMPL: post-edit (wkharness-post) diff the new vs .bak; if the edit ADDED an anti-knowledge honoring pattern, restore .bak + report; idempotent so repeated attempts keep reverting."
+  ],
+  "requirements": [
+    {
+      "cmd": "git commit --no-verify",
+      "expect": "blocked by harness (anti-knowledge command)",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill contribute with id containing bypass",
+      "expect": "flagged or renamed to a fix-name",
+      "prompt": null
+    },
+    {
+      "cmd": "each registered anti-knowledge command",
+      "expect": "verified actually-blocked by a canary",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-19T14:30:34.4770194Z",
+  "updated": "2026-06-19T14:35:01.2974921Z",
+  "version": "1.8"
+}

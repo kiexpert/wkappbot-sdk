@@ -1,0 +1,22 @@
+{
+  "id": "kampala-pattern-reverse-engineer-apps-into-apis-for-automation",
+  "app": "wkappbot-core",
+  "title": "[Kampala YC W26] Reverse-Engineer Apps into APIs \u2014 HTS Win32 automation pattern",
+  "desc": "Kampala (YC W26) reverse-engineers apps into APIs by analyzing network traffic and UI patterns. Applicable to WKAppBot for MFC/HTS apps with no UIA support.",
+  "steps": [
+    "CONCEPT: When UIA returns nothing useful, Kampala-style approach sniffs app network calls or Win32 messages to discover the app\u0027s own internal API. For WKAppBot: combine with WM_COPYDATA / RegisterWindowMessage to talk to HTS/MFC apps directly."
+  ],
+  "tags": [
+    "reverse-engineering",
+    "api",
+    "uia-fallback",
+    "automation",
+    "research"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-22T10:15:17.2886801Z",
+  "updated": "2026-04-22T10:17:50.2232725Z",
+  "version": "1.1"
+}

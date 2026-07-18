@@ -1,0 +1,47 @@
+{
+  "id": "diet-score-guard-dated-spec-todos-and-incident-history",
+  "app": "wkappbot-workflow",
+  "title": "Diet-score guard: dated spec, TODOs, and incident history",
+  "title_ko": "다이어트스코어 게이트 상세 이력",
+  "desc": "T3 reference for harness-diet-score-guard: the v2 calculator spec, wiring TODOs, circular-deadlock incident, tag-vs-step correction, and 2026-07-04 live-block observations. See harness-diet-score-guard for the short actionable core.",
+  "steps": [
+    "DIET-SCORE v2 SPEC (Opus 2026-06-25): base 100 minus weighted penalties -- wksplit-400-lock density (weight 25, target <10pct), stale-timestamp ratio (weight 20, target <5pct), duplicate skill-read 3-line clusters (weight 20, target <3), pointer density reward (weight 20, target >30pct), line count >600 (weight 10), max section length (weight 5, target <60). Plus LIVE-POINTER BONUS up to +10 for pointers a Haiku subagent read in the last 30 days.",
+    "WIRING HISTORY: born a stub (2026-06-08, always 90-100, never fired). Opus wrote the v2 spec 2026-06-25. Live hard-block confirmed 2026-07-01 on Agent.cmd dispatches specifically (rc=2 when score<60).",
+    "CIRCULAR DEADLOCK INCIDENT (2026-06-26): the diet-block message inline-referenced claudemd-slim-plan, whose own coverage score was <60, so the skill-currency gate blocked the very edit meant to fix the reference -- a self-blocking loop.",
+    "TAG-VS-STEP CORRECTION (2026-06-26, important): coverage score = id + title + title_ko + desc + best-tag ONLY -- steps are invisible to scoring, they only feed OR-filter inclusion. Adding more steps to a low-score skill does NOT raise its score and can trigger harness-tier-gate by making the skill fatter/more monolithic. The correct fix is short precise tags plus tight title/desc, or a proper T1/T2/T3 split -- never more steps.",
+    "2026-07-04 LIVE OBSERVATIONS: confirmed the diet-score block applies to ALL Agent.cmd dispatches regardless of model tier. Manual harness:skill-block consolidation in CLAUDE.md moved score 45 to 49 over 3 rounds -- diminishing returns for a time-critical fix. A bare env-var override attempt was blocked by an unrelated anti-knowledge guard.",
+    "OPEN TODO: the diet calculator module and its wiring into wkharness-guards-evidence.ps1 per the v2 spec above still needs final promotion by ROOT."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read harness-diet-score-guard-ref",
+      "expect": "DIET-SCORE v2 SPEC",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill search diet score history",
+      "expect": "harness-diet-score-guard-ref",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read harness-diet-score-guard-ref",
+      "expect": "TAG-VS-STEP CORRECTION",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "diet",
+    "claudemd",
+    "score",
+    "ref",
+    "history",
+    "bloat"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-07-04T12:52:10.6162127Z",
+  "updated": "2026-07-04T12:52:10.616221Z",
+  "version": "1.0"
+}

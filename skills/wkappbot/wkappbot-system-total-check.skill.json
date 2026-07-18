@@ -1,0 +1,36 @@
+{
+  "id": "wkappbot-system-total-check",
+  "app": "wkappbot",
+  "title": "wkappbot-system-total-check",
+  "title_ko": null,
+  "desc": "WKAppBot full system inspection checklist: Eye/sessions/CI/issues/suggests/schedule/chrome/audio",
+  "steps": [
+    "1. EYE: wkappbot eye tick -- check ctx%, active sessions, isolation. Sessions at 170%\u002B need immediate newchat. 2. GIT: git log --oneline -5 (recent commits), git status --short (uncommitted). Any .cs/.yaml uncommitted = commit immediately. 3. CI: gh run list --limit 5 -- find failing workflows. AI News Collect failures: run scripts/ai-news-briefing.sh manually to diagnose. 4. ISSUES: gh issue list --repo kiexpert/WKAppBot --limit 10 -- identify blockers. win-capture GPU-render issue is ongoing. 5. SUGGESTS: wkappbot suggest list -- prioritize star 3\u002B or freq over 100/hr. WkAutoQuant-channel suggests need co-resolve from that session. 6. SCHEDULE: wkappbot schedule list -- verify AI News 11:00/18:00 recurring jobs exist and last ran OK. 7. CHROME: check bin/wkappbot.hq/chrome-profile/Default/Login Data exists (login persists). 8. AUDIO: ls bin/wkappbot.hq/profiles/whisper_exp/*.mp3 -- delete or commit pending audio files.",
+    "YOUTUBE RSS STATUS (2026-04-30): YouTube feeds/videos.xml returns 404/500 intermittently -- YouTube server issue, not config. Channel IDs in ai-news-channels.jsonl may also be stale. Workaround: script falls back to HN-only. Monitor: python3 -c \u0027import urllib.request; urllib.request.urlopen(\u0022https://www.youtube.com/feeds/videos.xml?channel_id=UCXuqSBlHAE6Xw-yeJA0Tunw\u0022, timeout=5)\u0027 -- if works, re-verify channel IDs."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot eye tick",
+      "expect": "ctx",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot suggest list",
+      "expect": "active",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot schedule list",
+      "expect": "pending",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-30T02:40:18.2569464Z",
+  "updated": "2026-04-30T03:14:35.2428579Z",
+  "version": "1.1"
+}

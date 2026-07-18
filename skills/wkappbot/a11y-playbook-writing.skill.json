@@ -1,0 +1,50 @@
+{
+  "id": "a11y-playbook-writing",
+  "app": "wkappbot",
+  "title": "a11y playbook writing",
+  "title_ko": null,
+  "desc": "Create and revise executable WKAppBot playbooks/scenarios for focusless desktop automation. Use when drafting or updating YAML scenarios, Notepad-style demos, save-dialog recovery flows, or any target-heavy automation that should prefer `a11y find`, paste-ready grap targets, UTF-8-safe files, and graceful close behavior over brittle clicks or taskkill.",
+  "steps": [
+    "Read the shared repo guidance first: AGENTS.md, CLAUDE.md, and README.md. Keep any new prose English-first and UTF-8 encoded; only UI-localized labels may stay localized when the target app requires them.",
+    "Reuse existing skills before inventing new flow: `wkappbot skill list`, then `wkappbot skill read a11y-find`, `grap-target`, and `control-ui-without-stealing-focus-3-tier-focusless-strategy`.",
+    "Write the playbook as a runnable scenario: `scenario`, `config`, `app`, `steps`, optional `teardown`. Prefer `prefer_focusless: true` and `focus_check: false` when the goal is background automation.",
+    "Discover exact targets with `a11y find` and copy the emitted `# TARGET` grap. Prefer node-tag / grap-path resolution over raw `name` matching for buttons and modal controls.",
+    "For Notepad close flows, prefer `window_close` first. If a save prompt appears, dismiss it by invoking the button found through the a11y node tag path. Keep `press_key` only as fallback, not as the primary path.",
+    "Avoid destructive process-kill shortcuts for Notepad. Use graceful close, prompt dismissal, and only narrow fallback logic when the UI path fails.",
+    "Prefer stable selectors in scenarios: `control_type`, `automation_id`, and `description` over fragile visible text. Use localized text only where the OS/app label itself is localized.",
+    "Validate the playbook after edits with the official binary on PATH: `wkappbot validate <file>` and, when relevant, `wkappbot run <file>`. If validation fails with log or lock issues, inspect runtime state before assuming the YAML is wrong.",
+    "After creating or updating the skill, verify it with `wkappbot skill read <id>` and keep the skill body short, imperative, and reusable.",
+    "Use wkappbot skill contribute / wkappbot skill edit for all skill changes; never hand-edit .skill.json files.",
+    "Screenshot action supports per-step window scoping and explicit output path: target.class_name is resolved through WindowFinder.FindByClassName (falls back to main window if not set), and params.path takes precedence over params.filename as the verbatim output path (intermediate dirs auto-created). Regression: scenarios/screenshot_path_classname_test.yaml.",
+    "Verified 2026-04-21: test-run-scenario-screenshot-path-classname.cmd (resolve ts=2026-04-19T06:48)",
+    "LIVE CASE 2026-07-02: ts=2026-06-23T19:53:08 ScenarioParseException 'File not found: New-Item -ItemType Directory -Force ...' -- ScenarioParser.Load() (csharp/src/WKAppBot.Core/Scenario/ScenarioParser.cs ~line 19-22) received a literal PowerShell COMMAND STRING as its filePath argument instead of a real .yaml scenario path. ScenarioParser itself is behaving correctly (rejecting a non-existent path); the bug is UPSTREAM in whatever caller (likely ScenarioRunner.RunCommand or a YAML step's action/params.command field) passed a raw shell command instead of a scenario file path. NOT YET FIXED: add a boundary check in the scenario-loading caller that validates the path ends in .yaml/.yml and rejects/logs clearly if it looks like a shell command instead of escalating a confusing ScenarioParseException.",
+    "LIVE CASE 2026-07-02 FIXED: commit 0eb9dd6e1 added a LooksLikeShellCommand() boundary check to ScenarioParser.Load() (checks for a PowerShell Verb-Noun leading token or a dash-prefixed switch, but only when the path doesn't already end in .yaml/.yml/.xmf, so real Windows paths with spaces are never misclassified). Now throws a clear 'Expected a .yaml/.yml scenario file path, got what looks like a shell command' instead of the confusing 'File not found: New-Item -ItemType Directory -Force ...'. Live-verified: a shell-command-shaped arg gets the new message, a real missing .yaml file still gets the original 'File not found' message (regression-safe). NOTE: the upstream caller that originally constructs the bad shell-command string was NOT chased/found -- this fix only makes the failure diagnosable, it doesn't stop the bad call from happening. If the same pattern recurs, the next step is finding that caller."
+  ],
+  "requirements": null,
+  "primary_cmd": null,
+  "tags": [
+    "a11y",
+    "playbook",
+    "scenario",
+    "script",
+    "grap",
+    "notepad",
+    "focusless",
+    "utf8",
+    "validation",
+    "project"
+  ],
+  "source_refs": [
+    {
+      "file": "csharp/src/WKAppBot.Core/Runner/ActionExecutor.Window.cs",
+      "line": null,
+      "pattern": "DoWindowAction",
+      "note": null
+    }
+  ],
+  "regression_script": "experience/tests/wkappbot/skill/test-wkappbot-skill-a11y-playbook-writing.ps1",
+  "author": "codex",
+  "created": "2026-04-17T00:00:00Z",
+  "updated": "2026-07-02T07:34:15.1882619Z",
+  "version": "2.2"
+}

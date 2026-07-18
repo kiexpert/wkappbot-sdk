@@ -1,0 +1,40 @@
+{
+  "id": "skill-read-auto-export-to-claude-code-claude-skills",
+  "app": "wkappbot-core",
+  "title": "skill read: auto-export to Claude Code .claude/skills/",
+  "title_ko": null,
+  "desc": "wkappbot skill read auto-exports to .claude/skills/<id>/SKILL.md when invoked from Claude Code. Raw skill JSON section at bottom preserves future fields.",
+  "steps": [
+    "TRIGGER: parent PID chain contains claude or node+claude in cmdline",
+    "WRITES .claude/skills/<id>/SKILL.md: frontmatter + steps + Raw Skill JSON section",
+    "RAW JSON uses skill.FilePath raw bytes -- all fields, future-proof",
+    "MEMORY: ~/.claude/projects/<slug>/memory/skill-<id>.md index entry",
+    "SOURCE: SkillCommand.ClaudeExport.cs TryExportToClaudeCode()",
+    "Verified 2026-05-23: ev-skill-read-claude-code-export.sh (resolve ts=2026-05-22T18:07:07.1635562Z)"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read on-load",
+      "expect": "MANDATORY",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill list",
+      "expect": "v1",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read standard-appbot-window",
+      "expect": "DEFINITION",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": "wkappbot skill read standard-appbot-window",
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-23T04:14:14.155239Z",
+  "updated": "2026-05-23T04:36:49.1934331Z",
+  "version": "1.2"
+}

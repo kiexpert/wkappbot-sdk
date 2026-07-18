@@ -1,0 +1,38 @@
+{
+  "id": "launcher-source-separation-private-core-stripped-from-public-repo",
+  "app": "wkappbot-sdk",
+  "title": "Launcher source separation: private core stripped from public repo",
+  "title_ko": null,
+  "desc": "wkappbot-sdk csharp/src stripped to Launcher\u002BShared\u002BAbstractions only. CLI/Core/WebBot/Win32/KiwoomProxy/Report removed. All workflows updated to fetch core binary from GitHub Release instead of building from source.",
+  "steps": [
+    "Removed: WKAppBot.CLI WKAppBot.Core WKAppBot.WebBot WKAppBot.Win32 WKAppBot.KiwoomProxy WKAppBot.Report (554 files). Kept: WKAppBot.Launcher Shared WKAppBot.Abstractions",
+    "build.yml core fetch pattern: add env WKAPPBOT_CORE_PAT secret \u002B step \u0027Download core binary\u0027 using gh release download from kiexpert/wkappbot latest release",
+    "Reverting separation: git revert c3b2ec61 restores all private source. Only do this if private source must temporarily re-appear for debugging -- never push revert to public repo",
+    "Post-separation checklist: verify release.yml can fetch core artifact, run extended-smoke against downloaded binary, confirm tests.yml no-op doesn\u0027t block merge"
+  ],
+  "requirements": [
+    {
+      "cmd": "ls D:/GitHub/wkappbot-sdk/csharp/src/",
+      "expect": "WKAppBot.Launcher present, WKAppBot.CLI absent",
+      "prompt": null
+    },
+    {
+      "cmd": "dotnet build D:/GitHub/wkappbot-sdk/csharp/src/WKAppBot.Launcher/WKAppBot.Launcher.csproj -c Release --no-restore -v q",
+      "expect": "\uC624\uB958 0\uAC1C",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot diagnostics",
+      "expect": "Version field (wkappbot still running after separation)",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-04-29T01:01:04.5735546Z",
+  "updated": "2026-04-29T01:01:35.700431Z",
+  "version": "1.3"
+}

@@ -1,0 +1,40 @@
+{
+  "id": "wkappbot-build-verify-workflow-howto",
+  "app": "wkappbot-core",
+  "title": "WKAppBot Build Verify Workflow T2 HowTo",
+  "title_ko": null,
+  "desc": "T2 domain tier. Refactor loop, partial-class pattern, common errors, smoke check commands.",
+  "steps": [
+    "Refactor loop: (1) make change (2) wkappbot-pub\\build.cmd (3) check last 3 lines for staged+skills installed (4) wkappbot --version to force swap (5) wkappbot <affected-cmd> smoke test (6) git add+commit ONLY after all green.",
+    "Partial-class split pattern: new file must have same namespace WKAppBot.CLI AND internal partial class Program. No extra using-statements beyond what extracted code needs.",
+    "CS0246 (type/namespace not found): new file created but not referenced, OR extracted method left dangling reference. Read error location and verify both sites.",
+    "Smoke check: wkappbot --version (expect base version). wkappbot exec list (expect built-in presets). wkappbot <affected-command> with minimal args.",
+    "Launcher auto-swap failing: see hot-swap-stuck-orphan-mcp-workers-kill-force-swap skill. Short: wkappbot --sudo --force-swap eye tick when admin orphan blocks.",
+    "After deploy: wkappbot skill sync to push local edits to HQ. Conflicts -> wkappbot skill sync --resolve <id>. Never leave split-brain pending."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read wkappbot-build-verify-workflow-howto",
+      "expect": "T2 howto",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wkappbot-build-verify-workflow",
+      "expect": "T1 core",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot-pub\\build.cmd",
+      "expect": "build success",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-31T12:39:52.4898642Z",
+  "updated": "2026-05-31T12:39:52.4898738Z",
+  "version": "1.0"
+}

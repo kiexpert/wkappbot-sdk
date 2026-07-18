@@ -1,0 +1,37 @@
+{
+  "id": "sonnet-self-reflection-ref",
+  "app": "wkappbot-sdk",
+  "title": "Sonnet Self-Reflection Ref",
+  "title_ko": null,
+  "desc": "Reference: links to high-impact patterns, pattern history, and cross-session lessons for Sonnet self-improvement",
+  "steps": [
+    "PATTERN HISTORY summary: P1=env-var-bypass-is-backdoor (use proper gate path, not env override); P2=guard-source-first (read guard source at retry 2, not retry 6); P3=guard-early-not-late (add harness:block at FIRST revert, not after nth fix); P4=remove-item-in-heredoc fires on raw command text; P5=avoid-complex-quoting-for-harness-sandbox; P6=stall-guard-resets-on-skill-edit-only; P7=sandbox-inherits-study-lock; P8=dot-source-inside-function-local-scope-trap; P9=stall-guard-fires-on-repeated-replace-attempts.",
+    "NAVIGATION: core lessons live in sonnet-reflection (PATTERN steps). Authoring guide lives in sonnet-reflection-howto.",
+    "CLUSTER LINKS: guard-block-recurrence-failure-score (cost tracking), wkharness-guards (guard source), incident-trauma-reflex-ref (incident patterns)."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read sonnet-reflection-ref",
+      "expect": "PATTERN HISTORY",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read sonnet-reflection",
+      "expect": "PATTERN 1",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill search sonnet reflection",
+      "expect": "sonnet-reflection",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-25T21:22:55.5864274Z",
+  "updated": "2026-06-25T21:22:55.7880498Z",
+  "version": "1.1"
+}

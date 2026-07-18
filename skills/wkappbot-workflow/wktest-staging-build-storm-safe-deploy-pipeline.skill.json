@@ -1,0 +1,53 @@
+{
+  "id": "wktest-staging-build-storm-safe-deploy-pipeline",
+  "app": "wkappbot-workflow",
+  "title": "wktest staging build storm-safe deploy pipeline",
+  "title_ko": null,
+  "desc": "Storm-safe build+deploy: wkbuild.cmd -> wktest-build/smoke/gc/promote (bin/). Single-file self-contained publish, COPY-promote (never rename), NO .new.exe storm-marker as the deploy trigger, mandatory smoke gate before any hot-swap, built-in GC. Designed so a rookie AI cannot cause a wkappbot-core spawn storm.",
+  "steps": [
+    "ENTRY: wkbuild.cmd is a thin shim to wktest-build.sh. Standard build needs no flags (workspace + single-file publish handled).",
+    "BUILD: wktest-build.sh runs dotnet publish as a single-file self-contained exe with SkipDeployCore=true, computes the version from git (rev-list count since the WKAppBotBaseVersion bump commit), stages it as wktest-core-MODEL-vVER.exe, auto-runs smoke, and AUTO-DEPLOYS on smoke PASS by cp -f over wkappbot-core.exe. CRITICAL: it does NOT write a .new.exe -- that FSW hot-swap marker was the spawn-storm trigger, so deploy is a plain copy.",
+    "SMOKE: wktest-smoke.sh runs 6 safe checks (version; skill list with junk excluded over the floor; skill read on-load FULL with no developer-only stub; skill search; single-file integrity = no loose wkappbot-core.dll/deps in bin; storm-safety = core-count delta under 10). It uses cmd.exe file redirects not the nul redirect and MSYS2_ARG_CONV_EXCL, and doubles as housekeeping by calling wktest-gc.",
+    "PROMOTE: wktest-promote.sh is the ONLY sanctioned hot-swap path -- it REFUSES unless wktest-smoke passes (exit 0) AND the staging exe is a real single-file build (over 50 MB), then COPIES to wkappbot-core.exe plus wkappbot-core.new.exe (the marker a running Eye watches). FORCE=1 bypasses the gate with a loud warning.",
+    "GC: wktest-gc.sh keeps the newest N per model and age-gated sweeps old staging binaries; runs on every smoke so no separate schedule is needed.",
+    "STORM-SAFETY SUMMARY: no .new.exe as the build output (removed), copy-promote not rename, a mandatory smoke gate at every hot-swap, Defender-rename fallback, and a DEPLOY-BLOCKED message pointing at wkdoctor -DefenderFix when the canonical exe is quarantined.",
+    "BUILD ENTRY = ./wkbuild.cmd at REPO ROOT only (2026-06-21). Principle: the legit build script lives at the repo ROOT (core AND sdk); duplicates/imposters deleted. REMOVED: bin/wkbuild.cmd (dup; had made bare 'wkbuild' resolve to bin), wkbuild.sh (root; created the FORBIDDEN .new.exe FSW marker -> 2261-proc spawn storm), bin/wkbuild.sh (launcher-deploy, already built into wktest-build.sh). bare 'wkbuild' is GONE -> run './wkbuild.cmd' from repo root. DIAGNOSIS REFLEX: if a build seems 'slow/hung', check for a LIVE dotnet/msbuild/bash process FIRST -- ZERO build process + empty output + no _pub_ dir = the build NEVER STARTED (dead/orphaned shell), NOT a slow test. Background/detached wkbuild dies instantly (the .cmd->bash child orphans on detach); run ./wkbuild.cmd in FOREGROUND or via the user's own shell '! wkbuild'. Real lag points: dotnet publish (single-file), git log -S pickaxe (version calc), smoke (247MB self-extract) -- put any timeout on SMOKE.",
+    "FIX 2026-07-03: bin/wktest-build.sh's Launcher deploy step had 'if [ ! -f \"$LP\" ]' guarding the dotnet publish call -- if a publish artifact already existed at that path (from any earlier build), it was silently reused even after a real source fix, deploying stale Launcher code. Fixed: publish now always runs unconditionally every build (dotnet publish is internally incremental so an unchanged-source run stays fast)."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read wktest-staging-build-storm-safe-deploy-pipeline",
+      "expect": "smoke",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wkappbot-build-verify-workflow",
+      "expect": "build",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wkdr-emergency-doctor",
+      "expect": "storm",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "build",
+    "deploy",
+    "wktest",
+    "wkbuild",
+    "storm-safe",
+    "single-file",
+    "smoke",
+    "gc",
+    "pipeline",
+    "t2"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-07T12:09:39.6303754Z",
+  "updated": "2026-07-02T18:25:36.5400488Z",
+  "version": "1.4"
+}
