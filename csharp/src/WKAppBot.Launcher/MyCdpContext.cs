@@ -224,6 +224,7 @@ partial class Program
             {
                 "no_caller_window"        => "no caller window -- placement skipped",
                 "invalid_window_type"     => "caller is desktop or PseudoConsoleWindow -- placement skipped",
+                "caller_is_explorer_shell" => "caller resolved to explorer.exe's taskbar -- not session-specific, placement skipped",
                 "caller_offscreen"        => "caller window is off-screen",
                 "caller_foreign_process"  => "caller foreground belongs to an unrelated process -- placement skipped",
                 _                         => "caller HWND invalid -- placement skipped",

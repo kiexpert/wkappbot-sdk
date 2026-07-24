@@ -31,6 +31,20 @@ partial class Program
         if (IsDesktopWindow(callerHwnd) || IsPseudoConsoleWindow(callerHwnd))
             return new(true, "invalid_window_type");
 
+        // DEFENSIVE BAIL-OUT (concurrent-ai-isolation-env-var-detection-beats-parent-chain
+        // TODO, suggest ts=2026-07-24T10:14:25): reject explorer.exe's window (Shell_TrayWnd,
+        // the single machine-wide taskbar) unconditionally, before the console/host_process/
+        // foreground classification below. This closes a gap that EyeCmdPipeClient's own
+        // ancestor-walk skip does NOT cover: GetHostWindowSnapshot() does a raw immediate-
+        // parent MainWindowHandle lookup with no process filter at all, so a ConPTY-tab-
+        // creation PPID misattribution can feed explorer.exe in here directly. Worse, when
+        // that same misattributed PID is ALSO what the ancestor walk lands on, callerHwnd
+        // ends up EQUAL to hostHwnd purely by coincidence, which mislabels it "host_process"
+        // below and skips the IsKnownHostProcess foreign-process allow-list check entirely --
+        // checking here, unconditionally, closes that hole regardless of classification.
+        if (IsExplorerShellWindow(callerHwnd))
+            return new(true, "caller_is_explorer_shell");
+
         if (IsWindowOffScreen(callerHwnd))
             return new(true, "caller_offscreen_reject", DescribeCallerRect(callerHwnd));
 
@@ -115,6 +129,30 @@ partial class Program
             var cls = new System.Text.StringBuilder(256);
             GetClassNameW(hwnd, cls, 256);
             return cls.ToString() == "PseudoConsoleWindow";
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// DEFENSIVE BAIL-OUT helper (concurrent-ai-isolation-env-var-detection-beats-parent-chain
+    /// TODO): true when the window's owning process is explorer.exe. Twin of
+    /// EyeCmdPipeClient.IsExplorerProcess(uint pid) -- kept as a separate hwnd-keyed helper here
+    /// because this file's callers only ever have the hwnd, not the ancestor PID list, and this
+    /// backstop specifically must fire even when the hwnd arrived via GetHostWindowSnapshot()
+    /// (immediate-parent MainWindowHandle, no ancestor-walk / no process filter at all) rather
+    /// than via EyeCmdPipeClient.ResolveCallerTerminalHwnd()'s own (now-filtered) ancestor walk.
+    /// </summary>
+    static bool IsExplorerShellWindow(IntPtr hwnd)
+    {
+        try
+        {
+            GetWindowThreadProcessIdLocal(hwnd, out int pid);
+            if (pid <= 0) return false;
+            using var p = System.Diagnostics.Process.GetProcessById(pid);
+            return string.Equals(p.ProcessName, "explorer", StringComparison.OrdinalIgnoreCase);
         }
         catch
         {

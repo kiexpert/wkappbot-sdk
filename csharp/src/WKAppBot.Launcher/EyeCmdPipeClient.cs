@@ -274,6 +274,24 @@ internal static class EyeCmdPipeClient
         IntPtr hiddenFallback = IntPtr.Zero;
         foreach (var targetPid in ancestorPids)
         {
+            // DEFENSIVE BAIL-OUT (concurrent-ai-isolation-env-var-detection-beats-parent-chain
+            // TODO, suggest ts=2026-07-24T10:14:25): a ConPTY-hosted console app's PPID is
+            // sometimes misattributed by Windows during Windows Terminal tab creation, which
+            // makes this reverse ancestor walk land on explorer.exe. The only "window" that
+            // survives the filters below on explorer.exe is Shell_TrayWnd -- the single
+            // machine-wide taskbar, not session-specific. Any concurrent session hitting the
+            // same misattribution converges on the IDENTICAL hwnd, so accepting it here would
+            // silently resolve to an unrelated session's caller. Skip explorer.exe outright --
+            // never treat it (or any window it owns) as a placement anchor. This is a
+            // defensive bail-out only; the full forward-walk redesign (enumerate
+            // WindowsTerminal.exe instances and match by descendant CLAUDE_PID) is a
+            // separate, larger follow-up -- see the TODO skill for that direction.
+            if (IsExplorerProcess(targetPid))
+            {
+                if (verbose) Console.Error.WriteLine($"[CALLER:HWND] ancestor pid={targetPid} is explorer.exe -- skipping (not session-specific, see concurrent-ai-isolation-env-var-detection-beats-parent-chain)");
+                continue;
+            }
+
             // GA_ROOTOWNER PRE-PASS (verified 2026-05-24): A Windows Terminal tab spawns a
             // VISIBLE PseudoConsoleWindow (rect [0,0,0,0]) inside its ConPTY host process.
             // That PCW's GA_ROOTOWNER (flag=3) is the exact CASCADIA tab window that owns it.
@@ -366,6 +384,15 @@ internal static class EyeCmdPipeClient
                 }
                 foreach (var targetPid in conptyChain)
                 {
+                    // Same defensive bail-out as the main ancestor walk above: never
+                    // accept explorer.exe's window (Shell_TrayWnd) as a placement anchor
+                    // via the ConPTY-owner-chain fallback route either.
+                    if (IsExplorerProcess(targetPid))
+                    {
+                        if (verbose) Console.Error.WriteLine($"[CALLER:HWND] conpty-owner-chain pid={targetPid} is explorer.exe -- skipping");
+                        continue;
+                    }
+
                     IntPtr visibleMatch = IntPtr.Zero;
                     EnumWindows((hWnd, _) =>
                     {
@@ -444,6 +471,24 @@ internal static class EyeCmdPipeClient
             return (int)BitConverter.ToInt64(pbi, 40); // InheritedFromUniqueProcessId at offset 40 (64-bit: ExitStatus+pad+Peb+AffinityMask+BasePriority+pad+UniqueProcessId = 40)
         }
         catch { return 0; }
+    }
+
+    /// <summary>
+    /// DEFENSIVE BAIL-OUT helper (concurrent-ai-isolation-env-var-detection-beats-parent-chain
+    /// TODO): true when the given PID's process image is explorer.exe (Windows Explorer / the
+    /// shell). explorer.exe's only ancestor-walk-visible window is Shell_TrayWnd, the single
+    /// machine-wide taskbar -- never a session-specific terminal, so it must never be accepted
+    /// as a placement caller. Fails closed (false) if the process cannot be inspected (e.g.
+    /// already exited), same as every other best-effort PID lookup in this file.
+    /// </summary>
+    static bool IsExplorerProcess(uint pid)
+    {
+        try
+        {
+            using var p = System.Diagnostics.Process.GetProcessById((int)pid);
+            return string.Equals(p.ProcessName, "explorer", StringComparison.OrdinalIgnoreCase);
+        }
+        catch { return false; }
     }
 
     // CharSet.Unicode: prevents char[] from being marshaled as ANSI bytes.

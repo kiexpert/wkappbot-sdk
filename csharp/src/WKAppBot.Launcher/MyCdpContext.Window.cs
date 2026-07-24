@@ -1,4 +1,4 @@
-﻿namespace WKAppBot.Launcher;
+namespace WKAppBot.Launcher;
 
 partial class Program
 {
