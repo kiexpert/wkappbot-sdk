@@ -1,0 +1,28 @@
+---
+id: handoff-checklist
+app: wkappbot-workflow
+description: "새 세션 시작 시 첫 5분이 전체 세션 효율을 결정한다. 순서 지켜서 빠르게 파악 후 슬랙 보고, 그 다음 바로 작업 돌입."
+tags: [workflow, handoff, checklist, session, onboarding, operator]
+---
+
+> **Refresh**: `wkappbot skill read handoff-checklist --if-newer` — v1.6 (2026-04-07)
+
+# 인수인계 받았을 때 체크리스트
+
+## Steps
+
+- `wkappbot skill read handoff-checklist --if-newer   # re-read only if the cache changed`
+
+1. 1. CLAUDE.md 읽기 -- 프로젝트 규칙 + 최근 Handoff 섹션 확인
+2. 2. memory/MEMORY.md 읽기 -- 활성 버그, 피드백, 주요 결정 파악
+3. 3. wkappbot eye tick -- 현재 ctx%, 카드 상태, 최근 슬랙 메시지 확인
+4. 4. 슬랙 보고: wkappbot slack send '인수인계 수락! 이어서 달립니다'
+5. 5. 이전 세션 마지막 작업 파악 -> git log --oneline -5 로 최근 커밋 확인
+6. 6. 미완료 작업 있으면 즉시 재개 -- 확인 기다리지 말 것
+7. ★ 인수인계 섹션이 CLAUDE.md에 있으면 작업 후 삭제할 것
+8. ★ 채팅 제목은 작업 내용 반영해서 참신하게 (뻔한 '인수인계' 금지!)
+
+- `wkappbot skill edit handoff-checklist --add-step "<what you learned>"`
+
+- `wkappbot skill edit handoff-checklist --add-step "See also: <other-skill-id>"   # cross-link a reference skill`
+- (edit via wkappbot skill commands ONLY -- never raw .skill.json)

@@ -7,8 +7,8 @@
   "steps": [
     "Trigger this skill when GPT hits a reusable startup, hook, identity, delegation, transport, encoding, or guard failure that can recur in future GPT sessions.",
     "Keep GPT-owned lessons separate from GPT-mini-owned lessons. Do not use GPT-mini reflection as a substitute for GPT reflection.",
-    "Record each incident as four facts: symptom, root cause class, fix, and proof.",
     "Prefer concrete machine checks over apology text. Include the exact command, file, or hook setting that proves the fix.",
+    "Record each incident as four facts: symptom, root cause class, fix, and proof.",
     "For Codex or CLI hook failures, separate the layers before naming the bug: config feature flag, hook command, adapter stdout JSON, exit code, and downstream harness decision.",
     "For delegation failures, verify the real model family that answered, not only the dispatcher exit code.",
     "Promote only durable recurrence-prevention knowledge. Leave transient logs, cache state, and one-off screenshots out.",
@@ -55,6 +55,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-06-14T11:18:22.8900716Z",
-  "updated": "2026-06-30T04:48:19.6988591Z",
-  "version": "1.15"
+  "updated": "2026-08-03T23:02:25.8368673Z",
+  "version": "1.16"
 }

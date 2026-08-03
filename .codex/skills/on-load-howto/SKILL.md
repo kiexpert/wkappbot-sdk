@@ -5,11 +5,13 @@ description: "T2 domain tier of on-load. Session-start execution commands -- man
 tags: [session, on-load, 3tier, t2, howto, execution, commands, handoff, suggest, agent, wkedit]
 ---
 
-> **Refresh**: `wkappbot skill read on-load-howto --if-newer` — v1.2 (2026-05-31)
+> **Refresh**: `wkappbot skill read on-load-howto --if-newer` — v1.4 (2026-05-31)
 
 # T2 HowTo: on-load execution
 
 ## Steps
+
+- `wkappbot skill read on-load-howto --if-newer   # re-read only if the cache changed`
 
 1. MANDATORY SKILL LOADS at session-start/post-compaction. wkappbot skill read suggest-workflow, then wkappbot skill read ask-suggest-priority-batching. First session also: wkappbot skill read claude-md-guide. Failure -> skip + report.
 2. SKILL NEWS. wkappbot skill news (default 7 days) at session start -- shows NEW/UPD skills since last week. More useful than skill list. skill-list-guard warns on Edit/Write if neither was run this session.
@@ -24,3 +26,9 @@ tags: [session, on-load, 3tier, t2, howto, execution, commands, handoff, suggest
 11. NIGHTLY SCHEDULE. Session start: ensure CronCreate nightly (13 4 * * *) registered before wk-only-gate. Add gg todo to Pending before Agent calls (claude-md-sync-guard).
 12. GMAIL SYNC step in gg workflow. After naver sync run the gmail mail sync python script from personal-docs. Outputs in resume drafts gmail folder.
 13. KEY SKILLS 2026-05-31: skill-migration-3tier (split fat skills), skill-3tier-lazy-arch (design), token-economy (Haiku 33% KPI), pre-commit-full-block-plan (bypass roadmap), sonnet-bug-stop-policy (Sonnet bug patterns + harness TODOs), wkagent-name-tool (AI identity), claudemd-slim-plan (CLAUDE.md optimization). Tag search: wkappbot skill search skill-tree
+14. ON-LOAD GATE DETECTS LITERAL NAMES ONLY (2026-06-18 gotcha): the on-load compliance gate scans the session JSONL for 'wkappbot skill read <literal-id>'. If you batch the mandatory reflex reads through a SHELL LOOP VARIABLE (e.g. 'for s in a b c; do wkappbot skill read $s; done'), the JSONL records 'wkappbot skill read $s' -- the literal id is NEVER written, so the gate still reports the reads MISSING and HARD-BLOCKS your tools (incl the Agent tool). FIX: read each mandatory reflex skill with its LITERAL id (a ; -chain of literal 'wkappbot skill read on-load ; wkappbot skill read agent-cmd ; ...' is fine; a $var loop is not). Also note: an upstream hook error can MASK this gate -- once the error is fixed the gate re-activates (see [[incident-trauma-reflex]]).
+
+- `wkappbot skill edit on-load-howto --add-step "<what you learned>"`
+
+- `wkappbot skill edit on-load-howto --add-step "See also: <other-skill-id>"   # cross-link a reference skill`
+- (edit via wkappbot skill commands ONLY -- never raw .skill.json)

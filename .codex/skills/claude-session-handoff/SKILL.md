@@ -11,6 +11,8 @@ tags: [session, handoff, context, continuity, jsonl, claude]
 
 ## Steps
 
+- `wkappbot skill read claude-session-handoff --if-newer   # re-read only if the cache changed`
+
 1. 1. Derive project slug: convert CWD path (drive letter + slashes) to hyphens, e.g. D:/GitHub/WkAutoQuant -> d--GitHub-WkAutoQuant
 2. 2. List JSONL files sorted by mtime descending: ls -lt ~/.claude/projects/<slug>/*.jsonl 
 3.  head -5. Current session is index [0], previous session is index [1]
@@ -19,3 +21,8 @@ tags: [session, handoff, context, continuity, jsonl, claude]
 6. 5. Synthesize handoff summary: last user request, last assistant state, unfinished action items, pending confirmations, open file edits
 7. 6. Report to user: what was happening, what was left unfinished, proposed next step
 8. For predecessor questions or root-cause lookups, prefer wkhippo recall/foresee before manual JSONL reconstruction; wkrecall is archived.
+
+- `wkappbot skill edit claude-session-handoff --add-step "<what you learned>"`
+
+- `wkappbot skill edit claude-session-handoff --add-step "See also: <other-skill-id>"   # cross-link a reference skill`
+- (edit via wkappbot skill commands ONLY -- never raw .skill.json)

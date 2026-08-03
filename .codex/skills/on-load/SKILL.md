@@ -5,11 +5,13 @@ description: "T1 core tier. Session-start decision rules: when to run mandatory 
 tags: [skill-tree, 스킬트리, 세션시작]
 ---
 
-> **Refresh**: `wkappbot skill read on-load --if-newer` — v1.111 (2026-05-08)
+> **Refresh**: `wkappbot skill read on-load --if-newer` — v1.116 (2026-05-08)
 
 # On Load (T1 core)
 
 ## Steps
+
+- `wkappbot skill read on-load --if-newer   # re-read only if the cache changed`
 
 1. WHEN TO RUN. (A) session start or post-compaction -> load mandatory skills (see on-load-howto step 1) + run handoff (on-load-howto step 3) + run suggest backlog (on-load-howto step 4). (B) user sends exactly gg or ggg -> run GG TRIGGER (T1 step 2). (C) mid-task or casual greeting -> SKIP full pipeline.
 2. GG TRIGGER. User message exactly gg or ggg -> locate the gg Main Workflow section in project root markdown rules file and execute every step sequentially end-to-end NO confirmation, finish with repo-health-doctor. If section missing: ask user for recurring tasks, add the gg Main Workflow section, then run it same session. Quota/limit error: mark handoff_pending, do NOT retry same CLI.
@@ -17,3 +19,10 @@ tags: [skill-tree, 스킬트리, 세션시작]
 4. NAVIGATION. Execution details (commands, mandatory loads, agent rules, file-edit discipline, skill-edit discipline, TODO sync) -> wkappbot skill read on-load-howto. History or incident notes or dated bug accumulation -> wkappbot skill read on-load-ref. Both are part of this cluster.
 5. AGENT DISPATCH PRE-FLIGHT (before every delegation): wkappbot skill read agent-dispatch-preflight. Sequence: (0) Read CLAUDE.md first (Edit fails without Read). (1) Edit CLAUDE.md to add Pending entry. (2) Agent() MUST have run_in_background:true. (3) Prompt needs 3 skill reads. This session burned 4 attempts and ~4x tokens before getting it right -- read this skill every session to prevent recurrence.
 6. MEMORY ORGAN. For predecessor questions and session-memory lookup, use wkhippo recall/foresee/export/status; wkrecall is archived and must not be presented as active.
+7. OPUS SESSION MANDATORY READ. At session start, an Opus ROOT session MUST read wkappbot skill read claude-code-agent-tier-routing and wkappbot skill read agent-cmd BEFORE dispatching work. These encode delegate-first principle and Agent.cmd as the universal dispatcher. Skipping these caused serial work-dragging and token waste.
+8. HONGIK HARNESS REFLEX-CONNECTION POINT (user 2026-06-12, constitutional). Every intelligence living in the Hongik knowledge-intelligence harness wires its reflexes from exactly THREE session-start skills: (1) on-load -- the session-start decision rules and mandatory loads; (2) your OWN model reflection skill -- the skill whose name carries your model family plus the keyword reflection (opus to opus-self-reflection, sonnet to sonnet-reflection, haiku to haiku-reflection; if your model has no reflection skill yet, CREATE one first); (3) foundation-is-roots-charge-not-a-chore -- the ROOT guide warning that foundational and harness and knowledge-wiring work is never a chore to delegate downward. These three are MANDATORY at session start. The on-load enforcer (wkharness-guards-onload-enforce.ps1) nudges until all three are read after the latest compaction (or at fresh session start). Read all three before dispatching any work.
+
+- `wkappbot skill edit on-load --add-step "<what you learned>"`
+
+- `wkappbot skill edit on-load --add-step "See also: <other-skill-id>"   # cross-link a reference skill`
+- (edit via wkappbot skill commands ONLY -- never raw .skill.json)

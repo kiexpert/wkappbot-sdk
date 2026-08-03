@@ -11,6 +11,8 @@ tags: [wkappbot, codex, cli, workflow, windows, path, symlink, chatgpt, limits, 
 
 ## Steps
 
+- `wkappbot skill read codex-cli-wkappbot-usage --if-newer   # re-read only if the cache changed`
+
 1. Use repo-local bin\codex.exe first when the goal is to make Codex callable from the WKAppBot toolchain; keep PATH injections repo-local and prefer a bin symlink or wrapper over ad-hoc global installs.
 2. Smoke-check the install with codex --help and codex --version; if auth is missing or stale, run codex login and verify the CLI can store credentials under ~/.codex.
 3. Treat Codex command results as rc-sensitive: rc=0 is success, rc=1 is a handled failure, and any other rc means the run needs investigation even if the terminal looked quiet.
@@ -35,3 +37,8 @@ tags: [wkappbot, codex, cli, workflow, windows, path, symlink, chatgpt, limits, 
 22. CONSULT PATTERN (2026-05-22): codex exec works for pure knowledge questions not just code tasks. SPEC block + 3 skill refs gives codex the context it needs to answer well. Tested: CredentialUIBroker UIPI bypass query answered with WebAuthn Win32 API alternative.
 23. today 2026-05-22: groq_agent.py SYS prompt updated to force read_file before analysis. cerebras_agent.py pending same update. Both agents tested in wkautoquant/scripts/.
 24. When Codex produces a durable lesson, route it into the Hongik Harness by reading hongik-reflexes and knowledge-ification-procedure-jisikhwa, then skillify or guard it instead of leaving it as a one-off note.
+
+- `wkappbot skill edit codex-cli-wkappbot-usage --add-step "<what you learned>"`
+
+- `wkappbot skill edit codex-cli-wkappbot-usage --add-step "See also: <other-skill-id>"   # cross-link a reference skill`
+- (edit via wkappbot skill commands ONLY -- never raw .skill.json)
