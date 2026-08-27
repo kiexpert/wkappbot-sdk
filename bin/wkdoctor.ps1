@@ -1,13 +1,38 @@
 # wkdoctor -- wkappbot-sdk health check orchestrator
-# Usage: wkdoctor [-Json] [-DefenderFix] [-EmergencyKill] [-Build]
+# Usage: wkdoctor [-Json] [-DefenderFix] [-EmergencyKill] [-Build] [-LastRun]
 # Drop custom checks as *.ps1 into wkappbot.hq/doctor/ for plugin extension
-param([switch]$Json, [switch]$EmergencyKill, [switch]$DefenderFix, [switch]$Build)
+param([switch]$Json, [switch]$EmergencyKill, [switch]$DefenderFix, [switch]$Build, [switch]$LastRun)
+
+# SEAM: Handle -LastRun flag (read-back entry point)
+if ($LastRun) {
+    $logModule = Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Path) 'wkdoctor-runlog.ps1'
+    if (Test-Path $logModule) {
+        . $logModule
+        Show-WkdoctorLastRun
+    } else {
+        Write-Host "Log module not found at $logModule" -ForegroundColor Red
+    }
+    exit 0
+}
 
 $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $binDir     = $scriptRoot
 $repoRoot   = Split-Path -Parent $scriptRoot
 $pass = 0; $fail = 0; $warn = 0
 $items = [System.Collections.Generic.List[PSCustomObject]]::new()
+
+# SEAM: Load logging module and initialize.
+# NOT under -Json: Emit is never called on the Json path, so Initialize would truncate the log
+# and leave nothing but a header -- destroying the last human-readable run for no gain, since
+# the Json caller already receives every check in the payload. Measured live 2026-08-27.
+$logModule = Join-Path $binDir 'wkdoctor-runlog.ps1'
+if ((Test-Path $logModule) -and (-not $Json)) {
+    . $logModule
+    Initialize-WkdoctorLog
+    $wkdoctorLoggingEnabled = $true
+} else {
+    $wkdoctorLoggingEnabled = $false
+}
 
 function Add-Check {
     param([string]$Name, [string]$Status, [string]$Detail)
@@ -25,6 +50,10 @@ function Emit {
     $line = "$sym $Name"
     if ($Detail) { $line += " -- $Detail" }
     Write-Host $line -ForegroundColor $color
+    # SEAM: Also add to log buffer
+    if ($script:wkdoctorLoggingEnabled) {
+        Add-WkdoctorLogLine $line
+    }
 }
 
 function Get-DoctorNote {
@@ -324,15 +353,29 @@ if (-not $Json) {
     $color = if ($fail -gt 0) { 'Red' } elseif ($warn -gt 0) { 'Yellow' } else { 'Green' }
     Write-Host "wkdoctor: $pass ok, $warn warn, $fail fail" -ForegroundColor $color
     Write-Host "wkdoctor note: $(Get-DoctorNote)" -ForegroundColor $color
+    # SEAM: Log the summary lines
+    if ($script:wkdoctorLoggingEnabled) {
+        Add-WkdoctorLogLine ""
+        Add-WkdoctorLogLine "wkdoctor: $pass ok, $warn warn, $fail fail"
+        Add-WkdoctorLogLine "wkdoctor note: $(Get-DoctorNote)"
+    }
 }
 if ($Json) {
     [PSCustomObject]@{ pass = $pass; warn = $warn; fail = $fail; items = $items } | ConvertTo-Json -Depth 5
 }
 $_doctorBrokenFlag = Join-Path $env:USERPROFILE '.claude\wkharness\wkdoctor_broken.flag'
-if ($fail -gt 0) { 
+if ($fail -gt 0) {
     try { [System.IO.File]::WriteAllText($_doctorBrokenFlag, "wkdoctor failed: $fail failures at $(Get-Date)") } catch {}
-    exit 1 
-} else { 
+    # SEAM: Finalize logging on failure
+    if ($script:wkdoctorLoggingEnabled) {
+        Finalize-WkdoctorLog -Pass $pass -Fail $fail -Warn $warn
+    }
+    exit 1
+} else {
     if (Test-Path $_doctorBrokenFlag) { Remove-Item $_doctorBrokenFlag -Force -ErrorAction SilentlyContinue }
-    exit 0 
+    # SEAM: Finalize logging on success
+    if ($script:wkdoctorLoggingEnabled) {
+        Finalize-WkdoctorLog -Pass $pass -Fail $fail -Warn $warn
+    }
+    exit 0
 }

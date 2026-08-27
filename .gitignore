@@ -84,6 +84,7 @@ nul
 !wktaskkill.ps1
 !tests/**/*.ps1
 !bin/wkdoctor.ps1
+!bin/wkdoctor-runlog.ps1
 !bin/wkappbot.cmd
 *.png
 tmp/
