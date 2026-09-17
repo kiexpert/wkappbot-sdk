@@ -29,7 +29,7 @@ wkappbot logcat error --past 10m
 ```
 
 Common causes:
-- Another Eye already running (`wkappbot windows *eye*`)
+- Another Eye already running (`wkappbot find "*eye*"`)
 - Port conflict on named pipe — check with `wkappbot eye tick --timeout 3`
 
 ## Build fails: `vswhere.exe not recognized`

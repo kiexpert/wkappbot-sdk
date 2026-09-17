@@ -10,7 +10,7 @@
 wkappbot --version
 ```
 ```
-WKAppBot v7.3.0 (core: 7.3.0)
+WKAppBot v7.6.86 (banner also prints the ASCII logo + eye/a11y/cdp/slack/skill/suggest command groups)
 ```
 
 ---
@@ -18,14 +18,16 @@ WKAppBot v7.3.0 (core: 7.3.0)
 ## 2. 열린 윈도우 확인
 
 ```bash
-wkappbot windows
+wkappbot find "*"
 ```
 ```
-hwnd:0x00050ABC  [notepad.exe]  "제목 없음 - 메모장"
-hwnd:0x000A1234  [chrome.exe]   "새 탭 - Google Chrome"
-hwnd:0x000B5678  [explorer.exe] "바탕 화면"
+## 제목 없음 - 메모장  [hwnd:0x00050ABC] (Notepad)
+## 새 탭 - Google Chrome  [hwnd:0x000A1234] (Chrome_WidgetWin_1)
+## 바탕 화면  [hwnd:0x000B5678] (Progman)
 ```
 
+> `find`는 윈도우 타이틀과 UIA 접근성 요소를 함께 검색합니다. **참고 (2026-09-17 확인):** 예전 `wkappbot windows` 명령은 현재 빌드에서 제거되었습니다 (실행 시 exit 1, 배너조차 출력 안 됨) — `find`를 사용하세요.
+>
 > `hwnd:0x...` 형식으로 Win32 핸들을 직접 복사해 쓸 수 있습니다.
 
 ---
@@ -128,16 +130,16 @@ wkappbot run test-notepad.yaml        # 실행
 
 ## AI에게 맞춤 설명 받기
 
-설치 후 막막하다면 `wkappbot help` 출력을 그대로 AI에 붙여넣고 물어보세요:
+설치 후 막막하다면 `wkappbot --help` 출력을 그대로 AI에 붙여넣고 물어보세요:
 
 ```bash
-wkappbot help
+wkappbot --help
 ```
 
 출력 전체를 복사한 뒤 Claude(또는 ChatGPT·Gemini)에 다음처럼 보내면 됩니다:
 
 ```
-wkappbot help 출력이야. 이 앱봇으로 나한테 맞게 설명해줘.
+wkappbot --help 출력이야. 이 앱봇으로 나한테 맞게 설명해줘.
 ```
 
 내 PC에 설치된 버전 기준으로, 내 상황에 맞는 설명을 바로 얻을 수 있습니다.

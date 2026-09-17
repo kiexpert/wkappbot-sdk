@@ -1,6 +1,7 @@
 # CLI 명령어 레퍼런스
 
-> WKAppBot v7.3.0 기준. 모든 명령에 `--help` 플래그로 상세 도움말을 볼 수 있습니다.
+> 예시 출력은 v7.3.0 기준으로 작성되었습니다. 정확한 서브커맨드/옵션은 항상 `wkappbot <command> --help`로 확인하세요.
+> **2026-09-17 확인:** `wkappbot windows` 명령은 현재 빌드(v7.9.274)에서 제거되었습니다 (인자 유무와 무관하게 exit 1, 배너조차 출력하지 않음) — 아래 `wkappbot find` 섹션을 사용하세요.
 
 ---
 
@@ -210,17 +211,21 @@ wkappbot ask triad "버그 원인 분석" --debate 3
 
 ---
 
-## `wkappbot windows`
+## `wkappbot find`
+
+윈도우 타이틀 + UIA 접근성 요소를 함께 검색하는 통합 명령입니다. 예전 `wkappbot windows` 명령을 대체합니다 (2026-09-17 확인: `windows`는 현재 바이너리에서 제거됨).
 
 ```bash
-wkappbot windows              # 전체 윈도우 목록
-wkappbot windows "*chrome*"   # 패턴 필터
+wkappbot find "*"           # 열린 모든 윈도우 (와일드카드)
+wkappbot find "chrome"      # 제목/프로세스에 chrome이 포함된 윈도우 + UIA 요소
+wkappbot find "chrome" --deep --limit 20   # 더 깊은 탐색 (depth 12), 결과 수 제한
 ```
 ```
-hwnd:0x00050ABC  [notepad.exe]   "제목 없음 - 메모장"
-hwnd:0x000A1234  [chrome.exe]    "새 탭 - Google Chrome"  (3 tabs)
-hwnd:0x001A2B3C  [calc.exe]      "계산기"
+## (8734) 제목 예시 - Microsoft Edge  [hwnd:0x003613B2] (Chrome_WidgetWin_1)
+"..." "..."#Pane/Pane/... (매칭된 UIA 노드 경로들)
 ```
+
+세부 옵션은 `wkappbot find --help`를 참고하세요.
 
 ---
 
@@ -248,7 +253,7 @@ wkappbot skill contribute \            # 새 스킬 작성
   --app wkappbot \
   --title "내 스킬" \
   --desc "설명" \
-  --steps "step1|step2"
+  --steps "step1 @@ step2"
 ```
 ```
 === wkappbot (42 skills) ===
@@ -258,18 +263,20 @@ wkappbot skill contribute \            # 새 스킬 작성
   ...
 ```
 
+> `--steps`의 구분자는 `@@` (양쪽에 공백 필요)입니다. 파이프(`|`)는 구분자가 아닙니다 — 복잡한 스텝은 `--steps-json`을 사용하세요.
+
 ---
 
 ## `wkappbot schedule`
 
 ```bash
-wkappbot schedule add "매일 로그 정리" --at "09:00" --repeat 1d
-wkappbot schedule list
-wkappbot schedule remove <id>
+wkappbot schedule list                              # 대기/활성 스케줄 목록
+wkappbot schedule add --every 1h --prompt "..."      # 반복 스케줄 등록
+wkappbot schedule remove <id>                        # 스케줄 제거
+wkappbot schedule exec <id>                          # 즉시 1회 실행
 ```
-```
-[schedule] added  id=sched_001  "매일 로그 정리"  next=2026-05-01T09:00
-```
+
+스케줄은 활성 Claude/AI 세션에 프롬프트를 주입하는 영속 항목입니다. 별칭: `wkappbot cron` (동일 명령).
 
 ---
 

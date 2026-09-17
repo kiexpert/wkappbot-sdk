@@ -35,7 +35,7 @@ wkappbot file glob "**/*.log" --path "bin\wkappbot.hq\logs"
 ```
 
 주요 원인:
-- 이미 다른 Eye 실행 중 → `wkappbot windows *eye*` 로 확인
+- 이미 다른 Eye 실행 중 → `wkappbot find "*eye*"` 로 확인
 - named pipe 충돌 → `wkappbot eye tick --timeout 3` 으로 타임아웃 테스트
 
 ---
