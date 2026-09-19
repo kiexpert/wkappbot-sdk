@@ -36,6 +36,26 @@ WKAppBot gives AI agents:
 
 No app rewrite. No vendor API. If a human can use it, WKAppBot can automate it.
 
+**And that is a position, not a convenience.** We are not building an intelligence to come
+first. We are looking, together with the intelligence itself, for a way to grow *alongside*
+the ecosystem people already live in — decades-old Windows programs, the developers who
+maintain them, and the humans who use them every day — and to write that way down as norms
+that **execute** rather than as a document that is filed.
+
+Three rules make it real, and none of them names a vendor or a tool:
+
+1. **A claim travels with the command that produced it**, so a reader re-runs it instead of trusting it.
+2. **A refusal names the state that must be reached**, never the paperwork that is missing — otherwise compliance is bought by faking the artifact.
+3. **A correction is embodied where the next actor passes anyway**, so nobody is told twice.
+
+Accessibility is the same position in technical clothing: WKAppBot reads the **accessibility
+tree first**, because the route a blind person takes through a screen reader is the route an
+intelligence without eyes takes too. A system that can act only through interfaces built for
+itself has already excluded most of the world it claims to serve.
+
+A promise to slow AI down cannot be checked. A gate that refuses an unproven claim is running
+right now — including against the people who wrote it.
+
 > **Free tier covers all base automation.** CDP browser automation, multi-AI delegation (`ask triad`), and `--sudo` admin access are paid Pro tiers. See [PRICING.md](./PRICING.md).
 
 ---
