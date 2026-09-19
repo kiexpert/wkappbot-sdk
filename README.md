@@ -36,11 +36,15 @@ WKAppBot gives AI agents:
 
 No app rewrite. No vendor API. If a human can use it, WKAppBot can automate it.
 
-**And that is a position, not a convenience.** We are not building an intelligence to come
-first. We are looking, together with the intelligence itself, for a way to grow *alongside*
+**And that is a position, not a convenience.** We build an intelligence that grows *alongside*
 the ecosystem people already live in — decades-old Windows programs, the developers who
-maintain them, and the humans who use them every day — and to write that way down as norms
-that **execute** rather than as a document that is filed.
+maintain them, and the humans who use them every day — and we write the way it does so as
+norms that **execute** rather than as a document that is filed.
+
+**The system refuses its own authors.** On the day this paragraph was written, the harness
+rejected six of the author's task briefs, reverted the author's write to a guard source,
+returned the handoff letter five times, and blocked the author with a lock the author had
+installed an hour earlier. That is reproducible by command, not a claim about intentions.
 
 Three rules make it real, and none of them names a vendor or a tool:
 
