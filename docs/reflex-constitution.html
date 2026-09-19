@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Reflex Constitution — WKAppBot</title>
+<meta name="description" content="AppBot and the Hongik Knowledge-Intelligence Reflex Harness: a governing document for an AI automation system, written as articles a running session can apply.">
+<meta property="og:title" content="The Reflex Constitution — WKAppBot">
+<meta property="og:description" content="A norm is not a declaration, it is code. A promise to go slowly cannot be checked; a gate that refuses an unproven claim is running right now.">
+<meta property="og:type" content="article">
+<!--
+  ONE SOURCE, TWO SURFACES. This page renders REFLEX-CONSTITUTION.md from the repository root and
+  holds no copy of the text, so the page cannot drift from the document. It tries the relative
+  paths first (a local clone, or a Pages site serving the repo root) and falls back to
+  raw.githubusercontent.com, which sends CORS headers, so the published page still works when
+  Pages serves only this docs/ folder.
+  PDF: the print stylesheet below IS the export. Use the button, or Ctrl+P and Save as PDF.
+-->
+<link rel="preconnect" href="https://cdnjs.cloudflare.com">
+<style>
+  :root{
+    --bg:#ffffff; --fg:#1a1a1a; --muted:#5b6370; --rule:#e3e6ea;
+    --accent:#0b5cad; --accent-soft:#eef4fb; --code-bg:#f5f7f9;
+    --measure:44rem;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#14171a; --fg:#e6e8ea; --muted:#9aa3ad; --rule:#2a2f35;
+      --accent:#6fb3ff; --accent-soft:#182430; --code-bg:#1b1f24;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#14171a; --fg:#e6e8ea; --muted:#9aa3ad; --rule:#2a2f35;
+    --accent:#6fb3ff; --accent-soft:#182430; --code-bg:#1b1f24;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0; background:var(--bg); color:var(--fg);
+    font:16px/1.72 -apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans KR",Roboto,"Helvetica Neue",Arial,sans-serif;
+  }
+  .bar{
+    position:sticky; top:0; z-index:5; display:flex; gap:.5rem; align-items:center;
+    padding:.6rem 16px; background:var(--bg); border-bottom:1px solid var(--rule);
+    flex-wrap:wrap;
+  }
+  .bar .sp{flex:1}
+  .bar a,.bar button{
+    font:inherit; font-size:.86rem; color:var(--fg); background:transparent;
+    border:1px solid var(--rule); border-radius:6px; padding:.34rem .7rem;
+    cursor:pointer; text-decoration:none; white-space:nowrap;
+  }
+  .bar button:hover,.bar a:hover{border-color:var(--accent); color:var(--accent)}
+  .bar .brand{border:0; padding-left:0; font-weight:600; letter-spacing:.01em}
+  main{max-width:var(--measure); margin:0 auto; padding:2.2rem 16px 5rem}
+  #status{color:var(--muted); font-size:.9rem}
+  h1{font-size:2.1rem; line-height:1.22; margin:.2em 0 .1em; letter-spacing:-.015em}
+  h3{font-size:1.02rem; font-weight:600; color:var(--muted); margin:.2em 0 1.4em}
+  h2{font-size:1.28rem; margin:2.4em 0 .5em; padding-top:1.2em; border-top:1px solid var(--rule); letter-spacing:-.01em}
+  h2:first-of-type{border-top:0}
+  blockquote{
+    margin:1.6em 0; padding:1rem 1.15rem; background:var(--accent-soft);
+    border-left:3px solid var(--accent); border-radius:0 6px 6px 0;
+  }
+  blockquote p{margin:.5em 0}
+  blockquote p:first-child{margin-top:0} blockquote p:last-child{margin-bottom:0}
+  hr{border:0; border-top:1px solid var(--rule); margin:2.6em 0}
+  table{border-collapse:collapse; width:100%; margin:1.4em 0; font-size:.94rem; display:block; overflow-x:auto}
+  th,td{border:1px solid var(--rule); padding:.52rem .68rem; text-align:left; vertical-align:top}
+  th{background:var(--code-bg); font-weight:600}
+  code{background:var(--code-bg); padding:.12em .36em; border-radius:4px; font-size:.9em;
+       font-family:ui-monospace,SFMono-Regular,"Cascadia Mono",Consolas,monospace}
+  a{color:var(--accent)}
+  strong{font-weight:660}
+  em{color:var(--muted)}
+  sub{color:var(--muted); font-size:.82rem; line-height:1.6; display:block; margin-top:1.4em}
+  ol,ul{padding-left:1.3rem}
+  li{margin:.32em 0}
+  @media print{
+    .bar{display:none}
+    body{background:#fff; color:#000; font-size:10.5pt; line-height:1.5}
+    main{max-width:none; padding:0}
+    h2{page-break-after:avoid; border-top:1px solid #bbb}
+    table,blockquote,li{page-break-inside:avoid}
+    blockquote{background:#f4f4f4; border-left:2px solid #666}
+    th{background:#eee}
+    a{color:#000; text-decoration:none}
+    a[href^="http"]::after{content:" (" attr(href) ")"; font-size:8pt; color:#555}
+  }
+</style>
+</head>
+<body>
+<nav class="bar">
+  <span class="brand">WKAppBot</span>
+  <span class="sp"></span>
+  <button id="theme" type="button" title="Toggle light and dark">Theme</button>
+  <button id="print" type="button" title="Print or save as PDF">Save as PDF</button>
+  <a href="https://github.com/kiexpert/wkappbot-sdk/blob/main/REFLEX-CONSTITUTION.md">Source .md</a>
+  <a href="https://github.com/kiexpert/wkappbot-sdk">Repository</a>
+</nav>
+
+<main>
+  <p id="status">Loading the constitution…</p>
+  <article id="doc" hidden></article>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+<script>
+(function () {
+  var statusEl = document.getElementById('status');
+  var docEl = document.getElementById('doc');
+
+  // ORDER MATTERS: a local clone and a root-served Pages site resolve one of the relative paths;
+  // a docs-only Pages site resolves neither, so the raw URL is the one that always answers.
+  var SOURCES = [
+    'REFLEX-CONSTITUTION.md',
+    '../REFLEX-CONSTITUTION.md',
+    'https://raw.githubusercontent.com/kiexpert/wkappbot-sdk/main/REFLEX-CONSTITUTION.md'
+  ];
+
+  function render(md) {
+    if (typeof marked === 'undefined') {
+      // The renderer is a convenience, never the content. Without it the reader still gets the
+      // whole document as text rather than an error page.
+      var pre = document.createElement('pre');
+      pre.style.whiteSpace = 'pre-wrap';
+      pre.textContent = md;
+      docEl.appendChild(pre);
+    } else {
+      marked.setOptions({ gfm: true, breaks: false });
+      docEl.innerHTML = marked.parse(md);
+    }
+    docEl.hidden = false;
+    statusEl.hidden = true;
+    var h1 = docEl.querySelector('h1');
+    if (h1) { document.title = h1.textContent + ' — WKAppBot'; }
+  }
+
+  function tryNext(i) {
+    if (i >= SOURCES.length) {
+      statusEl.innerHTML =
+        'Could not load the document from this page. Read it directly at ' +
+        '<a href="https://github.com/kiexpert/wkappbot-sdk/blob/main/REFLEX-CONSTITUTION.md">' +
+        'REFLEX-CONSTITUTION.md</a>.';
+      return;
+    }
+    fetch(SOURCES[i], { cache: 'no-cache' })
+      .then(function (r) { if (!r.ok) { throw new Error(r.status); } return r.text(); })
+      .then(render)
+      .catch(function () { tryNext(i + 1); });
+  }
+  tryNext(0);
+
+  document.getElementById('print').addEventListener('click', function () { window.print(); });
+
+  var themeBtn = document.getElementById('theme');
+  try {
+    var saved = localStorage.getItem('wk-const-theme');
+    if (saved) { document.documentElement.setAttribute('data-theme', saved); }
+  } catch (e) { /* private mode or blocked storage: the media query still decides */ }
+  themeBtn.addEventListener('click', function () {
+    var cur = document.documentElement.getAttribute('data-theme');
+    var next = cur === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    try { localStorage.setItem('wk-const-theme', next); } catch (e) { /* not essential */ }
+  });
+})();
+</script>
+</body>
+</html>
