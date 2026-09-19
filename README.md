@@ -17,6 +17,10 @@
 **Windows + Android UI automation for Claude, GPT, Gemini, Copilot, and any AI agent.**
 Focusless. Self-healing. AI-native. The open-source bridge between LLMs and the apps humans already use.
 
+> ⚖️ **[The Reflex Constitution →](./REFLEX-CONSTITUTION.md)** · *[read as a page](https://kiexpert.github.io/wkappbot-sdk/reflex-constitution.html)*
+> How this project governs the speed of its own AI: norms that **execute** rather than a document that is filed.
+> **The system refuses its own authors** — and Article 12 states in advance what would prove it wrong.
+
 ---
 
 > 🤖 **Let your AI agent control any Windows app — without screen takeover.**
