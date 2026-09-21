@@ -18,7 +18,7 @@ try {
     }
 
     # The Claude-named wrapper set (the primary harness entry points).
-    $wrapperNames = @('Agent','Bash','Cmd','Edit','Glob','Grep','PowerShell','Read','Write')
+    $wrapperNames = @('Agent','Bash','Edit','Glob','Grep','PowerShell','Read','Write')
     $stale = New-Object 'System.Collections.Generic.List[string]'
     $checked = 0
     foreach ($n in $wrapperNames) {
