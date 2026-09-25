@@ -426,7 +426,7 @@ wkappbot skill read sdk-gg-main-automation then run health check: bash scripts/g
 ## harness:warn wkedit.*--line.*\\
 wkappbot file edit --old-file /tmp/old.txt --new-file /tmp/new.txt FILE
 
-## harness:block (?i)bash.*powershell|bash.*pwsh
+## harness:block (?i)bash\b.*(?:^|[\s;&|('"\\/])(?:powershell|pwsh)(?:\.exe)?['"]?\s+-
 Use PowerShell tool directly
 
 ## harness:done (?i)skipped|완료|완성|끝
