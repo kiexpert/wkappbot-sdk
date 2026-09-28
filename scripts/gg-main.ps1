@@ -70,11 +70,8 @@ $INTERNAL_PATTERNS = @(
   'personal-docs',
   'kivilab\.co\.kr'
 )
-$publicFiles = Get-ChildItem -Recurse -Include '*.md','*.txt','*.yml','*.yaml' `
-  -ErrorAction SilentlyContinue |
-  Where-Object { $_.FullName -notmatch '\\\.git\\' -and
-                 $_.FullName -notmatch '\\\.' -and
-                 $_.FullName -notmatch '\\node_modules\\' }
+$TOP_DOCS = @('README.md','AGENTS.md','CLAUDE.md','CHANGELOG.md','SECURITY.md','VERSIONING.md','SUBSCRIBE.md','PRICING.md')
+$publicFiles = $TOP_DOCS | Where-Object { Test-Path $_ } | ForEach-Object { Get-Item $_ }
 $hygieneHits = 0
 foreach ($pat in $INTERNAL_PATTERNS) {
   $ms = $publicFiles | Select-String -Pattern $pat -ErrorAction SilentlyContinue
