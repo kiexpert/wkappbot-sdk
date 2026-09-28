@@ -5,9 +5,23 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [7.10.0-sdk] - 2026-09-28
 
-### Aligned with WKAppBot core v7.10 (official QA launch)
+### Aligned with WKAppBot core v7.10 — Indexer & Executor Consolidation
 
-Full v7.10.0-sdk release notes to be filled in Phase 3 (opus release conductor). Note: 7.7-7.9 SDK entries were skipped upstream and are not backfilled by this release; the changelog jumps 7.6.0-sdk to 7.10.0-sdk by design.
+**Core highlights**
+- **Memory system: wkhippo indexer parity** — regex search over Claude/Codex transcripts with persistent weekly cache; `wkhippo trace SID` for one-session event tails
+- **ReadFormatter: exact-phrase then keyword fallback** — copy-pasted quotes never return "no match" when words are present
+- **Executor & spawn-site: one core-path resolver** — every spawn call through `Program.ResolveExistingCoreExe`
+- **Hotswap: swap only, never kill** — stale-worker kill loop removed from `PerformHotSwap`
+- **Harness reflex** — branch-switch refusal in shared working trees; bash-pwsh flag-only refusal
+- **Skill 3-tier migration** — `wk-unwired` fully tiered; SkillCommand.Edit gained delete-step verbatim-quote guard
+- **Raw command line pipeline** — launcher forwards caller raw command line to Eye; MCP runner hands it via `WKAPPBOT_RAW_CMDLINE`
+
+**SDK maintenance since v7.6.0-sdk**
+- Bash-pwsh block refinement: matches only powershell/pwsh CALLED with a flag; path-prefixed powershell.exe still refused
+- Codex SKILL.md mirrors retired at call site
+- wkdoctor agy integration carried forward from 7.6.0-sdk
+
+See [WKAppBot core v7.10.0 release notes](https://github.com/kiexpert/WKAppBot/releases/tag/v7.10.0) for full details. Note: SDK jumps 7.6.0-sdk → 7.10.0-sdk by design to align with core minor.
 
 ---
 
@@ -60,7 +74,7 @@ Full v7.10.0-sdk release notes to be filled in Phase 3 (opus release conductor).
 - **MyCdpContext.ChromeHealthCheck**: `DiagnoseExcessiveChromeProcesses()` and `CleanExcessiveChromeProcesses()` for SDK-side mitigation when Core `FindRunningChromePortAny` guard is not yet deployed (deploy verification pending on Core repo).
 
 ### Notes
-- WKAppBot core repo (`D:/GitHub/WKAppBot`) commit `41f722f49` carries the `wkask`/`wkcdp-mon` source fixes; push to private remote is blocked by pre-existing large-file commits unrelated to this release. Local fix is active in `D:/GitHub/WKAppBot/bin/` and consumed by both the SDK launcher and operator scripts.
+- WKAppBot core repository commit `41f722f49` carries the `wkask`/`wkcdp-mon` source fixes. Local mitigation is active in the SDK launcher and operator scripts.
 
 ## [7.4.0-sdk] - 2026-05-25
 
