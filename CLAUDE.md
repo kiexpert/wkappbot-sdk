@@ -1,4 +1,4 @@
-# WKAppBot v7.6.0-sdk - Windows + Android App Automation Test Framework
+# WKAppBot v7.10.0-sdk - Windows + Android App Automation Test Framework
 
 ## Operating Rules (READ FIRST)
 
@@ -552,7 +552,6 @@ wkappbot skill read claude-md-harness-rules     # Task: harness:skill rule + stu
 - [ ] [CDP-TODO-5] Haiku isHaikuSession not propagated to subagents (suggest filed). Core fix needed for proper Haiku subagent exemption.
 - [ ] [CDP-TODO-6] CronDelete stall-guard false positive (suggest needed). One-time admin ops should be exempt.
 
-- [ ] ChatSessionGuard: AI-spawned child processes killable without restriction (suggest 1779528582 pending) -- merge with [2] zombie over-protect, fix together
 - [ ] FOCUS-STEAL: FocusStealSentinel Core issue (suggest 2026-05-23T09:07:20)
 - [ ] suggest check corrupts production skill: co-resolve requirement cmds mutate live skill (NOT clone/dry-run) -- file suggest to Core
 - [ ] on-load skill co-resolve check (2026-05-23T06:18:21): DO NOT rerun -- will re-corrupt. Needs requirement rewrite to use clone target
