@@ -1,6 +1,6 @@
 # Harness Guard Verification Spec
 
-Create and run a PowerShell test harness at `D:/GitHub/wkappbot-sdk/test-harness-verify.ps1`.
+Create and run a PowerShell test harness as `test-harness-verify.ps1` in the repository root.
 
 ## Requirements
 - Use ONLY `[System.Diagnostics.ProcessStartInfo]` to spawn child processes.
@@ -22,17 +22,17 @@ For case 4, Arguments is the string: two forward slashes, then `c wkappbot windo
 
 ## Self-test (case 6)
 - FileName: powershell.exe
-- Arguments: `-NoProfile -ExecutionPolicy Bypass -File "D:\GitHub\wkappbot-kih\tools\wkharness.ps1" -Test`
+- Arguments: `-NoProfile -ExecutionPolicy Bypass -File wkharness.ps1 -Test`
 - Env: WKHARNESS_SELFTEST=1
 - Report PASS/FAIL count parsed from its output.
 
 ## Output
 - Print a summary table: Case | ExitCode | TagFound | PASS/FAIL.
-- WorkingDirectory for spawned children = D:/GitHub/wkappbot-sdk.
+- WorkingDirectory for spawned children = repository root.
 
 ## Execute
 After writing the script, run it via:
-`powershell.exe -NoProfile -ExecutionPolicy Bypass -File D:/GitHub/wkappbot-sdk/test-harness-verify.ps1`
+`powershell.exe -NoProfile -ExecutionPolicy Bypass -File test-harness-verify.ps1`
 Print the full output.
 
 Exit criterion: script ran and printed the summary table with all 6 results.

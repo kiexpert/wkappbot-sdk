@@ -207,8 +207,7 @@ Wrappers pipe stdin JSON through wkharness.ps1 (pre-tool guard) before executing
 | Shell (ps) | `PowerShell.cmd` | `shell powershell ...` |
 | Delegate agent | `Agent.cmd` | direct agent spawn |
 
-Wrapper location: `D:\GitHub\WKAppBot\bin\` (symlinked from `D:\GitHub\personal-docs\tools\`).
-Add this bin dir to PATH so wrappers resolve without full paths.
+Wrapper location: the SDK's `bin/` directory. Add this to PATH so wrappers resolve without full paths.
 
 Why: native tools bypass wkharness guards (spec-gate, brief-guard, pace-guard, harness:block).
 Violations are blocked by wkharness PreToolUse hook via harness:block patterns in CLAUDE.md.
