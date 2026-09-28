@@ -52,6 +52,7 @@ bin/wkappbot.hq/profiles/*/stt_*.jsonl
 *.DotSettings.user
 
 # Output & Temp files
+bin/*-syntax-err.txt
 output/
 logs/
 /profiles/
