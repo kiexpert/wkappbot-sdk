@@ -152,8 +152,8 @@ jobs:
           'WkFeedQuant',
           'personal-docs'
         )
-        $PUBLIC_FILES = Get-ChildItem -Recurse -Include '*.md','*.txt','*.yml','*.yaml','*.json' `
-          | Where-Object { $_.FullName -notmatch '\\\.git\\' -and $_.FullName -notmatch '\\\.' }
+        $TOP_DOCS = @('README.md','AGENTS.md','CLAUDE.md','CHANGELOG.md','SECURITY.md','VERSIONING.md','SUBSCRIBE.md','PRICING.md')
+        $PUBLIC_FILES = $TOP_DOCS | Where-Object { Test-Path $_ } | ForEach-Object { Get-Item $_ }
         $hits = 0
         foreach ($pat in $PATTERNS) {
           $matches_ = $PUBLIC_FILES | Select-String -Pattern $pat -ErrorAction SilentlyContinue

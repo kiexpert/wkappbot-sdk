@@ -23,7 +23,7 @@ When bumping minor version (e.g. `4.6 -> 4.7`):
 | File | What to change |
 |------|---------------|
 | `csharp/Directory.Build.props` | `<WKAppBotBaseVersion>4.7</WKAppBotBaseVersion>` |
-| `CLAUDE.md` | Header line: `# WKAppBot v4.7.0 - ...` |
+| `CLAUDE.md` | Header line: `# WKAppBot v7.10.0-sdk - ...` |
 | `VERSIONING.md` | Update version references if needed |
 
 **If you skip the bump commit:** git pickaxe won't find the new version string
@@ -34,7 +34,7 @@ Features committed before the bump will show under the old minor version.
 
 ## Current version
 
-`7.6.0` -- bumped at 2026-06-09 -- aligned to Core base 7.6. wkdoctor agy (antigravity CLI) integration: check 08-harness-connection for agy + gemini settings auto-recovery; Claude settings validation + wildcard bypass rules; tool alias symlink auto-repair (PATH order + doctor-bin fallback); agy wrapper shim policy revert (delegate to wrapper install); ghost score/depth penalty normalization
+`v7.10.0-sdk` -- bumped at 2026-09-28 -- unified main-duty runner, user-perspective QA workflow, hygiene scan fixes, wkpushsdk path fix, CHANGELOG 7.10.0-sdk filled. wkdoctor agy (antigravity CLI) integration: check 08-harness-connection for agy + gemini settings auto-recovery; Claude settings validation + wildcard bypass rules; tool alias symlink auto-repair (PATH order + doctor-bin fallback); agy wrapper shim policy revert (delegate to wrapper install); ghost score/depth penalty normalization
 
 ## Previous version
 

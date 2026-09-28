@@ -1,8 +1,8 @@
-﻿scenario:
+scenario:
   name: "Web UI Phase 1 — In-page Interactions"
 
 app:
-  launch: "chrome.exe file:///D:/GitHub/WKAppBot/output/web_test.html"
+  launch: "chrome.exe file:///PATH_TO_WEB_TEST_HTML/web_test.html"
   wait_for_window:
     title_contains: "WKAppBot Web"
 

@@ -13,7 +13,7 @@ This is a PUBLIC repository. Every root/session here carries two ALWAYS-ON main-
 
 1. **EXTERNAL-USER QA.** Exercise wkappbot / the SDK as a FRESH external user with no insider knowledge: read the public README and docs as a newcomer, run the documented commands and public examples, and file every point of friction, confusing output, broken example, or defect via `wkappbot suggest` (a real repro plus 3 requirements). The goal is to find what a real outside user would hit before they do.
 
-2. **PUBLIC-REPO SECRET HYGIENE -- no exposed development, business, or secret information.** Continuously, and before any commit, scan the repo for anything that must NOT be public: credentials / tokens / API keys / PINs (NEVER any value from `D:\GitHub\.env`), internal-only URLs / hostnames / absolute machine paths, unreleased or internal development detail, and business / sales-sensitive information. If any is found: remove or replace it with a neutral placeholder, then report it. A public repo that leaks a secret or an internal detail is the HIGHEST-severity defect here -- treat it ahead of any other work.
+2. **PUBLIC-REPO SECRET HYGIENE -- no exposed development, business, or secret information.** Continuously, and before any commit, scan the repo for anything that must NOT be public: credentials / tokens / API keys / PINs (NEVER any value from the central credentials file), internal-only URLs / hostnames / absolute machine paths, unreleased or internal development detail, and business / sales-sensitive information. If any is found: remove or replace it with a neutral placeholder, then report it. A public repo that leaks a secret or an internal detail is the HIGHEST-severity defect here -- treat it ahead of any other work.
 
 3. **RELEASE & PUBLIC-FACE UPKEEP.** Keep the public release surface current and internally consistent, because there is a lot of it and it drifts easily:
    - **Launcher & core VERSION**: the version the launcher and core report, kept in sync with the actual released build.
@@ -45,7 +45,7 @@ This is a PUBLIC repository. Every root/session here carries two ALWAYS-ON main-
 - **eye tick**: one-shot status query (includes ctx=N%) / **eye**: FSW hybrid loop
 - **Handoff**: `wkappbot newchat "prompt"` -- passes context summary to new chat
 - **Cro card forbidden!**: OpenClaw(Cro) is a separate service -- do not modify. Only Claude cards OK.
-- **CWD shorthand**: `D:\GitHub\WKAppBot` -> `WG-WKAppBot` / noise filters: `NO_REPLY`, `?긱꽦`
+- **CWD shorthand**: `<WKAppBot-repo>` -> `WG-WKAppBot` / noise filters: `NO_REPLY`, `?긱꽦`
 - **Skill discovery**: use `wkappbot skill search <topic>` first; if the user says `?긱꽦` or `?긱꽦??, also search `wkappbot skill search ?긱꽦` or `wkappbot skill search ?긱꽦??.
 
 ### Build & Deploy
@@ -252,7 +252,7 @@ MFC controls: almost no UIA patterns -> Win32 message fallback required. Heroes 
 ## Internal Tools
 
 ### wkfind - Unified Code + Session Search
-**Location**: `D:\GitHub\WKAppBot\bin\wkfind.ps1` (core repo)
+**Location**: `<WKAppBot-repo>/bin/wkfind.ps1` (core repo)
 **Usage**: `wkfind [--day|--week|--month|--year|--unlimited] <keyword1> <keyword2> ...`
 
 Unified multi-keyword search across code + Claude sessions:
@@ -347,7 +347,7 @@ Execute in order when user sends `gg` or `gogo`. This is the project's recurring
 
 > **FOCUS**: SDK Launcher (`WKAppBot.Launcher/*`), HWND validation, CDP monitoring/suggest triage, suggest resolution.
 > **OUT OF SCOPE (Core repo)**: ClaudePromptHelper, CdpClient internals, ChromeLauncher core logic ??delegate to Opus agent (`wkappbot ask opus "..."`) or Core maintainers.
-> **Boundary**: If you find a bug in Core (`D:\GitHub\WKAppBot\csharp\src\...`), file a suggest and optionally spawn Opus agent to fix in the private repo. Your repo builds, tests, and deploys the launcher binary only. Core fixes require separate build+deploy in the private repo.
+> **Boundary**: If you find a bug in Core (`<WKAppBot-repo>/csharp/src/...`), file a suggest and optionally spawn Opus agent to fix in the private repo. Your repo builds, tests, and deploys the launcher binary only. Core fixes require separate build+deploy in the private repo.
 
 ---
 
@@ -429,10 +429,6 @@ https://chatgpt.com/codex/settings/usage to purchase more credits or try again a
 
 ### CronCreate(cron="13 4 * * *", durable=true, recurring=true)
 wkappbot skill read skill-heal-nightly then run STEP 2 HEALING as Opus subagent from repository root. Proceed autonomously without user confirmation.
-
-
-<!-- KillForeign hourly cron REMOVED 2026-05-31: blind kill without diagnosis. CDP issues now handled by gg-main 3h cycle with full diagnosis + escalation. -->
-- [x] DONE (2026-05-31 gg-main+nightly cluster): gg-main Section D CDP live monitoring; Core fixes 82d60f74f+ce6ee8569 (cdp open 143min->15s, O(1) wmic); 3h checks Eye/Chrome cleaned; nightly-heal 3ok/54-cross-repo/630-norefs v7.5 OK; Chrome 202->7 emergency cleanup; wkask.sh \n fix 94026081c
 
 ### CronCreate(cron="0 */3 * * *", durable=true, recurring=true)
 wkappbot skill read sdk-gg-main-automation then run health check: bash scripts/gg-main.sh from repository root. If any issues (Amber status or critical red flags detected): spawn Opus agent to diagnose root cause and implement autonomous fixes per escalation rules (Chrome mult->Core escalate, Eye lag->taskkill+restart, CI fail->fix+push).
