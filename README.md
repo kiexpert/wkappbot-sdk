@@ -153,7 +153,7 @@ The chain grows. The system gets harder to break.
 
 ## What's New
 
-Current binary: `wkappbot --version` reports the installed build number; the public repo's latest tagged release is [v7.6.86-sdk](https://github.com/kiexpert/wkappbot-sdk/releases/tag/v7.6.86-sdk) (2026-07-05). Curated highlights below cover through v7.6.0 -- see [Releases](https://github.com/kiexpert/wkappbot-sdk/releases) and the [full compare](https://github.com/kiexpert/wkappbot-sdk/compare/v7.6.0-sdk...v7.6.86-sdk) for everything since.
+Current binary: `wkappbot --version` reports the installed build number; the public repo's latest tagged release is [v7.10.0-sdk](https://github.com/kiexpert/wkappbot-sdk/releases/tag/v7.10.0-sdk) (2026-09-28). Curated highlights below cover through v7.10.0 (aligned with WKAppBot core v7.10, official QA launch 2026-09-28) -- see [Releases](https://github.com/kiexpert/wkappbot-sdk/releases) and the [full compare](https://github.com/kiexpert/wkappbot-sdk/compare/v7.6.0-sdk...v7.10.0-sdk) for everything since.
 
 ### v7.6.0 highlights
 

@@ -3,6 +3,14 @@
 All notable changes to WKAppBot SDK are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [7.10.0-sdk] - 2026-09-28
+
+### Aligned with WKAppBot core v7.10 (official QA launch)
+
+Full v7.10.0-sdk release notes to be filled in Phase 3 (opus release conductor). Note: 7.7-7.9 SDK entries were skipped upstream and are not backfilled by this release; the changelog jumps 7.6.0-sdk to 7.10.0-sdk by design.
+
+---
+
 ## [7.6.0-sdk] - 2026-06-09
 
 ### Added
