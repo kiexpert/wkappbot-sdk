@@ -1,0 +1,200 @@
+name: User-Perspective QA
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'   # every 6h (UTC): 00:00 06:00 12:00 18:00
+  workflow_dispatch:
+    inputs:
+      plant_mismatch:
+        description: 'Plant a version mismatch to verify detection (true/false)'
+        required: false
+        default: 'false'
+
+jobs:
+  fresh-user-install:
+    name: Fresh-User Install & Smoke (Windows)
+    runs-on: windows-latest
+    permissions:
+      contents: read
+      issues: write
+
+    steps:
+    # ── 0. Checkout ───────────────────────────────────────────────────────
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    # ── 1. Setup .NET 8 (build requirement per README) ───────────────────
+    - name: Setup .NET 8 SDK
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+
+    # ── 2. Build from source exactly as README instructs ─────────────────
+    - name: Build (README: build.cmd)
+      shell: cmd
+      run: |
+        build.cmd 2>&1
+        if %ERRORLEVEL% NEQ 0 (
+          echo ::error::build.cmd failed with exit %ERRORLEVEL%
+          exit /b %ERRORLEVEL%
+        )
+        echo BUILD_OK=true >> "%GITHUB_ENV%"
+
+    # ── 3. Add bin to PATH (README step) ─────────────────────────────────
+    - name: Add bin to PATH
+      shell: pwsh
+      run: |
+        $bin = Join-Path $env:GITHUB_WORKSPACE "bin"
+        echo "$bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+        Write-Host "Added to PATH: $bin"
+
+    # ── 4. README verify: wkappbot --version ─────────────────────────────
+    - name: Verify install (wkappbot --version)
+      shell: pwsh
+      run: |
+        $out = & wkappbot --version 2>&1
+        $out | Out-File -FilePath qa-version.txt -Encoding utf8
+        Write-Host "=== wkappbot --version ==="
+        Get-Content qa-version.txt
+        if (-not ($out -match '\d+\.\d+\.\d+')) {
+          Write-Error "::error::wkappbot --version did not print a version number"
+          exit 1
+        }
+        Write-Host "PASS: version string found"
+
+    # ── 5. README verify: wkappbot skill list ────────────────────────────
+    - name: Verify skill list (wkappbot skill list)
+      shell: pwsh
+      run: |
+        $out = & wkappbot skill list 2>&1
+        $out | Out-File -FilePath qa-skill-list.txt -Encoding utf8
+        Write-Host "=== wkappbot skill list (first 20 lines) ==="
+        Get-Content qa-skill-list.txt | Select-Object -First 20
+        if ($LASTEXITCODE -ne 0) {
+          Write-Error "::error::wkappbot skill list exited $LASTEXITCODE"
+          exit 1
+        }
+        Write-Host "PASS: skill list returned"
+
+    # ── 6. README verify: wkappbot --help ────────────────────────────────
+    - name: Verify help output (wkappbot --help)
+      shell: pwsh
+      run: |
+        $out = & wkappbot --help 2>&1
+        $out | Out-File -FilePath qa-help.txt -Encoding utf8
+        Write-Host "=== wkappbot --help (first 30 lines) ==="
+        Get-Content qa-help.txt | Select-Object -First 30
+        # README documents these subcommands -- verify they appear in --help
+        $required = @('a11y', 'skill', 'eye', 'ask', 'chat', 'file')
+        $helpText = Get-Content qa-help.txt -Raw
+        $missing = $required | Where-Object { $helpText -notmatch [regex]::Escape($_) }
+        if ($missing) {
+          $missing | ForEach-Object { Write-Host "::error::Subcommand '$_' missing from --help" }
+          exit 1
+        }
+        Write-Host "PASS: all documented subcommands present in --help"
+
+    # ── 7. Version consistency: README vs VERSIONING.md vs CHANGELOG ─────
+    - name: Version consistency check
+      shell: pwsh
+      run: |
+        $plant = '${{ github.event.inputs.plant_mismatch }}' -eq 'true'
+
+        # Read current version from VERSIONING.md
+        $versioningContent = Get-Content VERSIONING.md -Raw -ErrorAction SilentlyContinue
+        $verMatch = [regex]::Match($versioningContent, 'v(\d+\.\d+\.\d+(?:-sdk)?)')
+        $verVersion = if ($verMatch.Success) { $verMatch.Groups[1].Value } else { "" }
+
+        # Read version from README
+        $readmeContent = Get-Content README.md -Raw
+        $readmeMatch = [regex]::Match($readmeContent, 'v(\d+\.\d+\.\d+-sdk)')
+        $readmeVersion = if ($readmeMatch.Success) { $readmeMatch.Groups[1].Value } else { "" }
+
+        # Read top version from CHANGELOG
+        $changelogContent = Get-Content CHANGELOG.md -Raw -ErrorAction SilentlyContinue
+        $clMatch = [regex]::Match($changelogContent, '##\s+\[(\d+\.\d+\.\d+(?:-sdk)?)\]')
+        $clVersion = if ($clMatch.Success) { $clMatch.Groups[1].Value } else { "" }
+
+        if ($plant) {
+          # Simulate a mismatch by injecting a fake version
+          Write-Host "::notice::PLANT MODE: injecting fake version to verify detection"
+          $verVersion = "9.99.99"
+        }
+
+        Write-Host "VERSIONING.md: $verVersion"
+        Write-Host "README.md:     $readmeVersion"
+        Write-Host "CHANGELOG.md:  $clVersion"
+
+        $fail = 0
+        if ($verVersion -and $readmeVersion -and ($verVersion -replace '-sdk','') -ne ($readmeVersion -replace '-sdk','')) {
+          Write-Host "::error::Version mismatch: VERSIONING=$verVersion README=$readmeVersion"
+          $fail++
+        }
+        if ($clVersion -and $readmeVersion -and ($clVersion -replace '-sdk','') -ne ($readmeVersion -replace '-sdk','')) {
+          Write-Host "::error::Version mismatch: CHANGELOG=$clVersion README=$readmeVersion"
+          $fail++
+        }
+        if ($fail -gt 0) { exit 1 }
+        Write-Host "PASS: version strings consistent"
+
+    # ── 8. Secret hygiene: no internal paths in public docs ──────────────
+    - name: Secret / internal-path hygiene scan
+      shell: pwsh
+      run: |
+        $PATTERNS = @(
+          'D:\\GitHub\\',
+          'D:/GitHub/',
+          'C:\\Program Files\\dotnet',
+          'C:/Program Files/dotnet',
+          'kiexpert@',
+          'kivilab\.co\.kr',
+          'WkAutoQuant',
+          'WkFeedQuant',
+          'personal-docs'
+        )
+        $PUBLIC_FILES = Get-ChildItem -Recurse -Include '*.md','*.txt','*.yml','*.yaml','*.json' `
+          | Where-Object { $_.FullName -notmatch '\\\.git\\' -and $_.FullName -notmatch '\\\.' }
+        $hits = 0
+        foreach ($pat in $PATTERNS) {
+          $matches_ = $PUBLIC_FILES | Select-String -Pattern $pat -ErrorAction SilentlyContinue
+          foreach ($m in $matches_) {
+            Write-Host "::error::Internal reference in $($m.Filename):$($m.LineNumber): $pat"
+            $hits++
+          }
+        }
+        if ($hits -gt 0) { exit 1 }
+        Write-Host "PASS: no internal references found ($($PUBLIC_FILES.Count) files scanned)"
+
+    # ── 9. Upload all QA outputs as artifact ─────────────────────────────
+    - name: Upload QA artifacts
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: user-perspective-qa-${{ github.run_id }}
+        path: |
+          qa-version.txt
+          qa-skill-list.txt
+          qa-help.txt
+        retention-days: 30
+
+    # ── 10. Job summary ───────────────────────────────────────────────────
+    - name: Write job summary
+      if: always()
+      shell: pwsh
+      run: |
+        $lines = @(
+          "## User-Perspective QA Results",
+          "",
+          "Run: ${{ github.run_id }} | Ref: ${{ github.ref_name }} | $(Get-Date -Format 'yyyy-MM-dd HH:mm UTC')",
+          "",
+          "| Step | Notes |",
+          "|---|---|",
+          "| Build from source | build.cmd |",
+          "| wkappbot --version | see qa-version.txt artifact |",
+          "| wkappbot skill list | see qa-skill-list.txt artifact |",
+          "| wkappbot --help | all documented subcommands checked |",
+          "| Version consistency | VERSIONING / README / CHANGELOG |",
+          "| Secret hygiene | internal paths in public docs |",
+          ""
+        )
+        $lines | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append
