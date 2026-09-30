@@ -3,6 +3,26 @@
 All notable changes to WKAppBot SDK are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [7.11.0-sdk] - 2026-09-30
+
+### Aligned with WKAppBot core v7.11 — macOS Portable Phase 1 + CLI Improvements
+
+**Core highlights**
+- **macOS Portable Phase 1**: net8.0 multi-targeting for Abstractions, Shared, PluginContract, Android; Portable.slnf build path; EnableWindowsTargeting for macOS CI validation
+- **Global options from any position**: --keep, --budget, --sudo, --timeout peel before subcommand via PeelPreCommandGlobalOpts (wkappbot-cli-argument-order-spec compliant)
+- **file-edit diff output**: ANSI background coloring in diff hunks plus byte-change counts plus explicit success indicators
+- **a11y-find output cleanup**: removed JSON and ANSI escape pollution from System and Mouse sections
+- **Launcher safety**: PID verification before TerminateProcess prevents wrong-process kill
+
+**Fixes**
+- skill-search: --budget flag now properly consumes its value argument
+- help: add missing ime-relay-daemon entry to CommandHelpMap
+- Portable CI: relax global.json rollForward to latestFeature; correct Portable.slnf JSON format
+
+See [WKAppBot core v7.11.0 release notes](https://github.com/kiexpert/WKAppBot/releases/tag/v7.11.0) for full details.
+
+---
+
 ## [7.10.0-sdk] - 2026-09-28
 
 ### Aligned with WKAppBot core v7.10 — Indexer & Executor Consolidation

@@ -153,9 +153,17 @@ The chain grows. The system gets harder to break.
 
 ## What's New
 
-Current binary: `wkappbot --version` reports the installed build number; the public repo's latest tagged release is [v7.10.0-sdk](https://github.com/kiexpert/wkappbot-sdk/releases/tag/v7.10.0-sdk) (2026-09-28). Curated highlights below cover through v7.10.0 (aligned with WKAppBot core v7.10, official QA launch 2026-09-28) -- see [Releases](https://github.com/kiexpert/wkappbot-sdk/releases) and the [full compare](https://github.com/kiexpert/wkappbot-sdk/compare/v7.6.0-sdk...v7.10.0-sdk) for everything since.
+Current binary: `wkappbot --version` reports the installed build number; the public repo's latest tagged release is [v7.11.0-sdk](https://github.com/kiexpert/wkappbot-sdk/releases/tag/v7.11.0-sdk) (2026-09-30). Curated highlights below cover through v7.11.0 (aligned with WKAppBot core v7.11, macOS Portable Phase 1 + CLI Improvements 2026-09-30) -- see [Releases](https://github.com/kiexpert/wkappbot-sdk/releases) and the [full compare](https://github.com/kiexpert/wkappbot-sdk/compare/v7.10.0-sdk...v7.11.0-sdk) for everything since.
 
-### v7.6.0 highlights
+### v7.11.0-sdk highlights (core v7.11 — macOS Portable Phase 1 + CLI Improvements)
+
+- **macOS Portable Phase 1** — net8.0 multi-targeting for Abstractions/Shared/PluginContract/Android; Portable.slnf for non-Windows builds; EnableWindowsTargeting for macOS CI.
+- **Global options from any position** — `--keep`, `--budget`, `--sudo`, `--timeout` peel before subcommand via PeelPreCommandGlobalOpts.
+- **file-edit diff** — ANSI background coloring on hunks, byte-change counts, explicit success indicators.
+- **a11y-find cleanup** — no more JSON/ANSI escape pollution in System and Mouse sections.
+- **Launcher PID safety** — TerminateProcess verified by PID before calling.
+
+### v7.10.0-sdk highlights (core v7.10 — Indexer & Executor Consolidation)
 
 - **wkdoctor agy integration** -- antigravity CLI detection and Gemini settings auto-recovery via `check 08-harness-connection`.
 - **Tool alias auto-repair** -- wkdoctor automatically detects and repairs broken tool alias symlinks (wkappbot.exe -> a11y.exe).
