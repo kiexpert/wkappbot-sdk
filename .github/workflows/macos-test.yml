@@ -1,0 +1,51 @@
+name: MacOS Test
+
+on:
+  workflow_dispatch:
+  repository_dispatch:
+    types: [macos-test]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7  # v5
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Clone dependencies
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.WKAPPBOT_CORE_PAT }}
+        run: |
+          git clone --depth 1 "https://x-access-token:${GH_TOKEN}@github.com/kiexpert/WKAppBot.git" wkab
+
+      - name: Print environment
+        shell: bash
+        run: dotnet --info
+
+      - name: Build portable
+        shell: bash
+        run: |
+          if [ -f wkab/csharp/Portable.slnf ]; then
+            output_file="build_output.log"
+            dotnet build wkab/csharp/Portable.slnf -f net8.0 -v q > "$output_file" 2>&1
+            exit_code=$?
+            if [ $exit_code -eq 0 ]; then
+              echo "✓ Build completed successfully"
+            else
+              echo "✗ Build failed with exit code $exit_code"
+              tail -n 20 "$output_file"
+            fi
+            exit $exit_code
+          else
+            echo "Portable build not available yet"
+            exit 0
+          fi
