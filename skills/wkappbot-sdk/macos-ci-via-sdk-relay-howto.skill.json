@@ -1,0 +1,53 @@
+{
+  "id": "macos-ci-via-sdk-relay-howto",
+  "app": "wkappbot-sdk",
+  "title": "macOS CI via SDK relay implementation",
+  "title_ko": null,
+  "desc": "Procedure and implementation details for macOS portable .NET build validation",
+  "steps": [
+    "GitHub receives dispatch: workflow_dispatch from web UI or repository_dispatch via gh workflow run command",
+    "Workflow executes on macos-latest runner: .NET 8.0.x pre-installed by setup-dotnet action",
+    "Access control: WKAPPBOT_CORE_PAT secret (GitHub personal access token) clones kiexpert/WKAppBot private core with depth=1 for minimal download",
+    "Shell: bash used throughout for cross-platform compatibility (macOS native shell)",
+    "Token hygiene: GH_TOKEN env var passed to git clone command but never echoed to logs or console",
+    "Conditional build: checks if wkab/csharp/Portable.slnf exists before attempting dotnet build",
+    "Build command: dotnet build Portable.slnf -f net8.0 -v q redirects output to build_output.log for review",
+    "Success path: exit code 0 prints checkmark, echoes Build completed successfully",
+    "Failure path: exit code non-zero prints X, echoes Build failed with exit code N, tails last 20 lines of log file",
+    "Not-yet-available path: Portable.slnf missing, graceful exit 0 with no error (not a failure)",
+    "Public log location: GitHub Actions tab shows full logs but sensitive data (token, paths) stripped by wkappbot secret-masking policy",
+    "To test locally: clone repo, run dotnet build csharp/Portable.slnf -f net8.0 -v q if file exists"
+  ],
+  "requirements": [
+    {
+      "cmd": "dotnet --info",
+      "expect": "prints SDK version and runtime",
+      "prompt": null
+    },
+    {
+      "cmd": "test -f csharp/Portable.slnf",
+      "expect": "Portable.slnf present or exit 0 (not-yet-available)",
+      "prompt": null
+    },
+    {
+      "cmd": "dotnet build csharp/Portable.slnf -f net8.0",
+      "expect": "exit 0 on success or non-zero on build error",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "macos",
+    "ci",
+    "github-actions",
+    "dotnet",
+    "portable-build",
+    "implementation"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-09-30T03:19:07.7537473Z",
+  "updated": "2026-09-30T03:19:07.7537675Z",
+  "version": "1.0"
+}

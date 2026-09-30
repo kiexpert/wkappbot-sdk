@@ -1,0 +1,58 @@
+{
+  "id": "macos-ci-via-sdk-relay-ref",
+  "app": "wkappbot-sdk",
+  "title": "macOS CI via SDK relay work record",
+  "title_ko": null,
+  "desc": "Work record: creation, implementation, test results, and maintenance history for macOS portable .NET CI",
+  "steps": [
+    "Created: 2026-09-30 by Haiku sector + ROOT verification",
+    "Source file: .github/workflows/macos-test.yml in wkappbot-sdk origin/main",
+    "Proto: .tmp/macos-test-proto.yml (committed to origin/main via commit 3bb5b7c6)",
+    "Spec origin: Spokesman order for SDK phase 2 skeleton (GitHub Actions CI expansion for cross-platform validation)",
+    "Workflow file signature: 52 lines, uses actions/checkout@v4 + actions/setup-dotnet@v5",
+    "Entry point: on.workflow_dispatch (manual trigger) and on.repository_dispatch type=macos-test (automation trigger)",
+    "Environment baseline: macos-latest runner, .NET 8.0.x SDK",
+    "Portable.slnf file status: Not yet present in WKAppBot core repo (graceful no-op via exit 0)",
+    "Integration point: wkappbot-sdk .github/workflows/ directory (public GitHub Actions)",
+    "Cross-repo reference: kiexpert/WKAppBot private core cloned on-demand with WKAPPBOT_CORE_PAT secret",
+    "Test run: GitHub Actions run 36664055544 (workflow_dispatch trigger, 2026-09-30T12:20 UTC) (awaiting Portable.slnf availability in WKAppBot core)",
+    "Known limitations: Portable.slnf not yet available in core repo; workflow will run but report not-yet-available gracefully",
+    "Token security: GH_TOKEN env var masked in logs per GitHub Actions default masking policy",
+    "Log output: build_output.log written locally, final status (success/failure/skipped) echoed to console only",
+    "Maintenance: Review quarterly with wkappbot-sdk CI runs; update if .NET LTS version changes or Portable.slnf availability changes",
+    "Related skills: macos-ci-via-sdk-relay (Tier 1 usage), macos-ci-via-sdk-relay-howto (Tier 2 implementation), wkappbot-build-verify-workflow (SDK release CI)"
+  ],
+  "requirements": [
+    {
+      "cmd": "git log --oneline .github/workflows/macos-test.yml",
+      "expect": "workflow creation commit visible",
+      "prompt": null
+    },
+    {
+      "cmd": "gh workflow view macos-test.yml --repo kiexpert/wkappbot-sdk",
+      "expect": "workflow status and last run (if any)",
+      "prompt": null
+    },
+    {
+      "cmd": "test -f .github/workflows/macos-test.yml",
+      "expect": "workflow file present at origin/main",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "macos",
+    "ci",
+    "github-actions",
+    "dotnet",
+    "portable-build",
+    "reference",
+    "work-record"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-09-30T03:19:33.6942332Z",
+  "updated": "2026-09-30T03:22:24.9025036Z",
+  "version": "1.1"
+}

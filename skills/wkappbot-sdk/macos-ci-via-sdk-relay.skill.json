@@ -1,0 +1,46 @@
+{
+  "id": "macos-ci-via-sdk-relay",
+  "app": "wkappbot-sdk",
+  "title": "macOS CI via SDK relay",
+  "title_ko": null,
+  "desc": "GitHub Actions workflow validating WKAppBot portable .NET split on macOS",
+  "steps": [
+    "Trigger: GitHub Actions workflow runs on macOS-latest via workflow_dispatch or repository_dispatch (type: macos-test)",
+    "Environment: Runner macos-latest, .NET 8.0.x, Clones kiexpert/WKAppBot private core with WKAPPBOT_CORE_PAT secret",
+    "Workflow Steps: (1) Checkout wkappbot-sdk repository (2) Setup .NET 8.0.x environment (3) Clone WKAppBot core repo with depth=1 (4) Print .NET environment via dotnet --info (5) Conditionally build Portable.slnf if available",
+    "Output handling: Success shows Build completed successfully, Failure shows exit code N with tail last 20 lines, Not available gracefully exits 0",
+    "Public Log Hygiene: Token never echoed, only summary to console, no paths disclosed",
+    "To trigger: gh workflow run macos-test.yml --repo kiexpert/wkappbot-sdk"
+  ],
+  "requirements": [
+    {
+      "cmd": "test -f .github/workflows/macos-test.yml",
+      "expect": "macos-test.yml exists",
+      "prompt": null
+    },
+    {
+      "cmd": "gh workflow list --repo kiexpert/wkappbot-sdk",
+      "expect": "macos-test.yml listed",
+      "prompt": null
+    },
+    {
+      "cmd": "gh workflow view macos-test.yml --repo kiexpert/wkappbot-sdk",
+      "expect": "workflow contents shown",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "macos",
+    "ci",
+    "github-actions",
+    "dotnet",
+    "portable-build"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-09-30T02:57:29.6228911Z",
+  "updated": "2026-09-30T03:18:49.0563329Z",
+  "version": "1.1"
+}
