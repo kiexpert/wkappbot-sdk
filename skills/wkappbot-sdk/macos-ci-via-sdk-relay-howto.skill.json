@@ -16,7 +16,8 @@
     "Failure path: exit code non-zero prints X, echoes Build failed with exit code N, tails last 20 lines of log file",
     "Not-yet-available path: Portable.slnf missing, graceful exit 0 with no error (not a failure)",
     "Public log location: GitHub Actions tab shows full logs but sensitive data (token, paths) stripped by wkappbot secret-masking policy",
-    "To test locally: clone repo, run dotnet build csharp/Portable.slnf -f net8.0 -v q if file exists"
+    "To test locally: clone repo, run dotnet build csharp/Portable.slnf -f net8.0 -v q if file exists",
+    "Verified Execution (2026-09-30): workflow_dispatch trigger confirmed working (run 36664055544, success in 41 seconds). Repository_dispatch API support wired; requires specific GitHub API client_payload JSON format per API spec."
   ],
   "requirements": [
     {
@@ -48,6 +49,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-09-30T03:19:07.7537473Z",
-  "updated": "2026-09-30T03:19:07.7537675Z",
-  "version": "1.0"
+  "updated": "2026-09-30T03:33:13.7882328Z",
+  "version": "1.1"
 }
