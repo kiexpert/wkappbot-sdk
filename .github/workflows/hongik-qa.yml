@@ -50,7 +50,7 @@ jobs:
           if (-not $version) { throw "FAIL: Version check returned empty" }
           Write-Host "✓ PASS: Version OK: $version"
 
-          $license = & bin/wkappbot.exe license status 2>&1 | Select-String 'Free|Pro'
+          $license = & bin/wkappbot.exe license status 2>&1 | Select-String 'Tier'
           if (-not $license) { throw "FAIL: License check returned empty" }
           Write-Host "✓ PASS: License OK: $license"
 
