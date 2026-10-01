@@ -109,13 +109,15 @@ jobs:
           Write-Host "=== 정(正): Start Chrome headless (same step to prevent process kill) ===" -ForegroundColor Cyan
 
           # Start Chrome with headless flags in SAME STEP (won't be killed when step ends)
-          $chromePath = & where.exe chrome 2>$null
-          if (-not $chromePath) {
-            $chromePath = "C:\Program Files\Google\Chrome\Application\chrome.exe"
-            if (-not (Test-Path $chromePath)) {
-              Write-Host "Chrome not found, CDP checks will fail"
-              exit 1
-            }
+          # where.exe chrome matched the repo folder named Chrome (no extension filter), so use the installed exe first
+          $chromePath = "C:\Program Files\Google\Chrome\Application\chrome.exe"
+          if (-not (Test-Path -LiteralPath $chromePath -PathType Leaf)) {
+            $c = Get-Command chrome.exe -ErrorAction SilentlyContinue
+            if ($c) { $chromePath = $c.Source }
+          }
+          if (-not (Test-Path -LiteralPath $chromePath -PathType Leaf)) {
+            Write-Host "Chrome not found: $chromePath"
+            exit 1
           }
           Write-Host "Starting Chrome headless on port 9222: $chromePath"
           $chromeProc = Start-Process $chromePath -ArgumentList `
