@@ -234,6 +234,7 @@ jobs:
           }
           Write-Host ""
           Write-Host "Full suite: all failures accounted for (CI-skip or none). Green." -ForegroundColor Green
+          exit 0
 
       # ------------------------------------------------------------------
       # STEP 3: Upload doctor output as an artifact (inspect without re-running)
