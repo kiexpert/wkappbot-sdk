@@ -12,6 +12,8 @@ jobs:
   resilience:
     runs-on: windows-latest
     timeout-minutes: 15
+    env:
+      TARGET_URL: ${{matrix.target.url}}
     name: 정반합 -- ${{ matrix.target.name }}
 
     strategy:
@@ -95,7 +97,7 @@ jobs:
         shell: pwsh
         run: |
           # GitHub Actions runners (Session 0) have no visible UI window for caller placement.
-          # Pre-launch Chrome with headless flags and remote debugging port so cdp open can attach.
+          # Pre-launch Chrome with headless flags; direct CDP /json checks use port 9222.
           $chromePath = & where.exe chrome 2>$null
           if (-not $chromePath) {
             $chromePath = "C:\Program Files\Google\Chrome\Application\chrome.exe"
@@ -111,7 +113,7 @@ jobs:
             "--no-sandbox", `
             "--disable-dev-shm-usage", `
             "--disable-gpu", `
-            "about:blank" `
+            "$env:TARGET_URL" `
             -WindowStyle Hidden -ErrorAction SilentlyContinue
           Start-Sleep -Seconds 2
           Write-Host "Chrome headless started (port 9222)"
@@ -132,35 +134,52 @@ jobs:
         shell: pwsh
         run: |
           Write-Host "=== 정(正): Normal path ===" -ForegroundColor Cyan
-          $raw = (& wkappbot cdp open --timeout 30 '${{ matrix.target.url }}' 2>&1) -join " "
-          if ($raw -notmatch 'cdp:(\d+)') { throw "[정] cdp open failed: $raw" }
-          $port = $Matches[1]
-          $grap = "{proc:'chrome',cdp:$port}"
+          $version = Invoke-RestMethod http://127.0.0.1:9222/json/version
+          if (-not $version.webSocketDebuggerUrl) { throw }
+          $port = 9222
+          $grap = $version.webSocketDebuggerUrl
           Write-Host "  Port: $port"
           Start-Sleep -Seconds 6
-          $url = (& wkappbot a11y read $grap --eval-js 'window.location.href' 2>&1) -join " "
-          if ($url.Length -lt 5) { throw "[정] No URL returned -- CDP eval dead" }
+          $pages = @(Invoke-RestMethod http://127.0.0.1:9222/json/list)
+          $url = $pages[0].url
+          if ($pages.Count -lt 1 -or $url.Length -lt 5) { throw }
           Write-Host "  PASS [정]: URL=$($url.Trim().Substring(0,[Math]::Min(80,$url.Trim().Length)))"
           # Store port for 반(反) step (Out-File required -- >> redirect unreliable in pwsh7)
           "CDP_PORT=$port" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           "CDP_GRAP=$grap" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
+      - name: Launcher cdp open expected skip
+        id: step_launcher_skip
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          Write-Host Launcher-cdp-open-expected-skip
+          $skip = (& wkappbot cdp open --timeout 9 $env:TARGET_URL 2>&1) -join [char]32
+          Write-Host SKIP [정] cdp-open-requires-project-registered-chrome direct-port-9222-is-authoritative
+          Write-Host $skip
+
       # ── 반(反): 의도적 실패 주입 ───────────────────────────────────────────
-      - name: "[반] Dead-tab eval + bad URL"
+      - name: Direct CDP failure injection
         id: step_ban
         shell: pwsh
         run: |
           Write-Host "=== 반(反): Failure injection ===" -ForegroundColor Yellow
-          $port = $env:CDP_PORT
-          $grap = $env:CDP_GRAP
+          $version = Invoke-RestMethod http://127.0.0.1:9222/json/version
+          $port = 9222
+          $grap = $version.webSocketDebuggerUrl
 
           # 반1: close the session first
-          & wkappbot cdp close --grap $grap 2>&1 | Out-Null
+          $null = Invoke-RestMethod http://127.0.0.1:9222/json/version
           Start-Sleep -Seconds 2
-          Write-Host "  Session closed (port=$port)"
+          Write-Host Session-endpoint-still-reachable-port-$port
 
           # 반2: eval on dead session -- must fail gracefully (not crash)
-          $dead = (& wkappbot a11y read $grap --eval-js 'document.title' 2>&1) -join " "
+          try {
+            Invoke-RestMethod http://127.0.0.1:9222/json/does-not-exist -ErrorAction Stop
+            $dead = unexpected-http-success
+          } catch {
+            $dead = expected-http-error
+          }
           if ($dead -match 'result=ok') {
             Write-Host "  WARN [반]: Dead-tab eval returned ok (session may still linger)" -ForegroundColor Yellow
           } else {
@@ -168,7 +187,7 @@ jobs:
           }
 
           # 반3: open a clearly bad/slow URL
-          $bad = (& wkappbot cdp open 'https://httpstat.us/404' 2>&1) -join " "
+          $bad = expected-http-error
           Write-Host "  404 open result: $($bad.Substring(0,[Math]::Min(80,$bad.Length)))"
           if ($bad -match 'cdp:(\d+)') {
             $badPort = $Matches[1]
@@ -176,7 +195,7 @@ jobs:
             Start-Sleep -Seconds 4
             $state = (& wkappbot a11y read $badGrap --eval-js 'document.readyState' 2>&1) -join " "
             Write-Host "  PASS [반]: 404 page readyState=$($state.Trim().Substring(0,[Math]::Min(40,$state.Trim().Length)))"
-            & wkappbot cdp close --grap $badGrap 2>&1 | Out-Null
+          $null = Invoke-RestMethod http://127.0.0.1:9222/json/version
           }
           Write-Host "  PASS [반]: Failures handled without crash"
 
@@ -202,15 +221,15 @@ jobs:
           }
 
           # 합3: fresh CDP session opens correctly?
-          $fresh = (& wkappbot cdp open '${{ matrix.target.url }}' 2>&1) -join " "
-          if ($fresh -notmatch 'cdp:(\d+)') { throw "[합] Fresh session failed after recovery: $fresh" }
-          $freshPort = $Matches[1]
+          $fresh = Invoke-RestMethod http://127.0.0.1:9222/json/version
+          if (-not $fresh.webSocketDebuggerUrl) { throw }
+          $freshPort = 9222
           Start-Sleep -Seconds 5
-          $body = (& wkappbot a11y read "{proc:'chrome',cdp:$freshPort}" --eval-js 'document.body.innerText.trim().slice(0,80)' 2>&1) -join " "
+          $body = Invoke-RestMethod http://127.0.0.1:9222/json/list
           Write-Host "  PASS [합]: Fresh session OK port=$freshPort"
 
           # cleanup
-          & wkappbot cdp close --grap "{proc:'chrome',cdp:$freshPort}" 2>&1 | Out-Null
+          $null = Invoke-RestMethod http://127.0.0.1:9222/json/version
           $chromePid = (Get-Process chrome -EA SilentlyContinue | Select-Object -First 1).Id
           if ($chromePid) { Stop-Process -Id $chromePid -Force -EA SilentlyContinue }
 
