@@ -86,6 +86,7 @@ jobs:
           Write-Host "Binary OK: $v"
 
       - name: "1. SDK Version and License Check"
+        id: check1
         shell: pwsh
         run: |
           Write-Host "=== Check 1: Version, License ===" -ForegroundColor Cyan
@@ -103,6 +104,7 @@ jobs:
           $global:LASTEXITCODE = 0
 
       - name: "2. Skill Read and Search"
+        id: check2
         shell: pwsh
         run: |
           Write-Host "=== Check 2: Skill Operations ===" -ForegroundColor Cyan
@@ -131,26 +133,34 @@ jobs:
           $global:LASTEXITCODE = 0
 
       - name: "3. Harness Guard Validation"
+        id: check3
         shell: pwsh
         run: |
           Write-Host "=== Check 3: Harness Guard Tests ===" -ForegroundColor Cyan
-          $normalTest = & ./bin/wkappbot.exe --version 2>&1 | Select-String 'wkappbot v'
-          if (-not $normalTest) { throw "FAIL: Harness guard validation failed" }
+          # raw output printed first so a failing assertion shows evidence in the log
+          $guardText = (& ./bin/wkappbot.exe skill search harness guard rule policy 2>&1) -join "`n"
+          Write-Host "  harness guard search, first lines:"
+          ($guardText -split "`n" | Select-Object -First 10) | ForEach-Object { Write-Host "    $_" }
+          if ([string]::IsNullOrWhiteSpace($guardText) -or $guardText -notmatch 'harness|guard|on-load') { throw "FAIL: Harness guard search did not find guard skills" }
           Write-Host "✓ PASS: Harness guards verified"
 
-          $LASTEXITCODE = 0
+          $global:LASTEXITCODE = 0
 
       - name: "4. Reflex Pulse Fixtures"
+        id: check4
         shell: pwsh
         run: |
           Write-Host "=== Check 4: Reflex Pulse ===" -ForegroundColor Cyan
-          $pulseTest = & ./bin/wkappbot.exe eye tick 2>&1 | Select-String 'result=ok|end:0'
-          if (-not $pulseTest) { throw "FAIL: Reflex pulse fixtures failed" }
+          # raw output printed first so a failing assertion shows evidence in the log
+          $pulseOutput = (& ./bin/wkappbot.exe eye tick 2>&1) -join "`n"
+          Write-Host "  eye tick raw output:`n$pulseOutput"
+          if ([string]::IsNullOrWhiteSpace($pulseOutput) -or $pulseOutput -notmatch 'result=ok|end:0|ctx=') { throw "FAIL: Reflex pulse fixtures failed" }
           Write-Host "✓ PASS: Pulse fixtures verified"
 
-          $LASTEXITCODE = 0
+          $global:LASTEXITCODE = 0
 
       - name: "5. CDP Port and Headless Chrome"
+        id: check5
         shell: pwsh
         run: |
           Write-Host "=== Check 5: CDP Headless Launch ===" -ForegroundColor Cyan
@@ -188,6 +198,7 @@ jobs:
           $global:LASTEXITCODE = 0
 
       - name: "6. Hippocampus Recall Test"
+        id: check6
         shell: pwsh
         run: |
           Write-Host "=== Check 6: Hippocampus Recall ===" -ForegroundColor Cyan
@@ -195,7 +206,7 @@ jobs:
           if (-not $recallTest) { throw "FAIL: Hippocampus recall failed" }
           Write-Host "✓ PASS: Memory recall fixture verified"
 
-          $LASTEXITCODE = 0
+          $global:LASTEXITCODE = 0
 
       - name: Publish Summary
         if: always()
@@ -205,12 +216,25 @@ jobs:
           Write-Host "" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append
           Write-Host "| Check | Status |" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append
           Write-Host "|-------|--------|" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append
-          Write-Host "| Version/License | ✓ |" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append
-          Write-Host "| Skill Ops | ✓ |" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append
-          Write-Host "| Harness Guards | ✓ |" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append
-          Write-Host "| Reflex Pulse | ✓ |" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append
-          Write-Host "| CDP Headless | ✓ |" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append
-          Write-Host "| Hippocampus Recall | ✓ |" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append
+
+          $checks = @(
+            @{ Name = 'Version/License';    Outcome = '${{ steps.check1.outcome }}' },
+            @{ Name = 'Skill Ops';          Outcome = '${{ steps.check2.outcome }}' },
+            @{ Name = 'Harness Guards';     Outcome = '${{ steps.check3.outcome }}' },
+            @{ Name = 'Reflex Pulse';       Outcome = '${{ steps.check4.outcome }}' },
+            @{ Name = 'CDP Headless';       Outcome = '${{ steps.check5.outcome }}' },
+            @{ Name = 'Hippocampus Recall'; Outcome = '${{ steps.check6.outcome }}' }
+          )
+
+          foreach ($c in $checks) {
+            $symbol = switch ($c.Outcome) {
+              'success'   { '✓' }
+              'skipped'   { '-' }
+              'cancelled' { '!' }
+              default     { '✗' }
+            }
+            Write-Host "| $($c.Name) | $symbol |" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append
+          }
 
       - name: Upload logs on failure
         if: failure()
