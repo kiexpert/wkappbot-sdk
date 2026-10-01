@@ -96,27 +96,59 @@ jobs:
       - name: Start Chrome headless (GitHub Actions runner compatibility)
         shell: pwsh
         run: |
-          # GitHub Actions runners (Session 0) have no visible UI window for caller placement.
-          # Pre-launch Chrome with headless flags; direct CDP /json checks use port 9222.
-          $chromePath = & where.exe chrome 2>$null
-          if (-not $chromePath) {
-            $chromePath = "C:\Program Files\Google\Chrome\Application\chrome.exe"
-            if (-not (Test-Path $chromePath)) {
-              Write-Host "Chrome not found, cdp open will attempt launch"
-              exit 0
-            }
-          }
+          # Session 0 has no visible caller window, so launch a directly addressable headless browser.
+          $chromeCommand = Get-Command chrome.exe -ErrorAction SilentlyContinue
+          $chromePath = if ($chromeCommand) { $chromeCommand.Source } else { "C:\Program Files\Google\Chrome\Application\chrome.exe" }
+          if (-not (Test-Path $chromePath)) { throw "Chrome not found at $chromePath" }
+
+          $profilePath = Join-Path $env:RUNNER_TEMP ("cdp-headless-" + $env:GITHUB_RUN_ID + "-" + $env:GITHUB_RUN_ATTEMPT)
+          $stdoutLog = Join-Path $env:RUNNER_TEMP "cdp-chrome.stdout.log"
+          $stderrLog = Join-Path $env:RUNNER_TEMP "cdp-chrome.stderr.log"
+          New-Item -ItemType Directory -Force -Path $profilePath | Out-Null
+          Remove-Item $stdoutLog, $stderrLog -Force -ErrorAction SilentlyContinue
+
+          $chromeArgs = @(
+            "--headless=new"
+            "--remote-debugging-port=9222"
+            "--remote-debugging-address=127.0.0.1"
+            "--no-sandbox"
+            "--disable-gpu"
+            "--disable-dev-shm-usage"
+            "--no-first-run"
+            "--disable-extensions"
+            "--user-data-dir=$profilePath"
+            "$env:TARGET_URL"
+          )
           Write-Host "Starting Chrome headless on port 9222: $chromePath"
-          Start-Process $chromePath -ArgumentList `
-            "--headless=new", `
-            "--remote-debugging-port=9222", `
-            "--no-sandbox", `
-            "--disable-dev-shm-usage", `
-            "--disable-gpu", `
-            "$env:TARGET_URL" `
-            -WindowStyle Hidden -ErrorAction SilentlyContinue
-          Start-Sleep -Seconds 2
-          Write-Host "Chrome headless started (port 9222)"
+          Write-Host "Chrome profile: $profilePath"
+          $chrome = Start-Process -FilePath $chromePath -ArgumentList $chromeArgs -WindowStyle Hidden -PassThru `
+            -RedirectStandardOutput $stdoutLog -RedirectStandardError $stderrLog
+
+          $deadline = (Get-Date).AddSeconds(30)
+          $version = $null
+          while ((Get-Date) -lt $deadline) {
+            if ($chrome.HasExited) { break }
+            try {
+              $version = Invoke-RestMethod http://127.0.0.1:9222/json/version -TimeoutSec 1 -ErrorAction Stop
+              if ($version.webSocketDebuggerUrl) { break }
+            } catch {
+              # Chrome may need a few seconds to bind the debugging port.
+            }
+            Start-Sleep -Seconds 1
+          }
+
+          if (-not $version -or -not $version.webSocketDebuggerUrl) {
+            $exitCode = if ($chrome.HasExited) { $chrome.ExitCode } else { "still running" }
+            Write-Host "Chrome did not answer CDP within 30 seconds. Exit code: $exitCode" -ForegroundColor Red
+            foreach ($logPath in @($stdoutLog, $stderrLog)) {
+              if (Test-Path $logPath) {
+                Write-Host "Chrome log: $logPath"
+                Get-Content $logPath -Tail 40
+              }
+            }
+            throw "Chrome CDP endpoint did not become ready on 127.0.0.1:9222"
+          }
+          Write-Host "Chrome headless ready on port 9222: $($version.webSocketDebuggerUrl)"
 
       - name: Spawn caller window (CI placement guard)
         shell: pwsh
