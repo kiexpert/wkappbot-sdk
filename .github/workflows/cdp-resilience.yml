@@ -91,6 +91,31 @@ jobs:
           Start-Sleep -Seconds 3
           wkappbot eye tick
 
+      - name: Start Chrome headless (GitHub Actions runner compatibility)
+        shell: pwsh
+        run: |
+          # GitHub Actions runners (Session 0) have no visible UI window for caller placement.
+          # Pre-launch Chrome with headless flags and remote debugging port so cdp open can attach.
+          $chromePath = & where.exe chrome 2>$null
+          if (-not $chromePath) {
+            $chromePath = "C:\Program Files\Google\Chrome\Application\chrome.exe"
+            if (-not (Test-Path $chromePath)) {
+              Write-Host "Chrome not found, cdp open will attempt launch"
+              exit 0
+            }
+          }
+          Write-Host "Starting Chrome headless on port 9222: $chromePath"
+          Start-Process $chromePath -ArgumentList `
+            "--headless=new", `
+            "--remote-debugging-port=9222", `
+            "--no-sandbox", `
+            "--disable-dev-shm-usage", `
+            "--disable-gpu", `
+            "about:blank" `
+            -WindowStyle Hidden -ErrorAction SilentlyContinue
+          Start-Sleep -Seconds 2
+          Write-Host "Chrome headless started (port 9222)"
+
       - name: Spawn caller window (CI placement guard)
         shell: pwsh
         run: |
