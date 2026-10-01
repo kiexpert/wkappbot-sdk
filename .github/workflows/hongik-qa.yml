@@ -154,22 +154,23 @@ jobs:
         shell: pwsh
         run: |
           Write-Host "=== Check 5: CDP Headless Launch ===" -ForegroundColor Cyan
-          $chromePath = & where.exe chrome 2>$null
-          if (-not $chromePath) { $chromePath = "C:\Program Files\Google\Chrome\Application\chrome.exe" }
-          if (-not (Test-Path $chromePath)) {
-            Write-Host "SKIP: Chrome not found on this runner"
-            $LASTEXITCODE = 0
-            exit 0
+          # installed path first: where.exe chrome matches a repo folder named Chrome
+          $chromePath = "C:\Program Files\Google\Chrome\Application\chrome.exe"
+          if (-not (Test-Path -LiteralPath $chromePath -PathType Leaf)) {
+            $c = Get-Command chrome.exe -ErrorAction SilentlyContinue
+            if ($c) { $chromePath = $c.Source }
           }
+          if (-not (Test-Path -LiteralPath $chromePath -PathType Leaf)) { throw "FAIL: Chrome not found on this runner: $chromePath" }
+          Write-Host "  Chrome: $chromePath"
 
           $proc = Start-Process $chromePath -ArgumentList `
-            "--headless=new", "--remote-debugging-port=9222", `
-            "--no-sandbox", "--disable-gpu", "--user-data-dir=$env:TEMP\chrome-headless", `
-            "about:blank" -PassThru -WindowStyle Hidden -EA SilentlyContinue
+            "--headless=new", "--remote-debugging-port=9222", "--remote-debugging-address=127.0.0.1", `
+            "--no-sandbox", "--disable-gpu", "--disable-dev-shm-usage", "--user-data-dir=$env:RUNNER_TEMP\chrome-headless-hongik", `
+            "about:blank" -PassThru -WindowStyle Hidden
 
           $sw = [System.Diagnostics.Stopwatch]::StartNew()
           $ready = $false
-          while ($sw.Elapsed.TotalSeconds -lt 10) {
+          while ($sw.Elapsed.TotalSeconds -lt 30) {
             try {
               $json = Invoke-RestMethod http://127.0.0.1:9222/json/version -EA Stop
               if ($json.webSocketDebuggerUrl) { $ready = $true; break }
@@ -184,7 +185,7 @@ jobs:
 
           if ($proc.HasExited -eq $false) { Stop-Process -Id $proc.Id -Force -EA SilentlyContinue }
 
-          $LASTEXITCODE = 0
+          $global:LASTEXITCODE = 0
 
       - name: "6. Hippocampus Recall Test"
         shell: pwsh
