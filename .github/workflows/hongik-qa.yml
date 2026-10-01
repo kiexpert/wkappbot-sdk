@@ -41,6 +41,8 @@ jobs:
         run: |
           dotnet publish csharp/src/WKAppBot.Launcher/WKAppBot.Launcher.csproj `
             --configuration Release -o bin
+          Write-Host "=== Bin directory contents ===" -ForegroundColor Yellow
+          Get-ChildItem bin -Recurse -File | Select-Object FullName | head -20
 
       - name: "1. SDK Version and License Check"
         shell: pwsh
