@@ -34,7 +34,7 @@ Features committed before the bump will show under the old minor version.
 
 ## Current version
 
-`v7.10.0-sdk` -- bumped at 2026-09-28 -- unified main-duty runner, user-perspective QA workflow, hygiene scan fixes, wkpushsdk path fix, CHANGELOG 7.10.0-sdk filled. wkdoctor agy (antigravity CLI) integration: check 08-harness-connection for agy + gemini settings auto-recovery; Claude settings validation + wildcard bypass rules; tool alias symlink auto-repair (PATH order + doctor-bin fallback); agy wrapper shim policy revert (delegate to wrapper install); ghost score/depth penalty normalization
+`v7.11.0-sdk` -- bumped at 2026-09-30 -- unified main-duty runner, user-perspective QA workflow, hygiene scan fixes, wkpushsdk path fix, CHANGELOG 7.10.0-sdk filled. wkdoctor agy (antigravity CLI) integration: check 08-harness-connection for agy + gemini settings auto-recovery; Claude settings validation + wildcard bypass rules; tool alias symlink auto-repair (PATH order + doctor-bin fallback); agy wrapper shim policy revert (delegate to wrapper install); ghost score/depth penalty normalization
 
 ## Previous version
 

@@ -41,10 +41,10 @@ jobs:
         uses: actions/cache/restore@v5
         with:
           path: bin
-          key: ${{ runner.os }}-sdk-build-${{ hashFiles('csharp/**/*.cs', 'csharp/**/*.csproj', 'csharp/**/*.props', 'csharp/**/*.targets', 'csharp/WKAppBot.sln') }}
+          key: ${{ runner.os }}-sdk-build-v2-${{ hashFiles('csharp/**/*.cs', 'csharp/**/*.csproj', 'csharp/**/*.props', 'csharp/**/*.targets', 'csharp/WKAppBot.sln') }}
           restore-keys: |
-            ${{ runner.os }}-sdk-build-run-
-            ${{ runner.os }}-sdk-build-
+            ${{ runner.os }}-sdk-build-v2-run-
+            ${{ runner.os }}-sdk-build-v2-
 
       - name: Build launcher
         if: ${{ steps.bin_cache.outputs.cache-hit != 'true' || hashFiles('bin/wkappbot.exe') == '' }}
