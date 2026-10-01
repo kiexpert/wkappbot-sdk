@@ -41,10 +41,10 @@ jobs:
         uses: actions/cache/restore@v5
         with:
           path: bin
-          key: ${{ runner.os }}-sdk-build-v2-${{ hashFiles('csharp/**/*.cs', 'csharp/**/*.csproj', 'csharp/**/*.props', 'csharp/**/*.targets', 'csharp/WKAppBot.sln') }}
+          key: ${{ runner.os }}-sdk-build-${{ hashFiles('csharp/**/*.cs', 'csharp/**/*.csproj', 'csharp/**/*.props', 'csharp/**/*.targets', 'csharp/WKAppBot.sln') }}
           restore-keys: |
-            ${{ runner.os }}-sdk-build-v2-run-
-            ${{ runner.os }}-sdk-build-v2-
+            ${{ runner.os }}-sdk-build-run-
+            ${{ runner.os }}-sdk-build-
 
       - name: Build launcher
         if: ${{ steps.bin_cache.outputs.cache-hit != 'true' || hashFiles('bin/wkappbot.exe') == '' }}
@@ -91,13 +91,23 @@ jobs:
           Start-Sleep -Seconds 3
           wkappbot eye tick
 
+      - name: Spawn caller window (CI placement guard)
+        shell: pwsh
+        run: |
+          # wkappbot cdp open needs a visible caller window for CallerPlacementResolver.
+          # ConPTY shells are hidden; spawn a visible window to satisfy the on-screen guard.
+          $proc = Start-Process powershell -ArgumentList "-NoExit", "-Command", "while(`$true){Start-Sleep 60}" -WindowStyle Normal -PassThru
+          Start-Sleep -Seconds 2
+          $proc.Id | Out-File -FilePath "$env:TEMP\cdp-caller-pid.txt" -Encoding utf8
+          Write-Host "Caller window spawned: PID=$($proc.Id)"
+
       # ── 정(正): 정상 경로 ────────────────────────────────────────────────────
       - name: "[정] Normal CDP open + content"
         id: step_jeong
         shell: pwsh
         run: |
           Write-Host "=== 정(正): Normal path ===" -ForegroundColor Cyan
-          $raw = (& wkappbot cdp open --timeout 9 '${{ matrix.target.url }}' 2>&1) -join " "
+          $raw = (& wkappbot cdp open '${{ matrix.target.url }}' 2>&1) -join " "
           if ($raw -notmatch 'cdp:(\d+)') { throw "[정] cdp open failed: $raw" }
           $port = $Matches[1]
           $grap = "{proc:'chrome',cdp:$port}"
@@ -216,6 +226,16 @@ jobs:
             -f message="ci: promote cdp resilience summary from public sdk [skip ci]" `
             -f content="$content" `
             -f branch="main"
+
+      - name: Cleanup caller window
+        if: always()
+        shell: pwsh
+        run: |
+          if (Test-Path "$env:TEMP\cdp-caller-pid.txt") {
+            $cleanPid = [int](Get-Content "$env:TEMP\cdp-caller-pid.txt")
+            Stop-Process -Id $cleanPid -Force -ErrorAction SilentlyContinue
+            Write-Host "Caller window cleaned up: PID=$cleanPid"
+          }
 
       - name: Upload logs on failure
         if: failure()
