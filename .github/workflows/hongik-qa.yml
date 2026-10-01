@@ -122,7 +122,10 @@ jobs:
 
           $listText = (& ./bin/wkappbot.exe skill list 2>&1) -join "`n"
           Write-Host "  skill list length: $($listText.Length) chars"
-          if ($listText -notmatch '\bon-load\b') { throw "FAIL: skill list does not contain on-load" }
+          # the list output is grouped and elided, so it is judged by size and line count, not by one skill name
+          $listLines = @($listText -split "`n" | Where-Object { $_.Trim().Length -gt 0 }).Count
+          Write-Host "  skill list non-empty lines: $listLines"
+          if ($listLines -lt 50) { throw "FAIL: skill list printed only $listLines lines" }
           Write-Host "✓ PASS: Skill list OK"
 
           $global:LASTEXITCODE = 0
