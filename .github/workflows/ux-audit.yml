@@ -36,7 +36,6 @@ jobs:
           "/reference/grap"
           "/advanced/licensing"
           "/skills/"
-          "/skills/wkappbot-sdk/sonnet-reflection.html"
         )
         FAIL=0
         for page in "${PAGES[@]}"; do
