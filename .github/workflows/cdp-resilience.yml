@@ -91,31 +91,6 @@ jobs:
           Start-Sleep -Seconds 3
           wkappbot eye tick
 
-      - name: Start Chrome headless (GitHub Actions runner compatibility)
-        shell: pwsh
-        run: |
-          # GitHub Actions runners (Session 0) have no visible UI window for caller placement.
-          # Pre-launch Chrome with headless flags and remote debugging port so cdp open can attach.
-          $chromePath = & where.exe chrome 2>$null
-          if (-not $chromePath) {
-            $chromePath = "C:\Program Files\Google\Chrome\Application\chrome.exe"
-            if (-not (Test-Path $chromePath)) {
-              Write-Host "Chrome not found, cdp open will attempt launch"
-              exit 0
-            }
-          }
-          Write-Host "Starting Chrome headless on port 9222: $chromePath"
-          Start-Process $chromePath -ArgumentList `
-            "--headless=new", `
-            "--remote-debugging-port=9222", `
-            "--no-sandbox", `
-            "--disable-dev-shm-usage", `
-            "--disable-gpu", `
-            "about:blank" `
-            -WindowStyle Hidden -ErrorAction SilentlyContinue
-          Start-Sleep -Seconds 2
-          Write-Host "Chrome headless started (port 9222)"
-
       - name: Spawn caller window (CI placement guard)
         shell: pwsh
         run: |
@@ -127,17 +102,62 @@ jobs:
           Write-Host "Caller window spawned: PID=$($proc.Id)"
 
       # ── 정(正): 정상 경로 (headless port 9222 직접 사용) ────────────────────────
-      - name: "[정] Headless CDP on port 9222 + content"
+      - name: "[정] Start Chrome headless + CDP content checks (SAME STEP)"
         id: step_jeong
         shell: pwsh
         run: |
-          Write-Host "=== 정(正): Headless path (port 9222) ===" -ForegroundColor Cyan
+          Write-Host "=== 정(正): Start Chrome headless (same step to prevent process kill) ===" -ForegroundColor Cyan
+
+          # Start Chrome with headless flags in SAME STEP (won't be killed when step ends)
+          $chromePath = & where.exe chrome 2>$null
+          if (-not $chromePath) {
+            $chromePath = "C:\Program Files\Google\Chrome\Application\chrome.exe"
+            if (-not (Test-Path $chromePath)) {
+              Write-Host "Chrome not found, CDP checks will fail"
+              exit 1
+            }
+          }
+          Write-Host "Starting Chrome headless on port 9222: $chromePath"
+          $chromeProc = Start-Process $chromePath -ArgumentList `
+            "--headless=new", `
+            "--remote-debugging-port=9222", `
+            "--remote-debugging-address=127.0.0.1", `
+            "--no-sandbox", `
+            "--disable-dev-shm-usage", `
+            "--disable-gpu", `
+            "--user-data-dir=$env:RUNNER_TEMP\chrome-headless", `
+            "about:blank" `
+            -WindowStyle Hidden -PassThru -ErrorAction SilentlyContinue
+
+          # Poll for Chrome ready on port 9222 (same step keeps it alive)
+          Write-Host "Waiting for Chrome CDP port 9222 to be ready..."
+          $sw = [System.Diagnostics.Stopwatch]::StartNew()
+          $ready = $false
+          while ($sw.Elapsed.TotalSeconds -lt 30) {
+            try {
+              $json = Invoke-RestMethod http://127.0.0.1:9222/json/version -EA Stop
+              if ($json.webSocketDebuggerUrl) {
+                Write-Host "✓ Chrome headless ready on port 9222"
+                $ready = $true
+                break
+              }
+            } catch {
+              Start-Sleep -Milliseconds 500
+            }
+          }
+          if (-not $ready) {
+            $exitCode = if ($chromeProc.HasExited) { $chromeProc.ExitCode } else { "still running" }
+            throw "[정] Chrome did not answer port 9222 after 30s (exit code: $exitCode)"
+          }
+
+          # ── Run CDP checks (Chrome stays alive in same step) ──
+          Write-Host "=== 정(正): Running CDP content checks ===" -ForegroundColor Cyan
           $port = 9222
           $grap = "{proc:'chrome',cdp:$port}"
-          Write-Host "  Using pre-launched headless Chrome: port=$port"
+          Write-Host "  Using headless Chrome: port=$port"
 
           # Navigate to target URL via CDP eval
-          Start-Sleep -Seconds 2
+          Start-Sleep -Seconds 1
           $nav = (& wkappbot a11y read $grap --eval-js "window.location.href='${{ matrix.target.url }}'; window.location.href" 2>&1) -join " "
           Write-Host "  Navigate result: $($nav.Substring(0,[Math]::Min(80,$nav.Length)))"
 
@@ -165,6 +185,10 @@ jobs:
         shell: pwsh
         continue-on-error: true
         run: |
+          Write-Host "=== [정-fallback] Chrome process check ===" -ForegroundColor Gray
+          $chromes = Get-Process chrome -EA SilentlyContinue
+          Write-Host "  Chrome processes: $($chromes.Count)"
+
           Write-Host "=== [정-fallback] Standard cdp open (CI expected fail) ===" -ForegroundColor Gray
           $raw = (& wkappbot cdp open --timeout 15 '${{ matrix.target.url }}' 2>&1) -join " "
           if ($raw -match 'no caller window|CALLER:RESOLVE') {
@@ -186,6 +210,10 @@ jobs:
         id: step_ban
         shell: pwsh
         run: |
+          Write-Host "=== [반] Chrome process check ===" -ForegroundColor Yellow
+          $chromes = Get-Process chrome -EA SilentlyContinue
+          Write-Host "  Chrome processes: $($chromes.Count)"
+
           Write-Host "=== 반(反): Failure injection ===" -ForegroundColor Yellow
           $port = $env:CDP_PORT
           $grap = $env:CDP_GRAP
@@ -221,6 +249,10 @@ jobs:
         id: step_hap
         shell: pwsh
         run: |
+          Write-Host "=== [합] Chrome process check ===" -ForegroundColor Green
+          $chromes = Get-Process chrome -EA SilentlyContinue
+          Write-Host "  Chrome processes at step start: $($chromes.Count)"
+
           Write-Host "=== 합(合): Recovery verification ===" -ForegroundColor Green
 
           # 합1: Eye still alive after failures?
