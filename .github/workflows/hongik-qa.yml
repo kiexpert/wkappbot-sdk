@@ -40,7 +40,7 @@ jobs:
         shell: pwsh
         run: |
           dotnet publish csharp/src/WKAppBot.Launcher/WKAppBot.Launcher.csproj `
-            --configuration Release -p:SkipDeployLauncher=true -o bin
+            --configuration Release -o bin
 
       - name: "1. SDK Version and License Check"
         shell: pwsh
