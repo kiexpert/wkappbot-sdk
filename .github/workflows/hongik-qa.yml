@@ -89,11 +89,11 @@ jobs:
         shell: pwsh
         run: |
           Write-Host "=== Check 1: Version, License ===" -ForegroundColor Cyan
-          $version = wkappbot --version 2>&1 | Select-String 'wkappbot v'
+          $version = & ./bin/wkappbot.exe --version 2>&1 | Select-String 'wkappbot v'
           if (-not $version) { throw "FAIL: Version check returned empty" }
           Write-Host "✓ PASS: Version OK: $version"
 
-          $license = wkappbot license status 2>&1 | Select-String 'Tier'
+          $license = & ./bin/wkappbot.exe license status 2>&1 | Select-String 'Tier'
           if (-not $license) { throw "FAIL: License check returned empty" }
           Write-Host "✓ PASS: License OK: $license"
 
@@ -103,15 +103,15 @@ jobs:
         shell: pwsh
         run: |
           Write-Host "=== Check 2: Skill Operations ===" -ForegroundColor Cyan
-          $skillRead = wkappbot skill read on-load 2>&1 | Select-String 'Agent On-Load'
+          $skillRead = & ./bin/wkappbot.exe skill read on-load 2>&1 | Select-String 'Agent On-Load'
           if (-not $skillRead) { throw "FAIL: skill read on-load returned empty" }
           Write-Host "✓ PASS: Skill read OK"
 
-          $skillSearch = wkappbot skill search agent load 2>&1 | Select-String 'on-load'
+          $skillSearch = & ./bin/wkappbot.exe skill search agent load 2>&1 | Select-String 'on-load'
           if (-not $skillSearch) { throw "FAIL: skill search returned empty" }
           Write-Host "✓ PASS: Skill search OK"
 
-          $skillList = wkappbot skill list 2>&1 | Select-String 'skill\(s\)'
+          $skillList = & ./bin/wkappbot.exe skill list 2>&1 | Select-String 'skill\(s\)'
           if (-not $skillList) { throw "FAIL: skill list returned empty" }
           Write-Host "✓ PASS: Skill list OK"
 
@@ -121,7 +121,7 @@ jobs:
         shell: pwsh
         run: |
           Write-Host "=== Check 3: Harness Guard Tests ===" -ForegroundColor Cyan
-          $normalTest = wkappbot --version 2>&1 | Select-String 'wkappbot v'
+          $normalTest = & ./bin/wkappbot.exe --version 2>&1 | Select-String 'wkappbot v'
           if (-not $normalTest) { throw "FAIL: Harness guard validation failed" }
           Write-Host "✓ PASS: Harness guards verified"
 
@@ -131,7 +131,7 @@ jobs:
         shell: pwsh
         run: |
           Write-Host "=== Check 4: Reflex Pulse ===" -ForegroundColor Cyan
-          $pulseTest = wkappbot eye tick 2>&1 | Select-String 'result=ok|end:0'
+          $pulseTest = & ./bin/wkappbot.exe eye tick 2>&1 | Select-String 'result=ok|end:0'
           if (-not $pulseTest) { throw "FAIL: Reflex pulse fixtures failed" }
           Write-Host "✓ PASS: Pulse fixtures verified"
 
@@ -177,7 +177,7 @@ jobs:
         shell: pwsh
         run: |
           Write-Host "=== Check 6: Hippocampus Recall ===" -ForegroundColor Cyan
-          $recallTest = wkappbot skill list 2>&1 | Select-String 'skill\(s\)'
+          $recallTest = & ./bin/wkappbot.exe skill list 2>&1 | Select-String 'skill\(s\)'
           if (-not $recallTest) { throw "FAIL: Hippocampus recall failed" }
           Write-Host "✓ PASS: Memory recall fixture verified"
 
