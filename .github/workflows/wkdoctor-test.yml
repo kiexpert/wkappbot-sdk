@@ -12,7 +12,7 @@ name: wkdoctor self-test
 #   push               -- when any doctor module or wkdoctor itself changes
 #   schedule           -- daily at 02:15 UTC
 
-on:
+'on':
   workflow_dispatch:
   push:
     paths:
@@ -210,14 +210,15 @@ jobs:
           $outDir = Join-Path $PWD 'wkdoctor-output'
           New-Item -ItemType Directory -Force -Path $outDir | Out-Null
           $jsonOut | Out-File -FilePath (Join-Path $outDir 'wkdoctor-full.json') -Encoding utf8
-          @"
-wkdoctor CI run
-date:     $(Get-Date -Format o)
-ref:      $env:GITHUB_REF
-sha:      $env:GITHUB_SHA
-raw_exit: $rc
-ci_skip:  $($ciSkipNames -join ', ')
-"@ | Out-File -FilePath (Join-Path $outDir 'run-summary.txt') -Encoding utf8
+          $summary = @(
+            'wkdoctor CI run',
+            "date:     $(Get-Date -Format o)",
+            "ref:      $env:GITHUB_REF",
+            "sha:      $env:GITHUB_SHA",
+            "raw_exit: $rc",
+            "ci_skip:  $($ciSkipNames -join ', ')"
+          ) | Out-String
+          $summary | Out-File -FilePath (Join-Path $outDir 'run-summary.txt') -Encoding utf8
 
           # Fail only on unexpected failures (not CI-skip items).
           if ($unexpectedFails.Count -gt 0) {
