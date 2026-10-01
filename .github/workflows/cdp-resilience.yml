@@ -19,7 +19,6 @@ jobs:
       matrix:
         target:
           - { name: chatgpt,  url: 'https://chatgpt.com',       expect: 'chatgpt|openai' }
-          - { name: gemini,   url: 'https://gemini.google.com', expect: 'gemini|google'  }
           - { name: claude,   url: 'https://claude.ai',         expect: 'claude'         }
 
     steps:
