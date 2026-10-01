@@ -97,7 +97,7 @@ jobs:
         shell: pwsh
         run: |
           Write-Host "=== 정(正): Normal path ===" -ForegroundColor Cyan
-          $raw = (& wkappbot cdp open '${{ matrix.target.url }}' 2>&1) -join " "
+          $raw = (& wkappbot cdp open --timeout 9 '${{ matrix.target.url }}' 2>&1) -join " "
           if ($raw -notmatch 'cdp:(\d+)') { throw "[정] cdp open failed: $raw" }
           $port = $Matches[1]
           $grap = "{proc:'chrome',cdp:$port}"
