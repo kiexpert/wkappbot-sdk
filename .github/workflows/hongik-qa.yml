@@ -106,19 +106,26 @@ jobs:
         shell: pwsh
         run: |
           Write-Host "=== Check 2: Skill Operations ===" -ForegroundColor Cyan
-          $skillRead = & ./bin/wkappbot.exe skill read on-load 2>&1 | Select-String 'Agent On-Load'
-          if (-not $skillRead) { throw "FAIL: skill read on-load returned empty" }
+          # raw output first, so a failing assertion always has its evidence in the log
+          $readText = (& ./bin/wkappbot.exe skill read on-load 2>&1) -join "`n"
+          Write-Host "  skill read on-load, first lines:"
+          ($readText -split "`n" | Select-Object -First 12) | ForEach-Object { Write-Host "    $_" }
+          # a found skill prints its record with an ID line and a Desc line, a missing one does not
+          if ($readText -notmatch '(?m)^\s*ID\s*:\s*on-load\s*$' -or $readText -notmatch '(?m)^\s*Desc\s*:') { throw "FAIL: skill read on-load did not print the on-load record" }
           Write-Host "✓ PASS: Skill read OK"
 
-          $skillSearch = & ./bin/wkappbot.exe skill search agent load 2>&1 | Select-String 'on-load'
-          if (-not $skillSearch) { throw "FAIL: skill search returned empty" }
+          $searchText = (& ./bin/wkappbot.exe skill search session start mandatory loads routing gg trigger 2>&1) -join "`n"
+          Write-Host "  skill search, first lines:"
+          ($searchText -split "`n" | Select-Object -First 6) | ForEach-Object { Write-Host "    $_" }
+          if ($searchText -notmatch '\bon-load\b') { throw "FAIL: skill search did not find on-load" }
           Write-Host "✓ PASS: Skill search OK"
 
-          $skillList = & ./bin/wkappbot.exe skill list 2>&1 | Select-String 'skill\(s\)'
-          if (-not $skillList) { throw "FAIL: skill list returned empty" }
+          $listText = (& ./bin/wkappbot.exe skill list 2>&1) -join "`n"
+          Write-Host "  skill list length: $($listText.Length) chars"
+          if ($listText -notmatch '\bon-load\b') { throw "FAIL: skill list does not contain on-load" }
           Write-Host "✓ PASS: Skill list OK"
 
-          $LASTEXITCODE = 0
+          $global:LASTEXITCODE = 0
 
       - name: "3. Harness Guard Validation"
         shell: pwsh
