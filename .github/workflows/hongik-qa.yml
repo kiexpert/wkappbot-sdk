@@ -151,16 +151,16 @@ jobs:
 
           $global:LASTEXITCODE = 0
 
-      - name: "4. Reflex Pulse Fixtures"
+      - name: "4. Eye Tick Protocol Health"
         id: check4
         shell: pwsh
         run: |
-          Write-Host "=== Check 4: Reflex Pulse ===" -ForegroundColor Cyan
+          Write-Host "=== Check 4: Eye tick answers with its protocol markers ===" -ForegroundColor Cyan
           # raw output printed first so a failing assertion shows evidence in the log
           $pulseOutput = (& ./bin/wkappbot.exe eye tick 2>&1) -join "`n"
           Write-Host "  eye tick raw output:`n$pulseOutput"
-          if ([string]::IsNullOrWhiteSpace($pulseOutput) -or $pulseOutput -notmatch 'result=ok|end:0|status|version|LAUNCH|result') { throw "FAIL: Reflex pulse fixtures failed" }
-          Write-Host "✓ PASS: Pulse fixtures verified"
+          if ([string]::IsNullOrWhiteSpace($pulseOutput) -or $pulseOutput -notmatch 'result=ok|end:0|ctx=') { throw "FAIL: eye tick printed none of its protocol markers (result=ok, end:0, ctx=)" }
+          Write-Host "✓ PASS: Eye tick answered with its protocol markers"
 
           $global:LASTEXITCODE = 0
 
@@ -236,7 +236,7 @@ jobs:
             @{ Name = 'Version/License';    Outcome = '${{ steps.check1.outcome }}' },
             @{ Name = 'Skill Ops';          Outcome = '${{ steps.check2.outcome }}' },
             @{ Name = 'Harness Guards';     Outcome = '${{ steps.check3.outcome }}' },
-            @{ Name = 'Reflex Pulse';       Outcome = '${{ steps.check4.outcome }}' },
+            @{ Name = 'Eye Tick Health';    Outcome = '${{ steps.check4.outcome }}' },
             @{ Name = 'CDP Headless';       Outcome = '${{ steps.check5.outcome }}' },
             @{ Name = 'Hippocampus Recall'; Outcome = '${{ steps.check6.outcome }}' }
           )
