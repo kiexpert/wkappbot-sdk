@@ -189,8 +189,9 @@ jobs:
       # cdp open fallback test (expected to fail with caller validation error on GitHub Actions)
       - name: "[정-fallback] Attempt standard cdp open (expected to fail on CI)"
         id: step_jeong_fallback
-        shell: pwsh
+        timeout-minutes: 2
         continue-on-error: true
+        shell: pwsh
         run: |
           Write-Host "=== [정-fallback] Chrome process check ===" -ForegroundColor Gray
           $chromes = Get-Process chrome -EA SilentlyContinue
