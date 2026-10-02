@@ -119,7 +119,7 @@ jobs:
           $searchText = (& ./bin/wkappbot.exe skill search session start mandatory loads routing gg trigger 2>&1) -join "`n"
           Write-Host "  skill search, first lines:"
           ($searchText -split "`n" | Select-Object -First 6) | ForEach-Object { Write-Host "    $_" }
-          if ($searchText -notmatch '\bon-load\b') { throw "FAIL: skill search did not find on-load" }
+          if ($searchText -notmatch '\bon-load\b' -or $searchText -notmatch '(?m)\[SKILL\]\s+[1-9]\d* match\(es\)') { throw "FAIL: skill search did not print a match count of 1 or more together with on-load" }
           Write-Host "✓ PASS: Skill search OK"
 
           $listText = (& ./bin/wkappbot.exe skill list 2>&1) -join "`n"
@@ -146,7 +146,7 @@ jobs:
           $guardText = (& ./bin/wkappbot.exe skill search harness guard rule policy 2>&1) -join "`n"
           Write-Host "  harness guard search, first lines:"
           ($guardText -split "`n" | Select-Object -First 10) | ForEach-Object { Write-Host "    $_" }
-          if ([string]::IsNullOrWhiteSpace($guardText) -or $guardText -notmatch 'harness|guard|on-load') { throw "FAIL: Harness guard search did not find guard skills" }
+          if ([string]::IsNullOrWhiteSpace($guardText) -or $guardText -notmatch '(?m)\[SKILL\]\s+[1-9]\d* match\(es\)') { throw "FAIL: guard skill search printed no [SKILL] N match(es) line with N of 1 or more (the search echoes its own keywords, so a keyword match proves nothing)" }
           Write-Host "✓ PASS: Harness guards verified"
 
           $global:LASTEXITCODE = 0
@@ -202,13 +202,13 @@ jobs:
 
           $global:LASTEXITCODE = 0
 
-      - name: "6. Hippocampus Recall Test"
+      - name: "6. Skill List Count Line"
         id: check6
         shell: pwsh
         run: |
-          Write-Host "=== Check 6: Hippocampus Recall ===" -ForegroundColor Cyan
+          Write-Host "=== Check 6: skill list prints its count line ===" -ForegroundColor Cyan
           $recallTest = & ./bin/wkappbot.exe skill list 2>&1 | Select-String 'skill\(s\)'
-          if (-not $recallTest) { throw "FAIL: Hippocampus recall failed" }
+          if (-not $recallTest) { throw "FAIL: skill list printed no skill(s) count line" }
           Write-Host "✓ PASS: Memory recall fixture verified"
 
           $global:LASTEXITCODE = 0
@@ -238,7 +238,7 @@ jobs:
             @{ Name = 'Harness Guards';     Outcome = '${{ steps.check3.outcome }}' },
             @{ Name = 'Eye Tick Health';    Outcome = '${{ steps.check4.outcome }}' },
             @{ Name = 'CDP Headless';       Outcome = '${{ steps.check5.outcome }}' },
-            @{ Name = 'Hippocampus Recall'; Outcome = '${{ steps.check6.outcome }}' }
+            @{ Name = 'Skill List Count';   Outcome = '${{ steps.check6.outcome }}' }
           )
 
           foreach ($c in $checks) {
