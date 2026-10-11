@@ -12,7 +12,9 @@
     "TODO: ROOT must apply SuggestCommand.Resolve.Part3.cs line 2069 fix to permit confirm when evidence script passes despite zero requirements by changing regRc AND reqAllPass condition. WHEN: 3 old suggests blocked (ts=2026-07-02T07:31:48, ts=2026-07-02T07:32:08, ts=2026-07-05T06:24:30). HOW: wkappbot skill read suggest-resolve-evidence-conventions step 28 and suggest-co-resolve-2of2 step 13 for diagnosis and proposed fix. WHY: evidence-script-only suggests cannot confirm after HALF-resolve without this code patch.",
     "TODO: ROOT must apply SuggestCommand.Resolve.Part3.cs line 2069 fix to permit confirm when evidence script passes despite zero requirements by changing regRc AND reqAllPass condition to set reqAllPass true not false when reqs.Count==0. WHEN: 4 suggests blocked (ts=2026-08-13T05:08:19 added 2026-08-14, same deadlock) (ts=2026-07-02T07:31:48, ts=2026-07-02T07:32:08, ts=2026-07-05T06:24:30). HOW: wkappbot skill read suggest-resolve-evidence-conventions step 27 and suggest-co-resolve-2of2 steps 13-14 for diagnosis. WHY: evidence passes but canConfirm blocks all confirms when zero requirements stored.",
     "TODO: ROOT must apply SuggestCommand.Resolve.Part3.cs line 2069 fix to permit confirm when evidence script passes despite zero requirements: change regRc==0 AND reqAllPass condition by setting reqAllPass true not false when reqs.Count==0. WHEN: 3 old suggests (ts=2026-07-02T07:31:48, ts=2026-07-02T07:32:08, ts=2026-07-05T06:24:30) blocked by deadlock. HOW: wkappbot skill read suggest-resolve-evidence-conventions and wkappbot skill read suggest-co-resolve-2of2 for diagnosis. WHY: evidence-script-only suggests cannot confirm after HALF-resolve without this fix.",
-    "TODO: ROOT must apply SuggestCommand.Resolve.Part3.cs line 2069 fix to permit confirm when evidence script passes despite zero requirements by changing regRc AND reqAllPass condition. WHEN: 3 old suggests (ts=2026-07-02T07:31:48, ts=2026-07-02T07:32:08, ts=2026-07-05T06:24:30) blocked by deadlock. HOW: wkappbot skill read suggest-resolve-evidence-conventions step 25 and suggest-co-resolve-2of2 step 13 for diagnosis. WHY: evidence-script-only suggests cannot confirm after HALF-resolve without this fix."
+    "TODO: ROOT must apply SuggestCommand.Resolve.Part3.cs line 2069 fix to permit confirm when evidence script passes despite zero requirements by changing regRc AND reqAllPass condition. WHEN: 3 old suggests (ts=2026-07-02T07:31:48, ts=2026-07-02T07:32:08, ts=2026-07-05T06:24:30) blocked by deadlock. HOW: wkappbot skill read suggest-resolve-evidence-conventions step 25 and suggest-co-resolve-2of2 step 13 for diagnosis. WHY: evidence-script-only suggests cannot confirm after HALF-resolve without this fix.",
+    "2026-06-26: getcontent-read-proto.ps1 proto created for Get-Content read-tool recognition (cross-family-harness-integration step 32)",
+    "TODO: apply SuggestCommand.Resolve.Part3.cs line 2069 fix to permit confirm when evidence script passes but requirements absent: set reqAllPass true not false when reqs.Count==0 and regRc==0, then re-test suggests ts=2026-07-02T07:31:48 ts=2026-07-02T07:32:08 ts=2026-07-05T06:24:30 --confirm. WHEN: 3 old CHECK PASSED suggests blocked by deadlock diagnosis in step 14. HOW: wkappbot skill read suggest-resolve-evidence-conventions step 23 and suggest-co-resolve-2of2 step 14 for root cause and workaround. WHY: evidence script passed but zero requirement entries cause permanent canConfirm=false, blocking 2-of-2 confirm indefinitely."
   ],
   "requirements": [
     {
@@ -46,6 +48,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-08-15T11:51:04.9778739Z",
-  "updated": "2026-10-11T15:55:30.2524675Z",
-  "version": "1.4"
+  "updated": "2026-10-11T16:11:40.9160501Z",
+  "version": "1.6"
 }
