@@ -7,8 +7,8 @@
   "steps": [
     "Trigger this skill when GPT hits a reusable startup, hook, identity, delegation, transport, encoding, or guard failure that can recur in future GPT sessions.",
     "Keep GPT-owned lessons separate from GPT-mini-owned lessons. Do not use GPT-mini reflection as a substitute for GPT reflection.",
+    "Record each incident as four facts: symptom, root cause class, fix, and proof. //why:folded stop-hook repair step to howto tier //why:folded stop-hook repair step to howto tier-sonnet",
     "Prefer concrete machine checks over apology text. Include the exact command, file, or hook setting that proves the fix.",
-    "Record each incident as four facts: symptom, root cause class, fix, and proof.",
     "For Codex or CLI hook failures, separate the layers before naming the bug: config feature flag, hook command, adapter stdout JSON, exit code, and downstream harness decision.",
     "For delegation failures, verify the real model family that answered, not only the dispatcher exit code.",
     "Promote only durable recurrence-prevention knowledge. Leave transient logs, cache state, and one-off screenshots out.",
@@ -40,9 +40,7 @@
     "TODO: Audit Codex pace integration end-to-end: verify wkpace-codex.ps1 display against Get-WkCodexPaceInfo object fields for 5h/weekly used/remaining/limit/target, and verify whether Codex over-pace/weekly pressure is actually wired to root action restrictions in the harness. Measurement should be delegated read-only; root performs inference and any wiring changes.",
     "2026-07-24 Codex pace emergency handoff: when Codex budget must be conserved until reset, stop broad exploration and finish only emergency integration checks plus knowledge-ification. Root should keep inference/verification, avoid direct codex CLI, and prefer repo probes that do not spend Codex quota. Proof: tools\\\\wkharness-codex-pace-root-action-probe.ps1 verifies Codex pace-95 calls a block for a normal root Bash action while leaving Agent.cmd delegation open.",
     "2026-07-24 Codex pace probe preservation: important probe files matching gitignore patterns such as *-probe.ps1 must carry an in-source harness:skill block with literal wkappbot skill read command lines, be verified no-BOM, then be committed with git add -f so successor cleanup does not delete the proof. Proof: tools\\\\wkharness-codex-pace-root-action-probe.ps1 starts with gpt-reflection, codex-cli-wkappbot-usage, and harness-pace-guard skill-read lines and passes the root-action/delegation-open probe.",
-    "2026-07-28 INCIDENT: GPT/Codex ROOT misfiled delegation and skill-edit lessons into gpt-mini-reflection/codex-reflection instead of the model-name reflection returned by wkagent-name. Reflex: run or trust wkagent-name for the active model reflection target; write this agent's recurring hook/delegation/skill-edit lessons to gpt-reflection, and use sibling reflection skills only when explicitly reviewing that sibling's own failure.",
-    "2026-07-28 INCIDENT: ROOT sent a final answer even though the Stop hook was still failing. Reflex: a Stop-hook failure is not a stopping point; continue the repair loop, sharpen delegation briefs, and only final-answer after Stop behavior is verified or the remaining blocker is explicitly captured.",
-    "Stop-hook repair evidence: when a dot-sourced module calls an optional helper such as _wkPerf before the caller defines it, add a guarded file-scope fallback in the module, then verify with Parser.ParseFile and the canonical self-test; a command-not-found exception is a hook defect, not a clean-turn verdict."
+    "2026-07-28 INCIDENT: ROOT sent a final answer even though the Stop hook was still failing. Reflex: a Stop-hook failure is not a stopping point; continue the repair loop, sharpen delegation briefs, and only final-answer after Stop behavior is verified or the remaining blocker is explicitly captured."
   ],
   "requirements": [
     {
@@ -80,6 +78,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-06-14T11:18:22.8900716Z",
-  "updated": "2026-08-08T23:15:17.6294778Z",
-  "version": "1.211"
+  "updated": "2026-10-11T18:40:37.4054559Z",
+  "version": "1.215"
 }

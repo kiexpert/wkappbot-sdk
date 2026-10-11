@@ -9,7 +9,11 @@
     "LAYER-SEPARATE before naming a Codex/CLI hook bug: config feature flag -> hook command -> adapter stdout JSON -> exit code -> downstream harness decision; name the layer, not just the symptom.",
     "DELEGATION FAILURES: verify the REAL model family that answered (modelUsage), not only the dispatcher exit code -- a silent fallback to haiku looks like success.",
     "PROMOTE only durable recurrence-prevention knowledge; leave transient logs, cache state, one-off screenshots out.",
-    "TRIGGER: a GPT session hits a reusable startup/hook/identity/delegation/transport/encoding/guard failure that can recur in future GPT sessions."
+    "TRIGGER: a GPT session hits a reusable startup/hook/identity/delegation/transport/encoding/guard failure that can recur in future GPT sessions.",
+    "DISPATCH PROOF CONTRACT: before re-dispatching a cheap worker after a failed or ambiguous probe, require changed files plus exact PASS/FAIL lines plus nonzero exit on missing cases. Exit code 0 without visible PASS output is not structural proof and should be recorded as a debrief before any next Agent.cmd dispatch.",
+    "CODEX HARNESS REPAIR ORDER: when Agent.cmd is blocked by agent-debrief and ROOT verification is blocked by busy-fleet, do not retry the same dispatch. Sequence: (1) read gpt-reflection/gpt-mini-reflection plus the specific guard skill, (2) record the circular blocker with wkappbot skill edit if needed, (3) delegate a bounded cheap worker only for proto/probe plus its own self-test, (4) if Codex built-in delegation completion is not credited, fix/verify busy-fleet Get-WkLastDelegationTs first, (5) run git diff --check and the worker self-test, (6) wire debrief/session fallback only after proof, (7) run a live Agent.cmd --model gpt-5-mini canary. Proof command examples: git diff --check -- tools/wkharness-guards-busyfleet.ps1 tools/wkharness-guards-agent-debrief.ps1; & .\\tools\\wkharness-codex-agent-debrief-session-fallback-probe-selftest.ps1.",
+    "2026-07-28 INCIDENT: GPT/Codex ROOT misfiled delegation and skill-edit lessons into gpt-mini-reflection/codex-reflection instead of the model-name reflection returned by wkagent-name. Reflex: run or trust wkagent-name for the active model reflection target; write this agent's recurring hook/delegation/skill-edit lessons to gpt-reflection, and use sibling reflection skills only when explicitly reviewing that sibling's own failure.",
+    "Stop-hook repair evidence: when a dot-sourced module calls an optional helper such as _wkPerf before the caller defines it, add a guarded file-scope fallback in the module, then verify with Parser.ParseFile and the canonical self-test; a command-not-found exception is a hook defect, not a clean-turn verdict."
   ],
   "requirements": [
     {
@@ -34,6 +38,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-06-24T07:24:14.3412403Z",
-  "updated": "2026-06-24T07:24:14.3412497Z",
-  "version": "1.0"
+  "updated": "2026-10-11T18:39:40.8296748Z",
+  "version": "1.4"
 }
