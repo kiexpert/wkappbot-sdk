@@ -1,0 +1,40 @@
+{
+  "id": "claude-md-guide-ref",
+  "app": "personal-docs",
+  "title": "CLAUDE.md Guide Reference: History, incidents, and precedents",
+  "title_ko": null,
+  "desc": "Reference history for CLAUDE.md guide: past incidents, corrections, and dated precedents.",
+  "steps": [
+    "2026-05-08: initial CLAUDE.md guide created for session management and gg workflow.|Authoring rule: all content must be English only -- Korean in CLAUDE.md wastes 2-3x tokens on every session load.|Maintenance: keep project CLAUDE.md under 100 lines; extract fat sections into skills with a pointer.|Version history and incidents live in this -ref skill; current rules live in claude-md-guide T1 and claude-md-guide-howto T2."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read claude-md-guide-ref",
+      "expect": "no SKILL Load failed",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read claude-md-guide-ref",
+      "expect": "skill contents displayed",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read claude-md-guide",
+      "expect": "TWO-LAYER",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "CLAUDE.md",
+    "ref",
+    "history",
+    "incidents"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-10-11T17:11:36.5824578Z",
+  "updated": "2026-10-11T17:11:36.5824766Z",
+  "version": "1.0"
+}

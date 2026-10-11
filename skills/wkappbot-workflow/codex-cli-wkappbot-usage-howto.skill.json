@@ -5,12 +5,23 @@
   "title_ko": null,
   "desc": "Operate Codex CLI inside WKAppBot: install, modes, sandbox/config, the wkcodex wrapper.",
   "steps": [
-    "INSTALL: prefer repo-local bin codex.exe; smoke-check codex --help and codex --version; if auth stale run codex login (creds under ~/.codex). RC-SENSITIVE: rc=0 success, rc=1 handled failure, any other rc = investigate even if the terminal looked quiet.",
-    "MODES: codex [PROMPT] interactive; codex exec non-interactive automation; codex review for review jobs; codex resume --last / fork --last to continue/branch (resumed runs are separate executions).",
-    "REPRODUCIBILITY: -c key=value, --model MODEL (codex-mini cheap / gpt-5 strong), -p PROFILE; config files for defaults, CLI overrides for one-offs.",
-    "EXECUTION INTENT: -s read-only / workspace-write / danger-full-access, -a on-request, --full-auto; -C DIR anchors the tree, --add-dir for extra writable roots; --search only when web grounding needed; codex apply to apply the last diff.",
-    "WKCODEX WRAPPER (primary method): wkcodex.ps1 'skill-read A. skill-read B. skill-read C. task' -- pre-checks 3+ skill refs + forbidden kill/skill-edit patterns, auto-injects sandbox bypass, post-checks git diff + CP949.",
-    "STREAMING: codex exec --json prints JSONL events live; SPEC-GATE: non-mini codex exec needs a SPEC block + 3 skill refs, codex-mini skips both."
+    "INSTALL & RC: prefer repo-local bin codex.exe, smoke-check codex --help and codex --version, run codex login if auth stale. RC-SENSITIVE: rc=0 success, rc=1 handled, any other = investigate even if terminal quiet.",
+    "MODES: codex [PROMPT] interactive, codex exec non-interactive, codex review for reviews, codex resume --last / fork --last to continue/branch (resumed runs are separate executions).",
+    "REPRODUCIBILITY: -c key=value, --model MODEL (codex-mini cheap / gpt-5 strong), -p PROFILE; use config files for defaults, CLI overrides for one-offs.",
+    "EXECUTION INTENT: -s read-only/workspace-write/danger-full-access, -a on-request, --full-auto; -C DIR anchors tree, --add-dir for extra roots, --search only when web grounding needed, codex apply to apply last diff.",
+    "FAILURE CHAINS: If a command fails silently, write explicit chain: If X -> Y, prove Y with one follow-up command and observable output.",
+    "WKCODEX WRAPPER (primary): wkcodex.ps1 \\\"skill-read A. skill-read B. skill-read C. task\\\" -- pre-checks 3+ skill refs + forbidden kill/skill-edit, auto-injects sandbox, post-checks git diff + CP949.",
+    "STREAMING: codex exec --json prints JSONL events live (type: message, tool_call, tool_result, etc.). Combine with --output-last-message FILE for final response.",
+    "SPEC-GATE: non-mini codex exec needs SPEC block + 3 skill refs, codex-mini skips both. Pin model via --model.",
+    "WINDOWS TROUBLESHOOTING: If works in VS Code but not CMD/PowerShell, check PATH, ~/.codex, VS Code extension, repo-local bin codex.exe, --no-alt-screen scrollback before assuming binary broken.",
+    "HOOK INSTALL (2026-06-14): use [features].hooks = true not deprecated codex_hooks. Session init runs wkharness-codex-install.ps1 (writes features.hooks=true, installs PreToolUse -> CodexPreToolUseAdapter.ps1, creates .codex/wkharness-allow.json). VALIDATE adapters with representative stdin JSON: rc 2 for deny, empty stdout for allow, no invalid JSON.",
+    "REPO SMOKE ENTRY: use ./wk-test.cmd or ./wk-test.ps1 from repo root. Already reads mandatory startup skills, runs tools/wkharness-codex-main.ps1 -Test, hosts reusable regression checks.",
+    "CODEX SESSION CREDIT: skill-read credit relies on early helper in tools/wkharness-codex-main.ps1: define Get-WkActiveSessionJsonl and Get-WkSessionSkillReadIds after dot-sources, remove late duplicate provider from lazy-load block.",
+    "When Codex produces a durable lesson, route it into the Hongik Harness by reading hongik-reflexes and knowledge-ification-procedure-jisikhwa, then skillify or guard it instead of leaving it as a one-off note.",
+    "2026-06-14 Codex PreToolUse hook fix: use [features].hooks = true, not deprecated [features].codex_hooks. A deprecated flag can leave hooks inactive or noisy even when hooks.json exists. Verify with codex exec --json and look for absence of the deprecation warning before trusting hook enforcement.",
+    "2026-06-14 Codex setting joseki: for global default deny with controlled exceptions, read codex-default-deny-allow-override-spec. Keep the policy in Codex-only adapter files, place emergency hard-deny before explicit allow, then stage allow, then global deny, and use stderr plus exit 2 for deny.",
+    "2026-06-14 standard Codex hook install: session init runs wkharness-codex-install.ps1, writes features.hooks=true, installs a catch-all PreToolUse hook to CodexPreToolUseAdapter.ps1, and creates .codex/wkharness-allow.json for narrow explicit allow records. Codex CLI discovers AGENTS.md under ~/.codex and along repo root-to-current-directory, injecting global instructions first and closer files later; CODEX.md needs a pointer in an auto-loaded AGENTS.md. Source: https://developers.openai.com/cookbook/examples/gpt-5/codex_prompting_guide.",
+    "CodexPreToolPolicy now loads the Codex-only forced-like on-load helper; exposed mandatory skill IDs become one-time chatlog-confirmed like debt while pure knowledge commands retain fast-allow."
   ],
   "requirements": [
     {
@@ -35,6 +46,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-06-24T07:24:45.2444633Z",
-  "updated": "2026-06-24T07:24:45.2444752Z",
-  "version": "1.0"
+  "updated": "2026-10-11T17:06:43.2164764Z",
+  "version": "1.7"
 }

@@ -1,0 +1,41 @@
+{
+  "id": "claude-md-guide",
+  "app": "personal-docs",
+  "title": "CLAUDE.md Two-Layer System: Structure, Purpose, and Mandatory Rules",
+  "title_ko": null,
+  "desc": "Core usage guide for authoring and maintaining CLAUDE.md files. Covers the two-layer system (global + project), key mandatory rules, and decision logic for rule placement.",
+  "steps": [
+    "CLAUDE.md operates in two layers: (1) Global user-level CLAUDE.md -- universal rules applied to ALL projects, loaded first. (2) Project CLAUDE.md at repo root -- project-specific content, loaded second and WINS over global on conflict. Project rules override global rules.|Global CLAUDE.md purpose: tool-level universal rules that apply everywhere: language standards, notifications protocol, CDP port management, process kill protection, delegation policy, suggest workflow, loop/schedule rules, secrets file location. Do NOT put project-specific content in global CLAUDE.md (wastes tokens on every project load).|Project CLAUDE.md purpose: domain knowledge for this repo only: build commands, architecture overview, known gotchas, CWD shorthand, key file paths, gg Main Workflow section, harness:skill rules for files in this repo. Never duplicate global rules here.|Rule placement decision: if the rule applies to ALL repos go to global CLAUDE.md. If it applies to ONE repo go to project CLAUDE.md. If it belongs to a skill, wkappbot skill contribute it instead of bloating CLAUDE.md.|Fat CLAUDE.md is a defect: move detail into skills and leave a pointer. Run wkappbot skill read claude-md-guide-howto for the full authoring procedure and situation A-H remedies."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read claude-md-guide",
+      "expect": "no JsonException in output",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read claude-md-guide-howto",
+      "expect": "no SKILL Load failed",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read claude-md-guide-ref",
+      "expect": "skill contents displayed",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "CLAUDE.md",
+    "project-instructions",
+    "harness",
+    "mandatory-rules",
+    "configuration"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-10-11T17:10:21.0356265Z",
+  "updated": "2026-10-11T17:10:21.0356381Z",
+  "version": "1.0"
+}

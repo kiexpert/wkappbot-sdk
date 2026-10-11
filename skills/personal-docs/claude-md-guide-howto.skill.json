@@ -1,0 +1,41 @@
+{
+  "id": "claude-md-guide-howto",
+  "app": "personal-docs",
+  "title": "CLAUDE.md Guide HowTo: Step-by-step authoring and maintenance",
+  "title_ko": null,
+  "desc": "Step-by-step guide for maintaining CLAUDE.md files, situation-specific remedies A-H, and how to use the two-layer system correctly.",
+  "steps": [
+    "Situation A -- new repo with no CLAUDE.md: create the minimum template with build command, architecture, gg section starting with on-load and ending with repo-health-doctor.|Situation B -- a command just failed: delete or fix that line immediately, commit with the code change it describes.|Situation C -- new gotcha discovered: append one line under Gotchas section, commit same session.|Situation D -- new recurring pattern established: add to gg Main Workflow steps.|Situation E -- file exceeds 100 lines: trim stale content first; if still long, extract patterns into a skill and leave a pointer.|Situation F -- same subject drifts between CLAUDE.md and README.md: fix both in one commit.|Situation G -- session ending after significant work: scan for stale content, run wkappbot skill read handoff-checklist.|Situation H -- before release or repo feels stale: close open issues, run wkappbot skill read repo-health-doctor."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read claude-md-guide-howto",
+      "expect": "Situation A",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read claude-md-guide-howto",
+      "expect": "no SKILL Load failed",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read claude-md-guide",
+      "expect": "TWO-LAYER",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "CLAUDE.md",
+    "howto",
+    "authoring",
+    "maintenance",
+    "situations"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-10-11T17:11:26.1469076Z",
+  "updated": "2026-10-11T17:11:26.1469231Z",
+  "version": "1.0"
+}
