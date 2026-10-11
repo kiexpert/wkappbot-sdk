@@ -1,0 +1,51 @@
+{
+  "id": "suggest-co-resolve-2of2-ref",
+  "app": "wkappbot-core",
+  "title": "Suggest co-resolve 2-of-2: dated incidents and the line-2069 deadlock (T3 ref)",
+  "title_ko": null,
+  "desc": "T3 reference tier for suggest-co-resolve-2of2: the zero-requirements confirm deadlock and the suggests it blocks, the 2026-06-05 false-confirm that created the QC duty, and the 2026-08-15 finding that the harness block drifted from its own documented WARN design. Parent holds the protocol; this holds the evidence.",
+  "steps": [
+    "THE LINE-2069 CONFIRM DEADLOCK, diagnosed 2026-07-14 and still open. When a first-party half-resolve stored ZERO requirement entries and relied on an evidence script alone, the confirm path can never succeed: the code unconditionally sets the requirements-all-pass flag to FALSE whenever the requirement count is zero, regardless of whether the evidence script itself passed, so the can-confirm condition can never become true. Worse, adding a requirement is blocked after a half-resolve, frozen to protect the 2-of-2 anti-fake-resolve guarantee, so there is no workaround once in this state. THE FIX, proposed and not yet applied: when the requirement count is zero, treat it as VACUOUSLY SATISFIED if and only if the evidence script passed -- never unconditionally false. BLOCKED SUGGESTS as of 2026-08-14: ts=2026-07-02T07:31:48, ts=2026-07-02T07:32:08, ts=2026-07-05T06:24:30, and ts=2026-08-13T05:08:19. This TODO had accumulated as SEVEN near-identical duplicate steps in the parent, which is the anchor trap at industrial scale; consolidating it here is where it belongs.",
+    "THE 2026-06-05 FALSE CONFIRM, which is why the QC duty exists at all: a cheap session confirmed a suggest whose requirements were 0-of-3 FAILING. The confirm path skips every evidence check by design, so nothing downstream caught it. That single incident is the entire justification for the rule, and any proposal to relax the guard has to answer it rather than route around it.",
+    "THE GUARD DRIFTED FROM ITS OWN DESIGN, measured live 2026-08-15. The parent records the interim measure in these words: the harness WARNS, NOT BLOCKS, so genuine PASS confirms still work. It now BLOCKS unconditionally at wkharness-guards-emergency9.ps1 lines 376 to 377. A session ran the check WITHOUT the confirm flag, obtained a passing regression and 3 of 3 requirements passing, and was then refused by a message instructing it to run the check first and confirm only a PASS -- which it had just done. The guard cannot see that the check already ran, so it treats the compliant path and the blind path identically. THE RIGHT FIX IS NOT A DOWNGRADE TO WARN, which reopens the 2026-06-05 hole; it is to enforce the instruction MECHANICALLY -- require that the same session already ran a check for the SAME timestamp without the confirm flag. Matching merely that some check ran would let a session check one entry and blind-confirm another, the same defect wearing a different hat.",
+    "MEASURED AND COUNTERINTUITIVE, 2026-08-15: DELETING A DUPLICATE STEP LOWERED THE PARENT'S SCORE from 58 to 44, confirmed by two independent gauges -- the post-edit knowledge-score line and the tier-gate's own refusal message, which both read 44 afterwards. The documented model says the score divides by step count, which predicts that removing a step should HELP. It did the opposite. A predecessor had already measured that dedup buys ZERO points; the true figure in this band appears to be NEGATIVE. PRACTICAL RULE: do not dedup in order to raise a score. Dedup for readability and token cost, and reach for an absent tier sibling or a content addition when the score is what you need to move. The stop that saved this: one deletion, then a re-measure BEFORE deleting the remaining six.",
+    "TODO: ROOT must apply SuggestCommand.Resolve.Part3.cs line 2069 fix to permit confirm when evidence script passes despite zero requirements by changing regRc AND reqAllPass condition. WHEN: 3 old suggests blocked (ts=2026-07-02T07:31:48, ts=2026-07-02T07:32:08, ts=2026-07-05T06:24:30). HOW: wkappbot skill read suggest-resolve-evidence-conventions step 28 and suggest-co-resolve-2of2 step 13 for diagnosis and proposed fix. WHY: evidence-script-only suggests cannot confirm after HALF-resolve without this code patch.",
+    "TODO: ROOT must apply SuggestCommand.Resolve.Part3.cs line 2069 fix to permit confirm when evidence script passes despite zero requirements by changing regRc AND reqAllPass condition to set reqAllPass true not false when reqs.Count==0. WHEN: 4 suggests blocked (ts=2026-08-13T05:08:19 added 2026-08-14, same deadlock) (ts=2026-07-02T07:31:48, ts=2026-07-02T07:32:08, ts=2026-07-05T06:24:30). HOW: wkappbot skill read suggest-resolve-evidence-conventions step 27 and suggest-co-resolve-2of2 steps 13-14 for diagnosis. WHY: evidence passes but canConfirm blocks all confirms when zero requirements stored.",
+    "TODO: ROOT must apply SuggestCommand.Resolve.Part3.cs line 2069 fix to permit confirm when evidence script passes despite zero requirements: change regRc==0 AND reqAllPass condition by setting reqAllPass true not false when reqs.Count==0. WHEN: 3 old suggests (ts=2026-07-02T07:31:48, ts=2026-07-02T07:32:08, ts=2026-07-05T06:24:30) blocked by deadlock. HOW: wkappbot skill read suggest-resolve-evidence-conventions and wkappbot skill read suggest-co-resolve-2of2 for diagnosis. WHY: evidence-script-only suggests cannot confirm after HALF-resolve without this fix.",
+    "TODO: ROOT must apply SuggestCommand.Resolve.Part3.cs line 2069 fix to permit confirm when evidence script passes despite zero requirements by changing regRc AND reqAllPass condition. WHEN: 3 old suggests (ts=2026-07-02T07:31:48, ts=2026-07-02T07:32:08, ts=2026-07-05T06:24:30) blocked by deadlock. HOW: wkappbot skill read suggest-resolve-evidence-conventions step 25 and suggest-co-resolve-2of2 step 13 for diagnosis. WHY: evidence-script-only suggests cannot confirm after HALF-resolve without this fix."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read suggest-co-resolve-2of2-ref",
+      "expect": "prints the line-2069 deadlock and the four blocked timestamps",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read suggest-co-resolve-2of2",
+      "expect": "the parent still holds the protocol and now scores at or above 60",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read harness-tier-score-guard-howto",
+      "expect": "the band table this ref cross-references",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "suggest",
+    "co-resolve",
+    "ref",
+    "t3",
+    "deadlock",
+    "confirm",
+    "incident",
+    "qc"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-08-15T11:51:04.9778739Z",
+  "updated": "2026-10-11T15:55:30.2524675Z",
+  "version": "1.4"
+}

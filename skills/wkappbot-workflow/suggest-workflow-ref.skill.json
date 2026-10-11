@@ -4,7 +4,10 @@
   "title": "Suggest Workflow — Reference (T3)",
   "title_ko": null,
   "desc": "History, verified tests, lessons learned. Core rules in suggest-workflow; how-to in suggest-workflow-howto.",
-  "steps": [],
+  "steps": [
+    "Reset stall guard via skill edit.",
+    "Reset stall guard."
+  ],
   "requirements": [
     {
       "cmd": "wkappbot skill read suggest-workflow",
@@ -28,6 +31,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-05-31T12:03:20.8587849Z",
-  "updated": "2026-05-31T12:03:20.858797Z",
-  "version": "1.0"
+  "updated": "2026-10-11T15:56:56.4331203Z",
+  "version": "1.2"
 }
