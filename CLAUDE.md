@@ -445,7 +445,7 @@ wkappbot file edit --old-file /tmp/old.txt --new-file /tmp/new.txt FILE
 ## harness:block (?i)bash\b.*(?:^|[\s;&|('"\\/])(?:powershell|pwsh)(?:\.exe)?['"]?\s+-
 Use PowerShell tool directly
 
-## harness:block (?i)core\.hooksPath.*empty|null
+## harness:block (?i)core\.hooksPath(?:=(?:""|''|\s)|\s+(?:""|''|/dev/null))|--unset(?:-all)?\s+core\.hooksPath
 Git hook security: core.hooksPath must never be empty or null. Pre-push hooks are required to block secret exposure. Verify with: git config core.hooksPath
 See: wkappbot skill read security-guard
 
