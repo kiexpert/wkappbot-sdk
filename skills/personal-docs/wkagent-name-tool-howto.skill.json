@@ -1,0 +1,50 @@
+{
+  "id": "wkagent-name-tool-howto",
+  "app": "personal-docs",
+  "title": "wkagent-name-tool howto",
+  "title_ko": null,
+  "desc": "T2 howto for wkagent-name-tool: invocation, PATH install, resolution order, hook integration, stats output.",
+  "steps": [
+    "INVOKE (pace-safe): call the bare wk-prefixed command. In PowerShell or cmd the extension is optional via PATHEXT (wkagent-name). In bash you MUST append the extension (wkagent-name.cmd) because bash ignores PATHEXT, and a bare .ps1 will NOT run in bash. The wk-prefix is what makes it pace-exempt. NEVER call it by absolute path (the drive-letter tools wkagent-name.ps1 form is not wk-prefixed and gets pace-blocked when over budget).",
+    "INSTALL to PATH: copy a thin shim wkagent-name.cmd into the WillKim bin (find it with Split-Path of Get-Command wkappbot Source Parent). The shim forwards to tools wkagent-name.ps1 which dot-sources wkharness-agent-name.ps1 from its own dir, so the .ps1 must stay in tools. Prefer copy or shim over symlink (symlink needs admin). The grander design registers via the wkwrap resolver plus a wkdoctor-created bin symlink.",
+    "RESOLUTION ORDER (Get-WkCommitterModel in wkharness-agent-name.ps1): first env WKHARNESS_AGENT_MODEL, then the Win32 process parent chain for a model flag in an ancestor cmdline, then the active-session per-slug json fallback within an 8 hour window. Returns a model id, or ROOT (no model anywhere, treat as human), or UNKNOWN (CIM failure, fail-open).",
+    "HOOK INTEGRATION: githooks lib detect-model.sh calls wkagent-name first, then process lineage, then the subagent-active mark, then the active-session tracker, then a JSONL scan. pre-push allows opus and ROOT and empty, blocks a positively-identified cheap model. commit-msg appends a Model trailer. All three share detect-model.sh for DRY agreement.",
+    "STATS OUTPUT: stdout is the current model id only. stderr line 1 is the current process stats (pid cpu mem uptime plus truncated cmdline). stderr line 2 and beyond are ancestor AI processes prefixed with a caret and their model.",
+    "2026-07-07 PROTO FIX (wkharness-agent-name-proto.ps1): Get-WkModelFromSessionTail now accepts -SessionId and does an EXACT-match read of <Dir>/<SessionId>.jsonl BEFORE the fuzzy CreationTime time-join, fixing the confirmed Opus-mislabeled-as-Sonnet bug (harness-active-model-scoping step 9) where concurrent sessions' near-simultaneous jsonl creation times made the fuzzy join pick the wrong sibling session's model. Exact match wins outright; falls back to the existing time-join when SessionId is empty or its jsonl is absent.",
+    "MERGED LIVE 2026-07-07: the session_id exact-match fix (step 6) is now merged into the canonical wkharness-agent-name.ps1 (proto promoted via wkappbot file write, parse-check 0 errors, .bak saved). LIVE-VERIFIED end-to-end: a Write tool call that was previously [sonnet-solo-run] pace-blocked PASSED post-merge, proving the pre-hook (wkharness.ps1:388 Get-WkCommitterModel -SessionId) now resolves this Opus session's real model via the exact <SessionId>.jsonl match instead of the fuzzy time-join that had picked a concurrent Sonnet sibling. NOTE two follow-ups remain: (a) wkharness-claude-post.ps1:132 calls Get-WkCommitterModel WITHOUT -SessionId, so the active-session file WRITER can still fuzzy-resolve; pass -SessionId there too for full self-healing durability. (b) wkpace fail-closes on a ROOT resolve ('no active AI process') -- a ROOT interactive Claude session should map to the claude family for the pace display.",
+    "TODO: apply the two recorded lines to tools/wkharness-agent-name.ps1 through a delegated proto as soon as the clean-baseline window opens, then verify with three runs and commit. THE TWO LINES ARE ALREADY WRITTEN OUT VERBATIM in the CONFIRMED paragraph of the entry-point step above, so this needs no rediscovery: line 4 gains a third parameter, a string SessionId defaulting to empty, beside the two existing switches; line 813 passes that SessionId into the Get-WkCommitterModel call that currently takes no arguments. THE BLOCKER IS NOT TECHNICAL: the study-lock on that file prescribes a delegated proto, and the clean-baseline gate refuses every non-pro dispatch while a CONCURRENT agy session's uncommitted files sit in the shared tree -- files ROOT is forbidden to commit. Check that first; if the tree is clean, the route is open and this is one dispatch. THE THREE RUNS ARE THE ACCEPTANCE TEST and one green run does not count, because this resolution is context-dependent: the bare invocation must still print a model, and an EMPTY result there is the exact regression a previous attempt caused; the invocation carrying a known session id must print the tier that session is actually running; the selftest switch must still pass. ONLY AFTER all three pass, wire the id into the commit-msg helper, which is a separate file and a separate step. //why:That file now also carries the commit-SHAPE measurement, so a successor applying these two lines will not re-rank the resolver from the wrong number.-opus //why:That file now also carries the commit-SHAPE measurement, so a successor applying these two lines will not re-rank the resolver from the wrong number.-opus",
+    "STATUS 2026-05-31: Haiku writing tools/wkagent-name.ps1 + tools/wkagent-name.cmd prototype. Opus reviewing pending-auto-archive-proto.ps1 + wkagent-name. After review: register wkagent-name.cmd in WKAppBot/bin (different repo -- coordinate). wkappbot can then call wkagent-name to get current AI model + parent chain for monitoring/logging.",
+    "EXTENDED OUTPUT (optional --stats flag): each AI line also shows PID, CPU percent, WorkingSet MB. Format: model TAB pid=N cpu=X.X% mem=YMB TAB cmdline. Example: claude-haiku-4-5-20251001 TAB pid=1234 cpu=2.1% mem=145MB TAB Agent.cmd --model haiku task"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read wkagent-name-tool-howto",
+      "expect": "INVOKE",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wkagent-name-tool-howto",
+      "expect": "RESOLUTION ORDER",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wkagent-name-tool-howto",
+      "expect": "HOOK INTEGRATION",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "skill-tree",
+    "t2",
+    "howto",
+    "agent-name",
+    "diagnostic"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-03T05:50:26.3220677Z",
+  "updated": "2026-10-11T17:27:37.9274002Z",
+  "version": "1.7"
+}
