@@ -7,7 +7,7 @@
 > skills, memory files, commit messages, docs, prompts, internal notes -- ALL English.
 > Korean uses 2-3x more tokens. One Korean file = wasted budget on every session load.
 
-## Repo Main Work -- STANDING 강령 (owner 2026-09-28)
+## Repo Main Work -- STANDING MANDATE (owner 2026-09-28)
 
 This is a PUBLIC repository. Every root/session here carries two ALWAYS-ON main-work duties, in code as reflexes, not just when asked:
 
@@ -45,8 +45,8 @@ This is a PUBLIC repository. Every root/session here carries two ALWAYS-ON main-
 - **eye tick**: one-shot status query (includes ctx=N%) / **eye**: FSW hybrid loop
 - **Handoff**: `wkappbot newchat "prompt"` -- passes context summary to new chat
 - **Cro card forbidden!**: OpenClaw(Cro) is a separate service -- do not modify. Only Claude cards OK.
-- **CWD shorthand**: `<WKAppBot-repo>` -> `WG-WKAppBot` / noise filters: `NO_REPLY`, `?긱꽦`
-- **Skill discovery**: use `wkappbot skill search <topic>` first; if the user says `?긱꽦` or `?긱꽦??, also search `wkappbot skill search ?긱꽦` or `wkappbot skill search ?긱꽦??.
+- **CWD shorthand**: `<WKAppBot-repo>` -> `WG-WKAppBot` / noise filters: `NO_REPLY`, `giyeok-key`
+- **Skill discovery**: use `wkappbot skill search <topic>` first; if the user sends a Korean keyword, also search `wkappbot skill search <that-keyword>`.
 
 ### Build & Deploy
 Run `build.cmd` from the repository root to publish the launcher binary.
@@ -238,7 +238,7 @@ MFC controls: almost no UIA patterns -> Win32 message fallback required. Heroes 
 
 ## Session Management (Claude Code Tips)
 - `wkappbot claude-usage` -> JSONL size + ctx%
-- **ctx% = JSONL 첨 ~20MB** -- prepare handoff at 8MB, immediate handoff at 10MB
+- **ctx% = JSONL ~20MB** -- prepare handoff at 8MB, immediate handoff at 10MB
 - **Goal**: ~10MB or less per session. Aggressive token optimization!
 - **Handoff**: `wkappbot newchat "prompt"` -- passes work summary to new chat
 - **Handoff primer**: run this first after load/compact when continuing a session:
@@ -328,6 +328,8 @@ D:/SDK/bin/wkappbot.exe / a11y.exe / wkappbot.hq/
 
 ## gg Main Workflow
 
+MAIN DUTY 2026-10-11: (a) macOS (MacBook) release readiness of the SDK; (b) OVERALL QA of the release for every product: wkappbot (D:/GitHub/WKAppBot), the SDK, and the reflex app (WKAppBot.Reflex, prepared by the harness team).
+
 Execute in order when user sends `gg` or `gogo`. This is the project's recurring main-workflow trigger shorthand.
 0. **[PRIMARY DUTY] Smoke test loop**: 
    - `wkcdp-mon.sh -KillForeign` (Chrome cleanup first, check LAT avg — any >1000ms = CDP bug)
@@ -352,6 +354,8 @@ Execute in order when user sends `gg` or `gogo`. This is the project's recurring
 ---
 
 ## Main Duties (recurring responsibilities)
+
+> MAIN DUTY 2026-10-11: (a) macOS (MacBook) release readiness of the SDK; (b) OVERALL QA of the release for every product: wkappbot (D:/GitHub/WKAppBot), the SDK, and the reflex app (WKAppBot.Reflex, prepared by the harness team).
 
 > **PRIMARY DUTY**: You are the wkappbot-sdk product manager. Your job is to make wkappbot more commercially viable every session -- from the user's AND QA engineer's perspective. Not just fix what's asked: spot friction, latency, UX failures, and file suggests proactively. Ask: "would a paying user accept this?" If no ??fix or suggest immediately.
 > **CDP-FIRST RULE**: Prioritize CDP anomalies and ask timeouts above all else. These block user workflows. Direct-fix (no suggest) per CLAUDE.md mandate.
@@ -441,6 +445,10 @@ wkappbot file edit --old-file /tmp/old.txt --new-file /tmp/new.txt FILE
 ## harness:block (?i)bash\b.*(?:^|[\s;&|('"\\/])(?:powershell|pwsh)(?:\.exe)?['"]?\s+-
 Use PowerShell tool directly
 
+## harness:block (?i)core\.hooksPath.*empty|null
+Git hook security: core.hooksPath must never be empty or null. Pre-push hooks are required to block secret exposure. Verify with: git config core.hooksPath
+See: wkappbot skill read security-guard
+
 ## harness:done (?i)skipped|완료|완성|끝
 Step may have been skipped -- verify all gg steps ran
 
@@ -515,33 +523,31 @@ wkappbot skill read wkharness-guards            # Usage: guard/study-lock model 
 wkappbot skill read wkdoctor-system-physician   # Impl: doctor module Add-Check/Emit 4-phase pattern
 wkappbot skill read claude-md-harness-rules     # Task: harness:skill rule + study-lock wiring
 
-## Pending
+## Liked reflexes [ALL]
 
-- [ ] suggest triage 2026-06-05 (RANK 1-4, 2긴급+19중요+2기타 SDK channel; GPT ranking skipped — Chrome>5/CDP-bug risk per gg step 4 note; classified by SPEC impact/urgency/effort/scope):
-  - RANK 1 [8/9] BUG-CDP LOGIN_PAGE ports 9980 session expired | impact=HIGH blocks ask/CDP user workflow, user-facing | effort=MED | scope=Core → SDK mitigation already live (MyCdpContext.ChromeHealthCheck auto-cleanup); monitor recurrence, no new SDK fix
-  - RANK 2 [17] sdk-find-stable: dev repo build not green (failure) | impact=HIGH blocks releases | effort=LOW (verify) | scope=Core build (kiexpert/wkappbot) → escalate: gh run list --repo kiexpert/wkappbot; add to gg DEV-BUILD section (already in skill v1.34 step 14)
-  - RANK 3 [18/19/20] HARNESS GAP core.hooksPath='' bypasses pre-push | impact=MED security | effort=LOW | scope=SDK harness → ALREADY PATCHED (CLAUDE.md harness:block core.hooksPath rule present); resolve-as-fixed pending Eye stable
-  - RANK 3 [21/22] CRITICAL Chrome mult false-positive MERGE×2 | impact=MED | effort=DONE | scope=SDK ChromeHealthCheck.cs (MainWindowHandle filter + Skip(2) keep-2, threshold>3, commit 6dc2e6d9) → verified fixed; resolve pending
-  - RANK 3 [15/16] FEAT agent-msg command | impact=LOW nice-to-have | effort=MED | scope=SDK feature → backlog, not blocking
-  - RANK 4 [15→ts 2026-06-03T19:56:35] WebSocketException ReconnectAsync + [21→ts 2026-06-02T01:59:32] Runtime.evaluate timeout | stale BUG-AUTO CdpClient (Core, OUT OF SCOPE) from cold-start "ask gemini say:test" smoke | dismiss-stale per resolve-stale-bug-auto-merge-noise
-  - RANK 4 [35/36] wkask.sh literal-backslash exec | scope=SDK but fixed 3x (commit 94026081) → Codex deny-rule needed (Pending below); [37] skill sync CONFLICTS UX=LOW; [40] pre-push AI-block UX=LOW; [42] FEAT skill 3-tier auto-detect=LOW; [202/203] pre-commit false-block=already fixed
-  - BLOCKER: actual suggest resolve/merge IPC-lagged (Eye); triage documented only, formal resolution next stable session
+- To trigger: gh workflow run macos-test.yml --repo kiexpert/wkappbot-sdk -> wkappbot skill read macos-ci-via-sdk-relay --keep 'To trigger: gh workflow run macos-test.yml --repo kiexpert/wkappbot-sdk'
+- ROOT, ROOKIE OR MAIN SESSION: land your files with ONE command from the repo root: wkpush.sh -m FILE1 FILE2 -> wkappbot skill read git-blocked-land-it --keep 'ROOT, ROOKIE OR MAIN SESSION: land your files with ONE command from the repo root: wkpush.sh -m FILE1 FILE2'
+
+## Pending
+- [ ] ORDER-2026-10-11: continue SDK macOS readiness, overall QA, and main-duty smoke wiring; dispatch disjoint sectors and land verified results on origin.
+
+- [ ] suggest triage: closed items: HARNESS GAP (core.hooksPath rule present), Chrome mult (commit 6dc2e6d9), wkask literal-backslash (commit 94026081). See skills for detailed history.
 
 - [ ] GHA auto-build: add skills/ fallback to build-skill-page.py + upgrade build-skill-page.yml to build+commit on skills push
 - [ ] [CRIT] Core build broken: A11yActions.Invoke.cs(197) error CS0103 'A11yClick' — file suggest to DG-WKAppBot from core repo CWD
 - [ ] skill-browser-launch-checklist: deploy skills-data-full.js to wkappbot-harness before Pro unlock goes live
 - [ ] contributor service: skills-data-full.js generation + raw.githubusercontent.com dynamic load + localhost test (auto-approved, no confirmation needed)
-- [ ] WKHARNESS_OPUS_FG env var 백도어 언급 스킬 전체 정리 필요
-- [ ] wkappbot-harness repo 삭제 필요 (허락 없이 생성한 것, delete_repo scope 필요)
-- [ ] skill-heal-nightly 3tier 분리 필요 (21 steps, update-gate 차단 중)
+- [ ] WKHARNESS_OPUS_FG env var: audit all skills referencing this backdoor var, document and clean up as needed
+- [ ] wkappbot-harness repo delete (created without authorization, requires delete_repo GitHub scope)
+- [ ] skill-heal-nightly 3-tier split: currently 21 steps blocking update-gate; split into core, -howto, -ref tiers
 - [ ] gg-main final WARN classification 2026-06-05: Eye 5>3=boundary (1x13h PROTECTED survivor, reaper handles; not crit) MONITOR; suggests 14>5=backlog MONITOR; FOCUS-STEAL 3 + CHROME:CAP 7 = Core-scope ESCALATE; CI CDP Smoke fail=expected (real-site nav timeout) SKIP-rule OK; dev-repo skipped=non-standard MONITOR. SECURITY.md 7.5.x = intentional range, not drift.
-- [ ] wkask GPT: BLOCKED_NATIVE_DIALOG (Chrome minimized after cold start → 닫기 dialog). Needs auto-restore or on-screen Chrome guard before ask.
+- [ ] wkask GPT: BLOCKED_NATIVE_DIALOG (Chrome minimized after cold start shows close dialog). Needs auto-restore or on-screen Chrome guard before ask.
 - [ ] wkask Gemini: Google cookie consent banner off-screen (Chrome minimized). Same root cause as GPT issue.
 - [ ] wkask Gemini -Wait arch bug: sync exec + completed log → suggest needed (wkappbot ask gemini direct works)
-- [ ] 3tier migration 잔여: wktool-pattern(12), grap(10), wkcdp-mon, sdk-public-skill-index
-- [ ] skill browser 파이프라인: build-skill-page.py + .env 마스킹 + 44자 트런케이션 + GHA 워크플로 완성 중
-- [ ] open-skill-viewer.sh grap regex 버그 수정 필요: {hwnd:...,proc:chrome,cdp:PORT} 패턴
-- [ ] CDP ask 박멸 작업 중: wkask.ps1 line 149 Chrome restore 블록 추가 필요 (가드 cascade로 직접 편집 불가 상태)
+- [ ] 3-tier migration residue: wktool-pattern (12 steps), grap (10 steps), wkcdp-mon, sdk-public-skill-index need 3-tier structure (core, -howto, -ref)
+- [ ] skill browser pipeline: build-skill-page.py + .env masking + 44-char truncation + GHA workflow completion in progress
+- [ ] open-skill-viewer.sh grap regex bug fix: {hwnd:...,proc:chrome,cdp:PORT} pattern parsing needs correction
+- [ ] CDP ask eradication: wkask.ps1 line 149 Chrome restore block addition needed (guard cascade prevents direct edit; needs harness exception or Core fix)
 - [ ] Haiku subagent wk-only-gate bug: isHaikuSession not propagated to subagents spawned from Sonnet session. Suggest needed.
 - [ ] cdp open hang: cdp open hung 67s (port 9712 Eye also hung). Core timeout fixes deployed but hang persisting.
 - [ ] Eye hang investigation: eye+guardian+whisper-ring cycling hang every ~4min after frame-5-tick-ok. Bug filed via suggest. Root cause: inter-frame block in v7.5.20 binary (02:37 build). Core fix needed.
@@ -568,12 +574,16 @@ wkappbot skill read claude-md-harness-rules     # Task: harness:skill rule + stu
 - [ ] BUG: ask gemini leaks [CHAT_META]/[TITLE_RULE] meta-instructions into Chrome tab title (users can see internal prompt directives). File suggest to Core when suggest git is stable.
 - [ ] CDP renderer tab crash: check graceful close before force-kill in ChromeLauncher/CdpClient.
 - [ ] Cross-repo file sync: cdp-smoke-test.sh + wkjobs.ps1 fixes need to be merged to WKAppBot core repo (files live outside wkappbot-sdk boundary)
-- [x] nightly-heal 2026-06-11: skill audit run (FILE MISSING = expected, Core repo refs); 5 new SDK skills installed (releasing-under-harness-pace-guards, sdk-release-playbook-howto/ref, harness-active-model-scoping, opus-mechanical-self-drag-antipattern); CLAUDE.md Pending compressed 563→555 lines
 ## wksplit-400-lock wkagent-name.py (auto: 601 lines, read on 2026-06-18)
 ## harness:skill (?i)[/\\]wkagent-name\.py$
 wkappbot skill read wksplit-cs-utility  # Usage: six split-safety gates + 0-token determinism
 wkappbot skill read wksplit-smart-multi-language-dedup-round-trip-spec  # Impl: round-trip + dedup spec
 wkappbot skill read verify-tool-or-guard-synthetic-live-static  # Task: run-verify not parse-only
+
+## harness:skill (?i)[/\\]test-cdp-connectivity\.ps1$
+wkappbot skill read wktool-pattern  # Usage: CDP smoke test + cdp-mon anomaly integration
+wkappbot skill read cdp-command-guide  # Impl: eval syntax, timeout handling, session lifecycle
+wkappbot skill read verify-tool-or-guard-synthetic-live-static  # Task: run-verify smoke test live
 
 ## harness:skill (?i)[/\\]wkpushsdk\.sh$
 wkappbot skill read wkpushsdk  # Usage: push the wkappbot-sdk repo to origin (SDK release push), guard-free
