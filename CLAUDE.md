@@ -338,6 +338,8 @@ Execute in order when user sends `gg` or `gogo`. This is the project's recurring
    - `wkappbot taskkill /IM wkappbot-core.exe --dry-run` + `wkjobs.sh -Leaks`
    - Show ALL errors/warnings inline. Loop until 0 errors. 1-SECOND RULE: any CDP op >1s = BUG.
 0.5. **[CRITICAL] Enhanced Health Check**: `powershell -File scripts/gg-main-enhanced.ps1` (detects 8 issue categories). exit=2 → Opus emergency fix. exit=1 → log Pending, continue.
+0.75. **[RELEASE QA] Product Smoke Test Matrix**: Execute full release QA checklist for SDK/WKAppBot/Reflex. SDK macOS: gh workflow run macos-test.yml --repo kiexpert/wkappbot-sdk. WKAppBot Windows: wkappbot ask gpt "say: test" + wkask gpt "say: test". Reflex Windows: wkappbot eye tick + wkdoctor. Update docs/qa-release-2026-10.md with run IDs and PASS/FAIL status.
+0.75. **[RELEASE QA] Product Smoke Test Matrix**: Execute full release QA checklist for SDK/WKAppBot/Reflex. SDK macOS: gh workflow run macos-test.yml --repo kiexpert/wkappbot-sdk. WKAppBot Windows: wkappbot ask gpt "say: test" + wkask gpt "say: test". Reflex Windows: wkappbot eye tick + wkdoctor. Update docs/qa-release-2026-10.md with run IDs and PASS/FAIL status.
 1. wkappbot skill read on-load
 2. wkappbot skill news  -- check recently updated skills before triage (context for what changed)
 3. wkappbot suggest list
@@ -535,45 +537,6 @@ wkappbot skill read claude-md-harness-rules     # Task: harness:skill rule + stu
 
 - [ ] GHA auto-build: add skills/ fallback to build-skill-page.py + upgrade build-skill-page.yml to build+commit on skills push
 - [ ] [CRIT] Core build broken: A11yActions.Invoke.cs(197) error CS0103 'A11yClick' — file suggest to DG-WKAppBot from core repo CWD
-- [ ] skill-browser-launch-checklist: deploy skills-data-full.js to wkappbot-harness before Pro unlock goes live
-- [ ] contributor service: skills-data-full.js generation + raw.githubusercontent.com dynamic load + localhost test (auto-approved, no confirmation needed)
-- [ ] WKHARNESS_OPUS_FG env var: audit all skills referencing this backdoor var, document and clean up as needed
-- [ ] wkappbot-harness repo delete (created without authorization, requires delete_repo GitHub scope)
-- [ ] skill-heal-nightly 3-tier split: currently 21 steps blocking update-gate; split into core, -howto, -ref tiers
-- [ ] gg-main final WARN classification 2026-06-05: Eye 5>3=boundary (1x13h PROTECTED survivor, reaper handles; not crit) MONITOR; suggests 14>5=backlog MONITOR; FOCUS-STEAL 3 + CHROME:CAP 7 = Core-scope ESCALATE; CI CDP Smoke fail=expected (real-site nav timeout) SKIP-rule OK; dev-repo skipped=non-standard MONITOR. SECURITY.md 7.5.x = intentional range, not drift.
-- [ ] wkask GPT: BLOCKED_NATIVE_DIALOG (Chrome minimized after cold start shows close dialog). Needs auto-restore or on-screen Chrome guard before ask.
-- [ ] wkask Gemini: Google cookie consent banner off-screen (Chrome minimized). Same root cause as GPT issue.
-- [ ] wkask Gemini -Wait arch bug: sync exec + completed log → suggest needed (wkappbot ask gemini direct works)
-- [ ] 3-tier migration residue: wktool-pattern (12 steps), grap (10 steps), wkcdp-mon, sdk-public-skill-index need 3-tier structure (core, -howto, -ref)
-- [ ] skill browser pipeline: build-skill-page.py + .env masking + 44-char truncation + GHA workflow completion in progress
-- [ ] open-skill-viewer.sh grap regex bug fix: {hwnd:...,proc:chrome,cdp:PORT} pattern parsing needs correction
-- [ ] CDP ask eradication: wkask.ps1 line 149 Chrome restore block addition needed (guard cascade prevents direct edit; needs harness exception or Core fix)
-- [ ] Haiku subagent wk-only-gate bug: isHaikuSession not propagated to subagents spawned from Sonnet session. Suggest needed.
-- [ ] cdp open hang: cdp open hung 67s (port 9712 Eye also hung). Core timeout fixes deployed but hang persisting.
-- [ ] Eye hang investigation: eye+guardian+whisper-ring cycling hang every ~4min after frame-5-tick-ok. Bug filed via suggest. Root cause: inter-frame block in v7.5.20 binary (02:37 build). Core fix needed.
-- [ ] [CDP-TODO-1] Wire EditorWait.cs: insert IsBadTabState pre-check at line 51 (after EnsureChromeNotIconic, before Console.Write EDITOR-WAIT) in AskCommands.ChatGpt.EditorWait.cs. TabRecovery.cs already exists.
-- [ ] [CDP-TODO-2] Build Core after wiring: run build script to publish the Core
-- [ ] [CDP-TODO-3] Commit: add CdpClient.TabRecovery.cs and AskCommands.ChatGpt.EditorWait.cs with message "fix(cdp): IsBadTabState recovery before EDITOR-WAIT on crashed tab"
-- [ ] [CDP-TODO-4] Eye hang root cause: frame-5-tick-ok → inter-frame block in v7.5.20 (02:37 build). New Core commits edc6359f/7ea533cc may have introduced blocking CDP probe in inter-frame period. Core fix needed.
-- [ ] [CDP-TODO-5] Haiku isHaikuSession not propagated to subagents (suggest filed). Core fix needed for proper Haiku subagent exemption.
-- [ ] [CDP-TODO-6] CronDelete stall-guard false positive (suggest needed). One-time admin ops should be exempt.
-
-- [ ] FOCUS-STEAL: FocusStealSentinel Core issue (suggest 2026-05-23T09:07:20)
-- [ ] suggest check corrupts production skill: co-resolve requirement cmds mutate live skill (NOT clone/dry-run) -- file suggest to Core
-- [ ] on-load skill co-resolve check (2026-05-23T06:18:21): DO NOT rerun -- will re-corrupt. Needs requirement rewrite to use clone target
-- [ ] Codex exec wkappbot timeout: Eye IPC stall (100ms) + Core fallback exceeds Codex 34s cmd timeout; wkappbot cmds hang in subprocess
-- [ ] Core Program.PInvoke.GetParentProcessId() offset 24 bug (same as SDK fix d69b080b; suggest 1779611928 filed to Core)
-- [ ] Core CallerPlacementResolver window selection: missing IsWindowVisible guard vs SDK (hidden ConPTY vs visible terminal divergence)
-- [ ] TGT-POS vs PLACEMENT:ENV mismatch: measurement artifact (Core re-launch with --window-position from WKAPPBOT_CHROME_TARGET pending, Core scope)
-- [ ] WT Vis=True PCW PIDs (20824/21452/12600/8124): test if any in wkappbot ancestor chain -> CASCADIA match
-- [ ] wkclaude-direct-guard: move guard to Agent.cmd level (not global wkharness.ps1); avoids blocking legitimate subprocess wkclaude.sh calls from other sessions
-- [ ] off-screen Chrome cleanup: wkcdp-mon + close abnormal Chrome at (-2573,-856)
-- [ ] taskkill /IM: extended process info (CPU%/mem/handles/threads) for a11y windows is OUT-OF-SCOPE separate command enhancement -- file own suggest
-- [ ] Suggest to Core (manual): TaskkillCompatCommand.cs header + TaskkillUsage() are STALE (say classify-only v1.5, code is v1.9 auto-kill). Update docs to describe v1.9 behavior.
-- [ ] taskkill uncle-kill: GetDescendantProcessIds batch WMI for uncle processes. InlineIsDescendant hangs PID 11940. Spec in wkappbot-taskkill-usage skill.
-- [ ] BUG: ask gemini leaks [CHAT_META]/[TITLE_RULE] meta-instructions into Chrome tab title (users can see internal prompt directives). File suggest to Core when suggest git is stable.
-- [ ] CDP renderer tab crash: check graceful close before force-kill in ChromeLauncher/CdpClient.
-- [ ] Cross-repo file sync: cdp-smoke-test.sh + wkjobs.ps1 fixes need to be merged to WKAppBot core repo (files live outside wkappbot-sdk boundary)
 ## wksplit-400-lock wkagent-name.py (auto: 601 lines, read on 2026-06-18)
 ## harness:skill (?i)[/\\]wkagent-name\.py$
 wkappbot skill read wksplit-cs-utility  # Usage: six split-safety gates + 0-token determinism
