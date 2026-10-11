@@ -526,11 +526,6 @@ wkappbot skill read claude-md-harness-rules     # Task: harness:skill rule + stu
 - ROOT, ROOKIE OR MAIN SESSION: land your files with ONE command from the repo root: wkpush.sh -m FILE1 FILE2 -> wkappbot skill read git-blocked-land-it --keep 'ROOT, ROOKIE OR MAIN SESSION: land your files with ONE command from the repo root: wkpush.sh -m FILE1 FILE2'
 
 ## Pending
-## wksplit-400-lock wkagent-name.py (auto: 601 lines, read on 2026-06-18)
-## harness:skill (?i)[/\\]wkagent-name\.py$
-wkappbot skill read wksplit-cs-utility  # Usage: six split-safety gates + 0-token determinism
-wkappbot skill read wksplit-smart-multi-language-dedup-round-trip-spec  # Impl: round-trip + dedup spec
-wkappbot skill read verify-tool-or-guard-synthetic-live-static  # Task: run-verify not parse-only
 
 ## harness:skill (?i)[/\\]test-cdp-connectivity\.ps1$
 wkappbot skill read wktool-pattern  # Usage: CDP smoke test + cdp-mon anomaly integration
