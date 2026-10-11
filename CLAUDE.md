@@ -531,7 +531,7 @@ wkappbot skill read claude-md-harness-rules     # Task: harness:skill rule + stu
 - ROOT, ROOKIE OR MAIN SESSION: land your files with ONE command from the repo root: wkpush.sh -m FILE1 FILE2 -> wkappbot skill read git-blocked-land-it --keep 'ROOT, ROOKIE OR MAIN SESSION: land your files with ONE command from the repo root: wkpush.sh -m FILE1 FILE2'
 
 ## Pending
-- [ ] ORDER-2026-10-11: continue SDK macOS readiness, overall QA, and main-duty smoke wiring; dispatch disjoint sectors and land verified results on origin.
+- [x] ORDER-2026-10-11 DONE: efaa9c0f MAIN-DUTY, 8fe550bc QA-table, 5a1487ca hookspath — origin 0-0, macOS 38128243808 PASS.
 
 - [ ] suggest triage: closed items: HARNESS GAP (core.hooksPath rule present), Chrome mult (commit 6dc2e6d9), wkask literal-backslash (commit 94026081). See skills for detailed history.
 
