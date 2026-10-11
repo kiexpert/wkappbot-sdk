@@ -406,22 +406,12 @@ wkappbot skill read sdk-public-skill-index  # curated list of ~30 public skills 
 - Chrome translate infobar (auto-shown on Korean pages) blocks CDP injection ??it steals focus and intercepts clicks. Dismiss or suppress before automation.
 - `cdp-mon.ps1` off-screen check was `'^-\d{3,}'` regex (x < -100 = off-screen) ??**false positive on multi-monitor setups** where left monitor has large negative x. Fixed to use `MonitorFromPoint` Win32 API. Rule: never use raw coordinate sign for off-screen detection; always use `MonitorFromPoint` (same as `IsWindowOnScreen` in EyeCmdPipeClient.cs).
 
-## RIQUA: gg-main Automation + Opus Collaboration
-
-- **RIQUA [gg-main Opus spawn]**: Every 3 hours, gg-main script runs and detects Amber/critical status. Opus agent spawns automatically. However, Opus may not have full context if session is compacted or new. INTENDED: Opus should always carry forward prior findings + escalation state. WORKAROUND: Manual `wkappbot skill read sdk-gg-main-automation` before Opus spawn to provide context.
-
 ## References
 - `README.md`
 - `AGENTS.md`
 - **MEMORY.md** / **memory/**: build commands, architecture decisions, gotchas detail
 - .NET 8.0 `net8.0-windows10.0.22621.0`, Korean UI support
-
-## 由щ컠 硫붿떆吏 ?뚭???異붽?~ ?ㅽ궗?뷀썑 ???뱀뀡 ??젣 ?붾쭩~
-??You've hit your usage limit. Upgrade to Pro (https://chatgpt.com/explore/pro), visit
-https://chatgpt.com/codex/settings/usage to purchase more credits or try again at 4:30 PM.
-??First limit = no retry. Mark handoff_pending, let the current atomic task finish if it is already running, and let the next AI/provider stand by. If the same limit appears again while pending, terminate the current session and do not retry the same CLI.
-
-
+- GPT/Codex usage limit: first limit = no retry; mark handoff_pending, let current task finish, let next AI/provider stand by; second limit while pending = terminate session, do not retry.
 
 ## Nightly Schedules
 
@@ -524,6 +514,10 @@ wkappbot skill read claude-md-harness-rules     # Task: harness:skill rule + stu
 
 - To trigger: gh workflow run macos-test.yml --repo kiexpert/wkappbot-sdk -> wkappbot skill read macos-ci-via-sdk-relay --keep 'To trigger: gh workflow run macos-test.yml --repo kiexpert/wkappbot-sdk'
 - ROOT, ROOKIE OR MAIN SESSION: land your files with ONE command from the repo root: wkpush.sh -m FILE1 FILE2 -> wkappbot skill read git-blocked-land-it --keep 'ROOT, ROOKIE OR MAIN SESSION: land your files with ONE command from the repo root: wkpush.sh -m FILE1 FILE2'
+- every report paragraph names a skill id or folder/file name -> wkappbot skill read harness-stop-guard --keep 'every report paragraph names a skill id or folder/file name'
+- (A) session start or post-compaction, run steps 1+2 below. -> wkappbot skill read on-load --keep '(A) session start or post-compaction, run steps 1+2 below.'
+- ARCHITECTURE + WRAPPER SET: Codex native write_file/read_file/apply_patch are hook-DENIED (exit 2) -> wkappbot skill read codex-tool-wrappers --keep 'ARCHITECTURE + WRAPPER SET: Codex native write_file/read_file/apply_patch are hook-DENIED (exit 2)'
+- Treat Codex command results as rc-sensitive: rc=0 is success -> wkappbot skill read codex-cli-wkappbot-usage --keep 'Treat Codex command results as rc-sensitive: rc=0 is success'
 
 ## Pending
 
