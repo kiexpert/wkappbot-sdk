@@ -76,6 +76,8 @@
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/claude-token-optimization.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/claude-kill-guard-hook.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/claude-md-todo-sync.html</loc></url>
+<url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/claude-md-guide.html</loc></url>
+<url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/codex-cli-wkappbot-usage.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/codex-default-deny-allow-override-spec.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/diagnostic-commands-cheatsheet.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/file-command-cheatsheet.html</loc></url>
@@ -242,7 +244,6 @@
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/a11y-find-cdp-runtime-eval-focus-guard.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/claude-terminal-via-appbot-primary.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/claude-proxy-context-limit-auto-handoff-to-gemini-agent.html</loc></url>
-<url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/claude-md-guide.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/codex-agents-md-tool-rules.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/codex-session-tool-usage-statistics-551-sessions-analyzed.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/codex-shell-command-harness-gap-analysis-and-fix-spec.html</loc></url>
