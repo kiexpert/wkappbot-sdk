@@ -1,0 +1,48 @@
+{
+  "id": "git-lock-auto-cleanup",
+  "app": "wkappbot-workflow",
+  "title": "Git Index Lock Auto-Cleanup",
+  "title_ko": null,
+  "desc": "Built-in harness mechanism to auto-remove stale git index.lock files after 60s without active git process.",
+  "steps": [
+    "THE MECHANISM: git index.lock auto-cleanup (harness built-in). When a git command is blocked because .git/index.lock exists, the harness checks if the lock file is older than 60s and no git process is holding it open. If BOTH are true, it auto-removes the stale lock and retries.",
+    "WHEN IT HAPPENS: You run wkpush.sh -m FILE1 FILE2 and git fails with fatal: unable to create .git/index.lock: File exists. Harness detects stale lock, removes it, reruns command, and succeeds.",
+    "WHAT YOU DO: If index.lock is fresh (<60s) or held by running git, WAIT 20 seconds and RETRY. If stale (>60s, no git running), TRUST THE HARNESS auto-cleanup, OBSERVE BLOCKED NOTHING TO APPROVE, and VERIFY with git show origin/main:FILE.",
+    "LIVE EVIDENCE: Source in kih/wkharness.ps1 (git-blocked-land-it.sh v1.29, step 6). Deployed 2026-10-05, example commit d69b080b.",
+    "BANDAID DANGER (NEVER DO): Never manually rm .git/index.lock or Remove-Item while git might still be active. Let the harness safely verify process state and age.",
+    "EDGE CASES: Fresh lock (<60s): wait 20s, retry. Fresh lock + running git: wait 20s, retry. Stale lock + no running git: harness auto-removes. Stale lock + running git: wait 20s.",
+    "See also: git-blocked-land-it"
+  ],
+  "requirements": [
+    {
+      "cmd": "git status",
+      "expect": "clean or locked index check",
+      "prompt": null
+    },
+    {
+      "cmd": "wkpush.sh -m FILE",
+      "expect": "pushes file or triggers auto-cleanup retry",
+      "prompt": null
+    },
+    {
+      "cmd": "git show origin/main:FILE",
+      "expect": "shows landed changes",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "git",
+    "index.lock",
+    "stale",
+    "harness",
+    "auto-cleanup",
+    "blocker"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-10-11T10:28:14.2599218Z",
+  "updated": "2026-10-11T10:35:58.8499837Z",
+  "version": "1.1"
+}
