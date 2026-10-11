@@ -339,7 +339,6 @@ Execute in order when user sends `gg` or `gogo`. This is the project's recurring
    - Show ALL errors/warnings inline. Loop until 0 errors. 1-SECOND RULE: any CDP op >1s = BUG.
 0.5. **[CRITICAL] Enhanced Health Check**: `powershell -File scripts/gg-main-enhanced.ps1` (detects 8 issue categories). exit=2 → Opus emergency fix. exit=1 → log Pending, continue.
 0.75. **[RELEASE QA] Product Smoke Test Matrix**: Execute full release QA checklist for SDK/WKAppBot/Reflex. SDK macOS: gh workflow run macos-test.yml --repo kiexpert/wkappbot-sdk. WKAppBot Windows: wkappbot ask gpt "say: test" + wkask gpt "say: test". Reflex Windows: wkappbot eye tick + wkdoctor. Update docs/qa-release-2026-10.md with run IDs and PASS/FAIL status.
-0.75. **[RELEASE QA] Product Smoke Test Matrix**: Execute full release QA checklist for SDK/WKAppBot/Reflex. SDK macOS: gh workflow run macos-test.yml --repo kiexpert/wkappbot-sdk. WKAppBot Windows: wkappbot ask gpt "say: test" + wkask gpt "say: test". Reflex Windows: wkappbot eye tick + wkdoctor. Update docs/qa-release-2026-10.md with run IDs and PASS/FAIL status.
 1. wkappbot skill read on-load
 2. wkappbot skill news  -- check recently updated skills before triage (context for what changed)
 3. wkappbot suggest list
@@ -410,10 +409,6 @@ wkappbot skill read sdk-public-skill-index  # curated list of ~30 public skills 
 ## RIQUA: gg-main Automation + Opus Collaboration
 
 - **RIQUA [gg-main Opus spawn]**: Every 3 hours, gg-main script runs and detects Amber/critical status. Opus agent spawns automatically. However, Opus may not have full context if session is compacted or new. INTENDED: Opus should always carry forward prior findings + escalation state. WORKAROUND: Manual `wkappbot skill read sdk-gg-main-automation` before Opus spawn to provide context.
-
-- **RIQUA [Chrome multiplication fix deployed]**: 2026-05-28 SDK-side auto-cleanup implemented in MyCdpContext.ChromeHealthCheck.CleanExcessiveChromeProcesses(). When Chrome>5 detected, auto-kills duplicate processes, preserves 2 oldest. Integrated into gg-main-enhanced.ps1. Root cause (Core FindRunningChromePortAny guard 8819ed449) likely still not deployed to user system; SDK mitigation prevents cascade into Eye IPC lag. Verify: run gg-main-enhanced.ps1 repeatedly, Chrome should stay ≤5 after cleanup.
-
-- **RIQUA [Opus cost reduction]**: Removed 5-min zombie-watchdog CronCreate (was 8 × 60 = 480 checks/day). Now gg-main-enhanced runs every 3 hours (8/day) with auto-cleanup integrated. Reduced Opus spawns from 8 to 1 per day (only on CRITICAL). Cost: ~5-10 USD/month (vs prior 40-50 USD/month).
 
 ## References
 - `README.md`
@@ -531,12 +526,6 @@ wkappbot skill read claude-md-harness-rules     # Task: harness:skill rule + stu
 - ROOT, ROOKIE OR MAIN SESSION: land your files with ONE command from the repo root: wkpush.sh -m FILE1 FILE2 -> wkappbot skill read git-blocked-land-it --keep 'ROOT, ROOKIE OR MAIN SESSION: land your files with ONE command from the repo root: wkpush.sh -m FILE1 FILE2'
 
 ## Pending
-- [x] ORDER-2026-10-11 DONE: efaa9c0f MAIN-DUTY, 8fe550bc QA-table, 5a1487ca hookspath — origin 0-0, macOS 38128243808 PASS.
-
-- [ ] suggest triage: closed items: HARNESS GAP (core.hooksPath rule present), Chrome mult (commit 6dc2e6d9), wkask literal-backslash (commit 94026081). See skills for detailed history.
-
-- [ ] GHA auto-build: add skills/ fallback to build-skill-page.py + upgrade build-skill-page.yml to build+commit on skills push
-- [ ] [CRIT] Core build broken: A11yActions.Invoke.cs(197) error CS0103 'A11yClick' — file suggest to DG-WKAppBot from core repo CWD
 ## wksplit-400-lock wkagent-name.py (auto: 601 lines, read on 2026-06-18)
 ## harness:skill (?i)[/\\]wkagent-name\.py$
 wkappbot skill read wksplit-cs-utility  # Usage: six split-safety gates + 0-token determinism
