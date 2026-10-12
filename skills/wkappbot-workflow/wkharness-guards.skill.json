@@ -1,61 +1,95 @@
 {
   "id": "wkharness-guards",
   "app": "wkappbot-workflow",
-  "title": "wkharness-guards",
+  "title": "Harness Guard Routing",
   "title_ko": null,
-  "desc": "Guard cluster quick-ref for wkharness.ps1. One-liner per guard + escape hatch. Details in howto and ref skills.",
+  "desc": "Compact guard index for refusal reasons, safe routes, and recovery commands.",
   "steps": [
-    "GUARD CLUSTER G1-G6: G1 ASK-GUARD blocks ask run_in_background=true; G2 KILL-GUARD blocks terminate-cmdlet on wkappbot*; G3 SKILL-SEARCH-NUDGE soft nudge no block; G4 SKILL-EDIT-GUARD blocks .skill.json direct edit; G5 PACE-GUARD blocks Edit/Write when Sonnet%>Total%; G6 CP949-GUARD blocks non-CP949 chars in Write. -> unblock: wkappbot skill read wkharness-guards-howto",
-    "GUARD CLUSTER G7-G12: G7 AGENT-BRIEF-GUARD blocks Agent with <3 skill reads; G8 OPUS-BUDGET-GUARD blocks Opus at 95%+ budget; G9 STALL-GUARD blocks 300s+10calls solo loop; G10 BG-TASK-GUARD blocks when bg mark >30s; G11 AGENTS-HEAL-GUARD auto-heals AGENTS.md once/session; G12 COMMIT-HOOK-GUARD auto-installs CP949 git hook. -> unblock: wkappbot skill read wkharness-guards-howto",
-    "AGENT GUARDS: SPEC-GATE blocks Opus Agent without SPEC 1.Goal 2.Files 3.Approach 4.Constraints 5.Exit. CLAUDE-MD-SYNC blocks Agent without ## Pending in project MD. USAGE-TEST-GUARD 50pct Opus redirect to wkclaude.sh. WKCLAUDE-DIRECT blocks direct wkclaude.sh/cmd/ps1 calls.",
-    "DEADLOCK ESCAPE: Delegation guards fire on Agent/Agent.cmd/wkcodex/wkclaude path ONLY. When blocked: DO WORK DIRECTLY with wkappbot/git/gh/./wk* leading token. skill* ALWAYS exempt from all guards. file-edit wrapper doubly exempt from pace+stall.",
-    "GUARD CASCADE ORDER: (1) skill* always exempt. (2) file-edit wrapper doubly exempt. (3) wkcodex.sh safe from stall. (4) CronCreate entries need session-start registration. (5) ./wk* camelCase only -- dash after wk breaks gate.",
-    "SKILL-UPDATE-PENDING: wkappbot file write/edit (non-skill) arms lock. Clear: (1) write first, (2) skill edit to clear, (3) delegate with no intervening write. Read/Grep safe.",
-    "-> Per-guard unblock steps + full escape procedure: wkappbot skill read wkharness-guards-howto",
-    "-> RIQUA/history, Codex harness, regex patterns, edge cases: wkappbot skill read wkharness-guards-ref",
-    "STALL+HARNESS-SKILL DUAL-BLOCK TRAP (2026-06-10): When both stall-guard AND harness:skill fire simultaneously on an Edit call, the harness:skill block takes precedence in the error message. The stall guard ALSO fires. Both must be cleared independently: (1) harness:skill -- read all listed prerequisite skills (wkappbot skill read <each>); (2) stall-guard -- contribute a substantive knowledge step (score >=70) to a skill. Reading the skills alone does not reset stall-guard; only a WRITE (skill edit with score >=70) resets it. The correct sequence is: read all prerequisites FIRST (satisfies harness:skill check for that invocation), then attempt the edit. If stall guard fires again, do another skill edit before the next Edit attempt.",
-    "STALL BATCH ESCAPE (2026-06-11, confirmed): When stall blocks individual file writes, combine ALL writes into a SINGLE Bash/PowerShell call using PowerShell Set-Content or Out-File. One tool call = one stall check = all files written atomically before stall can re-fire. Pattern after knowledge reset: PowerShell -Command '@{Agent=1;Bash=1;...}.Keys | ForEach { Set-Content \"D:/WKAppBot/bin/extglob.cmd\" \"D:/kih/tools/extglob.cmd\" -NoNewline }' -- completes all 8 writes as one tool call. This bypasses the per-call stall check and is the correct escape for batch file mutations.",
-    "GIT-APPLY BATCH WRITE PATTERN: When stall blocks direct writes but git commands are stall-safe, create a patch string and use 'git -C REPO apply' to batch-write multiple file contents. For git symlinks (mode=120000 core.symlinks=false), the patch format is: --- a/bin/Name.cmd / +++ b/bin/Name.cmd / @@ -1 +1 @@ / -old_content / +new_content. Pipe the patch text via stdin: printf 'patch_content' | git -C REPO apply. All 8 stub repoints in one git apply call = one stall-safe tool call.",
-    "PACE-EXEMPT EDIT TRICK 2026-06-12: when [pace] guard blocks Edit tool, write old/new content to temp files using Write tool (which IS pace-blocked too) -- instead, use 'wkappbot file edit OLD NEW FILE' which is harness:safe per the safe rule. BUT the trick is you need the exact old/new content. Use wkhippo recall or Read to get the exact old text, then construct: wkappbot file edit old.txt new.txt filepath. The temp files must be created first without Edit/Write (which are also blocked). Alternative: use 'printf' in bash heredoc which IS pace-safe when wkappbot is the first token: start bash with 'wkappbot ...' then pipe to subcommand. SUMMARY: [pace] gate blocks Edit/Write/Bash tools but wkappbot file edit (bare command) is safe.",
-    "STALL-GUARD ABS-PATH TRAP (2026-06-12): The abs-path-noise guard fires when a Bash command starts with an absolute path to WKAppBot/bin. This also trips the stall-guard because both fire on the same command. The fix: use the bare tool name (e.g. 'wkappbot file edit') not 'D:/GitHub/WKAppBot/bin/wkappbot file edit'. The harness:safe rule for 'wkappbot file edit' only exempts the bare name form -- the abs-path form is not recognized as exempt.",
-    "PER-GUARD SKILLS INDEX (2026-06-12): every guard now has a dedicated harness-<guard> skill -- read the specific one when that guard fires (each carries TRIGGER + FIX-via-Agent.cmd + WHY). Pace/budget/stall: harness-pace-guard, harness-opus-budget-guard, harness-wk-only-gate, harness-stall-guard, harness-busy-fleet-guard, harness-codex-pace-guard. Delegation: harness-agent-brief-guard, harness-dialectic-guard, harness-tier-score-guard, harness-codex-spec-gate, harness-agent-leak-guard. Edit-discipline: harness-edit-bg-guard, harness-cp949-guard, harness-python-edit-guard, harness-skill-update-pending, harness-skill-guard, harness-skill-delete-guard. Safety/noise: harness-security-guard, harness-no-verify-guard, harness-kill-guard, harness-bash-uses-pwsh-guard, harness-cd-noise-guard. Infra/health: harness-watchdog-guard, harness-pending-protect, harness-bg-task-guard, harness-diet-score-guard, harness-tier-gate. The generic wkharness-guards (this skill) remains the cluster overview; the per-guard skills are the deep dive.",
-    "SEVERITY/TELEMETRY: each guard fire is a per-guard recurrence-prevention FAILURE SCORE and a real cost (each block re-sends the full context). Read: guard-block-recurrence-failure-score -- it defines the score, the escalate-don't-rewarn loop, the cost-weighting, and the resolved count+live-ctx implementation in central Block/Emit."
+    "GUARD 2 KILL-GUARD [PS]: blocks Stop-Process/Kill-Process on wkappbot-core/wkchat/wkappbot/wka11y. Fix: wkappbot taskkill /IM <exe>. //why:will follow kill-guard taskkill not stop-process-sonnet",
+    "GUARD 3 SKILL-SEARCH-NUDGE [Bash/Glob/Grep]: soft exit-0 nudge to run skill search before grepping. No block.",
+    "GUARD 4 SKILL-EDIT-GUARD [Edit/Write]: blocks direct .skill.json edits. Fix: skill edit <id> or skill contribute.",
+    "GUARD 5 PACE-GUARD [Edit/Write, Sonnet]: Sonnet over-pace -> delegate or wkedit. -> harness-pace-guard",
+    "GUARD 6 CP949-GUARD [Write]: non-CP949 char -> ASCII or Hangul only.",
+    "GUARD 9 STALL-GUARD [all tools except Agent]: solo loop over threshold -> delegate or knowledge-ify (instant reset). -> harness-stall-guard",
+    "GUARD 7 AGENT-BRIEF-GUARD [Agent]: fewer than 3 valid skill-read refs -> add 3, incl agent-on-load + model reflection. -> harness-agent-brief-guard",
+    "GUARD 8 OPUS-BUDGET-GUARD [Agent, opus]: over 95pct weekly budget -> Agent model haiku instead, or wait for reset. -> harness-opus-budget-guard",
+    "GUARD 11 AGENTS-HEAL-GUARD [any tool, once/session]: self-heals AGENTS.md Commit Gate section, no action needed.",
+    "GUARD 12 COMMIT-HOOK-GUARD [Bash/PS, git commit]: self-heals core.hooksPath + cp949 guard install, no action needed.",
+    "GUARD 13 SPEC-GATE [Agent, opus]: an Opus Agent() call missing a literal SPEC: line + 5 numbered items (Goal/Files/Approach/Constraints/Exit) is blocked. Fix: prepend SPEC: then numbered 1.Goal 2.Files 3.Approach 4.Constraints 5.Exit. -> harness-agent-brief-guard",
+    "GUARD 14 CLAUDE-MD-SYNC [Agent]: Agent dispatch is blocked when CLAUDE.md Pending section has no matching recent entry. Fix: add a Pending checkbox line first, then retry. -> agent-dispatch-preflight",
+    "GUARD 15 WKCLAUDE-DIRECT [Bash/PS]: a direct wkclaude call not routed through Agent.cmd is blocked. Fix: route through Agent.cmd instead. -> wkharness-guards-howto",
+    "NAVIGATION: this T1 core holds ONLY the 15 guard reflex lines above. Unblock recipes and per-guard detail live in wkharness-guards-howto (T2). Dated incidents, internals, and the heart-v2 dispatch model live in wkharness-guards-ref (T3). STANDING RULE (re-affirmed 2026-07-24 after a 2nd bloat-to-33-steps cycle): new lessons go to -ref first (or -howto if confirmed-recurring), NEVER appended here directly -- keep this base at true one-line reflexes only. A future session finding this core bloated again should re-run this exact trim (archive dated steps to -ref via add-step, then --steps-json replace core with just the guard list)."
   ],
   "requirements": [
     {
-      "cmd": "wkappbot skill read wkharness-guards",
-      "expect": "GUARD CLUSTER G1-G6",
+      "cmd": "powershell -File D:\\GitHub\\wkharness.ps1 -Test",
+      "expect": "10/10 passed",
       "prompt": null
     },
     {
       "cmd": "wkappbot skill read wkharness-guards",
-      "expect": "DEADLOCK ESCAPE",
+      "expect": "GUARD 1",
       "prompt": null
     },
     {
-      "cmd": "wkappbot skill read wkharness-guards",
-      "expect": "wkharness-guards-howto",
+      "cmd": "wkappbot skill search wkharness",
+      "expect": "wkharness-guards",
+      "prompt": null
+    },
+    {
+      "cmd": "pipe Edit JSON to wkharness.ps1 when Sonnet hogging",
+      "expect": "exit 2 + [pace-guard] EDIT/WRITE BLOCKED in stderr",
+      "prompt": null
+    },
+    {
+      "cmd": "powershell -File D:/GitHub/wkharness.ps1 -Status",
+      "expect": "sonnetHogging correct when Sonnet% > Total% (no per-file cache, FileStream tail read)",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read harness-learn-self-evolving-skills",
+      "expect": "harness:learn documented as working",
+      "prompt": "harness:learn Write-Output fix: SELF-HARNESS block moved before isBg gate. 50/51 tests pass."
+    },
+    {
+      "cmd": "wkappbot skill read run-postcase-testing",
+      "expect": "PostToolUse test coverage added",
+      "prompt": "harness:learn Write-Output fix: SELF-HARNESS block moved before isBg gate. 50/51 tests pass."
+    },
+    {
+      "cmd": "wkappbot skill read harness-source-edit-requires-skill-lock-howto",
+      "expect": "the copy-verbatim-then-inert-if-else extraction discipline, which THIS skill's own dated steps already cite by name but never document: when a locked hub needs new behaviour, implement it in its OWN module, verify standalone, wire as if-new-else-old with the legacy path left intact as a live rollback branch, and delete the old branch only after production proves the new one. Read it BEFORE adding logic to any wkharness hub -- piling concerns into a hub grows its study-lock union until an eleven-skill read is the price of a two-line fix (measured 2026-07-15 on tools/wkharness.ps1)",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read reflex-merit-lifecycle",
+      "expect": "fusing two overlapping steps",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read commit-push-hook-policy-overview",
+      "expect": "the single commit/push hook gate index, including the WillKim block-and-revert-on-unresolved-identity spec built on this file's user.name stamping logic (lines 186-205)",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill search wkharness-guards",
+      "expect": "cov score listed, core id present",
       "prompt": null
     }
   ],
   "primary_cmd": null,
   "tags": [
-    "wkharness",
-    "guards",
-    "pace",
-    "ask",
-    "kill",
-    "skill",
-    "cp949",
-    "hook",
-    "pretooluse",
-    "sonnet",
-    "delegation"
+    "harness",
+    "guard",
+    "routing",
+    "refusal",
+    "recovery",
+    "pretooluse"
   ],
   "source_refs": null,
   "regression_script": null,
   "author": "claude",
   "created": "2026-05-15T09:59:29.2612324Z",
-  "updated": "2026-06-12T07:02:01.4100959Z",
-  "version": "1.184"
+  "updated": "2026-10-12T00:22:34.2851745Z",
+  "version": "1.613"
 }

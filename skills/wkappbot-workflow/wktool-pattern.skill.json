@@ -5,7 +5,7 @@
   "title_ko": null,
   "desc": "wk-tool scripts are QA-first tools: they detect bugs, validate state, and report anomalies cheaply so Claude never wastes tokens polling logs. MANDATORY before any ask/CDP work. Covers: wkask/wkcdp usage, QA script authoring (state-check→eval-js→auto-suggest), health check sequence, cookie/off-screen detection.",
   "steps": [
-    "HAIKU QUICK START (exact commands, copy-paste ready):\nMEMORY CHECK: Get-Process chrome,wkappbot-core | Measure-Object WorkingSet64 -Sum | Select Sum\nSESSION STATUS: powershell -File D:/GitHub/WKAppBot/bin/wkcdp.ps1\nSESSION DETAIL: powershell -File D:/GitHub/WKAppBot/bin/cdp-mon.ps1\nCLEANUP STALE: powershell -File D:/GitHub/WKAppBot/bin/wkcdp.ps1 clean\nASK HEALTH GPT: powershell -File D:/GitHub/WKAppBot/bin/wkask.ps1 gpt 'say:ok' -Timeout 60\nASK HEALTH GEMINI: powershell -File D:/GitHub/WKAppBot/bin/wkask.ps1 gemini 'say:ok' -Timeout 90\nASK FAST (2s): wkappbot ask groq 'say:ok'\nNEVER poll log files in loops -- use these scripts which stream internally.",
+    "HAIKU QUICK START (exact commands, copy-paste ready):\nMEMORY CHECK: Get-Process chrome,wkappbot-core | Measure-Object WorkingSet64 -Sum | Select Sum\nSESSION STATUS: powershell -File D:/GitHub/WKAppBot/bin/wkcdp.ps1\nSESSION DETAIL: powershell -File D:/GitHub/WKAppBot/bin/cdp-mon.ps1\nCLEANUP STALE: powershell -File D:/GitHub/WKAppBot/bin/wkcdp.ps1 clean\nASK HEALTH GPT: powershell -File D:/GitHub/WKAppBot/bin/wkask.ps1 gpt 'say:ok' -Timeout 60\nASK HEALTH GEMINI: powershell -File D:/GitHub/WKAppBot/bin/wkask.ps1 gemini 'say:ok' -Timeout 90\nASK FAST (2s): wkappbot ask groq 'say:ok'\nNEVER poll log files in loops -- use these scripts which stream internally. //why:read wktool-pattern before editing gg-main-enhanced-sonnet",
     "STANDARD HEALTH CHECK SEQUENCE (run in order):\n1. powershell -File D:/GitHub/WKAppBot/bin/wkcdp.ps1 clean\n2. wkappbot ask groq 'say:ok' (fast 2-3s REST, no Chrome needed)\n3. powershell -File D:/GitHub/WKAppBot/bin/wkask.ps1 gpt 'say:ok' -Timeout 60 (Chrome CDP)\n4. powershell -File D:/GitHub/WKAppBot/bin/wkask.ps1 gemini 'say:ok' -Timeout 90\nAll pass = healthy. If gpt/gemini slow (>30s): run wkcdp clean + retry. groq always fast (2s) = good baseline.",
     "WKASK SIGNALS: [WAIT]=editor-wait [SERVER]=turn-wait [CHUNK]=streaming [REPLY]=done [WARN]=timeout/stuck [COOKIE]=banner detected. At 9s no activity: warns off-screen Chrome. Post-ask: checks consent cookies.",
     "WKCDP COMMANDS (exact paths):\nSTATUS: powershell -File D:/GitHub/WKAppBot/bin/wkcdp.ps1\nCLEAN STALE (kills idle sessions >2h): powershell -File D:/GitHub/WKAppBot/bin/wkcdp.ps1 clean\nKILL PORT: powershell -File D:/GitHub/WKAppBot/bin/wkcdp.ps1 kill 9740\nCOOKIES CHECK: powershell -File D:/GitHub/WKAppBot/bin/wkcdp.ps1 cookies\nDETAIL VIEW: powershell -File D:/GitHub/WKAppBot/bin/cdp-mon.ps1\nwkcdp output: N session(s) WARN/CRIT flags. Run clean first, then re-check. CRIT=off-screen(false positive possible on left monitor), WARN=drift/age/dup-tabs.",
@@ -54,6 +54,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-05-10T13:32:49.8983722Z",
-  "updated": "2026-05-31T14:18:00.8791036Z",
-  "version": "1.16"
+  "updated": "2026-10-12T00:23:31.9246625Z",
+  "version": "1.18"
 }

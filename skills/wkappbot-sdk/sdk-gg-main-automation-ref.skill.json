@@ -6,7 +6,8 @@
   "desc": "T3 Reference alias: see sdk-gg-main-automation-t3-ref for full content. Session history and key decisions.",
   "steps": [
     "See sdk-gg-main-automation-t3-ref for full reference.",
-    "2026-06-02: wkask fixes, Chrome restore, skill browser pipeline, marketing page created."
+    "2026-06-02: wkask fixes, Chrome restore, skill browser pipeline, marketing page created.",
+    "2026-06-02: wkappbot-the-artificial-knowledge-platform skill added to README.md pitch section. Resolving suggest ts=2026-06-02T13:55:57"
   ],
   "requirements": [
     {
@@ -36,6 +37,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-06-02T15:22:21.9574289Z",
-  "updated": "2026-06-02T15:22:21.9574407Z",
-  "version": "1.0"
+  "updated": "2026-10-12T00:25:19.3189109Z",
+  "version": "1.1"
 }

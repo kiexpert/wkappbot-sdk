@@ -6,7 +6,9 @@
   "desc": "History, verified tests, lessons learned. Core rules in suggest-workflow; how-to in suggest-workflow-howto.",
   "steps": [
     "Reset stall guard via skill edit.",
-    "Reset stall guard."
+    "Reset stall guard.",
+    "Reflex measured: suggest-workflow updated at 2026-09-22",
+    "Disable broken cmd hooks in CLAUDE.md and commit"
   ],
   "requirements": [
     {
@@ -31,6 +33,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-05-31T12:03:20.8587849Z",
-  "updated": "2026-10-11T15:56:56.4331203Z",
-  "version": "1.2"
+  "updated": "2026-10-12T00:17:48.4500332Z",
+  "version": "1.4"
 }
