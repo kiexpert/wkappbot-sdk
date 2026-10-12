@@ -209,6 +209,45 @@ if ($ghCommand) {
 Write-Host ""
 
 # ============================================================================
+# ISSUE #10: QA Release Smoke -- Product Matrix (docs/qa-release-2026-10.md)
+# ============================================================================
+Write-Host "==[ ISSUE #10 ] QA Release Smoke -- Product Matrix ==" -ForegroundColor Cyan
+$QA_RESULTS = @()
+try {
+  $macosRun = gh run list --repo kiexpert/wkappbot-sdk --workflow "MacOS Test" --limit 1 --json databaseId,status,conclusion,createdAt 2>$null | ConvertFrom-Json | Select-Object -First 1
+  if ($macosRun -and $macosRun.status -eq "completed" -and $macosRun.conclusion -eq "success") {
+    Write-Host "  [PASS] wkappbot-sdk | macOS | MacOS Test #$($macosRun.databaseId)" -ForegroundColor Green
+    $QA_RESULTS += "PASS | wkappbot-sdk | macOS | #$($macosRun.databaseId)"
+  } elseif ($macosRun) {
+    Write-Host "  [FAIL] wkappbot-sdk | macOS | $($macosRun.conclusion)" -ForegroundColor Red
+    $CRITICAL_ALERTS += "QA FAIL: wkappbot-sdk macOS run #$($macosRun.databaseId)"
+    $QA_RESULTS += "FAIL | wkappbot-sdk | macOS | #$($macosRun.databaseId)"
+  } else {
+    Write-Host "  [SKIP] wkappbot-sdk | macOS | no run found" -ForegroundColor Yellow
+    $QA_RESULTS += "SKIP | wkappbot-sdk | macOS | -"
+  }
+} catch { $QA_RESULTS += "SKIP | wkappbot-sdk | macOS | gh error" }
+try {
+  $wkRun = gh run list --repo kiexpert/WKAppBot --limit 1 --json databaseId,status,conclusion,workflowName 2>$null | ConvertFrom-Json | Select-Object -First 1
+  if ($wkRun -and $wkRun.status -eq "completed" -and $wkRun.conclusion -eq "success") {
+    Write-Host "  [PASS] WKAppBot | Windows | $($wkRun.workflowName) #$($wkRun.databaseId)" -ForegroundColor Green
+    $QA_RESULTS += "PASS | WKAppBot | Windows | #$($wkRun.databaseId)"
+  } elseif ($wkRun) {
+    Write-Host "  [WARN] WKAppBot | Windows | $($wkRun.conclusion)" -ForegroundColor Yellow
+    $WARNINGS += "QA WARN: WKAppBot last run=$($wkRun.conclusion)"
+    $QA_RESULTS += "WARN | WKAppBot | Windows | #$($wkRun.databaseId)"
+  } else { $QA_RESULTS += "SKIP | WKAppBot | Windows | -" }
+} catch { $QA_RESULTS += "SKIP | WKAppBot | Windows | gh error" }
+$QA_RESULTS += "SEE_ABOVE | WKAppBot.Reflex | Win+macOS | Reflex App QA (same run)"
+Write-Host ""
+Write-Host "  QA MATRIX:" -ForegroundColor White
+foreach ($row in $QA_RESULTS) {
+  $color = if ($row.StartsWith("PASS")) { "Green" } elseif ($row.StartsWith("FAIL")) { "Red" } else { "Yellow" }
+  Write-Host "    $row" -ForegroundColor $color
+}
+Write-Host ""
+
+# ============================================================================
 # FINAL ALERT SUMMARY
 # ============================================================================
 Write-Host "=== ALERT SUMMARY ===" -ForegroundColor Cyan
