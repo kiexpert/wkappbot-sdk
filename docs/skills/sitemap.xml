@@ -72,6 +72,7 @@
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/anti-knowledge-pattern-special-management.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/wkappbot-log-search.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/ask-health-check.html</loc></url>
+<url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/ask-suggest-priority-batching.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/ask-command-cheatsheet.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/chrome-profile-auth-sync-architecture.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/claude-token-optimization.html</loc></url>
@@ -97,6 +98,7 @@
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/multi-tab-assistant-implementation-checklist.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/multi-tab-assistant-interface-mvp.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/pace-95-circuit-breaker.html</loc></url>
+<url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/partial-class-file-splitting-400-line-soft-cap.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/wk-tool-first-use-skill-nudge.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/pre-push-orphan-gc-quarantine-full-mark-and-sweep.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/prompt-send-self-prompting.html</loc></url>
@@ -105,6 +107,7 @@
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/stall-guard-wk-exemption.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/suggest-resolve-evidence-conventions.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/web-command-cheatsheet.html</loc></url>
+<url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/windows-settings-automation.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/wkbuild.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/wkharness-agent-bulletin-shared-live-steering-channel-for-background-agents.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/wktool-pattern.html</loc></url>
@@ -332,7 +335,6 @@
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot/wk-cdp-fix-deploy-cdp-fix-deploy-launcher.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot/wkappbot-run-process-launcher-with-integrated-tracking.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot/wktest-promote-staging-binary-promotion.html</loc></url>
-<url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot/hippocampus-memory.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-core/kampala-pattern-reverse-engineer-apps-into-apis-for-automation.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-core/punk-pattern-remote-claude-code-control-via-lightweight-proxy.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-core/mcp-standard-for-desktop-and-browser-automation-integration-patterns.html</loc></url>
@@ -471,6 +473,7 @@
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/harness-skill-list-guard.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/harness-tier-gate.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/harness-wk-only-gate.html</loc></url>
+<url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/hippocampus_memory.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/no-verify-guard.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/wkharness-no-verify-guard.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/per-repository-window-persistence.html</loc></url>
