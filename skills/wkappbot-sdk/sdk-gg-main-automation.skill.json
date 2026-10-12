@@ -5,8 +5,8 @@
   "title_ko": null,
   "desc": "Proactive system health check for product quality & friction detection. Covers: Eye process count, Chrome multiplication, CI/build status, suggest backlog, CDP anomalies, release readiness. Works WITH Opus agent to detect and autonomously fix all discovered risks per escalation rules. Exit: 0=Green (ready), 1=Amber (issues). Runs every 3 hours via CronCreate with Opus auto-remediation.",
   "steps": [
-    "Run: bash scripts/gg-main.sh or wk-gg-main.cmd from repo root. OWNER RULE 2026-09-28: this runner is the LOCAL one-shot tool for ALL SDK main duties (external-user QA, public-file secret and internal-info hygiene, release consistency, CI, suggest backlog), written well -- one entry, PASS/WARN/FAIL per section, exit 0/1/2, no silent skip, each section naming its skill -- and MAINTAINING IT IS ITSELF A MAIN DUTY: every new duty goes into it, a broken section is fixed before new work",
-    "SECTION E (Eye): wkappbot-core should be 1-3. If >3: zombie lag possible",
+    "Run: bash scripts/gg-main.sh or wk-gg-main.cmd from repo root. OWNER RULE 2026-09-28: this runner is the LOCAL one-shot tool for ALL SDK main duties (external-user QA, public-file secret and internal-info hygiene, release consistency, CI, suggest backlog), written well -- one entry, PASS/WARN/FAIL per section, exit 0/1/2, no silent skip, each section naming its skill -- and MAINTAINING IT IS ITSELF A MAIN DUTY: every new duty goes into it, a broken section is fixed before new work //why:like first before citing main duty quote-sonnet //why:like first before citing main duty quote-sonnet //why:ISSUE 10 smoke block landed origin commit 219e8505 this session-sonnet",
+    "SECTION E (Eye): wkappbot-core should be 1-3. If >3: zombie lag possible //why:eye core count verified healthy this session //why:eye core count verified healthy this session-sonnet",
     "SECTION Z (Chrome): Chrome should be 1-3. If >5: multiplication bug (Core issue)",
     "SECTION C (CI): Recent runs should all be completed success. If fail: gh run view --log-failed",
     "SECTION P (Suggests): Check urgent/important counts. High (>10): batch triage or file suggest",
@@ -51,6 +51,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-05-28T03:59:22.3966318Z",
-  "updated": "2026-10-12T00:25:16.8723729Z",
-  "version": "1.38"
+  "updated": "2026-10-12T01:28:22.0867919Z",
+  "version": "1.48"
 }

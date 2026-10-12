@@ -13,7 +13,8 @@
     "TODO: Codex Stop-hook temporary bypass in D:\\GitHub\\wkappbot-kih\\tools\\CodexHookAdapter.ps1 -- change only the Stop switch branch from Invoke-WkHookScript(wkharness-codex-stop.ps1) to an immediate exit 0 fail-open, keep every other mode unchanged, verify by re-reading the branch text and then re-running a minimal Stop-path read/probe before any wider wiring change.",
     "TODO: delegated haiku measurement for Codex Stop reinstall must rerun the installer, inspect only the regenerated C:\\Users\\kiexp\\.codex\\hooks.json Stop entry, and prove whether the command string points directly to wkharness-codex-stop.ps1 instead of CodexHookAdapter.ps1.",
     "INCIDENT 2026-07-22: stall-guard also blocks non-shell MCP/node_repl file edits during Codex root merge, so the recovery rule must be: perform a high-score skill edit to reset, then immediately apply only the verified single-file Codex adapter merge and run parser/diff checks. This is not a reason to broaden permissions or edit shared guards.",
-    "INCIDENT 2026-07-22: stall-guard can keep blocking Codex root merge commands even after a worker completed a bounded verification, including wkappbot file edit on a Codex-only file. Treat this as a guard integration bug: root should be allowed to perform the single verified merge immediately after worker completion; if blocked, record this incident and retry only the exact merge, not broad shell writes."
+    "INCIDENT 2026-07-22: stall-guard can keep blocking Codex root merge commands even after a worker completed a bounded verification, including wkappbot file edit on a Codex-only file. Treat this as a guard integration bug: root should be allowed to perform the single verified merge immediately after worker completion; if blocked, record this incident and retry only the exact merge, not broad shell writes.",
+    "AGY study-lock repair finish checklist: after worker adds post-guards Test-WkHarnessStudyLock block, remove leftover EOF placeholder comments/blank comment churn, run parser + static order probe + diff --check, then commit only tools/wkharness-agy-main.ps1 and the knowledge update."
   ],
   "requirements": [
     {
@@ -38,6 +39,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-06-24T07:15:54.741329Z",
-  "updated": "2026-10-11T18:39:32.9684917Z",
-  "version": "1.4"
+  "updated": "2026-10-12T01:29:47.721617Z",
+  "version": "1.5"
 }
