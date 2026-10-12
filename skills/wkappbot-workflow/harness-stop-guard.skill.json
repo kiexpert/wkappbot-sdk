@@ -5,8 +5,8 @@
   "title_ko": null,
   "desc": "The Claude Stop hook (wkharness-claude-stop.ps1) and its check registry: refuses a turn that ends on a stop-menu offer, a contentless completion, a missing descent receipt, or a format recite. The only hook seeing the model's own composed text -- and per-family, so it does NOT fire for agy or codex, which is why descent gates like the gc-tmp purge moved onto a TOOL CALL (an edit to HANDOFF.md) instead. Cluster: harness-stop-guard-howto (field contract, check inventory, wk-stop-test), harness-stop-guard-ref (dated design history).",
   "steps": [
-    "REFLEX-HEALING SHAPE: last paragraph starts Reflex-healing, two evidence lines directly under it: first wkappbot file read OFFICIAL_MD --keep quote, then wkappbot skill read CORE_ID --keep quote. Name ONE concrete thing from this turn. The branch skill (CORE_ID) must govern the named mistake: cite the skill that covers letter-posture if that blocked (road: wkappbot skill read claude-session-handoff-howto), not harness-stop-guard itself. //why:reflex-healing shape cited in report this turn-sonnet //why:will follow: reflex-healing shape last paragraph-sonnet //why:will follow: reflex-healing shape last paragraph-sonnet",
-    "STOP REPORT SHAPE: ONE prose paragraph (not bullets) naming one core skill id, evidence line directly under it, then the Reflex-healing paragraph with two evidence lines. Every bullet line counts as its own paragraph and fires skill-ref-gate. Road: inline any PREDICT or status note inside the cited paragraph itself, never as a separate block (example: 'PREDICT: sectors return gaps -- dispatched per on-load, sector A surveys gaps'). Open with the cited paragraph itself, zero preamble. //why:stop report shape one paragraph evidence line-sonnet //why:stop report shape one paragraph evidence line required-sonnet //why:stop report shape one paragraph evidence line required-sonnet",
+    "STOP REPORT SHAPE: ONE prose paragraph (not bullets) naming one core skill id (never -howto or -ref in prose -- write 'the handoff skill' or a Korean term; naming a tier fires skill-tier-gate), evidence line directly under it, then the Reflex-healing paragraph with two evidence lines. Every bullet line counts as its own paragraph and fires skill-ref-gate. Road: inline any PREDICT or status note inside the cited paragraph itself, never as a separate block (example: 'PREDICT: sectors return gaps -- dispatched per on-load, sector A surveys gaps'). Open with the cited paragraph itself, zero preamble. //why:stop report shape one paragraph evidence line required-sonnet //why:will follow stop report shape one prose paragraph-sonnet //why:will follow stop report shape one prose paragraph-sonnet",
+    "REFLEX-HEALING SHAPE: last paragraph starts Reflex-healing, two evidence lines directly under it: first wkappbot file read OFFICIAL_MD --keep quote, then wkappbot skill read CORE_ID --keep quote. Name ONE concrete thing from this turn. The branch skill (CORE_ID) must govern the named mistake: cite the skill that covers letter-posture if that blocked (road: wkappbot skill read claude-session-handoff-howto), not harness-stop-guard itself. //why:will follow: reflex-healing shape last paragraph-sonnet //why:will follow: reflex-healing shape: last paragraph-sonnet //why:will follow: reflex-healing shape last paragraph-sonnet",
     "TODO: verify HANDOFF.md landed -- after commit gate passes, run git show origin/main:HANDOFF.md and confirm the DONE section names LicenseStatus PrintAsync Free tier; RESULT: DONE -- HANDOFF.md landed on origin 2026-10-12, git show origin/main:HANDOFF.md confirmed DONE section present"
   ],
   "requirements": [
@@ -37,6 +37,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-07-18T18:27:38.9890873Z",
-  "updated": "2026-10-12T06:42:15.6181687Z",
-  "version": "1.752"
+  "updated": "2026-10-12T06:56:50.1919663Z",
+  "version": "1.761"
 }
