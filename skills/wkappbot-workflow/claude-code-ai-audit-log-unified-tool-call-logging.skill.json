@@ -3,8 +3,10 @@
   "app": "wkappbot-workflow",
   "title": "Claude Code AI Audit Log -- unified tool call logging",
   "title_ko": null,
-  "desc": "PreToolUse hook \u002B Codex wrapper logs all AI tool calls with timestamp and CWD slug to D:/GitHub/ai-audit.log.",
-  "steps": [],
+  "desc": "PreToolUse hook + Codex wrapper logs all AI tool calls with timestamp and CWD slug to D:/GitHub/ai-audit.log.",
+  "steps": [
+    "PreToolUse hook appends a timestamped JSON line per AI tool call to D:/GitHub/ai-audit.log with CWD slug. Codex wrapper does the same. Field shape: {ts, model, tool, cwd_slug}. Rotate log weekly."
+  ],
   "requirements": [
     {
       "cmd": "wkappbot skill read claude-code-ai-audit-log",
@@ -28,6 +30,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-05-02T10:17:53.4285803Z",
-  "updated": "2026-05-02T10:17:53.4285896Z",
-  "version": "1.0"
+  "updated": "2026-10-12T22:38:20.846147Z",
+  "version": "1.1"
 }

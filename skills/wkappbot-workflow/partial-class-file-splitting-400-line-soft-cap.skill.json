@@ -1,9 +1,9 @@
 {
   "id": "partial-class-file-splitting-400-line-soft-cap",
-  "catalog": "wkappbot-workflow",
-  "name": "C# Partial Class File Splitting (400-Line Soft Cap)",
-  "description": "Pattern for splitting large C# source files into partial classes while keeping each under 400 lines per CLAUDE.md soft cap",
-  "tags": ["source-split", "refactor", "csharp", "400-line-cap", "partial-class"],
+  "app": "wkappbot-workflow",
+  "title": "Partial-class file splitting at the 400-line soft cap",
+  "title_ko": null,
+  "desc": "Split a C# source over the 400-line soft cap into partial classes: what to move, the mandatory Release build check, single-commit rule, and the five common mistakes.",
   "steps": [
     "Identify problem: Source file exceeds ~400 lines. Per CLAUDE.md: split via partial class (C#), module split, or extract helper.",
     "Categorize methods by domain: Group into logical units — main business logic vs. helper utilities vs. internal plumbing. Extract helpers (fewest dependencies).",
@@ -14,13 +14,39 @@
     "Commit (single): Both files in one commit. Message includes split reason + 'partial-class' keyword for suggest resolve.",
     "Example: fix(taskkill): split TaskkillCompatCommand into partial classes for parent-process-ancestry validation",
     "Recursive splitting: If secondary file still >400 lines, apply pattern again (Part2.cs, Part3.cs).",
-    "Avoid mistakes: (1) Moving only 10 lines (too small). (2) Splitting cohesive group (defeats clarity). (3) Missing using statements (undefined types). (4) No build check (errors hide). (5) Changing namespace (breaks partial class)."
+    "Avoid mistakes: (1) Moving only 10 lines (too small). (2) Splitting cohesive group (defeats clarity). (3) Missing using statements (undefined types). (4) No build check (errors hide). (5) Changing namespace (breaks partial class).",
+    "REQUIREMENT EXPECTATIONS WERE EMPTY (fixed 2026-07-23 audit): this skill shipped with 3 requirement commands and NO expected output, so nothing could ever validate them -- an unverifiable requirement is worse than none because the evidence gate reports it as present. Expected results are: (1) 'wc -l' on the split pair => BOTH files under 400 lines, and their sum within a few lines of the pre-split original (no code dropped -- the exact failure mode that lost ~320 lines in the SuggestCommand.Resolve split); (2) 'dotnet build -c Release' => '0 error(s)', warnings acceptable, under 300s; (3) 'grep namespace' on both files => the SAME namespace AND the same 'partial class' name, since a changed namespace silently breaks the partial-class join. See also wksplit-cs-utility for the automated splitter and its six safety gates.",
+    "See also: wksplit-cs-utility for the automated 6-gate splitter that handles this pattern deterministically."
   ],
   "requirements": [
-    "wc -l csharp/src/WKAppBot.CLI/Commands/TaskkillCompatCommand.cs csharp/src/WKAppBot.CLI/Commands/TaskkillCompatCommand.Helpers.cs",
-    "dotnet build csharp/WKAppBot.sln -c Release 2>&1 | grep -E '(error|succeeded)'",
-    "grep namespace csharp/src/WKAppBot.CLI/Commands/TaskkillCompatCommand.{cs,Helpers.cs}"
+    {
+      "cmd": "wc -l csharp/src/WKAppBot.CLI/Commands/TaskkillCompatCommand.cs csharp/src/WKAppBot.CLI/Commands/TaskkillCompatCommand.Helpers.cs",
+      "expect": "total",
+      "prompt": null
+    },
+    {
+      "cmd": "dotnet build csharp/WKAppBot.sln -c Release 2>&1 | grep -E '(error|succeeded)'",
+      "expect": "succeeded",
+      "prompt": null
+    },
+    {
+      "cmd": "grep namespace csharp/src/WKAppBot.CLI/Commands/TaskkillCompatCommand.{cs,Helpers.cs}",
+      "expect": "namespace",
+      "prompt": null
+    }
   ],
-  "skills_ref": ["wkappbot-build-verify-workflow", "claude-md-harness-rules"],
-  "notes": "Applied 2026-05-28: TaskkillCompatCommand 580→370+90 lines. Build 0 errors. Commit 0ed077fbc. Use case: parent-process-ancestry validation requires multiple helpers — extract to Helpers.cs to keep main file focused."
+  "primary_cmd": null,
+  "tags": [
+    "source-split",
+    "refactor",
+    "csharp",
+    "400-line-cap",
+    "partial-class"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": null,
+  "created": "2026-07-23T02:48:58.8575674Z",
+  "updated": "2026-10-12T22:45:21.2957053Z",
+  "version": "1.7"
 }

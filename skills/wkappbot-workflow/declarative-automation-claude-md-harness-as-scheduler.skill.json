@@ -4,7 +4,12 @@
   "title": "Declarative Automation: CLAUDE.md + Harness as Scheduler",
   "title_ko": null,
   "desc": "CLAUDE.md CronCreate declarations + harness auto-detection replaces custom scheduler. Recording execution in CLAUDE.md guarantees periodic execution without deployment.",
-  "steps": [],
+  "steps": [
+    "Add a CronCreate heading to CLAUDE.md under ## Nightly Schedules section with cron expression and durable=true flag for recurring execution.",
+    "The harness detects CronCreate(cron=...) headings at session start and schedules them automatically without additional deployment.",
+    "Run 'wkappbot cron list' to verify the scheduled tasks and their next execution times.",
+    "See skill-search-coverage-guide for coverage scoring rules."
+  ],
   "requirements": [
     {
       "cmd": "wkappbot cron list",
@@ -28,6 +33,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-05-28T04:38:51.2092208Z",
-  "updated": "2026-05-28T04:38:51.20923Z",
-  "version": "1.0"
+  "updated": "2026-10-12T22:38:33.8932246Z",
+  "version": "1.1"
 }

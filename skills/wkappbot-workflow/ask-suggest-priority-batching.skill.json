@@ -3,22 +3,20 @@
   "app": "wkappbot-workflow",
   "title": "Ask Suggest Priority Batching",
   "title_ko": null,
-  "desc": "Reduce ask-gpt calls when triaging wkappbot suggest backlogs. Use when you have a page of suggestions and want one GPT ranking pass, then one ask per suggestion in priority order.",
+  "desc": "Triage wkappbot suggest backlogs. OVERRIDE (2026-06-06): 'ask gpt' is DISABLED -- chronic CDP/ChatGPT-session-expiry loop makes it unreliable. Use wkhippo foresee (predecessor outcomes) + wkcodex (API-based, no browser) for ranking and per-item triage instead. The GPT-ranking steps below are SUSPENDED until ask-health-check confirms a stable PONG.",
   "steps": [
-    "SELF-HEAL BEFORE TRIAGE (MANDATORY): verify tools first -- (1) skill read this skill + suggest-workflow: fix stale steps with skill edit. (2) wkappbot ask speed-check: if dead or slow, reopen with --new-tab. (3) wkappbot suggest list: if malformed or errors, fix upstream. Broken tools = fake progress. Heal first, triage second.",
-    "Pull one page: wkappbot suggest list -- keep scope bounded. Do NOT re-triage full backlog at once.",
-    "Before asking GPT, run wkappbot suggest read <ts> for each candidate -- include ts, title, and current status in the GPT prompt for accurate ranking",
-    "Merge obvious duplicates first: wkappbot suggest merge --all-matching PATTERN --dry-run to preview, then without --dry-run. NOTE: (a) --all-matching blocked in WKAppBot maintainer channel -- run from sibling project CWD (e.g. WkAutoQuant) to bypass. (b) merge requires --root-cause, --work, --components, --affected-cmds -- always supply all four or the command errors.",
-    "Fire GPT batch rank once for the whole page (fire-and-forget, background): ask in English to rank by impact, risk, urgency, effort. Immediately continue -- NEVER block waiting for GPT response.",
-    "NO-RESPONSE HANDLING: (1) While ask gpt runs, start own codebase analysis on top items via grep + skill reads in parallel. (2) After 2 minutes without response: re-dispatch with --new-tab, continue triage. (3) If wkappbot ask log shows FindAllPrompts: 0, Chrome AI tabs are closed -- reopen with --new-tab, file BUG-AUTO suggest.",
-    "PER-ITEM ASK IS MANDATORY (NEVER skip): for EVERY suggest item you act on, MUST call wkappbot ask gpt --timeout 20s with ts + title + root-cause question BEFORE writing any code. No ask = no action. Triad for ambiguous items, gpt for clear ones. Fire all asks concurrently then WAIT for all responses -- do NOT proceed until ask results are in hand. If ask response reveals a problem: if small+safe, fix inline; otherwise delegate to Opus agent with exact file path, failing evidence, and expected verification step.",
-    "DELEGATION (MANDATORY): Sonnet orchestrates, Opus executes. Brief Opus agent with: suggest ts + title + root-cause from ask + fix path. Opus edits code, builds, writes evidence script, resolves. Sonnet never writes code inline. Pattern: Agent(model:'opus', prompt:'fix suggest <ts>: <title>. Ask result: <summary>. Fix: <steps>.')",
-    "ASK FAILURE RECOVERY: if ask times out or injection fails -- (1) file BUG-AUTO for the failure. (2) continue triage via codebase analysis only. (3) attempt fix: reopen with --new-tab, check Chrome. Never block on broken ask -- triage continues.",
-    "If ask reveals reusable pattern: wkappbot skill edit <id> to update the related skill before moving on.",
-    "After fix commit: wkappbot suggest check <ts> to verify regression PASS. Then close via ONE of two paths -- (A) 1st-party resolve: wkappbot suggest resolve <ts> NOTE [see suggest-workflow step 5 for the exact --i-completed-... flag; use that verbatim] --skill <id> --commit <hash> (creates HALF state with evidence script; Eye auto-confirms hourly when binary newer). (B) 2nd-party confirm (only if suggest is already HALF from another resolver): wkappbot suggest resolve <ts> NOTE --confirm --skill <id>. See suggest-workflow skill for the long --i-completed flag and DGWCS limitations.",
-    "Recurrence: if bug recurs AFTER fix commit, do NOT resolve old suggest -- file new suggest with post-fix repro date and uncovered code path.",
-    "Next page: reuse same batching prompt. Track page number to avoid re-reading already-ranked items. Repeat from step 2.",
-    "RIQUA [resolve pre-flight]: when ready to resolve a suggest, always read suggest-resolve-pre-flight-checklist first. It gates 5 guards: commit keyword match, class file under 400 lines, evidence filename convention, full absolute path, all required flags. Missing any one = repeated failure."
+    "Batch triage: one GPT ranking pass for full page, then per-item queries fired concurrently. next:ask-suggest-priority-batching-howto for execution steps. cluster:ask-suggest-priority-batching-ref for calibration history.",
+    "DELEGATION PATTERN: Sonnet fires queries and waits. After responses arrive, brief Opus with ts+title+result+fix-path. Opus edits/builds/resolves. Sonnet never writes code inline.",
+    "TIMEOUT=20s (--timeout 20s). No response in 20s = proceed with codebase analysis immediately. Never block indefinitely. No retry.",
+    "STOP after firing queries. Do NOT use Sonnet tokens while GPT runs. Resume only after responses or 20s timeout. This is the whole point of batching.",
+    "[RECALL BEFORE ASK -- wkhippo first] Before firing 'ask gpt' for a per-item suggest triage question (root cause? fix path?), FIRST run 'wkhippo foresee <symptom/ts/error-keywords>' -- a predecessor session has very often already triaged or fixed the exact same BUG-AUTO/symptom, and foresee returns its outcome-ranked record (the fix that worked + the commands run, or the approach that broke). This is local, pace-exempt, and has no CDP/ChatGPT dependency, so it works even when the ask pipeline is down. Use ask gpt ONLY for genuinely novel items the corpus has no precedent for. Saves a CDP round-trip and avoids re-deriving a known fix. See [[hippocampus-living-memory-howto]] and [[ask-health-check]] (wkhippo local-fallback step). //why:consult predecessor outcomes before novel triage",
+    "PIPELINE HEALTH CHECK: ping --new-session --sync --timeout 20s before triage. Broken pipeline = file BUG-AUTO + continue with codebase analysis fallback.",
+    "[OVERRIDE -- READ FIRST] ask gpt is DISABLED for triage as of 2026-06-06 (chronic CDP / ChatGPT-session-expiry loop -- it keeps cycling broken). IGNORE every step below that says 'fire ask gpt' / 'GPT ranking pass' / 'ask gpt per item'. INSTEAD: (1) rank + per-item triage with 'wkhippo foresee <ts/symptom/error-kw>' to find the predecessor that already solved it (outcome-ranked, local, pace-exempt, no browser); (2) for novel items with no precedent ([FRONTIER]), delegate to wkcodex (GPT-5.5 via API -- no CDP dependency). Re-enable the GPT steps ONLY after ask-health-check confirms a stable PONG. See hippocampus-living-memory-howto.",
+    "Verified 2026-06-08:  (resolve ts=2026-06-02T11:52:46)",
+    "Cross-link: wksplit-400-lock auto-register coverage check (2026-06-25) -- the coverage pre-check in wkharness-*-post.ps1 skips appending duplicate harness:skill blocks when the file is already covered by an existing wildcard rule.",
+    "BATCH BY ROOT CAUSE, NOT BY INCIDENT -- one class with SEVEN instances outranks seven separate entries. WHEN: a session accumulates several guard refusals or tool failures in one sitting and is deciding what to file. HOW: before writing any entry, group the refusals by the PREDICATE that produced them, not by the command that tripped them; file ONE entry per predicate carrying every instance as evidence, and rank it by instance count. WHY: measured 2026-09-13 in wkappbot-kih. Seven refusals looked like seven guards -- anti-knowledge versus heart-v2 over a redirect, a heredoc BODY read as an invocation, a brief PROHIBITION read as a request, two brief gates whose prescribed remedies refuse each other, a brief DESCRIBING a guard refused by that same guard, a bug-fix brief asked for a wired proto, and a heredoc commit message refused as unparseable. All seven share ONE predicate defect: a classifier matching characters inside a quoted payload, a diff context line or a negation, and treating them as the author's instruction. Filed as seven each reads as a minor annoyance and none gets priority; filed as one with seven instances it is the highest-value entry of the day. THE TELL that a group is really one class: every remedy you can think of is the same remedy. Cross: wkappbot skill read gate-two-tier-verify-before-block-t1 for the confirm-before-refuse pattern this class needs. //why:triage grouped suggests by root cause correctly //why:root cause batching prevents duplicate fix work",
+    "POLICY REMINDER (user directive, cross-linked from suggest-workflow step 12): triaging/resolving a suggest means aligning the fix with the CURRENT system policy and development direction -- never blindly implement the suggester's literal ask. Apply engineering judgment before landing any fix. Full policy: wkappbot skill read suggest-workflow (step 12).",
+    "TODO: raw-capture measurement pass -- run 'wkappbot suggest list --page 1' and 'wkappbot suggest list --page 2' verbatim (no pipes/filters) so ROOT can eyeball the urgent bucket for obvious duplicates before any merge/resolve action. Verification: the pasted output actually shows suggest entries with ts values."
   ],
   "requirements": [
     {
@@ -33,7 +31,7 @@
     },
     {
       "cmd": "wkappbot skill read ask-suggest-priority-batching",
-      "expect": "shows the one-page batching workflow",
+      "expect": "shows the one-page batching workflow --exit-event wkappbot-exit-33348",
       "prompt": null
     },
     {
@@ -57,17 +55,22 @@
       "prompt": null
     },
     {
-      "cmd": "wkappbot suggest read <ts>",
+      "cmd": "wkappbot suggest show <ts>",
       "expect": "shows one visible suggest with ts and project context",
       "prompt": null
     },
     {
-      "cmd": "wkappbot suggest read 2026-05-09T03:07:28",
-      "expect": "suggest detail printed",
-      "prompt": null
+      "cmd": "wkappbot skill read suggest-resolve-pre-flight-checklist",
+      "expect": "RESOLVE",
+      "prompt": "resolved duplicate exit flood in WkAutoQuant"
+    },
+    {
+      "cmd": "wkappbot skill read errors-jsonl-triage",
+      "expect": "errors",
+      "prompt": "resolved duplicate exit flood in WkAutoQuant"
     }
   ],
-  "primary_cmd": null,
+  "primary_cmd": "wkappbot skill read suggest-workflow",
   "tags": [
     "ask",
     "gpt",
@@ -75,12 +78,13 @@
     "priority",
     "batching",
     "triage",
-    "workflow"
+    "workflow",
+    "백로그처리"
   ],
   "source_refs": null,
   "regression_script": null,
   "author": "claude",
   "created": "2026-05-06T07:15:28.141417Z",
-  "updated": "2026-05-14T06:42:05.934371Z",
-  "version": "1.48"
+  "updated": "2026-10-12T19:55:16.5054153Z",
+  "version": "1.85"
 }

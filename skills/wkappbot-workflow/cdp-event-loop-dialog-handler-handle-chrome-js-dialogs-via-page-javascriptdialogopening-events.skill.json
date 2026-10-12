@@ -3,8 +3,10 @@
   "app": "wkappbot-workflow",
   "title": "CDP Event Loop Dialog Handler -- handle Chrome JS dialogs via Page.javascriptDialogOpening events",
   "title_ko": null,
-  "desc": "Pattern for automating Chrome pages that show alert/confirm/beforeunload dialogs. Uses Page.enable \u002B event loop to catch and auto-dismiss dialogs while waiting for navigation or AJAX response.",
-  "steps": [],
+  "desc": "Pattern for automating Chrome pages that show alert/confirm/beforeunload dialogs. Uses Page.enable + event loop to catch and auto-dismiss dialogs while waiting for navigation or AJAX response.",
+  "steps": [
+    "Enable Page events via CDP: send Page.enable, then run event loop catching Page.javascriptDialogOpening. Auto-dismiss alert/confirm/beforeunload dialogs by sending Page.handleJavaScriptDialog with accept=true. Use this pattern when automating pages that block on JS dialogs mid-navigation."
+  ],
   "requirements": [
     {
       "cmd": "wkappbot skill read cdp-event-loop-dialog-handler",
@@ -28,6 +30,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-05-02T10:18:38.6053021Z",
-  "updated": "2026-05-02T10:18:38.6053113Z",
-  "version": "1.0"
+  "updated": "2026-10-12T22:43:54.5933007Z",
+  "version": "1.1"
 }

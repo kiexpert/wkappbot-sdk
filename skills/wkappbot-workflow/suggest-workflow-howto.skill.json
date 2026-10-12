@@ -4,7 +4,16 @@
   "title": "Suggest Workflow — HowTo (T2)",
   "title_ko": null,
   "desc": "How-to guide: merge, resolve, check, evidence script rules, guardrails. See suggest-workflow for core principles.",
-  "steps": [],
+  "steps": [
+    "Step 1: Review suggest-workflow core principles before diving into resolution procedures",
+    "Step 2: Launcher troubleshooting — if suggest or file commands hang, switch to wkappbot-core.exe and re-issue the command identically; check wkappbot suggest list first to verify no duplicate entry was created",
+    "Step 3: Launcher misbehavior diagnosis — symptoms include HANGS, TIMEOUTS, swallowed PENDING submissions, or commands that work under core but fail under wrapper; when symptomatic, read suggest-co-resolve-2of2 protocol before retrying",
+    "TODO: Run git commit and status for Disable broken cmd hooks",
+    "2026-06-01: skill-update-pending lock cleared for wkcodex dispatch",
+    "Stall reset for cmd powershell test at 2026-09-22",
+    "TODO: 2026-08-07 gg-cycle urgent-tier (44 items) triage batch needs a categorized report before any resolve/merge action. WHEN: the gg workflow's suggest list --all shows a large urgent backlog and a delegated triage pass is needed instead of manual per-item review. HOW: run wkappbot skill read errors-jsonl-triage for the App-field ownership rule, then for each item run wkhippo foresee <symptom/ts/error-keyword> to check for a predecessor fix before treating it as novel, then categorize as ALREADY-RESOLVED/DUPLICATE/KNOWN-FIX-AVAILABLE/NOVEL. WHY: wkhippo foresee is local and pace-exempt (no CDP/ask-gpt dependency, which is disabled for triage per this skill's own OVERRIDE note), so it is the correct first lookup before any fresh investigation, and 44 items is too large to individually re-derive without collapsing duplicates first.",
+    "Stall reset for personal-docs list at 2026-09-22"
+  ],
   "requirements": [
     {
       "cmd": "wkappbot suggest list",
@@ -28,6 +37,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-05-31T12:02:37.8840788Z",
-  "updated": "2026-05-31T12:02:37.8840878Z",
-  "version": "1.0"
+  "updated": "2026-10-12T19:45:39.6951005Z",
+  "version": "1.8"
 }

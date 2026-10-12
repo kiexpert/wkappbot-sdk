@@ -1,4 +1,4 @@
-﻿@echo off
+@echo off
 setlocal EnableExtensions EnableDelayedExpansion
 
 rem ===========================================================================
@@ -273,7 +273,7 @@ rem --- Fallback: unauthenticated PowerShell (public repo only) ---
 powershell -NoProfile -ExecutionPolicy Bypass -Command ^
   "try { $r = Invoke-RestMethod 'https://api.github.com/repos/kiexpert/wkappbot-sdk/releases/latest'; ^
    $a = $r.assets | Where-Object { $_.name -like '*.zip' } | Select-Object -First 1; ^
-   if (!$a) { exit 1 }; ^
+   if ($null -eq $a) { exit 1 }; ^
    Invoke-WebRequest $a.browser_download_url -OutFile '%DL_TMP%\wkappbot.zip' -UseBasicParsing; ^
    Write-Host '[BUILD]   Downloaded.' } catch { exit 1 }" 2>&1
 if errorlevel 1 (

@@ -4,7 +4,9 @@
   "title": "Claude Code Kill Guard Hook -- block taskkill/Stop-Process for out-of-CWD processes",
   "title_ko": null,
   "desc": "PreToolUse hook intercepts taskkill and Stop-Process. Processes outside CWD require user approval; inside CWD allowed silently.",
-  "steps": [],
+  "steps": [
+    "PreToolUse hook intercepts taskkill and Stop-Process. Processes outside current CWD require user approval; inside CWD are allowed silently. Hook reads CWD from environment, resolves process working dir, and blocks if they diverge."
+  ],
   "requirements": [
     {
       "cmd": "wkappbot skill read claude-code-kill-guard-hook",
@@ -28,6 +30,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-05-02T10:18:12.9498379Z",
-  "updated": "2026-05-02T10:18:12.9498472Z",
-  "version": "1.0"
+  "updated": "2026-10-12T22:38:48.6826536Z",
+  "version": "1.1"
 }

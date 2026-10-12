@@ -5,8 +5,8 @@
   "title_ko": null,
   "desc": "GPT-specific reflection skill for recurring harness, hook, delegation, identity, and transport lessons that belong to the GPT family but are not GPT-mini-specific.",
   "steps": [
+    "Prefer concrete machine checks over apology text. Include the exact command, file, or hook setting that proves the fix. //why:will follow concrete checks over apology-sonnet //why:concrete check proves gpt-reflection read this turn-sonnet //why:concrete check proves gpt-reflection read this turn-sonnet //why:concrete checks over apology re-like post-compaction",
     "Trigger this skill when GPT hits a reusable startup, hook, identity, delegation, transport, encoding, or guard failure that can recur in future GPT sessions. //why:guard failure recurred six stop attempts this session //why:will follow: trigger this skill when-sonnet //why:guard failure recurred six stop attempts this session-sonnet",
-    "Prefer concrete machine checks over apology text. Include the exact command, file, or hook setting that proves the fix. //why:will follow concrete checks over apology-sonnet //why:concrete check proves gpt-reflection read this turn-sonnet //why:concrete check proves gpt-reflection read this turn-sonnet",
     "Record each incident as four facts: symptom, root cause class, fix, and proof. //why:four facts pattern used this stop report //why:folded stop-hook repair step to howto tier //why:folded stop-hook repair step to howto tier-sonnet //why:four facts pattern used this stop report-sonnet //why:four facts pattern used this stop report-sonnet //why:will follow: incident documentation pattern",
     "Promote only durable recurrence-prevention knowledge. Leave transient logs, cache state, and one-off screenshots out. //why:skill-file landing used durable citation not transient log //why:stop report uses durable knowledge citation //why:stop report uses durable knowledge citation-sonnet //why:skill-file landing used durable citation not transient log-sonnet //why:skill-file landing used durable citation not transient log-sonnet //why:will follow: durable knowledge only",
     "Keep GPT-owned lessons separate from GPT-mini-owned lessons. Do not use GPT-mini reflection as a substitute for GPT reflection. //why:will follow: keep gpt-owned lessons separate //why:will follow: keep gpt-owned lessons separate-sonnet //why:will follow: keep gpt-owned lessons separate-sonnet",
@@ -28,8 +28,7 @@
     "NAVIGATION: recurring procedures live in gpt-reflection-howto; dated incidents and recurrence proofs live in gpt-reflection-ref. Keep this core limited to GPT-family reflex triggers and link both satellites.",
     "2026-07-24 Codex PTY status probe false-success fix: tools\\\\wk-codex-pty-test.ps1 compiled from the wrong .tmp source path even though the real source lives at wkstdpty\\\\wkcodex-status-pty.cs, so csc emitted missing-source warnings and the test relied on stale/fallback artifacts. It also treated WARNING lines as success, hiding a real Codex startup failure. Fix: point  at wkstdpty\\\\wkcodex-status-pty.cs and require real PTY/status/limit lines; surface ERROR/couldn't start/damaged/readonly database/failed initialize lines as exit 4. Proof: parsecheck passes, csc now rc=0, and the test now correctly fails on the real environment issue: C:\\\\Users\\\\kiexp\\\\.codex\\\\state_5.sqlite opens as readonly for sandboxed Codex because ACL contains Write Deny entries for sandbox SIDs, despite IsReadOnly=False.",
     "TRIGGER: A successful wkappbot file read of HANDOFF.md is followed by an on-load refusal saying the predecessor letter was not read. ACTION: classify a Read-evidence transport mismatch, preserve the exact refusal and command, use only the sanctioned Read wrapper or owner reset, and do not retry unrelated commands. PROOF: 2026-10-12, file read printed HANDOFF.md lines 1-21 yet session list and Agent.cmd remained blocked. ROOT-CAUSE CLASS: the gate observes Read-tool transport metadata rather than returned file bytes.",
-    "INCIDENT: a plain shell read of a C:\\Users\\kiexp\\.claude path is blocked by the harness. FIX: use wkappbot file write D:\\GitHub\\WkAutoQuant\\tmp\\global-CLAUDE.md --source-file C:\\Users\\kiexp\\.claude\\CLAUDE.md, then read the copy. PROOF: the file-write command returned byte-exact copy and Get-Content read 36988 bytes.",
-    "INCIDENT 2026-10-13: Codex file-read transport mismatch reproduced. Symptom: wkappbot file read HANDOFF.md and Read.cmd JSON both printed all 21 lines, but every non-skill command still received predecessor handoff not read. Root-cause class: on-load observes Read-tool metadata rather than returned bytes. Fix: preserve the refusal, use only the sanctioned Read tool or owner reset, and do not claim the gate is cleared from file output alone. Proof: exact refusal remained on build.cmd and Agent.cmd after both read paths."
+    "INCIDENT: a plain shell read of a C:\\Users\\kiexp\\.claude path is blocked by the harness. FIX: use wkappbot file write D:\\GitHub\\WkAutoQuant\\tmp\\global-CLAUDE.md --source-file C:\\Users\\kiexp\\.claude\\CLAUDE.md, then read the copy. PROOF: the file-write command returned byte-exact copy and Get-Content read 36988 bytes."
   ],
   "requirements": [
     {
@@ -67,6 +66,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-06-14T11:18:22.8900716Z",
-  "updated": "2026-10-12T17:44:43.0573008Z",
-  "version": "1.269"
+  "updated": "2026-10-12T20:22:42.416616Z",
+  "version": "1.273"
 }

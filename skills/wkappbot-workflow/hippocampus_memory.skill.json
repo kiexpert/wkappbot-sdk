@@ -1,15 +1,42 @@
 {
-  "id": "hippocampus-memory",
-  "app": "wkappbot",
-  "title": "해마 메모 저장·조회",
-  "desc": "사용자가 add·query 명령으로 기억을 저장하고 유사도 기반 검색할 수 있는 스킬. 내부적으로 scripts/hippocampus_tool.py 를 호출합니다.",
+  "id": "hippocampus_memory",
+  "app": "wkappbot-workflow",
+  "title": "Hippocampus memory store and query",
+  "title_ko": null,
+  "desc": "Store and retrieve memories via hippocampus_tool.py. Use add to store, query for similarity search. Wraps scripts/hippocampus_tool.py.",
   "steps": [
     "wkappbot skill read suggest-workflow",
-    "python scripts/hippocampus_tool.py add   --content \"<내용>\"   --tags <태그들>",
-    "python scripts/hippocampus_tool.py query  --q \"<검색어>\"   --top 5"
+    "python scripts/hippocampus_tool.py add --content CONTENT --tags TAGS",
+    "python scripts/hippocampus_tool.py query --q KEYWORD --top 5"
   ],
   "requirements": [
-    { "cmd": "python scripts/hippocampus_tool.py --help", "expect": "MANDATORY" }
+    {
+      "cmd": "python scripts/hippocampus_tool.py --help",
+      "expect": "hippocampus",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read hippocampus_memory",
+      "expect": "Store",
+      "prompt": null
+    },
+    {
+      "cmd": "python scripts/hippocampus_tool.py query --q test --top 5",
+      "expect": "results",
+      "prompt": null
+    }
   ],
-  "tags": ["memory","hippocampus","korean","utility"]
+  "primary_cmd": null,
+  "tags": [
+    "memory",
+    "hippocampus",
+    "korean",
+    "utility"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-10-12T23:24:27.8799107Z",
+  "updated": "2026-10-12T23:24:27.8801098Z",
+  "version": "1.1"
 }

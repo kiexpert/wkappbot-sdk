@@ -4,7 +4,10 @@
   "title": "Gemini Pro Reflection: The Hongik Harness Connection & Compliance",
   "title_ko": "제미니-프로-반성문: 하네스 연결 및 규정 준수 성찰",
   "desc": "T1 core. Formal reflection for Gemini sessions regarding harness integration, on-load compliance, and family isolation rules. Mandates a HARD BLOCK for missing briefings and documentation of 'Zero-Env' and 'Modern Hook Protocol' standards.",
-  "steps": [],
+  "steps": [
+    "BUG/REFLEX 2026-07-23 cross-family freshness can block unrelated GPT delegation when this Gemini reflection has no visible Steps and scores 69/100. Gemini Pro sessions must keep at least one concise T1 core step plus runnable proof requirements so agent-debrief freshness can distinguish real decay from an empty-step catalog artifact. Repro: run Agent.cmd --model gpt-5-mini canary from wkappbot-kih; block message names gemini-pro-reflection score 69/100 even though the requested worker is GPT-mini. Fix target: either keep this skill structured with visible core steps, or make proactive freshness scope by active/caller family before cross-family checks.",
+    "Gemini sessions must load harness configuration from .gemini/settings.json before any automation work. Zero-Env rule: never rely on ambient environment variables for harness state. Modern Hook Protocol: all hooks must use JSON output, never plain text. Missing briefing = HARD BLOCK: do not proceed until wkappbot skill read gemini-pro-reflection is confirmed."
+  ],
   "requirements": [
     {
       "cmd": "wkappbot skill read gemini-pro-reflection",
@@ -36,6 +39,6 @@
   "regression_script": null,
   "author": "gemini",
   "created": "2026-06-14T18:40:00Z",
-  "updated": "2026-06-16T13:33:53.9807546Z",
-  "version": "1.23"
+  "updated": "2026-10-12T22:35:37.5094168Z",
+  "version": "1.25"
 }

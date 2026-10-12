@@ -4,7 +4,9 @@
   "title": "Headhunter Email Workflow -- Naver IMAP scan, DOC form fill, and reply",
   "title_ko": null,
   "desc": "End-to-end headhunter email handling: scan Naver IMAP for real headhunter emails (not newsletter spam), download their DOC template attachment, fill it with resume data, and reply with filled form.",
-  "steps": [],
+  "steps": [
+    "Scan Naver IMAP for headhunter emails: filter by From/Subject patterns to exclude newsletter spam. Download DOC template attachment, fill resume data fields, then reply-all with filled form. Uses wkappbot email commands for IMAP access."
+  ],
   "requirements": [
     {
       "cmd": "wkappbot skill read headhunter-email-workflow",
@@ -28,6 +30,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-05-02T12:34:42.6241166Z",
-  "updated": "2026-05-02T12:34:42.6241261Z",
-  "version": "1.0"
+  "updated": "2026-10-12T22:43:26.1863243Z",
+  "version": "1.1"
 }
