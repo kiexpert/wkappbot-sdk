@@ -1,4 +1,4 @@
-﻿# gg-main-enhanced.ps1: SDK Product Manager Health Check + All Issues Detection
+# gg-main-enhanced.ps1: SDK Product Manager Health Check + All Issues Detection
 # Detects all problems found in past month + immediate alerts
 # Run: powershell -File scripts/gg-main-enhanced.ps1
 
