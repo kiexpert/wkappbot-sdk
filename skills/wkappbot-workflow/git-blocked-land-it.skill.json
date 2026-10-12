@@ -5,7 +5,7 @@
   "title_ko": null,
   "desc": "T1 core for every intelligence, small models first. When a git command or a .git touch is blocked, do this one thing: wkpush.sh -m FILES from the repo root, or if you are a sector write under .tmp and report the path.",
   "steps": [
-    "ROOT, ROOKIE OR MAIN SESSION: land your files with ONE command from the repo root: wkpush.sh -m FILE1 FILE2 (bare name, no bash prefix. Another repo: wkpush.sh -C D:/GitHub/REPO -m FILES). It commits only those files and pushes from its own private worktree, so a lock, a dirty tree or a crowded index cannot stop it. Then run git show origin/main:FILE1 and see your change there, because a green exit line alone proves nothing -- wkpush.sh copies from HEAD not the working tree: files not yet committed to HEAD are rejected with 'not in ORIG_BRANCH HEAD -- commit it first'; run git commit -m msg -- FILE before calling wkpush.sh. //why:fresh fragment for third stop attempt evidence-sonnet //why:sector confirmed route for root push-haiku //why:sector confirmed route for root push-haiku",
+    "ROOT, ROOKIE OR MAIN SESSION: land your files with ONE command from the repo root: wkpush.sh -m FILE1 FILE2 (bare name, no bash prefix. Another repo: wkpush.sh -C D:/GitHub/REPO -m FILES). It commits only those files and pushes from its own private worktree, so a lock, a dirty tree or a crowded index cannot stop it. Then run git show origin/main:FILE1 and see your change there, because a green exit line alone proves nothing -- wkpush.sh copies from HEAD not the working tree: files not yet committed to HEAD are rejected with 'not in ORIG_BRANCH HEAD -- commit it first'; run git commit -m msg -- FILE before calling wkpush.sh. //why:sector confirmed route for root push-haiku //why:will follow: root, rookie or main session-sonnet //why:will follow: root, rookie or main session-sonnet",
     "INDEX.LOCK EXISTS: another git is running. Wait 20 seconds and run the same wkpush.sh command again. Never delete the lock, never hand-build a GIT_INDEX_FILE, never run git checkout, rebase or stash by hand. //why:stale lock tool follows the running git check //why:self-test validated all lock safety cases",
     "WHO ARE YOU FIRST. A SECTOR (an Agent or Agent.cmd dispatched you) never runs git: write only the path your brief names under .tmp, print that path last, and report it to your dispatcher. Your ROOT lands it. A git block message is not your task. //why:sector writes artifacts under tmp folder //why:sector path output goes to tmp-haiku //why:sector path output temp directory gate-sonnet //why:sector writes artifacts under tmp folder-haiku",
     "HAIKU ROOTS: bash script.sh is refused, but bare wkpush.sh -m FILES and ./wk-push-minimal.cmd FILES pass. Success story to copy: the Stop gate fix landed as bfdf68e5c from a private worktree while the main tree held 300 dirty files and a stale lock. //why:one command landing is the success road",
@@ -59,6 +59,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-10-05T06:31:20.6663222Z",
-  "updated": "2026-10-12T01:13:41.1569785Z",
-  "version": "1.49"
+  "updated": "2026-10-12T05:05:43.9782935Z",
+  "version": "1.52"
 }
