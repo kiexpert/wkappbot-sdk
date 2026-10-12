@@ -5,9 +5,9 @@
   "title_ko": null,
   "desc": "Systematic QA playbook for the public SDK launcher from a first-time user perspective. Each step: run command, check exit code and output, file suggest on deviation.",
   "steps": [
-    "KNOWN SDK-LAUNCHER BEHAVIOR: launcher connects to whichever wkappbot Eye is running on the machine. In dev env with private Eye active, commands route to private core. For isolated testing use wkappbot-core.exe directly.",
-    "SDK QA FLOW: for user-visible launcher/CDP bugs, start from this playbook, then run the matching wkask/wkcdp smoke and compare exit code plus output against the first-time-user baseline before diagnosing internals.",
-    "EVIDENCE RULE: on any failure, keep the exact command, exit code, and smoke output together so the same user path can be replayed without re-deriving context."
+    "KNOWN SDK-LAUNCHER BEHAVIOR: launcher connects to whichever wkappbot Eye is running on the machine. In dev env with private Eye active, commands route to private core. For isolated testing use wkappbot-core.exe directly. //why:will follow: playbook step baseline known sdk behavior-sonnet",
+    "SDK QA FLOW: for user-visible launcher/CDP bugs, start from this playbook, then run the matching wkask/wkcdp smoke and compare exit code plus output against the first-time-user baseline before diagnosing internals. //why:sdk qa flow playbook baseline compare exit code //why:sdk qa flow playbook baseline compare exit code-sonnet",
+    "EVIDENCE RULE: on any failure, keep the exact command, exit code, and smoke output together so the same user path can be replayed without re-deriving context. //why:will follow: evidence rule exact command exit code //why:will follow: evidence rule exact command exit code-sonnet //why:will follow: evidence rule exact command exit code-sonnet"
   ],
   "requirements": [
     {
@@ -39,6 +39,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-04-28T04:08:16.8430032Z",
-  "updated": "2026-05-11T16:11:09.0143091Z",
-  "version": "1.5"
+  "updated": "2026-10-12T03:16:11.7839998Z",
+  "version": "1.12"
 }
