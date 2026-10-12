@@ -14,10 +14,13 @@ static class LicenseStatus
         var token = GetToken();
         if (string.IsNullOrEmpty(token))
         {
-            Console.Error.WriteLine("[license] GitHub 인증이 필요해요.");
-            Console.Error.WriteLine("          → gh auth login");
-            Console.Error.WriteLine("          또는 GH_TOKEN=<token> wkappbot license status");
-            return 1;
+            // No credentials: show free-tier info so first-time users get a clean result
+            Console.WriteLine($"  User    : (not authenticated)");
+            Console.WriteLine($"  Tier    : Free");
+            Console.WriteLine($"  CDP     : ✗ not licensed");
+            Console.WriteLine($"  Sudo    : ✗ not licensed");
+            Console.WriteLine($"  Info    : https://github.com/{Repo}/blob/main/PRICING.md");
+            return 0;
         }
 
         using var http = MakeClient(token);
