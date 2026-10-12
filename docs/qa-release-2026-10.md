@@ -65,3 +65,44 @@
   - 1 SDK CDP Connectivity (secrets issue)
   - 20 WKAppBot Skill Check (cascading)
   - 20 wkappbot-kih harness-ci (BLOCKING: Test-WkBriefSkillKeep.ps1 parse error)
+
+## QA Matrix 2026-10-13
+
+### 1. WKAppBot Reflex App QA (kiexpert/WKAppBot)
+
+| OS | Run ID | Result | Date |
+|----|--------|--------|------|
+| macos-latest + windows-latest | 38285480982 | PASS | 2026-10-12T17:37:49Z |
+
+Newest reflex-app-qa run: 38285480982 (completed success, triggered by push feat(macos-phase2-m2)).
+Prior spokesman-noted run 38281811943 superseded by this run.
+
+### 2. wkappbot-sdk macOS Test (kiexpert/wkappbot-sdk)
+
+| OS | Run ID | Result | Date | Trigger |
+|----|--------|--------|------|---------|
+| macOS | 38291793651 | PASS | 2026-10-12T18:34:10Z | workflow_dispatch (this session) |
+| macOS | 38251290294 | PASS | 2026-10-12T12:47:48Z | workflow_dispatch |
+
+Triggered `gh workflow run macos-test.yml --repo kiexpert/wkappbot-sdk` → run 38291793651 completed success in 50s.
+
+### 3. Failure Summary by Workflow (all repos, last 20 failures each, as of 2026-10-13)
+
+#### kiexpert/WKAppBot
+| Workflow | Failure Count | Latest Failure Run | Date Range |
+|----------|--------------|-------------------|------------|
+| Skill Check | 20 | 38285481028 | 2026-10-12 04:00Z–17:37Z |
+
+#### kiexpert/wkappbot-sdk
+| Workflow | Failure Count | Latest Failure Run | Notes |
+|----------|--------------|-------------------|-------|
+| Skill Check | 12 | 38222257253 | 2026-10-11T18:07Z–2026-10-12T08:13Z |
+| User-Perspective QA | 4 | 38288799172 | investigation needed |
+| CDP Connectivity Smoke | 1 | 38248574671 | secrets/infra issue |
+| build-skill-page | 1 | 38192702582 | investigation needed |
+
+#### kiexpert/wkappbot-kih
+| Workflow | Status | Notes |
+|----------|--------|-------|
+| harness-ci | **GREEN** since run 38283074760 (2026-10-12T17:16Z) | 20 prior failures resolved; commit 2becfe008 fixed Test-WkBriefSkillKeep.ps1 parse error |
+| Latest 3 runs | SUCCESS (38290860495, 38284755000, 38283074760) | All 2026-10-12 |
