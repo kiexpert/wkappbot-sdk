@@ -201,6 +201,7 @@
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-core/wktest-staging-build-storm-safe-deploy-pipeline.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-core/wktest-staging-build-pipeline.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-kih/gemini-harness-decoupling-lessons.html</loc></url>
+<url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-kih/harness-omega-guard.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-sdk/placement-port-pid-filter.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-sdk/gmail-support-bot.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-sdk/license-pending-invite-detect-and-guide-user-to-accept.html</loc></url>
@@ -491,6 +492,7 @@
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/skill-review-completed-codex-cli-wkappbot-usage-updated-to-v1-4.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/ascii-only-source-no-decorative-unicode.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/wkharness-stall-guard.html</loc></url>
+<url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/harness-stop-guard.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/syntax-rollback-cover-bash-writes.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/tier-gate.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/wkharness-tier-gate.html</loc></url>
