@@ -5,15 +5,15 @@
   "title_ko": null,
   "desc": "GPT-specific reflection skill for recurring harness, hook, delegation, identity, and transport lessons that belong to the GPT family but are not GPT-mini-specific.",
   "steps": [
-    "Prefer concrete machine checks over apology text. Include the exact command, file, or hook setting that proves the fix. //why:concrete evidence checks preferred in reports-sonnet //why:will follow concrete checks over apology-sonnet //why:will follow concrete checks over apology-sonnet",
-    "Trigger this skill when GPT hits a reusable startup, hook, identity, delegation, transport, encoding, or guard failure that can recur in future GPT sessions. //why:will follow: trigger this skill when-sonnet",
+    "Trigger this skill when GPT hits a reusable startup, hook, identity, delegation, transport, encoding, or guard failure that can recur in future GPT sessions. //why:guard failure recurred six stop attempts this session //why:will follow: trigger this skill when-sonnet //why:guard failure recurred six stop attempts this session-sonnet",
+    "Prefer concrete machine checks over apology text. Include the exact command, file, or hook setting that proves the fix. //why:will follow concrete checks over apology-sonnet //why:concrete check proves gpt-reflection read this turn-sonnet //why:concrete check proves gpt-reflection read this turn-sonnet",
     "Keep GPT-owned lessons separate from GPT-mini-owned lessons. Do not use GPT-mini reflection as a substitute for GPT reflection. //why:will follow: keep gpt-owned lessons separate //why:will follow: keep gpt-owned lessons separate-sonnet //why:will follow: keep gpt-owned lessons separate-sonnet",
     "Record each incident as four facts: symptom, root cause class, fix, and proof. //why:four facts pattern used this stop report //why:folded stop-hook repair step to howto tier //why:folded stop-hook repair step to howto tier-sonnet //why:four facts pattern used this stop report-sonnet //why:four facts pattern used this stop report-sonnet",
     "For Codex or CLI hook failures, separate the layers before naming the bug: config feature flag, hook command, adapter stdout JSON, exit code, and downstream harness decision.",
     "Promote only durable recurrence-prevention knowledge. Leave transient logs, cache state, and one-off screenshots out. //why:stop report uses durable knowledge citation //why:stop report uses durable knowledge citation-sonnet",
     "For delegation failures, verify the real model family that answered, not only the dispatcher exit code.",
+    "ELDER REVIEW DUTY: GPT must review mistakes made by smaller sibling models, extract the durable failure pattern, and turn it into recurrence prevention. Do not merely blame the smaller model. Identify the missing guard, missing reflection, missing skill read, or bad delegation contract that allowed the mistake to happen, then record the prevention path. //why:extracted stop gate preamble failure pattern this session //why:extracted stop gate preamble failure pattern this session-sonnet",
     "FAILURE WARNING: this choice breaks the system. If GPT treats model identity as interchangeable, uses GPT-mini reflection as GPT reflection, or accepts Haiku reflection as a substitute, future agents inherit the wrong reflex and the same hook or delegation failure repeats. Stop and create the model-specific reflection instead.",
-    "ELDER REVIEW DUTY: GPT must review mistakes made by smaller sibling models, extract the durable failure pattern, and turn it into recurrence prevention. Do not merely blame the smaller model. Identify the missing guard, missing reflection, missing skill read, or bad delegation contract that allowed the mistake to happen, then record the prevention path.",
     "KNOWLEDGE-IFICATION REFLEX: after any confirmed GPT operational mistake, do not end with apology or status. Immediately read knowledge-ification-procedure-jisikhwa, encode symptom, root cause, fix, proof, failed attempts, and command invariants into the relevant AppBot skill, cross-link the domain skill and GPT reflection, then re-read the edited skill to verify persistence. Cluster: knowledge-ification-procedure-jisikhwa, on-load, cdp-open-reuse-existing-chrome-tab, jobkorea-naver-cookie-persistence, wk-cdp.",
     "ANTI-KNOWLEDGE RULE: A PermissionRequest or adapter must not make an autonomous default-deny decision before the user's harness evaluates the action. Pre-harness blocking bypasses the living knowledge, skill locks, repository exceptions, and user-governed approval path; in this harness it is punishable anti-knowledge behavior. Correct flow: preserve the requested operation and evidence, enter the harness, let harness rules classify allow/warn/block/approval, and only then enforce the decision. A pre-harness component may normalize transport but must not replace harness judgment.",
     "IMPLEMENTATION CHECKPOINT 2026-06-30: Codex PermissionRequest must never re-run CodexPreToolPolicy and emit an autonomous deny after PreToolUse. PreToolUse delegates unmatched operations to wkharness-codex-main; PermissionRequest may consume an exact prior harness allow once, otherwise it stays silent so the normal user approval flow proceeds. wkharness-codex-install must reinstall this same handoff behavior on every SessionStart.",
@@ -64,6 +64,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-06-14T11:18:22.8900716Z",
-  "updated": "2026-10-12T07:11:34.4625753Z",
-  "version": "1.253"
+  "updated": "2026-10-12T08:05:11.3791979Z",
+  "version": "1.260"
 }
