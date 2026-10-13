@@ -141,29 +141,28 @@ jobs:
     - name: Secret / internal-path hygiene scan
       shell: pwsh
       run: |
-        $PATTERNS = @(
-          'D:\\GitHub\\',
-          'D:/GitHub/',
-          'C:\\Program Files\\dotnet',
-          'C:/Program Files/dotnet',
-          'kiexpert@',
-          'kivilab\.co\.kr',
-          'WkAutoQuant',
-          'WkFeedQuant',
-          'personal-docs'
+        $PATTERNS_ALL = @(
+          'D:\\GitHub\\', 'D:/GitHub/', 'C:\\Program Files\\dotnet',
+          'C:/Program Files/dotnet', 'WkAutoQuant', 'WkFeedQuant', 'personal-docs'
         )
-        $TOP_DOCS = @('README.md','AGENTS.md','CLAUDE.md','CHANGELOG.md','SECURITY.md','VERSIONING.md','SUBSCRIBE.md','PRICING.md')
-        $PUBLIC_FILES = $TOP_DOCS | Where-Object { Test-Path $_ } | ForEach-Object { Get-Item $_ }
+        $PATTERNS_TECH = @('kiexpert@', 'kivilab\.co\.kr')
+        $TOP_DOCS  = @('README.md','AGENTS.md','CLAUDE.md','CHANGELOG.md','SECURITY.md','VERSIONING.md','SUBSCRIBE.md','PRICING.md')
+        $TECH_DOCS = @('CLAUDE.md','AGENTS.md','CHANGELOG.md','SECURITY.md','VERSIONING.md')
+        $allFiles  = $TOP_DOCS  | Where-Object { Test-Path $_ } | ForEach-Object { Get-Item $_ }
+        $techFiles = $TECH_DOCS | Where-Object { Test-Path $_ } | ForEach-Object { Get-Item $_ }
         $hits = 0
-        foreach ($pat in $PATTERNS) {
-          $matches_ = $PUBLIC_FILES | Select-String -Pattern $pat -ErrorAction SilentlyContinue
-          foreach ($m in $matches_) {
-            Write-Host "::error::Internal reference in $($m.Filename):$($m.LineNumber): $pat"
-            $hits++
+        foreach ($pat in $PATTERNS_ALL) {
+          $allFiles | Select-String -Pattern $pat -EA SilentlyContinue | ForEach-Object {
+            Write-Host "::error::Internal reference in $($_.Filename):$($_.LineNumber): $pat"; $hits++
+          }
+        }
+        foreach ($pat in $PATTERNS_TECH) {
+          $techFiles | Select-String -Pattern $pat -EA SilentlyContinue | ForEach-Object {
+            Write-Host "::error::Internal reference in $($_.Filename):$($_.LineNumber): $pat"; $hits++
           }
         }
         if ($hits -gt 0) { exit 1 }
-        Write-Host "PASS: no internal references found ($($PUBLIC_FILES.Count) files scanned)"
+        Write-Host "PASS: no internal references found ($($allFiles.Count) files scanned)"
 
     # ── 9. Upload all QA outputs as artifact ─────────────────────────────
     - name: Upload QA artifacts

@@ -328,7 +328,7 @@ D:/SDK/bin/wkappbot.exe / a11y.exe / wkappbot.hq/
 
 ## gg Main Workflow
 
-MAIN DUTY 2026-10-11: (a) macOS (MacBook) release readiness of the SDK; (b) OVERALL QA of the release for every product: wkappbot (D:/GitHub/WKAppBot), the SDK, and the reflex app (WKAppBot.Reflex, prepared by the harness team).
+MAIN DUTY 2026-10-11: (a) macOS (MacBook) release readiness of the SDK; (b) OVERALL QA of the release for every product: wkappbot (WKAppBot repo), the SDK, and the reflex app (WKAppBot.Reflex, prepared by the harness team).
 
 Execute in order when user sends `gg` or `gogo`. This is the project's recurring main-workflow trigger shorthand.
 0. **[PRIMARY DUTY] Smoke test loop**: 
@@ -356,7 +356,7 @@ Execute in order when user sends `gg` or `gogo`. This is the project's recurring
 
 ## Main Duties (recurring responsibilities)
 
-> MAIN DUTY 2026-10-11: (a) macOS (MacBook) release readiness of the SDK; (b) OVERALL QA of the release for every product: wkappbot (D:/GitHub/WKAppBot), the SDK, and the reflex app (WKAppBot.Reflex, prepared by the harness team).
+> MAIN DUTY 2026-10-11: (a) macOS (MacBook) release readiness of the SDK; (b) OVERALL QA of the release for every product: wkappbot (WKAppBot repo), the SDK, and the reflex app (WKAppBot.Reflex, prepared by the harness team).
 
 > **PRIMARY DUTY**: You are the wkappbot-sdk product manager. Your job is to make wkappbot more commercially viable every session -- from the user's AND QA engineer's perspective. Not just fix what's asked: spot friction, latency, UX failures, and file suggests proactively. Ask: "would a paying user accept this?" If no ??fix or suggest immediately.
 > **CDP-FIRST RULE**: Prioritize CDP anomalies and ask timeouts above all else. These block user workflows. Direct-fix (no suggest) per CLAUDE.md mandate.
@@ -518,7 +518,6 @@ wkappbot skill read claude-md-harness-rules     # Task: harness:skill rule + stu
 - (A) session start or post-compaction, run steps 1+2 below. -> wkappbot skill read on-load --keep '(A) session start or post-compaction, run steps 1+2 below.'
 - ARCHITECTURE + WRAPPER SET: Codex native write_file/read_file/apply_patch are hook-DENIED (exit 2) -> wkappbot skill read codex-tool-wrappers --keep 'ARCHITECTURE + WRAPPER SET: Codex native write_file/read_file/apply_patch are hook-DENIED (exit 2)'
 - Treat Codex command results as rc-sensitive: rc=0 is success -> wkappbot skill read codex-cli-wkappbot-usage --keep 'Treat Codex command results as rc-sensitive: rc=0 is success'
-
 ## Pending
 
 ## harness:skill (?i)[/\\]test-cdp-connectivity\.ps1$
@@ -530,4 +529,3 @@ wkappbot skill read verify-tool-or-guard-synthetic-live-static  # Task: run-veri
 wkappbot skill read wkpushsdk  # Usage: push the wkappbot-sdk repo to origin (SDK release push), guard-free
 wkappbot skill read wk-gitsync  # Impl: same wk-prefixed internal-git guard-escape pattern for the main repo
 wkappbot skill read verify-tool-or-guard-synthetic-live-static  # Task: run-verify the sdk push live, not parse-only
-
