@@ -10,7 +10,14 @@
     "Workflow Steps: (1) Checkout wkappbot-sdk repository (2) Setup .NET 8.0.x environment (3) Clone WKAppBot core repo with depth=1 (4) Print .NET environment via dotnet --info (5) Conditionally build Portable.slnf if available",
     "Output handling: Success shows Build completed successfully, Failure shows exit code N with tail last 20 lines, Not available gracefully exits 0",
     "Public Log Hygiene: Token never echoed, only summary to console, no paths disclosed",
-    "To trigger: gh workflow run macos-test.yml --repo kiexpert/wkappbot-sdk"
+    "To trigger: gh workflow run macos-test.yml --repo kiexpert/wkappbot-sdk",
+    "PHASE 1 SPEC (WKAppBot core team, owner 2026-09-30): Build portable .NET split for macOS. (1) Survey csharp/src projects for net8.0 portability, output .tmp/macos/portable-survey.md. (2) Design Portable.slnf filter + multi-target (net8.0;net8.0-windows10.0.22621.0) on portable projects. (3) Implement #if WINDOWS seams or interface boundaries. (4) Proof: Windows build green + dotnet build csharp/Portable.slnf -f net8.0 succeeds. (5) Wire macos-test.yml to build Portable.slnf. Rules: foreground sectors, one item per commit by pathspec, wkpush.sh -m, origin verification.",
+    "PHASE 1 COMPLETE (2026-09-30, run 36676298999): macOS CI PASS. Root cause of CI failure: <TargetFrameworks> containing net8.0-windows* causes MSBuild to refuse project evaluation on non-Windows hosts unless EnableWindowsTargeting=true is set. Fix: added to csharp/Directory.Build.props. Also: latestPatch->latestFeature in global.json (precaution), direct stdout in workflow Build step (no set-e+redirect conflict). All 4 portable projects build net8.0 clean: Abstractions, PluginContract, Android, Example.Plugin.",
+    "Phase 1 COMPLETE (2026-09-30): csharp/Portable.slnf (JSON, 4 projects: Abstractions, PluginContract, Android, Example.Plugin), all 4 .csproj multi-targeted (net8.0;net8.0-windows10.0.22621.0), AdbClient.cs #if WINDOWS seam, Directory.Build.props EnableWindowsTargeting=true, global.json rollForward:latestFeature. macOS CI run 36676298999 PASSED (arm64, .NET 8.0.425, 33s). Root cause of earlier failures: EnableWindowsTargeting missing caused MSBuild to refuse project evaluation on non-Windows hosts even with -f net8.0. Phase 3 (Win32/UIA + AXUIElement backend) is out of Phase 1 scope per portable-survey.md; needs new spec.",
+    "DONE: skill git mirror pushed to origin/main at commit a0fec39c60 (2026-09-30). File at bin/wkappbot.hq/skills/wkappbot-sdk/macos-ci-via-sdk-relay.skill.json with Phase 1 completion steps (9-10) verified on origin. (bin/wkappbot.hq/skills/wkappbot-sdk/macos-ci-via-sdk-relay.skill.json) is on origin/main at v1.4. If disk has v1.4 but origin is missing or stale: hash-object the file, fast-import a commit on top of origin/main with that blob, then push via wkpush.sh -m the path. Done when: git show origin/main:..skill.json shows Version 1.4 in JSON.",
+    "TODO (owner 2026-09-30, after macOS core port succeeds): port the harness itself to macOS -- Python implementation of wkharness*.ps1, PowerShell source stays canonical/untouched as the reference, build the Python port alongside it and verify BEHAVIOR PARITY between the two (same input, same verdict) rather than trusting a rewrite. Gate: only after WKAppBot macOS phase 2/3 (a11y AXUIElement backend) lands.",
+    "DONE 2026-10-12: Survey complete -- see .tmp/macos-ci-survey-haiku-probe.md: check last 3 reflex-app-qa.yml runs (kiexpert/WKAppBot) for macOS job result, list all csproj files with osx runtime identifiers, check last macos-test.yml run (kiexpert/wkappbot-sdk). Write findings to .tmp/macos-ci-survey-haiku-probe.md. DONE when: file exists with green/red status per job and a csproj osx target list.",
+    "TODO: Fix .github/workflows/reflex-app-qa.yml: (1) find Windows job bash step exiting 127 and fix the path/tool reference, (2) add dotnet test csharp/Portable.slnf -f net8.0 --configuration Release --no-build to macOS job, (3) keep existing Assert-step and roster fixture intact. PROTO READY path: .tmp/macos-portable/reflex-app-qa.yml. Verify: gh workflow run reflex-app-qa.yml --repo kiexpert/WKAppBot then gh run view <id> shows both jobs green."
   ],
   "requirements": [
     {
@@ -35,12 +42,15 @@
     "ci",
     "github-actions",
     "dotnet",
-    "portable-build"
+    "portable-build",
+    "맥북",
+    "이식",
+    "포팅"
   ],
   "source_refs": null,
   "regression_script": null,
   "author": "claude",
   "created": "2026-09-30T02:57:29.6228911Z",
-  "updated": "2026-09-30T03:18:49.0563329Z",
-  "version": "1.1"
+  "updated": "2026-10-13T02:01:16.3640147Z",
+  "version": "1.13"
 }
