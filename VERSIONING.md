@@ -23,7 +23,7 @@ When bumping minor version (e.g. `4.6 -> 4.7`):
 | File | What to change |
 |------|---------------|
 | `csharp/Directory.Build.props` | `<WKAppBotBaseVersion>4.7</WKAppBotBaseVersion>` |
-| `CLAUDE.md` | Header line: `# WKAppBot v7.10.0-sdk - ...` |
+| `CLAUDE.md` | Header line: `# WKAppBot v7.11.0-sdk - ...` |
 | `VERSIONING.md` | Update version references if needed |
 
 **If you skip the bump commit:** git pickaxe won't find the new version string
