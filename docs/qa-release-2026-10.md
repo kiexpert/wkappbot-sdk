@@ -106,3 +106,10 @@ Triggered `gh workflow run macos-test.yml --repo kiexpert/wkappbot-sdk` → run 
 |----------|--------|-------|
 | harness-ci | **GREEN** since run 38283074760 (2026-10-12T17:16Z) | 20 prior failures resolved; commit 2becfe008 fixed Test-WkBriefSkillKeep.ps1 parse error |
 | Latest 3 runs | SUCCESS (38290860495, 38284755000, 38283074760) | All 2026-10-12 |
+
+## Actions Fix Log 2026-10-13
+
+| Workflow | Root Cause | Fix Commits | Green Run ID |
+|----------|------------|-------------|--------------|
+| Skill Check | 12 skills had empty steps[] or id/filename mismatch; on-load skill lost claude-md-guide chain reference | ea7cf366 (build.cmd EnableDelayedExpansion !-swallowing), 533ced71 (on-load chain ref + VERSIONING example) | 38325685030 |
+| User-Perspective QA | build.cmd exit 255 (!-swallowing); VERSIONING.md stale v7.10.0-sdk example caused version mismatch; D:/GitHub/ in CLAUDE.md triggered hygiene scan; scan scope too broad (checked marketing pages for internal email) | ea7cf366 + 533ced71 + db87710e | 38328390676 |
