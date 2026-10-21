@@ -3,8 +3,10 @@
 
 Lists every skill id with all its copies across the given sources, flags ids whose copies
 diverge, and proposes one home per id:
-  SDK      generic, no private marker -> wkappbot-sdk/skills (public, ships with the SDK)
-  PRIVATE  any private marker -> stays in a private repo (never the public SDK)
+  SDK        generic, no private marker -> wkappbot-sdk/skills (public, ships with the SDK)
+  <repo>     private marker, and every copy is about one repo (app folder -> repo)
+  WKAppBot   private marker, ambiguous -> the core repo (owner ruling 2026-10-21, spec v1.2)
+Private = any owner-mandated marker or a hit of the kih public-skill gate (kih 20fd779).
 
 Sources (each optional; resolved env var -> sibling checkout -> D:/GitHub/<repo>):
   sdk  this repo                       kih  $KIH_ROOT       core $WKAPPBOT_ROOT
@@ -44,6 +46,13 @@ MARKERS = [
     ("machine path", re.compile(r"(?i)[A-Z]:[\\/]+Users[\\/]+(?!test\b|public\b|<|%|\$)\w+")),
 ]
 PRIVATE_APPS = {"personal-docs", "wkautoquant", "paypal-developer"}
+# kih .githooks/lib/public-skill-gate.sh (kih 20fd779): refuses these skill files on the SDK remote.
+GATE = re.compile(r'(?i)"private"\s*:\s*true|repo-only|hantoo_cache|hantoo|kiwoom|KIS_WEB_PIN|KIWOOM_CERT_PIN|GH_PAT|'
+                  r'SLACK_BOT_TOKEN|appsecret|wavevault|WkFeedQuant|WkAutoQuant|scalper')
+# Owner ruling 2026-10-21 (spec v1.2): a private skill is homed in the one repo it is about,
+# else (ambiguous) in the core repo kiexpert/WKAppBot.
+APP_REPO = {"wkappbot-kih": "wkappbot-kih", "personal-docs": "personal-docs", "wkautoquant": "WkAutoQuant"}
+CORE_REPO = "WKAppBot"
 RE_CRED_TOKEN = re.compile(r"(?i)\b(api|access|auth|bearer|refresh|slack|github|gh|oauth|secret|bot|session|app|"
                            r"personal|xox[bpa]|hantoo|kiwoom)[ _-]?tokens?\b|\btoken\s*[:=]\s*\S")
 RE_ENV_TOKEN = re.compile(r"\b[A-Z][A-Z0-9_]*_TOKEN\b|\bTOKEN_[A-Z0-9_]+\b")  # case-sensitive env names
@@ -106,10 +115,18 @@ def plan(sources):
         mk = markers(copies)
         in_sdk = any(c["source"] == "sdk" for c in copies)
         private_srcs = sorted({c["source"] for c in copies if c["source"] != "sdk"} - {"hq"})
+        gate = sorted({m.group(0).lower() for c in copies for m in GATE.finditer(c["text"])})
+        gate_files = sum(1 for c in copies if c["source"] == "sdk" and GATE.search(c["text"]))
+        if gate:
+            mk = sorted(set(mk) | {"gate"})
         if mk:
-            home = "PRIVATE"
-            where = private_srcs[0] if private_srcs else "a private repo (none holds it yet)"
-            reason = "markers: " + ", ".join(mk) + f"; home {where}"
+            repos = {APP_REPO.get(c["app"]) or APP_REPO.get(c["path"].split("/")[0]) for c in copies}
+            home = repos.pop() if len(repos) == 1 and None not in repos else CORE_REPO
+            why = "about one repo" if home != CORE_REPO else "private + ambiguous -> core repo"
+            reason = "markers: " + ", ".join(m for m in mk if m != "gate")
+            if gate:
+                reason += ("; " if reason != "markers: " else "") + "kih gate: " + ", ".join(gate) + " (SDK edits now refused)"
+            reason = reason.replace("markers: ; ", "") + f"; {why}"
             if not strong(mk):
                 reason += "; review: only weak 'token' wording, no credential context found"
             if in_sdk:
@@ -120,6 +137,7 @@ def plan(sources):
         if any(c["error"] for c in copies):
             reason += "; unparseable copy"
         rows.append({"id": sid, "copies": copies, "diverges": diverges, "home": home, "reason": reason,
+                     "gate": gate, "gate_files": gate_files,
                      "weak_only": bool(mk) and not strong(mk),
                      "private_only": not in_sdk and all(c["source"] != "sdk" for c in copies)})
     return rows
@@ -132,10 +150,15 @@ def write_md(rows, sources, out, redact):
     n = len(rows)
     sdk = sum(r["home"] == "SDK" for r in rows)
     priv = n - sdk
+    homes = {}
+    for r in rows:
+        homes[r["home"]] = homes.get(r["home"], 0) + 1
     div = sum(r["diverges"] for r in rows)
-    leak = sum(r["home"] == "PRIVATE" and r["reason"].startswith("PUBLIC NOW") for r in rows)
-    leak_strong = sum(r["home"] == "PRIVATE" and r["reason"].startswith("PUBLIC NOW") and not r["weak_only"]
+    leak = sum(r["home"] != "SDK" and r["reason"].startswith("PUBLIC NOW") for r in rows)
+    leak_strong = sum(r["home"] != "SDK" and r["reason"].startswith("PUBLIC NOW") and not r["weak_only"]
                       for r in rows)
+    gate_ids = sum(bool(r["gate"]) for r in rows)
+    gate_files = sum(r["gate_files"] for r in rows)
     lines = [
         "# Skill home plan (DRY RUN -- nothing moved or deleted)",
         "",
@@ -143,9 +166,13 @@ def write_md(rows, sources, out, redact):
         "",
         "Sources: " + ", ".join(f"`{l}`" + ("" if r else " (not found)") for l, r in sources),
         "",
-        "| total ids | SDK-proposed | private-proposed | diverging | private-marked, public now | of those, beyond weak 'token' wording |",
-        "|---|---|---|---|---|---|",
-        f"| {n} | {sdk} | {priv} | {div} | {leak} | {leak_strong} |",
+        "| total ids | SDK-proposed | private-proposed | diverging | private-marked, public now | of those, beyond weak 'token' wording | kih-gate hits on sdk (files / ids) |",
+        "|---|---|---|---|---|---|---|",
+        f"| {n} | {sdk} | {priv} | {div} | {leak} | {leak_strong} | {gate_files} / {gate_ids} |",
+        "",
+        "Proposed homes: " + ", ".join(f"{h} {c}" for h, c in sorted(homes.items(), key=lambda x: -x[1]))
+        + ". Owner ruling 2026-10-21: SDK = generic and passes PUBLIC SAFETY; a private skill goes to the one repo"
+        " it is about, else (ambiguous) to the core repo WKAppBot.",
         "",
         "Copy format: `source:path@vVERSION#contenthash` (content hash ignores location and volatile keys: `app`, `updated`, read counters).",
         "Private markers (owner mandate, any hit = PRIVATE): " + ", ".join(m for m, _ in MARKERS)
@@ -165,8 +192,9 @@ def write_md(rows, sources, out, redact):
         lines.append(f"| {sid} | {copies_txt} | {'y' if r['diverges'] else 'n'} | {r['home']} | {r['reason']} |")
     Path(out).parent.mkdir(parents=True, exist_ok=True)
     Path(out).write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
-    return {"total": n, "sdk": sdk, "private": priv, "diverging": div, "private_marked_public_now": leak,
-            "public_now_beyond_weak_token": leak_strong}
+    return {"total": n, "sdk": sdk, "private": priv, "homes": homes, "diverging": div,
+            "private_marked_public_now": leak, "public_now_beyond_weak_token": leak_strong,
+            "gate_files": gate_files, "gate_ids": gate_ids}
 
 
 def main():

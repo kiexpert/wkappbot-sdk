@@ -88,7 +88,7 @@ writes `.qa/xplat-baseline.txt` into kih and WKAppBot; commit it there.
 `python3 qa/skill_home_plan.py [--hq DIR] [--kih-root DIR] [--wkappbot-root DIR] [--source LABEL=DIR]`
 lists every skill id with all its copies (sdk, kih, core, HQ cache, extra sources), flags ids
 whose copies diverge (content hash ignoring volatile keys such as `updated`), and proposes one
-home per id: `SDK` (public) or `PRIVATE`. Any owner-mandated private marker forces PRIVATE:
+home per id: `SDK` (generic, passes PUBLIC SAFETY), the one repo the skill is about, or the core repo `WKAppBot` (private and ambiguous; owner ruling 2026-10-21). Any owner-mandated private marker, or a hit of the kih public-skill gate, makes it private:
 HANTOO, KIWOOM, token, account, .env, password, PIN, customer, owner-private rules, a personal
 machine path, or a private app folder. `token` is split into `token:credential` and
 `token:weak` (wording only) so the reviewer can tell them apart; both stay PRIVATE. Nothing is

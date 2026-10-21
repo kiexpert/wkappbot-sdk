@@ -383,7 +383,9 @@ class SkillHomePlan(Base):
         rows = {r["id"]: r for r in skill_home_plan.plan([("sdk", sdk), ("kih", kih)])}
         self.assertEqual(rows["generic"]["home"], "SDK")
         self.assertFalse(rows["generic"]["diverges"])
-        self.assertEqual(rows["broker"]["home"], "PRIVATE")
+        self.assertEqual(rows["broker"]["home"], "WKAppBot")
+        self.assertIn("kih gate: hantoo", rows["broker"]["reason"])
+        self.assertEqual(rows["secret-only"]["home"], "wkappbot-kih")
         self.assertTrue(rows["broker"]["reason"].startswith("PUBLIC NOW"))
         self.assertIn("token:credential", rows["secret-only"]["reason"])
         self.assertTrue(rows["dup"]["diverges"])
