@@ -103,7 +103,12 @@ def print_platform_table(saved, current):
                 txt = "not run here"
             else:
                 rows = [r for r in doc["results"] if r["area"].startswith(AREA_PREFIX[a])]
-                if not rows:
+                reported = (doc.get("area_counts") or {}).get(a)  # summary relayed from another box
+                if reported:
+                    c = dict(zip((PASS, FAIL, SKIP), reported))
+                    verdict = "FAIL" if c[FAIL] else ("PASS" if c[PASS] else "SKIP")
+                    txt = f"{verdict} {c[PASS]}/{c[FAIL]}/{c[SKIP]}"
+                elif not rows:
                     txt = "-"
                 else:
                     c = counts(rows)
@@ -117,12 +122,26 @@ def print_platform_table(saved, current):
         if doc:
             mark = " (this run)" if key == current else ""
             print(f"{label}: {doc['when']} on {doc['context'].get('host', '?')}{mark}")
+            if doc.get("source"):
+                print(f"  source: {doc['source']}")
         else:
             print(f"{label}: not run here -> {RUN_CMD[key]}")
 
 
 AREA_PREFIX = {"static": "static-xplat", "hygiene": "hygiene", "cli": "cli", "encoding": "encoding",
                "wkhippo": "wkhippo", "hooks": "harness-hooks", "installer": "installer"}
+
+
+def load_saved(rdir):
+    saved = {}
+    for key, _ in PLATFORMS:
+        p = rdir / f"{key}.json"
+        if p.is_file():
+            try:
+                saved[key] = json.loads(p.read_text(encoding="utf-8"))
+            except ValueError:
+                pass
+    return saved
 
 
 def main():
@@ -135,9 +154,15 @@ def main():
     ap.add_argument("--since", help="static check: only lines added since this git ref")
     ap.add_argument("--update-baseline", action="store_true", help="static check: freeze current hits")
     ap.add_argument("--allow-mutations", action="store_true", help="run cases that edit skills / write reflexes")
+    ap.add_argument("--table-only", action="store_true", help="print the merged table from saved results, run nothing")
     ap.add_argument("--no-save", action="store_true", help="do not write qa/results/<platform>.json")
     ap.add_argument("--results-dir", default=str(QA_DIR / "results"))
     args = ap.parse_args()
+
+    if args.table_only:
+        saved = load_saved(Path(args.results_dir))
+        print_platform_table(saved, None)
+        return 1 if any(r["status"] == FAIL for d in saved.values() for r in d["results"]) else 0
 
     ctx = Ctx(args)
     print("WKAppBot all-platform QA")
@@ -164,14 +189,7 @@ def main():
         rdir.mkdir(parents=True, exist_ok=True)
         (rdir / f"{ctx.platform}.json").write_text(json.dumps(doc, indent=2, ensure_ascii=False) + "\n",
                                                    encoding="utf-8", newline="\n")
-    saved = {}
-    for key, _ in PLATFORMS:
-        p = rdir / f"{key}.json"
-        if p.is_file():
-            try:
-                saved[key] = json.loads(p.read_text(encoding="utf-8"))
-            except ValueError:
-                pass
+    saved = load_saved(rdir)
     saved[ctx.platform] = doc
     print_platform_table(saved, ctx.platform)
 

@@ -6,10 +6,12 @@ Flags in code files:
 
 Allowed without baseline:
   - a line carrying the marker  qa:allow-path
+  - comment-only lines (docs, not behaviour) and files under .evidence/ (frozen archives)
   - D:/GitHub/... as the LAST resolver step: an env-var lookup appears within  (qa:allow-path)
     the 10 lines above it (env var -> sibling -> historical Windows default)
 
-Existing hits are frozen in qa/baseline/xplat-<repo>.txt; only NEW hits FAIL.
+Existing hits are frozen in qa/baseline/xplat-wkappbot-sdk.txt (sdk) or <repo>/.qa/xplat-baseline.txt
+(other repos, committed there); only NEW hits FAIL.
 With --since REF only lines added since REF are checked (baseline ignored).
 """
 import hashlib
@@ -20,7 +22,8 @@ from qa_common import FAIL, PASS, QA_DIR, SKIP, Result, run
 
 CODE_EXT = {".ps1", ".psm1", ".psd1", ".sh", ".bash", ".py", ".cs", ".cmd", ".bat",
             ".js", ".mjs", ".cjs", ".ts"}
-EXCLUDE_PARTS = {".git", "node_modules", "obj", "__pycache__", ".venv", "venv"}
+EXCLUDE_PARTS = {".git", "node_modules", "obj", "__pycache__", ".venv", "venv", ".evidence"}  # .evidence = frozen archives
+RE_COMMENT_ONLY = re.compile(r"^\s*(#|//|::|rem\b|REM\b|<#|\*|/\*)")
 EXCLUDE_PREFIX = ("qa/fixtures/", "qa/baseline/", "qa/selftest.py")
 
 RE_DRIVE = re.compile(r"(?i)(?<![A-Za-z])(?:D:[\\/]|C:[\\/]+Users)")
@@ -44,10 +47,14 @@ def _files(root):
         rels = [str(p.relative_to(root)).replace("\\", "/") for p in Path(root).rglob("*") if p.is_file()]
     for rel in rels:
         rel = rel.replace("\\", "/")
-        if rel.startswith(EXCLUDE_PREFIX) or EXCLUDE_PARTS.intersection(rel.split("/")):
+        if _excluded(rel):
             continue
         if Path(rel).suffix.lower() in CODE_EXT:
             yield rel
+
+
+def _excluded(rel):
+    return rel.startswith(EXCLUDE_PREFIX) or bool(EXCLUDE_PARTS.intersection(rel.split("/")))
 
 
 def scan_lines(rel, lines, only=None):
@@ -56,7 +63,7 @@ def scan_lines(rel, lines, only=None):
         n = i + 1
         if only is not None and n not in only:
             continue
-        if ALLOW_MARK in line:
+        if ALLOW_MARK in line or RE_COMMENT_ONLY.match(line):
             continue
         if RE_DRIVE.search(line):
             allowed = False
@@ -106,19 +113,23 @@ def key(hit):
     return f"{rel}\t{rule}\t{hashlib.sha1(norm.encode('utf-8')).hexdigest()[:16]}"
 
 
-def baseline_path(name):
-    return QA_DIR / "baseline" / f"xplat-{name}.txt"
+def baseline_path(name, root=None):
+    """sdk baseline lives here; another repo's baseline lives in that repo (.qa/), so file
+    names of a private repo never land in this public one."""
+    if root is None or Path(root).resolve() == QA_DIR.parent:
+        return QA_DIR / "baseline" / f"xplat-{name}.txt"
+    return Path(root) / ".qa" / "xplat-baseline.txt"
 
 
-def load_baseline(name):
-    p = baseline_path(name)
+def load_baseline(name, root=None):
+    p = baseline_path(name, root)
     if not p.is_file():
         return None
     return {l for l in p.read_text(encoding="utf-8").splitlines() if l and not l.startswith("#")}
 
 
-def write_baseline(name, hits):
-    p = baseline_path(name)
+def write_baseline(name, hits, root=None):
+    p = baseline_path(name, root)
     p.parent.mkdir(parents=True, exist_ok=True)
     body = sorted({key(h) for h in hits})
     p.write_text("# frozen pre-existing cross-platform hits; regenerate with --update-baseline\n"
@@ -139,7 +150,7 @@ def check_repo(name, root, since=None, update=False):
             return [Result(area, name, FAIL, f"git diff {since}", cause=str(e)[:200])]
         hits = []
         for rel, nums in added.items():
-            if rel.startswith(EXCLUDE_PREFIX) or Path(rel).suffix.lower() not in CODE_EXT:
+            if _excluded(rel) or Path(rel).suffix.lower() not in CODE_EXT:
                 continue
             fp = Path(root) / rel
             if fp.is_file():
@@ -149,9 +160,9 @@ def check_repo(name, root, since=None, update=False):
     else:
         hits = scan_repo(root)
         if update:
-            p = write_baseline(name, hits)
-            return [Result(area, name, PASS, f"baseline written: {p.name} ({len(hits)} hits)")]
-        base = load_baseline(name)
+            p = write_baseline(name, hits, root)
+            return [Result(area, name, PASS, f"baseline written: {p} ({len(hits)} hits)")]
+        base = load_baseline(name, root)
         new = hits if base is None else [h for h in hits if key(h) not in base]
         label = f"{len(hits)} total, baseline {'missing' if base is None else len(base)}"
     if new:

@@ -2,6 +2,11 @@
 
 Runs inside a throwaway HOME/USERPROFILE seeded with a user settings.json that carries a
 user-owned hook and key; the installer must keep both and --uninstall must restore the seed.
+Hooks may land in any Claude settings scope, so all four are watched:
+  <HOME>/.claude/settings.json, <HOME>/.claude/settings.local.json,
+  <KIH_ROOT>/.claude/settings.json, <KIH_ROOT>/.claude/settings.local.json
+The KIH_ROOT files are backed up first and restored byte-exact afterwards, so a live
+install in that checkout survives the test.
 Installer: $KIH_INSTALLER, else per platform under KIH_ROOT:
   windows: install.ps1, install-windows.ps1     macos: install-macos.sh, install-linux.sh
   linux:   install-linux.sh
@@ -15,15 +20,18 @@ from pathlib import Path
 
 from qa_common import FAIL, PASS, SKIP, Result, first_line, run
 
+USER_HOOK = "echo qa-user-hook"
 SEED = {
     "model": "qa-keep",
-    "hooks": {"PreToolUse": [{"matcher": "Bash", "hooks": [{"type": "command", "command": "echo qa-user-hook"}]}]},
+    "hooks": {"PreToolUse": [{"matcher": "Bash", "hooks": [{"type": "command", "command": USER_HOOK}]}]},
 }
 CANDIDATES = {
     "windows": ["install.ps1", "install-windows.ps1"],
     "macos": ["install-macos.sh", "install-linux.sh"],
     "linux": ["install-linux.sh"],
 }
+NAMES = ["dry-run changes nothing", "install #1", "install #2 idempotent", "user settings preserved",
+         "uninstall restores seed"]
 
 
 def find_installer(ctx):
@@ -43,15 +51,20 @@ def argv_for(inst, *extra):
     return ["bash", str(inst), *extra]
 
 
-def snapshot(root):
+def snapshot(paths):
+    """Hash of every file under the given dirs/files (missing ones count as absent)."""
     h = hashlib.sha256()
-    for p in sorted(Path(root).rglob("*")):
-        rel = str(p.relative_to(root)).replace("\\", "/")
-        h.update(rel.encode())
-        if p.is_symlink():
-            h.update(b"L" + os.readlink(p).encode())
-        elif p.is_file():
-            h.update(p.read_bytes())
+    for root in paths:
+        root = Path(root)
+        items = sorted(root.rglob("*")) if root.is_dir() else [root]
+        for p in items:
+            h.update(str(p).replace("\\", "/").encode())
+            if p.is_symlink():
+                h.update(b"L" + os.readlink(p).encode())
+            elif p.is_file():
+                h.update(p.read_bytes())
+            else:
+                h.update(b"-")
     return h.hexdigest()
 
 
@@ -63,81 +76,100 @@ def hook_cmds(settings):
     return out
 
 
+def read_json(p):
+    try:
+        return json.loads(p.read_text(encoding="utf-8")) if p.is_file() else {}
+    except ValueError:
+        return {"_unparseable": True}
+
+
 def run_checks(ctx):
     area = "installer"
-    names = ["dry-run changes nothing", "install #1", "install #2 idempotent", "user settings preserved",
-             "uninstall restores seed"]
     if ctx.kih_root is None:
-        return [Result(area, n, SKIP, "KIH_ROOT not found") for n in names]
+        return [Result(area, n, SKIP, "KIH_ROOT not found") for n in NAMES]
     inst = find_installer(ctx)
     if inst is None:
-        return [Result(area, n, SKIP, f"no installer for {ctx.platform} in KIH_ROOT") for n in names]
+        return [Result(area, n, SKIP, f"no installer for {ctx.platform} in KIH_ROOT") for n in NAMES]
     sb = Path(tempfile.mkdtemp(prefix="qa-install-"))
     home = sb / "home"
-    sfile = home / ".claude" / "settings.json"
-    sfile.parent.mkdir(parents=True)
-    sfile.write_text(json.dumps(SEED, indent=2), encoding="utf-8")
+    seed_file = home / ".claude" / "settings.json"
+    seed_file.parent.mkdir(parents=True)
+    seed_file.write_text(json.dumps(SEED, indent=2), encoding="utf-8")
+    proj = [ctx.kih_root / ".claude" / "settings.json", ctx.kih_root / ".claude" / "settings.local.json"]
+    watched = [seed_file, home / ".claude" / "settings.local.json"] + proj
+    backup = {p: (p.read_bytes() if p.is_file() else None) for p in proj}
     env = {"HOME": str(home), "USERPROFILE": str(home), "XDG_CONFIG_HOME": str(home / ".config"),
            "XDG_DATA_HOME": str(home / ".local/share"), "KIH_ROOT": str(ctx.kih_root)}
     if ctx.wk_root:
         env["WKAPPBOT_HOME"] = str(ctx.wk_root)
     out = []
-    kih = str(ctx.kih_root).replace("\\", "/")
 
     def step(*extra):
         return run(argv_for(inst, *extra), cwd=str(ctx.kih_root), env=env, timeout=max(ctx.timeout, 180))
 
-    def load():
-        return json.loads(sfile.read_text(encoding="utf-8")) if sfile.is_file() else {}
+    def all_cmds():
+        return [c for p in watched for c in hook_cmds(read_json(p))]
+
+    def raw():
+        return [p.read_bytes() if p.is_file() else None for p in watched]
+
+    def where(cmds):
+        return ", ".join(sorted({str(p.relative_to(sb) if sb in p.parents else p.name) for p in watched
+                                 if set(hook_cmds(read_json(p))) & set(cmds)}))
 
     try:
-        before = snapshot(home)
+        before = snapshot([home] + proj)
         rc, so, se, ms = step("--dry-run")
-        after = snapshot(home)
         if rc != 0:
-            out.append(Result(area, names[0], FAIL, inst.name, ms, f"rc={rc}: {first_line(se, so)}"))
-        elif before != after:
-            out.append(Result(area, names[0], FAIL, inst.name, ms, "--dry-run modified the sandbox HOME"))
+            out.append(Result(area, NAMES[0], FAIL, inst.name, ms, f"rc={rc}: {first_line(se, so)}"))
+        elif snapshot([home] + proj) != before:
+            out.append(Result(area, NAMES[0], FAIL, inst.name, ms, "--dry-run modified HOME or KIH_ROOT/.claude"))
         else:
-            out.append(Result(area, names[0], PASS, inst.name, ms))
+            out.append(Result(area, NAMES[0], PASS, inst.name, ms))
 
         rc, so, se, ms = step()
-        s1, raw1 = load(), sfile.read_bytes() if sfile.is_file() else b""
-        mine = [c for c in hook_cmds(s1) if c and c != "echo qa-user-hook"]
+        raw1 = raw()
+        mine = sorted({c for c in all_cmds() if c and c != USER_HOOK})
         if rc != 0:
-            out.append(Result(area, names[1], FAIL, inst.name, ms, f"rc={rc}: {first_line(se, so)}"))
+            out.append(Result(area, NAMES[1], FAIL, inst.name, ms, f"rc={rc}: {first_line(se, so)}"))
         elif not mine:
-            out.append(Result(area, names[1], FAIL, inst.name, ms, "no harness hooks written to settings.json"))
+            out.append(Result(area, NAMES[1], FAIL, inst.name, ms, "no harness hooks in any watched settings file"))
         else:
-            out.append(Result(area, names[1], PASS, f"{len(mine)} hook command(s) wired", ms))
+            out.append(Result(area, NAMES[1], PASS, f"{len(mine)} hook command(s) in {where(mine)}", ms))
 
         rc, so, se, ms = step()
-        s2, raw2 = load(), sfile.read_bytes() if sfile.is_file() else b""
-        cmds = hook_cmds(s2)
+        cmds = all_cmds()
         dups = len(cmds) - len(set(cmds))
         if rc != 0:
-            out.append(Result(area, names[2], FAIL, inst.name, ms, f"rc={rc}: {first_line(se, so)}"))
-        elif raw1 != raw2:
-            cause = f"settings.json changed on 2nd run ({dups} duplicate hook command(s))"
-            out.append(Result(area, names[2], FAIL, inst.name, ms, cause))
+            out.append(Result(area, NAMES[2], FAIL, inst.name, ms, f"rc={rc}: {first_line(se, so)}"))
+        elif raw() != raw1:
+            out.append(Result(area, NAMES[2], FAIL, inst.name, ms,
+                              f"settings changed on 2nd run ({dups} duplicate hook command(s))"))
         else:
-            out.append(Result(area, names[2], PASS, "settings.json byte-identical", ms))
+            out.append(Result(area, NAMES[2], PASS, "watched settings byte-identical", ms))
 
-        kept = s2.get("model") == "qa-keep" and "echo qa-user-hook" in cmds
-        out.append(Result(area, names[3], PASS if kept else FAIL, "model key + user hook",
+        s2 = read_json(seed_file)
+        kept = s2.get("model") == "qa-keep" and USER_HOOK in hook_cmds(s2)
+        out.append(Result(area, NAMES[3], PASS if kept else FAIL, "model key + user hook",
                           cause="" if kept else "installer dropped user-owned settings"))
 
         rc, so, se, ms = step("--uninstall")
-        s3 = load()
-        left = [c for c in hook_cmds(s3) if kih in c.replace("\\", "/") or c in mine]
+        left = [c for c in all_cmds() if c in mine]
         if rc != 0:
-            out.append(Result(area, names[4], FAIL, inst.name, ms, f"rc={rc}: {first_line(se, so)}"))
+            out.append(Result(area, NAMES[4], FAIL, inst.name, ms, f"rc={rc}: {first_line(se, so)}"))
         elif left:
-            out.append(Result(area, names[4], FAIL, inst.name, ms, f"{len(left)} harness hook(s) left: {left[0][:100]}"))
-        elif s3 != SEED:
-            out.append(Result(area, names[4], FAIL, inst.name, ms, "settings.json differs from the pre-install seed"))
+            out.append(Result(area, NAMES[4], FAIL, inst.name, ms,
+                              f"{len(left)} harness hook(s) left in {where(left)}: {left[0][:100]}"))
+        elif read_json(seed_file) != SEED:
+            out.append(Result(area, NAMES[4], FAIL, inst.name, ms, "HOME settings.json differs from the seed"))
         else:
-            out.append(Result(area, names[4], PASS, "settings.json == seed", ms))
+            out.append(Result(area, NAMES[4], PASS, "no harness hooks left, HOME settings.json == seed", ms))
     finally:
+        for p, data in backup.items():
+            if data is None:
+                p.unlink(missing_ok=True)
+            else:
+                p.parent.mkdir(parents=True, exist_ok=True)
+                p.write_bytes(data)
         shutil.rmtree(sb, ignore_errors=True)
     return out

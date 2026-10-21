@@ -39,7 +39,8 @@ if deny:
 FAKE_INSTALLER = r'''
 import json, os, sys
 home = os.environ.get("USERPROFILE") or os.environ["HOME"]
-f = os.path.join(home, ".claude", "settings.json")
+f = TARGET
+os.makedirs(os.path.dirname(f), exist_ok=True)
 s = json.load(open(f)) if os.path.exists(f) else {}
 mine = {"type": "command", "command": "python3 KIHROOT/hooks/guard.py"}
 grp = s.setdefault("hooks", {}).setdefault("PreToolUse", [])
@@ -116,6 +117,13 @@ class StaticRules(Base):
         """
         self.assertEqual(self.scan(src), [])
 
+    def test_comment_lines_skipped(self):
+        self.assertEqual(self.scan('# default was D:/GitHub/WKAppBot\n  // C:/Users/x/y\nrem D:\\SDK'), [])
+
+    def test_evidence_excluded(self):
+        self.assertTrue(static_xplat._excluded(".evidence/2026-05-05/x.sh"))
+        self.assertFalse(static_xplat._excluded("bin/x.sh"))
+
     def test_allow_marker(self):
         self.assertEqual(self.scan('$x = "D:/SDK/bin"  # qa:allow-path'), [])
 
@@ -137,6 +145,7 @@ class StaticRules(Base):
         try:
             r = static_xplat.check_repo(name, repo, update=True)[0]
             self.assertEqual(r.status, PASS)
+            self.assertTrue((repo / ".qa" / "xplat-baseline.txt").is_file())
             self.assertEqual(static_xplat.check_repo(name, repo)[0].status, PASS)
             (repo / "b.py").write_text('NEW = "D:/new"\n', encoding="utf-8")
             r = static_xplat.check_repo(name, repo)[0]
@@ -148,7 +157,7 @@ class StaticRules(Base):
             self.assertNotIn("a.py", r.cause)
             self.assertEqual(static_xplat.check_repo(name, repo, since="no-such-ref")[0].status, SKIP)
         finally:
-            static_xplat.baseline_path(name).unlink(missing_ok=True)
+            static_xplat.baseline_path(name, repo).unlink(missing_ok=True)
 
 
 class HookFixtures(Base):
@@ -189,10 +198,13 @@ class HookFixtures(Base):
 
 
 class Installer(Base):
-    def kih(self, duplicate):
+    def kih(self, duplicate, project_local=False):
         kih = self.tmp / "kih"
         kih.mkdir()
+        target = repr(str(kih / ".claude" / "settings.local.json")) if project_local \
+            else 'os.path.join(home, ".claude", "settings.json")'
         src = FAKE_INSTALLER.replace("KIHROOT", str(kih).replace("\\", "/")).replace("DUPLICATE", str(duplicate))
+        src = src.replace("TARGET", target)
         (kih / "fake_install.py").write_text(src, encoding="utf-8")
         sh = kih / "install-fake.sh"
         sh.write_text(f'#!/usr/bin/env bash\nexec "{Path(PY).as_posix()}" "{(kih / "fake_install.py").as_posix()}" "$@"\n',
@@ -204,6 +216,17 @@ class Installer(Base):
     def test_good_installer(self):
         res = installer.run_checks(make_ctx(kih_root=str(self.kih(False))))
         self.assertEqual([(r.name, r.cause) for r in res if r.status != PASS], [])
+
+    @unittest.skipUnless(shutil.which("bash"), "bash needed")
+    def test_project_local_installer_and_restore(self):
+        kih = self.kih(False, project_local=True)
+        live = kih / ".claude" / "settings.local.json"
+        live.parent.mkdir(parents=True, exist_ok=True)
+        live.write_bytes(b'{"hooks": {}, "live": true}')
+        res = installer.run_checks(make_ctx(kih_root=str(kih)))
+        self.assertEqual([(r.name, r.cause) for r in res if r.status != PASS], [])
+        self.assertIn("settings.local.json", [r for r in res if r.name == "install #1"][0].detail)
+        self.assertEqual(live.read_bytes(), b'{"hooks": {}, "live": true}')
 
     @unittest.skipUnless(shutil.which("bash"), "bash needed")
     def test_non_idempotent_installer(self):

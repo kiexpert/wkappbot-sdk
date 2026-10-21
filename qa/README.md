@@ -52,18 +52,19 @@ Every location is a parameter. Each one resolves in the same order on every OS:
 | `--allow-mutations` | also run cases that edit a skill / keep a reflex | off |
 | `--since REF` | static check: only lines added since REF | full scan against the baseline |
 | `--update-baseline` | static check: freeze the current hits | - |
+| `--table-only` | print the merged per-platform table from `results/`, run nothing | - |
 
 ## Areas
 
 | Area | What it proves | Where |
 |---|---|---|
-| `static` | Cross-platform rule: no new `D:\` / `D:/` / `C:\Users` literals, no USERPROFILE-only joins. Hits that already exist are frozen in `baseline/xplat-<repo>.txt`, stored as line hashes so the baseline never republishes a path. `D:/GitHub/...` is allowed as the last resolver step, after an env lookup. Inline escape: `qa:allow-path`. | `checks/static_xplat.py` |
+| `static` | Cross-platform rule: no new `D:\` / `D:/` / `C:\Users` literals, no USERPROFILE-only joins. Hits that already exist are frozen as line hashes, so the baseline never republishes a path: the sdk baseline is `baseline/xplat-wkappbot-sdk.txt`; another repo's baseline is `<repo>/.qa/xplat-baseline.txt`, committed in that repo, so a private repo's file names never land here. Comment-only lines and `.evidence/` archives are skipped. `D:/GitHub/...` is allowed as the last resolver step, after an env lookup. Inline escape: `qa:allow-path`. | `checks/static_xplat.py` |
 | `hygiene` | sdk version sync (CLAUDE.md header = CHANGELOG top = VERSIONING = README = props base); no personal machine paths in the public sdk repo; kih `.githooks/*` tracked as 100755; AutoCommit porcelain parse does not `Trim()` before slicing the path | `checks/hygiene.py` |
 | `cli` | wkappbot command matrix: help, version, unknown command, skill list/search/read, suggest list, file read/write, parent dir creation | `fixtures/cli-matrix.json` |
 | `encoding` | Hangul through file write (byte-exact), file read, a Hangul file name, skill edit + read (mutating) | `fixtures/encoding-matrix.json` |
 | `wkhippo` | reflex `--rows/--since/--summary/--keep`, recall, recent (+`--json` must parse), trace, studied against `TRANSCRIPT` | `fixtures/wkhippo-matrix.json` |
 | `hooks` | Fixtures piped into every matching hook from settings, as Claude Code does: plain `ls` allow, cd-chain deny, force push to main deny, empty `core.hooksPath` deny, `pwsh` from Bash on a platform with no PowerShell tool, Read allow, PostToolUse no block, Stop clean exit; per-hook latency against the budget | `fixtures/hooks-fixtures.json` |
-| `installer` | In a throwaway HOME/USERPROFILE seeded with a user hook: `--dry-run` changes nothing, install wires hooks, a 2nd install leaves settings.json byte-identical, user settings survive, `--uninstall` restores the seed exactly | `checks/installer.py` |
+| `installer` | In a throwaway HOME/USERPROFILE seeded with a user hook: `--dry-run` changes nothing, install wires hooks, a 2nd install leaves every settings file byte-identical, user settings survive, `--uninstall` removes every harness hook and restores the seed. All four scopes are watched (`settings.json` and `settings.local.json` in HOME and in `KIH_ROOT/.claude`); the `KIH_ROOT` files are backed up and restored byte-exact afterwards | `checks/installer.py` |
 
 Command syntax lives in the JSON fixtures, so fix arguments there, not in code. A case with
 `known_bug` still FAILs; the note is appended to its cause line. Hook fixtures call the real
@@ -71,7 +72,13 @@ hooks with a `qa-<random>` session id, so harness state files may pick up that s
 
 ## Status
 
-The Linux column in `results/linux.json` comes from the sdk cloud container, where neither
-KIH_ROOT, WKAPPBOT_ROOT nor a CLI build exists, so only `static` and `hygiene` run there.
-The CLI / wkhippo / hook / installer argument syntax in the fixtures is taken from the spec
-and has not been checked against the real tools yet. Expect the first real run to need fixture fixes.
+`results/linux.json` holds the first real run, relayed by the kih ROOT from the kih container
+(Linux, pwsh 7.4.6, real kih + WKAppBot checkouts, the Linux minimal CLI, a live transcript):
+34 PASS / 12 FAIL / 5 SKIP with mutations off. Only the per-area counts and FAIL cause lines
+were relayed, so the file has no PASS/SKIP rows. View it with `qa/run-qa.sh --table-only`.
+Three of those FAILs were checker issues and are fixed (comment-only lines, `.evidence/`,
+installer writing `settings.local.json`); the rest are product defects or environment gaps.
+Windows and macOS have not been run yet.
+
+First-time setup on a box that has the other repos: `qa/run-qa.sh --areas static --update-baseline`
+writes `.qa/xplat-baseline.txt` into kih and WKAppBot; commit it there.
