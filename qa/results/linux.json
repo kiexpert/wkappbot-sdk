@@ -1,0 +1,401 @@
+{
+  "platform": "linux",
+  "when": "2026-10-21T06:10:29+00:00",
+  "context": {
+    "platform": "linux",
+    "sdk_root": "/home/user/wkappbot-sdk",
+    "kih_root": "None (not found (tried: /home/user/wkappbot-kih, D:/GitHub/wkappbot-kih))",
+    "wkappbot_root": "None (not found (tried: /home/user/WKAppBot, D:/GitHub/WKAppBot))",
+    "cli": null,
+    "transcript": null,
+    "hook_budget_ms": 1000,
+    "allow_mutations": false,
+    "host": "sdk-cloud-container"
+  },
+  "results": [
+    {
+      "area": "static-xplat",
+      "name": "wkappbot-sdk",
+      "status": "PASS",
+      "detail": "0 new hits; 288 total, baseline 286",
+      "ms": null,
+      "cause": ""
+    },
+    {
+      "area": "static-xplat",
+      "name": "wkappbot-kih",
+      "status": "SKIP",
+      "detail": "repo not found",
+      "ms": null,
+      "cause": ""
+    },
+    {
+      "area": "static-xplat",
+      "name": "WKAppBot",
+      "status": "SKIP",
+      "detail": "repo not found",
+      "ms": null,
+      "cause": ""
+    },
+    {
+      "area": "hygiene",
+      "name": "sdk version sync",
+      "status": "PASS",
+      "detail": "CLAUDE.md header=7.11.0, CHANGELOG top=7.11.0, VERSIONING current=7.11.0, README highlights=7.11.0, props base=7.11",
+      "ms": null,
+      "cause": ""
+    },
+    {
+      "area": "hygiene",
+      "name": "wkappbot-sdk: no personal machine paths",
+      "status": "FAIL",
+      "detail": "35 file(s), user(s): k****",
+      "ms": null,
+      "cause": "DGitHubwkappbot-sdksuggest_list_tmp.txt:32 names machine user 'k****' (35 files); replace with ~ / %USERPROFILE% / $HOME"
+    },
+    {
+      "area": "hygiene",
+      "name": "kih .githooks executable in git",
+      "status": "SKIP",
+      "detail": "KIH_ROOT not found",
+      "ms": null,
+      "cause": ""
+    },
+    {
+      "area": "hygiene",
+      "name": "AutoCommit porcelain parse keeps leading space",
+      "status": "SKIP",
+      "detail": "WKAPPBOT_ROOT not found",
+      "ms": null,
+      "cause": ""
+    },
+    {
+      "area": "cli",
+      "name": "help",
+      "status": "SKIP",
+      "detail": "tool not found",
+      "ms": null,
+      "cause": ""
+    },
+    {
+      "area": "cli",
+      "name": "version",
+      "status": "SKIP",
+      "detail": "tool not found",
+      "ms": null,
+      "cause": ""
+    },
+    {
+      "area": "cli",
+      "name": "unknown command exits nonzero",
+      "status": "SKIP",
+      "detail": "tool not found",
+      "ms": null,
+      "cause": ""
+    },
+    {
+      "area": "cli",
+      "name": "skill list",
+      "status": "SKIP",
+      "detail": "tool not found",
+      "ms": null,
+      "cause": ""
+    },
+    {
+      "area": "cli",
+      "name": "skill search",
+      "status": "SKIP",
+      "detail": "tool not found",
+      "ms": null,
+      "cause": ""
+    },
+    {
+      "area": "cli",
+      "name": "skill read",
+      "status": "SKIP",
+      "detail": "tool not found",
+      "ms": null,
+      "cause": ""
+    },
+    {
+      "area": "cli",
+      "name": "skill read missing id exits nonzero",
+      "status": "SKIP",
+      "detail": "tool not found",
+      "ms": null,
+      "cause": ""
+    },
+    {
+      "area": "cli",
+      "name": "suggest list",
+      "status": "SKIP",
+      "detail": "tool not found",
+      "ms": null,
+      "cause": ""
+    },
+    {
+      "area": "cli",
+      "name": "file read",
+      "status": "SKIP",
+      "detail": "tool not found",
+      "ms": null,
+      "cause": ""
+    },
+    {
+      "area": "cli",
+      "name": "file write --source-file",
+      "status": "SKIP",
+      "detail": "tool not found",
+      "ms": null,
+      "cause": ""
+    },
+    {
+      "area": "cli",
+      "name": "file write creates parent dirs",
+      "status": "SKIP",
+      "detail": "tool not found",
+      "ms": null,
+      "cause": ""
+    },
+    {
+      "area": "encoding",
+      "name": "file write Hangul bytes round trip",
+      "status": "SKIP",
+      "detail": "tool not found",
+      "ms": null,
+      "cause": ""
+    },
+    {
+      "area": "encoding",
+      "name": "file read prints Hangul",
+      "status": "SKIP",
+      "detail": "tool not found",
+      "ms": null,
+      "cause": ""
+    },
+    {
+      "area": "encoding",
+      "name": "file read Hangul filename",
+      "status": "SKIP",
+      "detail": "tool not found",
+      "ms": null,
+      "cause": ""
+    },
+    {
+      "area": "encoding",
+      "name": "skill edit Hangul step (rc)",
+      "status": "SKIP",
+      "detail": "tool not found",
+      "ms": null,
+      "cause": ""
+    },
+    {
+      "area": "encoding",
+      "name": "skill read shows Hangul after edit",
+      "status": "SKIP",
+      "detail": "tool not found",
+      "ms": null,
+      "cause": ""
+    },
+    {
+      "area": "wkhippo",
+      "name": "help",
+      "status": "SKIP",
+      "detail": "tool not found",
+      "ms": null,
+      "cause": ""
+    },
+    {
+      "area": "wkhippo",
+      "name": "reflex --rows",
+      "status": "SKIP",
+      "detail": "tool not found",
+      "ms": null,
+      "cause": ""
+    },
+    {
+      "area": "wkhippo",
+      "name": "reflex --since",
+      "status": "SKIP",
+      "detail": "tool not found",
+      "ms": null,
+      "cause": ""
+    },
+    {
+      "area": "wkhippo",
+      "name": "reflex --summary",
+      "status": "SKIP",
+      "detail": "tool not found",
+      "ms": null,
+      "cause": ""
+    },
+    {
+      "area": "wkhippo",
+      "name": "reflex --keep",
+      "status": "SKIP",
+      "detail": "tool not found",
+      "ms": null,
+      "cause": ""
+    },
+    {
+      "area": "wkhippo",
+      "name": "recall",
+      "status": "SKIP",
+      "detail": "tool not found",
+      "ms": null,
+      "cause": ""
+    },
+    {
+      "area": "wkhippo",
+      "name": "recent",
+      "status": "SKIP",
+      "detail": "tool not found",
+      "ms": null,
+      "cause": ""
+    },
+    {
+      "area": "wkhippo",
+      "name": "recent --json parses",
+      "status": "SKIP",
+      "detail": "tool not found",
+      "ms": null,
+      "cause": ""
+    },
+    {
+      "area": "wkhippo",
+      "name": "trace",
+      "status": "SKIP",
+      "detail": "tool not found",
+      "ms": null,
+      "cause": ""
+    },
+    {
+      "area": "wkhippo",
+      "name": "studied",
+      "status": "SKIP",
+      "detail": "tool not found",
+      "ms": null,
+      "cause": ""
+    },
+    {
+      "area": "wkhippo",
+      "name": "missing transcript exits nonzero",
+      "status": "SKIP",
+      "detail": "tool not found",
+      "ms": null,
+      "cause": ""
+    },
+    {
+      "area": "harness-hooks",
+      "name": "PreToolUse Bash plain ls -> allow",
+      "status": "SKIP",
+      "detail": "KIH_ROOT not found",
+      "ms": null,
+      "cause": ""
+    },
+    {
+      "area": "harness-hooks",
+      "name": "PreToolUse Bash cd-chain -> deny",
+      "status": "SKIP",
+      "detail": "KIH_ROOT not found",
+      "ms": null,
+      "cause": ""
+    },
+    {
+      "area": "harness-hooks",
+      "name": "PreToolUse Bash force-push main -> deny",
+      "status": "SKIP",
+      "detail": "KIH_ROOT not found",
+      "ms": null,
+      "cause": ""
+    },
+    {
+      "area": "harness-hooks",
+      "name": "PreToolUse Bash push -f HEAD:main -> deny",
+      "status": "SKIP",
+      "detail": "KIH_ROOT not found",
+      "ms": null,
+      "cause": ""
+    },
+    {
+      "area": "harness-hooks",
+      "name": "PreToolUse Bash empty hooksPath -> deny",
+      "status": "SKIP",
+      "detail": "KIH_ROOT not found",
+      "ms": null,
+      "cause": ""
+    },
+    {
+      "area": "harness-hooks",
+      "name": "PreToolUse Bash pwsh where no PowerShell tool",
+      "status": "SKIP",
+      "detail": "KIH_ROOT not found",
+      "ms": null,
+      "cause": ""
+    },
+    {
+      "area": "harness-hooks",
+      "name": "PreToolUse Read README -> allow",
+      "status": "SKIP",
+      "detail": "KIH_ROOT not found",
+      "ms": null,
+      "cause": ""
+    },
+    {
+      "area": "harness-hooks",
+      "name": "PostToolUse Bash ls -> no block",
+      "status": "SKIP",
+      "detail": "KIH_ROOT not found",
+      "ms": null,
+      "cause": ""
+    },
+    {
+      "area": "harness-hooks",
+      "name": "Stop hook runs cleanly",
+      "status": "SKIP",
+      "detail": "KIH_ROOT not found",
+      "ms": null,
+      "cause": ""
+    },
+    {
+      "area": "installer",
+      "name": "dry-run changes nothing",
+      "status": "SKIP",
+      "detail": "KIH_ROOT not found",
+      "ms": null,
+      "cause": ""
+    },
+    {
+      "area": "installer",
+      "name": "install #1",
+      "status": "SKIP",
+      "detail": "KIH_ROOT not found",
+      "ms": null,
+      "cause": ""
+    },
+    {
+      "area": "installer",
+      "name": "install #2 idempotent",
+      "status": "SKIP",
+      "detail": "KIH_ROOT not found",
+      "ms": null,
+      "cause": ""
+    },
+    {
+      "area": "installer",
+      "name": "user settings preserved",
+      "status": "SKIP",
+      "detail": "KIH_ROOT not found",
+      "ms": null,
+      "cause": ""
+    },
+    {
+      "area": "installer",
+      "name": "uninstall restores seed",
+      "status": "SKIP",
+      "detail": "KIH_ROOT not found",
+      "ms": null,
+      "cause": ""
+    }
+  ]
+}

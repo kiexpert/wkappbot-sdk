@@ -1,0 +1,16 @@
+{
+  "_doc": "wkhippo subcommands against a real Claude transcript (TRANSCRIPT). The transcript is passed with --transcript; adjust if wkhippo locates transcripts differently. --keep writes a reflex, so it is a mutating case.",
+  "cases": [
+    { "name": "help", "args": ["--help"], "expect_out": "(?i)reflex|recall|usage" },
+    { "name": "reflex --rows", "needs": ["TRANSCRIPT"], "args": ["reflex", "--transcript", "{TRANSCRIPT}", "--rows", "5"], "expect_out": "\\S" },
+    { "name": "reflex --since", "needs": ["TRANSCRIPT"], "args": ["reflex", "--transcript", "{TRANSCRIPT}", "--since", "24h"] },
+    { "name": "reflex --summary", "needs": ["TRANSCRIPT"], "args": ["reflex", "--transcript", "{TRANSCRIPT}", "--summary"], "expect_out": "\\S" },
+    { "name": "reflex --keep", "needs": ["TRANSCRIPT"], "mutates": true, "args": ["reflex", "--transcript", "{TRANSCRIPT}", "--keep", "qa probe {HANGUL}"] },
+    { "name": "recall", "needs": ["TRANSCRIPT"], "args": ["recall", "--transcript", "{TRANSCRIPT}", "skill"] },
+    { "name": "recent", "needs": ["TRANSCRIPT"], "args": ["recent", "--transcript", "{TRANSCRIPT}"], "expect_out": "\\S" },
+    { "name": "recent --json parses", "needs": ["TRANSCRIPT"], "args": ["recent", "--transcript", "{TRANSCRIPT}", "--json"], "json_out": true },
+    { "name": "trace", "needs": ["TRANSCRIPT"], "args": ["trace", "--transcript", "{TRANSCRIPT}"] },
+    { "name": "studied", "needs": ["TRANSCRIPT"], "args": ["studied", "--transcript", "{TRANSCRIPT}"] },
+    { "name": "missing transcript exits nonzero", "args": ["recent", "--transcript", "{TMP}/no-such.jsonl"], "expect_rc": "nonzero" }
+  ]
+}

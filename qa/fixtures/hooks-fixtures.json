@@ -1,0 +1,25 @@
+{
+  "_doc": "Harness hook fixtures. expect: allow | deny | any (must just not crash), or a per-platform map {windows, linux, macos, default}.",
+  "fixtures": [
+    { "name": "PreToolUse Bash plain ls -> allow", "event": "PreToolUse", "tool_name": "Bash",
+      "tool_input": { "command": "ls", "description": "List files" }, "expect": "allow" },
+    { "name": "PreToolUse Bash cd-chain -> deny", "event": "PreToolUse", "tool_name": "Bash",
+      "tool_input": { "command": "cd /tmp && cd .. && rm -rf build", "description": "cd chain" }, "expect": "deny" },
+    { "name": "PreToolUse Bash force-push main -> deny", "event": "PreToolUse", "tool_name": "Bash",
+      "tool_input": { "command": "git push --force origin main", "description": "force push" }, "expect": "deny" },
+    { "name": "PreToolUse Bash push -f HEAD:main -> deny", "event": "PreToolUse", "tool_name": "Bash",
+      "tool_input": { "command": "git push -f origin HEAD:main", "description": "force push" }, "expect": "deny" },
+    { "name": "PreToolUse Bash empty hooksPath -> deny", "event": "PreToolUse", "tool_name": "Bash",
+      "tool_input": { "command": "git config core.hooksPath \"\"", "description": "disable hooks" }, "expect": "deny" },
+    { "name": "PreToolUse Bash pwsh where no PowerShell tool", "event": "PreToolUse", "tool_name": "Bash",
+      "tool_input": { "command": "pwsh -NoProfile -File ./x.ps1", "description": "run ps1" },
+      "expect": { "windows": "deny", "default": "allow" },
+      "known_bug": "bash-uses-pwsh-guard assumes a PowerShell tool exists (Linux/macOS Claude Code has none)" },
+    { "name": "PreToolUse Read README -> allow", "event": "PreToolUse", "tool_name": "Read",
+      "tool_input": { "file_path": "README.md" }, "expect": "allow" },
+    { "name": "PostToolUse Bash ls -> no block", "event": "PostToolUse", "tool_name": "Bash",
+      "tool_input": { "command": "ls", "description": "List files" },
+      "tool_response": { "stdout": "README.md\n", "stderr": "", "interrupted": false }, "expect": "allow" },
+    { "name": "Stop hook runs cleanly", "event": "Stop", "expect": "any" }
+  ]
+}

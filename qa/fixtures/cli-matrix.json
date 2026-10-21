@@ -1,0 +1,25 @@
+{
+  "_doc": "wkappbot CLI command matrix. Argument syntax for file write/read follows CLAUDE.md tool-style aliases (--path, --source-file); adjust here if the CLI differs.",
+  "cases": [
+    { "name": "help", "args": ["--help"], "expect_out": "(?i)skill|a11y|usage" },
+    { "name": "version", "args": ["--version"], "expect_out": "\\d+\\.\\d+\\.\\d+" },
+    { "name": "unknown command exits nonzero", "args": ["qa-no-such-command"], "expect_rc": "nonzero" },
+    { "name": "skill list", "args": ["skill", "list"], "expect_out": "\\w" },
+    { "name": "skill search", "args": ["skill", "search", "grap"], "expect_out": "(?i)grap" },
+    { "name": "skill read", "args": ["skill", "read", "grap"], "expect_out": "(?i)grap" },
+    { "name": "skill read missing id exits nonzero", "args": ["skill", "read", "qa-no-such-skill-xyz"], "expect_rc": "nonzero" },
+    { "name": "suggest list", "args": ["suggest", "list"] },
+    { "name": "file read",
+      "setup": [{ "write": "{TMP}/src.txt", "text": "hello qa\n" }],
+      "args": ["file", "read", "--path", "{TMP}/src.txt"], "expect_out": "hello qa" },
+    { "name": "file write --source-file",
+      "setup": [{ "write": "{TMP}/src.txt", "text": "hello qa\n" }],
+      "args": ["file", "write", "--path", "{TMP}/out.txt", "--source-file", "{TMP}/src.txt"],
+      "verify": [{ "file_equals": ["{TMP}/out.txt", "{TMP}/src.txt"] }] },
+    { "name": "file write creates parent dirs",
+      "setup": [{ "write": "{TMP}/src.txt", "text": "hello qa\n" }],
+      "args": ["file", "write", "--path", "{TMP}/new/sub/out.txt", "--source-file", "{TMP}/src.txt"],
+      "verify": [{ "file_equals": ["{TMP}/new/sub/out.txt", "{TMP}/src.txt"] }],
+      "known_bug": "file write does not create parent directories" }
+  ]
+}

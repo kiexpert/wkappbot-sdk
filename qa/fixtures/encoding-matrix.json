@@ -1,0 +1,20 @@
+{
+  "_doc": "Hangul round trips through the wkappbot CLI. Skill-edit cases mutate a skill (QA_SKILL_ID, default qa-encoding-probe; it must exist) and also trigger peer/HQ sync + auto-commit, so they run only with --allow-mutations, ideally in a throwaway checkout.",
+  "cases": [
+    { "name": "file write Hangul bytes round trip",
+      "setup": [{ "write": "{TMP}/hsrc.txt", "text": "{HANGUL}\n" }],
+      "args": ["file", "write", "--path", "{TMP}/h.txt", "--source-file", "{TMP}/hsrc.txt"],
+      "verify": [{ "file_equals": ["{TMP}/h.txt", "{TMP}/hsrc.txt"] }] },
+    { "name": "file read prints Hangul",
+      "setup": [{ "write": "{TMP}/hsrc.txt", "text": "{HANGUL}\n" }],
+      "args": ["file", "read", "--path", "{TMP}/hsrc.txt"], "expect_out": "{HANGUL}" },
+    { "name": "file read Hangul filename",
+      "setup": [{ "write": "{TMP}/한글-파일.txt", "text": "ok-hangul-name\n" }],
+      "args": ["file", "read", "--path", "{TMP}/한글-파일.txt"], "expect_out": "ok-hangul-name" },
+    { "name": "skill edit Hangul step (rc)", "mutates": true,
+      "args": ["skill", "edit", "{SKILL}", "--add-step", "QA probe {HANGUL}"],
+      "known_bug": "skill edit auto-commit rc=1: AutoCommit.cs Trim() eats leading space of porcelain ' M path'" },
+    { "name": "skill read shows Hangul after edit", "mutates": true,
+      "args": ["skill", "read", "{SKILL}"], "expect_out": "{HANGUL}" }
+  ]
+}
