@@ -381,11 +381,17 @@ class SkillHomePlan(Base):
         self.write(kih, "wkappbot-kih", "dup", "b")
         self.write(sdk, "wkappbot-core", "llm", "keep the prompt token budget small")
         rows = {r["id"]: r for r in skill_home_plan.plan([("sdk", sdk), ("kih", kih)])}
-        self.assertEqual(rows["generic"]["home"], "SDK")
+        self.assertEqual(rows["generic"]["home"], "SPLIT: PRIVATE HOME + wkappbot-kih")
+        self.assertTrue(rows["generic"]["eligible"])
         self.assertFalse(rows["generic"]["diverges"])
-        self.assertEqual(rows["broker"]["home"], "WKAppBot")
-        self.assertIn("kih gate: hantoo", rows["broker"]["reason"])
+        self.assertEqual(rows["broker"]["home"], "PRIVATE HOME")
+        self.assertFalse(rows["broker"]["eligible"])
+        self.assertIn("gate: hantoo", rows["broker"]["reason"])
         self.assertEqual(rows["secret-only"]["home"], "wkappbot-kih")
+        self.write(sdk, "wkappbot-sdk", "sdk-leak", "set KIWOOM_PIN")
+        r = {x["id"]: x for x in skill_home_plan.plan([("sdk", sdk)])}["sdk-leak"]
+        self.assertEqual(r["home"], "wkappbot-sdk")
+        self.assertIn("CONFLICT", r["reason"])
         self.assertTrue(rows["broker"]["reason"].startswith("PUBLIC NOW"))
         self.assertIn("token:credential", rows["secret-only"]["reason"])
         self.assertTrue(rows["dup"]["diverges"])
@@ -396,6 +402,7 @@ class SkillHomePlan(Base):
         self.assertNotIn("secret-only", text)
         self.assertIn("private#", text)
         self.assertEqual(counts["total"], 5)
+        self.assertIn("| install-eligible |", text)
 
     def test_markers_inside_env_names(self):
         for text, mark in [("set KIWOOM_PIN first", "PIN"), ("read HANTOO_ACCOUNT_NO", "account"),

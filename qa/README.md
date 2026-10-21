@@ -87,10 +87,12 @@ writes `.qa/xplat-baseline.txt` into kih and WKAppBot; commit it there.
 
 `python3 qa/skill_home_plan.py [--hq DIR] [--kih-root DIR] [--wkappbot-root DIR] [--source LABEL=DIR]`
 lists every skill id with all its copies (sdk, kih, core, HQ cache, extra sources), flags ids
-whose copies diverge (content hash ignoring volatile keys such as `updated`), and proposes one
-home per id: `SDK` (generic, passes PUBLIC SAFETY), the one repo the skill is about, or the core repo `WKAppBot` (private and ambiguous; owner ruling 2026-10-21). Any owner-mandated private marker, or a hit of the kih public-skill gate, makes it private:
-HANTOO, KIWOOM, token, account, .env, password, PIN, customer, owner-private rules, a personal
-machine path, or a private app folder. `token` is split into `token:credential` and
-`token:weak` (wording only) so the reviewer can tell them apart; both stay PRIVATE. Nothing is
+whose copies diverge (content hash ignoring location and volatile keys such as `app`, `updated`),
+and proposes one home per id (spec v1.5): the repo whose name matches the App folder
+(`wkappbot-kih`, `wkappbot-sdk`, `wkappbot` -> WKAppBot), anything else `PRIVATE HOME`. The
+`install-eligible` column is `y` only when no owner-mandated marker (HANTOO, KIWOOM, token,
+account, .env, password, PIN, customer, owner-private rules, a personal machine path, a private
+app folder) and no kih public-skill gate word matches; `token` is split into `token:credential`
+and `token:weak` for the reviewer. Nothing is
 moved or deleted. Output: `results/skill-home-plan.md`. Ids found only in private sources are
 written as `private#<hash>` when the output is inside this public repo.
