@@ -21,6 +21,8 @@ import hygiene  # noqa: E402
 import installer  # noqa: E402
 import matrix  # noqa: E402
 import static_xplat  # noqa: E402
+sys.path.insert(0, str(HERE))
+import skill_home_plan  # noqa: E402
 from qa_common import FAIL, FIXTURES, PASS, SKIP, Ctx  # noqa: E402
 
 PY = sys.executable
@@ -360,6 +362,38 @@ class Runner(Base):
         txt = p.stdout.decode("utf-8", "replace")
         self.assertEqual(p.returncode, 1, txt)
         self.assertIn("FAIL [hygiene] kih .githooks executable in git", txt)
+
+
+class SkillHomePlan(Base):
+    def write(self, root, folder, sid, desc, version="1.0"):
+        d = root / folder
+        d.mkdir(parents=True, exist_ok=True)
+        (d / f"{sid}.skill.json").write_text(json.dumps({"id": sid, "app": folder, "desc": desc,
+                                                         "version": version}), encoding="utf-8")
+
+    def test_routing_divergence_redaction(self):
+        sdk, kih = self.tmp / "sdk", self.tmp / "kih"
+        self.write(sdk, "wkappbot-workflow", "generic", "click a button")
+        self.write(kih, "wkappbot-kih", "generic", "click a button")
+        self.write(sdk, "wkappbot-core", "broker", "HANTOO order flow")
+        self.write(kih, "wkappbot-kih", "secret-only", "uses SLACK_BOT_TOKEN", "2.0")
+        self.write(sdk, "wkappbot-core", "dup", "a")
+        self.write(kih, "wkappbot-kih", "dup", "b")
+        self.write(sdk, "wkappbot-core", "llm", "keep the prompt token budget small")
+        rows = {r["id"]: r for r in skill_home_plan.plan([("sdk", sdk), ("kih", kih)])}
+        self.assertEqual(rows["generic"]["home"], "SDK")
+        self.assertFalse(rows["generic"]["diverges"])
+        self.assertEqual(rows["broker"]["home"], "PRIVATE")
+        self.assertTrue(rows["broker"]["reason"].startswith("PUBLIC NOW"))
+        self.assertIn("token:credential", rows["secret-only"]["reason"])
+        self.assertTrue(rows["dup"]["diverges"])
+        self.assertTrue(rows["llm"]["weak_only"])
+        out = self.tmp / "plan.md"
+        counts = skill_home_plan.write_md(list(rows.values()), [("sdk", sdk), ("kih", kih)], out, redact=True)
+        text = out.read_text(encoding="utf-8")
+        self.assertNotIn("secret-only", text)
+        self.assertIn("private#", text)
+        self.assertEqual(counts["total"], 5)
 
 
 if __name__ == "__main__":

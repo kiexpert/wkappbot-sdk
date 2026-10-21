@@ -82,3 +82,15 @@ Windows and macOS have not been run yet.
 
 First-time setup on a box that has the other repos: `qa/run-qa.sh --areas static --update-baseline`
 writes `.qa/xplat-baseline.txt` into kih and WKAppBot; commit it there.
+
+## Skill home plan (dry run)
+
+`python3 qa/skill_home_plan.py [--hq DIR] [--kih-root DIR] [--wkappbot-root DIR] [--source LABEL=DIR]`
+lists every skill id with all its copies (sdk, kih, core, HQ cache, extra sources), flags ids
+whose copies diverge (content hash ignoring volatile keys such as `updated`), and proposes one
+home per id: `SDK` (public) or `PRIVATE`. Any owner-mandated private marker forces PRIVATE:
+HANTOO, KIWOOM, token, account, .env, password, PIN, customer, owner-private rules, a personal
+machine path, or a private app folder. `token` is split into `token:credential` and
+`token:weak` (wording only) so the reviewer can tell them apart; both stay PRIVATE. Nothing is
+moved or deleted. Output: `results/skill-home-plan.md`. Ids found only in private sources are
+written as `private#<hash>` when the output is inside this public repo.
