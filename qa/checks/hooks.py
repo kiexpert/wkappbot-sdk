@@ -90,7 +90,10 @@ def run_checks(ctx):
     files = settings_files(ctx)
     hooks = discover(files)
     if not hooks:
-        return [Result(area, f["name"], SKIP, "no hooks wired (run the kih installer)") for f in fixtures]
+        looked = [str(f) for f in files] or ["no settings file found"]
+        why = "no live hook wiring in " + "; ".join(looked) + " -- run the kih installer, then re-run"
+        return [Result(area, "live hook wiring", SKIP, why)] + \
+               [Result(area, f["name"], SKIP, "no live hook wiring (see 'live hook wiring')") for f in fixtures]
     tdir = tempfile.mkdtemp(prefix="qa-hooks-")
     transcript = ctx.transcript or str(Path(tdir) / "empty.jsonl")
     if not ctx.transcript:

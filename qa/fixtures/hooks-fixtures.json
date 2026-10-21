@@ -14,7 +14,7 @@
     { "name": "PreToolUse Bash pwsh where no PowerShell tool", "event": "PreToolUse", "tool_name": "Bash",
       "tool_input": { "command": "pwsh -NoProfile -File ./x.ps1", "description": "run ps1" },
       "expect": { "windows": "deny", "default": "allow" },
-      "known_bug": "bash-uses-pwsh-guard assumes a PowerShell tool exists (Linux/macOS Claude Code has none)" },
+      "_note": "bash-uses-pwsh-guard is Windows-only in kih since 2026-10-21; the declarative form is covered by hygiene 'declarative pwsh rules'" },
     { "name": "PreToolUse Read README -> allow", "event": "PreToolUse", "tool_name": "Read",
       "tool_input": { "file_path": "README.md" }, "expect": "allow" },
     { "name": "PostToolUse Bash ls -> no block", "event": "PostToolUse", "tool_name": "Bash",

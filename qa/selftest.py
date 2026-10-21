@@ -191,6 +191,15 @@ class HookFixtures(Base):
         self.assertTrue(any("hook crashed" in r.cause for r in res))
         self.assertTrue(any(r.name.startswith("latency") and r.status == FAIL for r in res))
 
+    def test_missing_wiring_skips_with_reason(self):
+        kih = self.tmp / "kih"
+        (kih / ".claude").mkdir(parents=True)
+        (kih / ".claude" / "settings.local.json").write_text("{}", encoding="utf-8")
+        res = hooks.run_checks(make_ctx(kih_root=str(kih)))
+        self.assertTrue(all(r.status == SKIP for r in res))
+        self.assertEqual(res[0].name, "live hook wiring")
+        self.assertIn("settings.local.json", res[0].detail)
+
     def test_rc2_is_deny(self):
         self.assertEqual(hooks.decision(2, ""), "deny")
         self.assertEqual(hooks.decision(0, '{"decision": "block"}'), "deny")
@@ -198,16 +207,18 @@ class HookFixtures(Base):
 
 
 class Installer(Base):
-    def kih(self, duplicate, project_local=False):
+    def kih(self, duplicate, target="home"):
+        """target: home = HOME settings.json; self = .claude/settings.local.json next to the script
+        (like install-linux.sh); real = the real checkout by absolute path (a misbehaving installer)."""
         kih = self.tmp / "kih"
         kih.mkdir()
-        target = repr(str(kih / ".claude" / "settings.local.json")) if project_local \
-            else 'os.path.join(home, ".claude", "settings.json")'
+        tgt = {"home": 'os.path.join(home, ".claude", "settings.json")',
+               "self": 'os.path.join(os.path.dirname(os.path.abspath(__file__)), ".claude", "settings.local.json")',
+               "real": repr(str(kih / ".claude" / "settings.local.json"))}[target]
         src = FAKE_INSTALLER.replace("KIHROOT", str(kih).replace("\\", "/")).replace("DUPLICATE", str(duplicate))
-        src = src.replace("TARGET", target)
-        (kih / "fake_install.py").write_text(src, encoding="utf-8")
+        (kih / "fake_install.py").write_text(src.replace("TARGET", tgt), encoding="utf-8")
         sh = kih / "install-fake.sh"
-        sh.write_text(f'#!/usr/bin/env bash\nexec "{Path(PY).as_posix()}" "{(kih / "fake_install.py").as_posix()}" "$@"\n',
+        sh.write_text(f'#!/usr/bin/env bash\nexec "{Path(PY).as_posix()}" "$(dirname "$0")/fake_install.py" "$@"\n',
                       encoding="utf-8")
         os.environ["KIH_INSTALLER"] = str(sh)
         return kih
@@ -218,8 +229,8 @@ class Installer(Base):
         self.assertEqual([(r.name, r.cause) for r in res if r.status != PASS], [])
 
     @unittest.skipUnless(shutil.which("bash"), "bash needed")
-    def test_project_local_installer_and_restore(self):
-        kih = self.kih(False, project_local=True)
+    def test_self_located_installer_runs_on_copy(self):
+        kih = self.kih(False, target="self")
         live = kih / ".claude" / "settings.local.json"
         live.parent.mkdir(parents=True, exist_ok=True)
         live.write_bytes(b'{"hooks": {}, "live": true}')
@@ -227,6 +238,12 @@ class Installer(Base):
         self.assertEqual([(r.name, r.cause) for r in res if r.status != PASS], [])
         self.assertIn("settings.local.json", [r for r in res if r.name == "install #1"][0].detail)
         self.assertEqual(live.read_bytes(), b'{"hooks": {}, "live": true}')
+
+    @unittest.skipUnless(shutil.which("bash"), "bash needed")
+    def test_installer_touching_real_checkout_fails(self):
+        kih = self.kih(False, target="real")
+        res = {r.name: r for r in installer.run_checks(make_ctx(kih_root=str(kih)))}
+        self.assertEqual(res["real KIH_ROOT untouched"].status, FAIL)
 
     @unittest.skipUnless(shutil.which("bash"), "bash needed")
     def test_non_idempotent_installer(self):
@@ -296,6 +313,15 @@ class Hygiene(Base):
         self.assertEqual(r.status, FAIL)
         self.assertIn("q*****", r.detail)
         self.assertNotIn(user, r.detail + r.cause)
+
+    def test_declarative_pwsh_rule(self):
+        kih = self.tmp / "kih"
+        kih.mkdir()
+        (kih / "REFLEX.md").write_text("## harness:block (?i)bash\\b.*pwsh\\s+-\nUse PowerShell tool\n", encoding="utf-8")
+        ctx = make_ctx(kih_root=str(kih))
+        r = hygiene.declarative_pwsh_rules(ctx)
+        self.assertIn("REFLEX.md:1", r.detail)
+        self.assertEqual(r.status, PASS if ctx.platform == "windows" else FAIL)
 
     def test_version_sync_drift(self):
         root = self.tmp / "sdk"

@@ -10,7 +10,7 @@
 import re
 from pathlib import Path
 
-from qa_common import FAIL, PASS, SDK_ROOT, SKIP, Result, run
+from qa_common import FAIL, PASS, SDK_ROOT, SKIP, Result, home_dir, run
 
 VER = r"(\d+\.\d+\.\d+)"
 
@@ -118,6 +118,42 @@ def personal_paths(root, name):
     return Result("hygiene", title, PASS, "0 personal paths")
 
 
+PWSH_SAMPLES = ['bash -c "pwsh -NoProfile -File ./x.ps1"', "pwsh -NoProfile -File ./x.ps1",
+                "powershell -NoProfile -File x.ps1"]
+RE_BLOCK_RULE = re.compile(r"^##\s+harness:block\s+(.+?)\s*$")
+
+
+def declarative_pwsh_rules(ctx):
+    """A markdown harness:block rule cannot say "Windows only". Where the platform has no
+    PowerShell tool (Linux/macOS Claude Code), a rule that blocks pwsh/powershell from Bash
+    leaves no way to run a .ps1 at all."""
+    name = "declarative pwsh rules OS-safe"
+    files = [SDK_ROOT / "CLAUDE.md", Path(home_dir()) / ".claude" / "CLAUDE.md"]
+    if ctx.kih_root:
+        files += [ctx.kih_root / "REFLEX.md", ctx.kih_root / "CLAUDE.md"]
+    hits = []
+    for f in files:
+        if not f.is_file():
+            continue
+        for n, line in enumerate(f.read_text(encoding="utf-8", errors="replace").splitlines(), 1):
+            m = RE_BLOCK_RULE.match(line)
+            if not m:
+                continue
+            try:
+                rx = re.compile(m.group(1))
+            except re.error:
+                continue
+            if any(rx.search(s) for s in PWSH_SAMPLES):
+                hits.append(f"{f.name if f.parent in (SDK_ROOT, ctx.kih_root) else f}:{n}")
+    if not hits:
+        return Result("hygiene", name, PASS, f"{len(files)} rule file(s), no pwsh block rule")
+    if ctx.platform == "windows":
+        return Result("hygiene", name, PASS, f"{len(hits)} pwsh block rule(s), valid on Windows: " + ", ".join(hits))
+    return Result("hygiene", name, FAIL, ", ".join(hits),
+                  cause=f"{hits[0]} harness:block denies pwsh from Bash on {ctx.platform}, where no PowerShell "
+                        f"tool exists; a markdown rule cannot express an OS -> move it to the OS-aware guard")
+
+
 def run_checks(ctx):
     return [version_sync(), personal_paths(SDK_ROOT, "wkappbot-sdk"), githooks_exec(ctx.kih_root),
-            autocommit_trim(ctx.wk_root)]
+            autocommit_trim(ctx.wk_root), declarative_pwsh_rules(ctx)]
