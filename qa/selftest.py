@@ -395,6 +395,14 @@ class SkillHomePlan(Base):
         self.assertIn("private#", text)
         self.assertEqual(counts["total"], 5)
 
+    def test_markers_inside_env_names(self):
+        for text, mark in [("set KIWOOM_PIN first", "PIN"), ("read HANTOO_ACCOUNT_NO", "account"),
+                           ("export GH_TOKEN=x", "token:credential")]:
+            c = [{"app": "wkappbot-core", "path": "wkappbot-core/x.skill.json", "text": text}]
+            self.assertIn(mark, skill_home_plan.markers(c), text)
+        c = [{"app": "wkappbot-core", "path": "wkappbot-core/x.skill.json", "text": "PINNED tabs, accountability"}]
+        self.assertEqual(skill_home_plan.markers(c), [])
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

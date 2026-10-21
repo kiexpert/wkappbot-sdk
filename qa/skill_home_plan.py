@@ -28,17 +28,17 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE / "lib"))
 from qa_common import SDK_ROOT, resolve_repo  # noqa: E402
 
-VOLATILE = {"updated", "updated_at", "last_read", "reads", "hits", "uses", "score"}
+VOLATILE = {"updated", "updated_at", "last_read", "reads", "hits", "uses", "score", "app"}  # app = location, not content
 # Owner-mandated public-safety markers. Any hit -> PRIVATE. Deliberately broad: a false
 # PRIVATE costs a review; a false SDK publishes something private.
 MARKERS = [
     ("HANTOO", re.compile(r"(?i)hantoo")),
     ("KIWOOM", re.compile(r"(?i)kiwoom")),
-    ("token", re.compile(r"(?i)\btokens?\b")),  # split below into token:credential / token:weak
-    ("account", re.compile(r"(?i)\baccounts?\b")),
+    ("token", re.compile(r"(?i)(?<![a-z])tokens?(?![a-z])")),  # also SLACK_BOT_TOKEN (\b fails at _)  # split below into token:credential / token:weak
+    ("account", re.compile(r"(?i)(?<![a-z])accounts?(?![a-z])")),
     (".env", re.compile(r"(?i)(?<![\w.])\.env\b")),
     ("password", re.compile(r"(?i)passw(or)?d")),
-    ("PIN", re.compile(r"\bPINs?\b")),
+    ("PIN", re.compile(r"(?<![A-Za-z])PINs?(?![A-Za-z])")),
     ("customer", re.compile(r"(?i)customer")),
     ("owner-private", re.compile(r"(?i)owner[- ]?(private|only|personal)|private[- ]rule")),
     ("machine path", re.compile(r"(?i)[A-Z]:[\\/]+Users[\\/]+(?!test\b|public\b|<|%|\$)\w+")),
@@ -147,7 +147,7 @@ def write_md(rows, sources, out, redact):
         "|---|---|---|---|---|---|",
         f"| {n} | {sdk} | {priv} | {div} | {leak} | {leak_strong} |",
         "",
-        "Copy format: `source:path@vVERSION#contenthash` (content hash ignores volatile keys such as `updated`).",
+        "Copy format: `source:path@vVERSION#contenthash` (content hash ignores location and volatile keys: `app`, `updated`, read counters).",
         "Private markers (owner mandate, any hit = PRIVATE): " + ", ".join(m for m, _ in MARKERS)
         + ", app in " + ", ".join(sorted(PRIVATE_APPS)) + ".",
         "",

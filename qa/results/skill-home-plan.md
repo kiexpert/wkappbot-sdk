@@ -6,827 +6,827 @@ Sources: `sdk`, `kih` (not found), `core` (not found), `hq` (not found)
 
 | total ids | SDK-proposed | private-proposed | diverging | private-marked, public now | of those, beyond weak 'token' wording |
 |---|---|---|---|---|---|
-| 817 | 566 | 251 | 7 | 251 | 95 |
+| 817 | 563 | 254 | 7 | 254 | 97 |
 
-Copy format: `source:path@vVERSION#contenthash` (content hash ignores volatile keys such as `updated`).
+Copy format: `source:path@vVERSION#contenthash` (content hash ignores location and volatile keys: `app`, `updated`, read counters).
 Private markers (owner mandate, any hit = PRIVATE): HANTOO, KIWOOM, token, account, .env, password, PIN, customer, owner-private, machine path, app in paypal-developer, personal-docs, wkautoquant.
 
 | id | copies | diverges | proposed home | reason |
 |---|---|---|---|---|
-| a11y-action-auto-diff | sdk:wkappbot-core/a11y-action-auto-diff.skill.json@v1.2#face70 | n | SDK | no private marker; already in sdk |
-| a11y-ancestor-blocker-bypass | sdk:wkappbot-core/a11y-ancestor-blocker-bypass.skill.json@v1.13#0a47e3 | n | SDK | no private marker; already in sdk |
-| a11y-auto-find-grap-verify-skip-miss-report-for-empty-pattern-wpf-overlays | sdk:wkappbot-core/a11y-auto-find-grap-verify-skip-miss-report-for-empty-pattern-wpf-overlays.skill.json@v1.1#f6f6fe | n | SDK | no private marker; already in sdk |
-| a11y-callout | sdk:wkappbot-core/a11y-callout.skill.json@v1.19#375b6d | n | SDK | no private marker; already in sdk |
-| a11y-chrome-cdp-overlay-uia-native-dialog-blocker-detection | sdk:wkappbot-core/a11y-chrome-cdp-overlay-uia-native-dialog-blocker-detection.skill.json@v1.8#f10e85 | n | SDK | no private marker; already in sdk |
-| a11y-click-react-fiber-cdp-trusted-fallback | sdk:wkappbot-core/a11y-click-react-fiber-cdp-trusted-fallback.skill.json@v1.5#d1a9b6 | n | SDK | no private marker; already in sdk |
-| a11y-close-focus-steal-guard | sdk:wkappbot-core/a11y-close-focus-steal-guard.skill.json@v1.2#7ecb60 | n | SDK | no private marker; already in sdk |
-| a11y-close-safety-ambiguity-focus-node-diagnostics | sdk:wkappbot/a11y-close-safety-ambiguity-focus-node-diagnostics.skill.json@v1.2#18d032 | n | SDK | no private marker; already in sdk |
-| a11y-command-always-print-resolved-target-full-path-grap-spec | sdk:wkappbot-core/a11y-command-always-print-resolved-target-full-path-grap-spec.skill.json@v1.4#6e10f5 | n | SDK | no private marker; already in sdk |
-| a11y-command-cheatsheet | sdk:wkappbot-workflow/a11y-command-cheatsheet.skill.json@v2.14#f4d95d | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| a11y-command-cheatsheet-howto | sdk:wkappbot-workflow/a11y-command-cheatsheet-howto.skill.json@v1.0#eb76e9 | n | SDK | no private marker; already in sdk |
-| a11y-command-cheatsheet-ref | sdk:wkappbot-workflow/a11y-command-cheatsheet-ref.skill.json@v1.0#4029de | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| a11y-find | sdk:wkappbot/a11y-find.skill.json@v1.27#890503 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| a11y-find-cdp-runtime-eval-focus-guard | sdk:wkappbot-workflow/a11y-find-cdp-runtime-eval-focus-guard.skill.json@v1.6#b86c41 | n | SDK | no private marker; already in sdk |
-| a11y-find-deprecated-eval-removal-guard | sdk:wkappbot-workflow/a11y-find-deprecated-eval-removal-guard.skill.json@v1.16#352108 | n | SDK | no private marker; already in sdk |
-| a11y-find-mfc-deep-descendant-grandchildren-via-enumchildwindows | sdk:wkappbot/a11y-find-mfc-deep-descendant-grandchildren-via-enumchildwindows.skill.json@v1.4#56b542 | n | SDK | no private marker; already in sdk |
-| a11y-find-performance-fastpath | sdk:wkappbot-core/a11y-find-performance-fastpath.skill.json@v1.9#c36024 | n | SDK | no private marker; already in sdk |
-| a11y-find-verify-miss-empty-grap-guard | sdk:wkappbot-workflow/a11y-find-verify-miss-empty-grap-guard.skill.json@v1.4#632918 | n | SDK | no private marker; already in sdk |
-| a11y-focus-steal-user-active-silent-yield | sdk:wkappbot-core/a11y-focus-steal-user-active-silent-yield.skill.json@v1.18#9ac69d | n | SDK | no private marker; already in sdk |
-| a11y-focus-steal-user-active-silent-yield-howto | sdk:wkappbot-workflow/a11y-focus-steal-user-active-silent-yield-howto.skill.json@v1.0#a0a2e0 | n | SDK | no private marker; already in sdk |
-| a11y-focus-steal-user-active-silent-yield-ref | sdk:wkappbot-workflow/a11y-focus-steal-user-active-silent-yield-ref.skill.json@v1.0#a055f4 | n | SDK | no private marker; already in sdk |
-| a11y-focus-tier-chain | sdk:wkappbot-core/a11y-focus-tier-chain.skill.json@v1.34#bbad91 | n | SDK | no private marker; already in sdk |
-| a11y-focus-tier-chain-howto | sdk:wkappbot-workflow/a11y-focus-tier-chain-howto.skill.json@v1.0#ab7aa9 | n | SDK | no private marker; already in sdk |
-| a11y-focus-tier-chain-ref | sdk:wkappbot-workflow/a11y-focus-tier-chain-ref.skill.json@v1.0#4d8234 | n | SDK | no private marker; already in sdk |
-| a11y-grap-hwnd-authoritative-no-and-reject-on-drifted-fields | sdk:wkappbot/a11y-grap-hwnd-authoritative-no-and-reject-on-drifted-fields.skill.json@v1.0#27afa7 | n | SDK | no private marker; already in sdk |
-| a11y-grid-read-clipboard-bridge-for-owner-drawn-hts-grids | sdk:wkappbot/a11y-grid-read-clipboard-bridge-for-owner-drawn-hts-grids.skill.json@v2#bf9cc6 | n | SDK | no private marker; already in sdk |
-| a11y-hack-ocr-opt-in-vision-worker-sentinel-bridge | sdk:wkappbot-core/a11y-hack-ocr-opt-in-vision-worker-sentinel-bridge.skill.json@v2#79d50e | n | SDK | no private marker; already in sdk |
-| a11y-kill-json5-grap-support | sdk:wkappbot-core/a11y-kill-json5-grap-support.skill.json@v1.4#dac0ad | n | SDK | no private marker; already in sdk |
-| a11y-node-first-content-gating | sdk:wkappbot-core/a11y-node-first-content-gating.skill.json@v1.21#18f6ce | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| a11y-playbook-writing | sdk:wkappbot/a11y-playbook-writing.skill.json@v2.2#1a24af | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| a11y-read-inspect-improvement-ideas | sdk:wkappbot/a11y-read-inspect-improvement-ideas.skill.json@v1.3#e66ffc | n | SDK | no private marker; already in sdk |
-| a11y-screenshot-crash-safe-layered-alpha-restore-guard | sdk:wkappbot-core/a11y-screenshot-crash-safe-layered-alpha-restore-guard.skill.json@v1.12#26b1c0 | n | SDK | no private marker; already in sdk |
-| a11y-screenshot-focusless-window-capture | sdk:wkappbot/a11y-screenshot-focusless-window-capture.skill.json@v1.13#585cd6 | n | SDK | no private marker; already in sdk |
-| a11y-screenshot-usage | sdk:wkappbot/a11y-screenshot-usage.skill.json@v1.6#8a27c1 | n | SDK | no private marker; already in sdk |
-| a11y-screenshot-usage-ref | sdk:wkappbot/a11y-screenshot-usage-ref.skill.json@v1.0#e19b10 | n | SDK | no private marker; already in sdk |
-| a11y-set-value-50ms-delay-read-back-warning-for-win11-richtextbox-and-chrome-stale-valuepattern | sdk:wkappbot-core/a11y-set-value-50ms-delay-read-back-warning-for-win11-richtextbox-and-chrome-stale-valuepattern.skill.json@v1.3#cba7e7 | n | SDK | no private marker; already in sdk |
-| a11y-type-force-hwnd-scope-bypass | sdk:wkappbot-workflow/a11y-type-force-hwnd-scope-bypass.skill.json@v1.6#be620e | n | PRIVATE | PUBLIC NOW (in sdk); markers: PIN; home a private repo (none holds it yet) |
-| adb-android-automation-was-intentionally-stripped-from-main-docs-still-stale | sdk:wkappbot-workflow/adb-android-automation-was-intentionally-stripped-from-main-docs-still-stale.skill.json@v1.3#aa6a6b | n | SDK | no private marker; already in sdk |
-| admin-eye-broadcast-close-handover | sdk:wkappbot-core/admin-eye-broadcast-close-handover.skill.json@v1.0#5f4e78 | n | SDK | no private marker; already in sdk |
-| admin-eye-hot-swap-known-gap-options-for-fix | sdk:wkappbot/admin-eye-hot-swap-known-gap-options-for-fix.skill.json@v1.1#9e65b3 | n | SDK | no private marker; already in sdk |
-| admin-eye-init-test-verify-sudo-pipe-encoding-after-startup | sdk:wkappbot/admin-eye-init-test-verify-sudo-pipe-encoding-after-startup.skill.json@v1.0#05054d | n | SDK | no private marker; already in sdk |
-| agent-brief | sdk:wkappbot-workflow/agent-brief.skill.json@v1.0#78323c | n | SDK | no private marker; already in sdk |
-| agent-brief-standard-template | sdk:wkappbot-workflow/agent-brief-standard-template.skill.json@v1.1117#a7cb51 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| agent-brief-standard-template-ref | sdk:wkappbot-workflow/agent-brief-standard-template-ref.skill.json@v1.32#49ab56 | n | PRIVATE | PUBLIC NOW (in sdk); markers: HANTOO, account, token:weak; home a private repo (none holds it yet) |
-| agent-canonical-dispatch | sdk:wkappbot-workflow/agent-canonical-dispatch.skill.json@v1.3#d5efbe | n | SDK | no private marker; already in sdk |
-| agent-cmd | sdk:harness/agent-cmd.skill.json@v1.9#b21c42 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| agent-cmd-howto | sdk:wkappbot-workflow/agent-cmd-howto.skill.json@v1.0#1f99b7 | n | SDK | no private marker; already in sdk |
-| agent-cmd-pace-exempt | sdk:wkappbot-workflow/agent-cmd-pace-exempt.skill.json@v1.1#d0f202 | n | SDK | no private marker; already in sdk |
-| agent-dispatch-preflight | sdk:wkappbot-workflow/agent-dispatch-preflight.skill.json@v1.4#b96e09 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| agent-dispatch-preflight-pre-research | sdk:wkappbot-workflow/agent-dispatch-preflight-pre-research.skill.json@v1.2#f0c337 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| agent-dispatch-preflight-ref | sdk:wkappbot-workflow/agent-dispatch-preflight-ref.skill.json@v1.1#4bb4cd | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| agent-failure-reflection-gate | sdk:wkappbot-workflow/agent-failure-reflection-gate.skill.json@v1.29#49cc2f | n | SDK | no private marker; already in sdk |
-| agent-failure-reflection-gate-howto | sdk:wkappbot-workflow/agent-failure-reflection-gate-howto.skill.json@v1.2#0914fc | n | SDK | no private marker; already in sdk |
-| agent-failure-reflection-gate-ref | sdk:wkappbot-workflow/agent-failure-reflection-gate-ref.skill.json@v1.1#621b35 | n | SDK | no private marker; already in sdk |
-| agent-leak-guard | sdk:wkappbot-workflow/agent-leak-guard.skill.json@v1.0#fef707 | n | SDK | no private marker; already in sdk |
-| agent-on-load | sdk:wkappbot-workflow/agent-on-load.skill.json@v1.6#886279 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| agent-on-load-howto | sdk:wkappbot-workflow/agent-on-load-howto.skill.json@v1.0#e0cd0f | n | SDK | no private marker; already in sdk |
-| agent-on-load-ref | sdk:wkappbot-workflow/agent-on-load-ref.skill.json@v1.0#6b5910 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| agy-gemini-agy-proxy-reflection | sdk:wkappbot-workflow/agy-gemini-agy-proxy-reflection.skill.json@v1.0#c2536b | n | SDK | no private marker; already in sdk |
-| agy-gemini-flash-reflection | sdk:wkappbot-workflow/agy-gemini-flash-reflection.skill.json@v1.2#5a9239 | n | SDK | no private marker; already in sdk |
-| agy-gemini-pro-reflection | sdk:wkappbot-workflow/agy-gemini-pro-reflection.skill.json@v1.2#f53f2c | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| agy-opus-reflection | sdk:wkappbot-workflow/agy-opus-reflection.skill.json@v1.1#20f941 | n | SDK | no private marker; already in sdk |
-| agy-root-reflection | sdk:wkappbot-workflow/agy-root-reflection.skill.json@v1.10#635b3b | n | SDK | no private marker; already in sdk |
-| agy-root-reflection-ref | sdk:wkappbot-workflow/agy-root-reflection-ref.skill.json@v1.0#807ec9 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| ai-agent-automation-patterns | sdk:wkappbot-core/ai-agent-automation-patterns.skill.json@v1.0#6010c6 | n | SDK | no private marker; already in sdk |
-| ai-agent-desktop-automation-landscape-competitor-and-pattern-reference-2026-04 | sdk:wkappbot-core/ai-agent-desktop-automation-landscape-competitor-and-pattern-reference-2026-04.skill.json@v1.5#ab3b4c | n | SDK | no private marker; already in sdk |
-| ai-auto-router-fallback-on-model-error | sdk:wkappbot-workflow/ai-auto-router-fallback-on-model-error.skill.json@v1.0#ab6abf | n | SDK | no private marker; already in sdk |
-| ai-ecosystem-updates-april-2026-briefing-backlog-reference | sdk:wkappbot-workflow/ai-ecosystem-updates-april-2026-briefing-backlog-reference.skill.json@v1.4#10c0f5 | n | SDK | no private marker; already in sdk |
-| ai-news-briefing | sdk:wkappbot-workflow/ai-news-briefing.skill.json@v1.4#3b644a | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| ai-news-competitive-eval | sdk:wkappbot-core/ai-news-competitive-eval.skill.json@v1.5#8a73cb | n | SDK | no private marker; already in sdk |
-| ai-news-to-suggests | sdk:wkappbot-workflow/ai-news-to-suggests.skill.json@v1.2#b49d23 | n | SDK | no private marker; already in sdk |
-| all-ai-global-approval-setup | sdk:wkappbot-workflow/all-ai-global-approval-setup.skill.json@v1.2#f67c85 | n | PRIVATE | PUBLIC NOW (in sdk); markers: machine path; home a private repo (none holds it yet) |
-| all-sudo-proxy-subprocess-timeout-hasexited-check | sdk:wkappbot-core/all-sudo-proxy-subprocess-timeout-hasexited-check.skill.json@v1.9#3cfbc5 | n | PRIVATE | PUBLIC NOW (in sdk); markers: KIWOOM; home a private repo (none holds it yet) |
-| always-on-ai-automation-daemon-appbot-eye-internals | sdk:wkappbot/always-on-ai-automation-daemon-appbot-eye-internals.skill.json@v1.19#a744a4 | n | SDK | no private marker; already in sdk |
-| ansi-color-output-auto-disable-on-pipe-no-color | sdk:wkappbot-core/ansi-color-output-auto-disable-on-pipe-no-color.skill.json@v1.2#472a31 | n | SDK | no private marker; already in sdk |
-| anthropic-computer-use-cross-platform | sdk:wkappbot-workflow/anthropic-computer-use-cross-platform.skill.json@v1.0#65f439 | n | PRIVATE | PUBLIC NOW (in sdk); markers: account, token:weak; home a private repo (none holds it yet) |
-| anti-knowledge-pattern-special-management | sdk:wkappbot-workflow/anti-knowledge-pattern-special-management.skill.json@v1.8#7a10c4 | n | SDK | no private marker; already in sdk |
-| anti-knowledge-pattern-special-management-howto | sdk:wkappbot-workflow/anti-knowledge-pattern-special-management-howto.skill.json@v1.6#10e558 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| anti-knowledge-pattern-special-management-ref | sdk:wkappbot-workflow/anti-knowledge-pattern-special-management-ref.skill.json@v1.2#1519b4 | n | SDK | no private marker; already in sdk |
-| appbot-skills-interconnection-map | sdk:wkappbot-core/appbot-skills-interconnection-map.skill.json@v1.0#9feadd | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| appbot-telemetry-promotion | sdk:wkappbot-workflow/appbot-telemetry-promotion.skill.json@v1.2#691207 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| ascii-only-source-no-decorative-unicode | sdk:wkappbot-workflow/ascii-only-source-no-decorative-unicode.skill.json@v1.0#386bb9 | n | SDK | no private marker; already in sdk |
-| ask-anon-tab-preserve-on-failure | sdk:wkappbot-core/ask-anon-tab-preserve-on-failure.skill.json@v1.2#8ac287 | n | SDK | no private marker; already in sdk |
-| ask-cdp-uia-focus-steal-coverage-via-sentinel | sdk:wkappbot-core/ask-cdp-uia-focus-steal-coverage-via-sentinel.skill.json@v1.23#b98a8b | n | SDK | no private marker; already in sdk |
-| ask-cdp-uia-focus-steal-coverage-via-sentinel-howto | sdk:wkappbot-workflow/ask-cdp-uia-focus-steal-coverage-via-sentinel-howto.skill.json@v1.0#280533 | n | SDK | no private marker; already in sdk |
-| ask-cdp-uia-focus-steal-coverage-via-sentinel-ref | sdk:wkappbot-workflow/ask-cdp-uia-focus-steal-coverage-via-sentinel-ref.skill.json@v1.0#03717e | n | SDK | no private marker; already in sdk |
-| ask-command-cheatsheet | sdk:wkappbot-workflow/ask-command-cheatsheet.skill.json@v1.12#b0e820 | n | SDK | no private marker; already in sdk |
-| ask-gpt-editor-wait-tag-and-rescue-fallback | sdk:wkappbot-webbot/ask-gpt-editor-wait-tag-and-rescue-fallback.skill.json@v1.13#d0a475 | n | SDK | no private marker; already in sdk |
-| ask-health-check | sdk:wkappbot-workflow/ask-health-check.skill.json@v1.5#f11282 | n | SDK | no private marker; already in sdk |
-| ask-prompt-pump-watchdog-dismiss-resend-recovery | sdk:wkappbot-core/ask-prompt-pump-watchdog-dismiss-resend-recovery.skill.json@v2.1#9c6b11 | n | SDK | no private marker; already in sdk |
-| ask-run-start-pwsh-path-resolution | sdk:wkappbot-core/ask-run-start-pwsh-path-resolution.skill.json@v1.0#55e88c | n | SDK | no private marker; already in sdk |
-| ask-suggest-priority-batching | sdk:wkappbot-workflow/ask-suggest-priority-batching.skill.json@v1.85#20911e | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| ask-suggest-priority-batching-howto | sdk:wkappbot-workflow/ask-suggest-priority-batching-howto.skill.json@v1.1#2dae77 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| ask-suggest-priority-batching-ref | sdk:wkappbot-workflow/ask-suggest-priority-batching-ref.skill.json@v1.1#943893 | n | SDK | no private marker; already in sdk |
-| ask-triad-when-uncertain | sdk:wkappbot-workflow/ask-triad-when-uncertain.skill.json@v1.7#743c26 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| ask-web-chrome-launch-focusless-guard-allowlist | sdk:wkappbot-core/ask-web-chrome-launch-focusless-guard-allowlist.skill.json@v1.13#86647f | n | SDK | no private marker; already in sdk |
-| attic-finance-subsystem-extracted-to-wkappbot-finance | sdk:wkappbot-core/attic-finance-subsystem-extracted-to-wkappbot-finance.skill.json@v1.0#211a55 | n | PRIVATE | PUBLIC NOW (in sdk); markers: KIWOOM; home a private repo (none holds it yet) |
-| autoheal-userinput-protection | sdk:wkappbot-core/autoheal-userinput-protection.skill.json@v2#b8b1eb | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| automating-legacy-mfc-apps-with-no-uia-hts-playbook | sdk:wkappbot/automating-legacy-mfc-apps-with-no-uia-hts-playbook.skill.json@v1.2#076e04 | n | SDK | no private marker; already in sdk |
-| bash-uses-pwsh-guard | sdk:wkappbot-workflow/bash-uses-pwsh-guard.skill.json@v1.0#9cd445 | n | SDK | no private marker; already in sdk |
-| black-desktop-progman-stuck | sdk:wkappbot-core/black-desktop-progman-stuck.skill.json@v1.1#9567fa | n | SDK | no private marker; already in sdk |
-| business-hours-triage-emergency-first | sdk:wkappbot-workflow/business-hours-triage-emergency-first.skill.json@v1.4#a68b84 | n | PRIVATE | PUBLIC NOW (in sdk); markers: HANTOO, account, token:credential; home a private repo (none holds it yet) |
-| busy-fleet-guard | sdk:wkappbot-workflow/busy-fleet-guard.skill.json@v1.0#bf94e9 | n | SDK | no private marker; already in sdk |
-| caller-window-rect-dpi-piping-ipc-extension-for-precise-chrome-placement | sdk:wkappbot/caller-window-rect-dpi-piping-ipc-extension-for-precise-chrome-placement.skill.json@v1.0#14b169 | n | SDK | no private marker; already in sdk |
-| cd-noise-guard | sdk:wkappbot-workflow/cd-noise-guard.skill.json@v1.0#e3fece | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| cdp-abnormal-tab-remediation | sdk:wkappbot-webbot/cdp-abnormal-tab-remediation.skill.json@v1.14#a65341 | n | SDK | no private marker; already in sdk |
-| cdp-appbot-sleep | sdk:wkappbot-webbot/cdp-appbot-sleep.skill.json@v1.0#5ad745 | n | SDK | no private marker; already in sdk |
-| cdp-chrome-blank-white-recovery | sdk:wkappbot-webbot/cdp-chrome-blank-white-recovery.skill.json@v1.0#539c86 | n | SDK | no private marker; already in sdk |
-| cdp-command-guide | sdk:wkappbot-workflow/cdp-command-guide.skill.json@v1.42#da0a66 | n | SDK | no private marker; already in sdk |
-| cdp-command-guide-howto | sdk:wkappbot-workflow/cdp-command-guide-howto.skill.json@v1.0#913043 | n | SDK | no private marker; already in sdk |
-| cdp-command-guide-ref | sdk:wkappbot-workflow/cdp-command-guide-ref.skill.json@v1.0#fd9e6f | n | SDK | no private marker; already in sdk |
-| cdp-console-log-stderr-forwarding | sdk:wkappbot-core/cdp-console-log-stderr-forwarding.skill.json@v1.0#4d6b0c | n | SDK | no private marker; already in sdk |
-| cdp-cookie-auto-sync | sdk:wkappbot-webbot/cdp-cookie-auto-sync.skill.json@v1.8#a097eb | n | SDK | no private marker; already in sdk |
-| cdp-dispatchkeyevent-timeout-transient-wkautoquant-ask | sdk:wkappbot/cdp-dispatchkeyevent-timeout-transient-wkautoquant-ask.skill.json@v1.1#d69bf1 | n | SDK | no private marker; already in sdk |
-| cdp-evalasync-retry-policy | sdk:wkappbot-webbot/cdp-evalasync-retry-policy.skill.json@v1.18#609a7e | n | SDK | no private marker; already in sdk |
-| cdp-evalasync-retry-policy-ref | sdk:wkappbot-webbot/cdp-evalasync-retry-policy-ref.skill.json@v1.0#e0a9ed | n | SDK | no private marker; already in sdk |
-| cdp-event-loop-dialog-handler-handle-chrome-js-dialogs-via-page-javascriptdialogopening-events | sdk:wkappbot-workflow/cdp-event-loop-dialog-handler-handle-chrome-js-dialogs-via-page-javascriptdialogopening-events.skill.json@v1.1#997420 | n | SDK | no private marker; already in sdk |
-| cdp-focus-steal-guard-runtime-evaluate-in-isfocusstealingmethod-weminimized-500ms-wait | sdk:wkappbot-core/cdp-focus-steal-guard-runtime-evaluate-in-isfocusstealingmethod-weminimized-500ms-wait.skill.json@v1.3#1038ba | n | SDK | no private marker; already in sdk |
-| cdp-geturlasync-uses-target-gettargetinfo-to-bypass-busy-renderer | sdk:wkappbot-core/cdp-geturlasync-uses-target-gettargetinfo-to-bypass-busy-renderer.skill.json@v1.2#2ae241 | n | SDK | no private marker; already in sdk |
-| cdp-health-check | sdk:wkappbot-sdk/cdp-health-check.skill.json@v1.0#166250 | n | SDK | no private marker; already in sdk |
-| cdp-latency-over-1s-is-a-state-detection-bug-not-a-cdp-block | sdk:wkappbot-webbot/cdp-latency-over-1s-is-a-state-detection-bug-not-a-cdp-block.skill.json@v1.1#4ae82d | n | SDK | no private marker; already in sdk |
-| cdp-open-reuse-existing-chrome-tab | sdk:wkappbot-webbot/cdp-open-reuse-existing-chrome-tab.skill.json@v1.9#5fb8f2 | n | SDK | no private marker; already in sdk |
-| cdp-popup-auto-dismiss-strategy | sdk:wkappbot-core/cdp-popup-auto-dismiss-strategy.skill.json@v1.0#47befa | n | PRIVATE | PUBLIC NOW (in sdk); markers: account; home a private repo (none holds it yet) |
-| cdp-port-block-foreign-chrome-clear | sdk:wkappbot-workflow/cdp-port-block-foreign-chrome-clear.skill.json@v1.0#973404 | n | SDK | no private marker; already in sdk |
-| cdp-port-isolation-sha256-4-port-block-per-project-cwd | sdk:wkappbot/cdp-port-isolation-sha256-4-port-block-per-project-cwd.skill.json@v1.0#5e68a3 | n | SDK | no private marker; already in sdk |
-| cdp-port-isolation-window-property | sdk:wkappbot-webbot/cdp-port-isolation-window-property.skill.json@v1.5#900039 | n | SDK | no private marker; already in sdk |
-| cdp-probe-port-9-guard-discard-low-port-values-to-prevent-httprequestexception | sdk:wkappbot-core/cdp-probe-port-9-guard-discard-low-port-values-to-prevent-httprequestexception.skill.json@v1.3#a5809a | n | SDK | no private marker; already in sdk |
-| cdp-prompt-pump-focusless-enter | sdk:wkappbot-core/cdp-prompt-pump-focusless-enter.skill.json@v1.0#e345b8 | n | SDK | no private marker; already in sdk |
-| cdp-runtime-enable-with-retry | sdk:wkappbot-webbot/cdp-runtime-enable-with-retry.skill.json@v1.9#2b483b | n | SDK | no private marker; already in sdk |
-| cdp-runtime-enable-with-retry-ref | sdk:wkappbot-webbot/cdp-runtime-enable-with-retry-ref.skill.json@v1.0#4a137b | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| cdp-smoke-ci-binary-fetch-pattern | sdk:wkappbot-workflow/cdp-smoke-ci-binary-fetch-pattern.skill.json@v1.1#6a4726 | n | SDK | no private marker; already in sdk |
-| cdp-smoke-ci-runbook | sdk:wkappbot-workflow/cdp-smoke-ci-runbook.skill.json@v1.7#0a1d88 | n | SDK | no private marker; already in sdk |
-| cdp-smoke-test | sdk:wkappbot-webbot/cdp-smoke-test.skill.json@v1.2#f1db77 | n | SDK | no private marker; already in sdk |
-| cdp-tab-identity-design | sdk:wkappbot-sdk/cdp-tab-identity-design.skill.json@v1.21#f7a72a | n | SDK | no private marker; already in sdk |
-| central-secrets-registry-d-github-env-consolidation-pattern | sdk:wkappbot-workflow/central-secrets-registry-d-github-env-consolidation-pattern.skill.json@v1.0#c5cba6 | n | PRIVATE | PUBLIC NOW (in sdk); markers: .env, HANTOO, KIWOOM; home a private repo (none holds it yet) |
-| chat-session-guard-centralised | sdk:wkappbot-core/chat-session-guard-centralised.skill.json@v1.0#1773af | n | SDK | no private marker; already in sdk |
-| chatgpt-blank-false-positive-guard | sdk:wkappbot-webbot/chatgpt-blank-false-positive-guard.skill.json@v2#5ba4a6 | n | SDK | no private marker; already in sdk |
-| chatgpt-stop-button-drain-before-send | sdk:wkappbot-webbot/chatgpt-stop-button-drain-before-send.skill.json@v1.2#4e73e8 | n | SDK | no private marker; already in sdk |
-| cheap-commit-todo-gate | sdk:wkappbot-workflow/cheap-commit-todo-gate.skill.json@v1.0#a17c4a | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| cheap-commit-todo-gate-block-commit-if-claude-md-pending-not-refreshed | sdk:wkappbot-workflow/cheap-commit-todo-gate-block-commit-if-claude-md-pending-not-refreshed.skill.json@v1.3#b9d3a6 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| chore-resolved-claude-md-delegation-rules-already-mandatory | sdk:wkappbot-core/chore-resolved-claude-md-delegation-rules-already-mandatory.skill.json@v1.4#1bdc8d | n | SDK | no private marker; already in sdk |
-| chrome-pos-ioe-stale-duplicate | sdk:wkappbot-core/chrome-pos-ioe-stale-duplicate.skill.json@v1.0#3d29f9 | n | SDK | no private marker; already in sdk |
-| chrome-process-architecture | sdk:wkappbot/chrome-process-architecture.skill.json@v1.7#1e131d | n | SDK | no private marker; already in sdk |
-| chrome-profile-auth-sync-architecture | sdk:wkappbot-workflow/chrome-profile-auth-sync-architecture.skill.json@v1.8#1c9dae | n | SDK | no private marker; already in sdk |
-| chrome-session-restore-position-fix | sdk:wkappbot-webbot/chrome-session-restore-position-fix.skill.json@v1.2#56ebe7 | n | SDK | no private marker; already in sdk |
-| claude-agent-team-no-code | sdk:wkappbot-workflow/claude-agent-team-no-code.skill.json@v1.1#4677d5 | n | SDK | no private marker; already in sdk |
-| claude-audit-log-hook | sdk:wkappbot-workflow/claude-audit-log-hook.skill.json@v1.0#f900d5 | n | PRIVATE | PUBLIC NOW (in sdk); markers: machine path; home a private repo (none holds it yet) |
-| claude-cli-automation-patterns-wkappbot-integration | sdk:wkappbot-workflow/claude-cli-automation-patterns-wkappbot-integration.skill.json@v1.1#5d0617 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| claude-code-agent-tier-routing | sdk:wkappbot-workflow/claude-code-agent-tier-routing.skill.json@v1.144#f70912 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| claude-code-agent-tier-routing-howto | sdk:wkappbot-workflow/claude-code-agent-tier-routing-howto.skill.json@v1.34#388bfc | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| claude-code-agent-tier-routing-ref | sdk:wkappbot-workflow/claude-code-agent-tier-routing-ref.skill.json@v1.21#93e4e2 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| claude-code-agent-tier-routing-t2-howto | sdk:wkappbot-workflow/claude-code-agent-tier-routing-t2-howto.skill.json@v1.0#9e14fc | n | SDK | no private marker; already in sdk |
-| claude-code-ai-audit-log-unified-tool-call-logging | sdk:wkappbot-workflow/claude-code-ai-audit-log-unified-tool-call-logging.skill.json@v1.1#72c57a | n | SDK | no private marker; already in sdk |
-| claude-code-global-approval-state | sdk:wkappbot-workflow/claude-code-global-approval-state.skill.json@v1.2#704713 | n | PRIVATE | PUBLIC NOW (in sdk); markers: machine path; home a private repo (none holds it yet) |
-| claude-code-kill-guard-hook-block-taskkill-stop-process-for-out-of-cwd-processes | sdk:wkappbot-workflow/claude-code-kill-guard-hook-block-taskkill-stop-process-for-out-of-cwd-processes.skill.json@v1.1#eed980 | n | SDK | no private marker; already in sdk |
-| claude-family-model-ids | sdk:wkappbot-workflow/claude-family-model-ids.skill.json@v1.0#a14412 | n | SDK | no private marker; already in sdk |
-| claude-kill-guard-hook | sdk:wkappbot-workflow/claude-kill-guard-hook.skill.json@v1.9#019452 | n | PRIVATE | PUBLIC NOW (in sdk); markers: machine path; home a private repo (none holds it yet) |
-| claude-md-diet-score-deadlock-reflex | sdk:wkappbot-workflow/claude-md-diet-score-deadlock-reflex.skill.json@v1.4#e7864f | n | SDK | no private marker; already in sdk |
-| claude-md-guide | sdk:wkappbot-workflow/claude-md-guide.skill.json@v1.25#66dafe<br>sdk:personal-docs/claude-md-guide.skill.json@v1.53#6a27c0 | y | PRIVATE | PUBLIC NOW (in sdk); markers: app:personal-docs, token:weak; home a private repo (none holds it yet) |
-| claude-md-guide-howto | sdk:wkappbot-workflow/claude-md-guide-howto.skill.json@v1.1#889793<br>sdk:personal-docs/claude-md-guide-howto.skill.json@v1.0#e9a3b7 | y | PRIVATE | PUBLIC NOW (in sdk); markers: app:personal-docs; home a private repo (none holds it yet) |
-| claude-md-guide-ref | sdk:personal-docs/claude-md-guide-ref.skill.json@v1.0#7b8404 | n | PRIVATE | PUBLIC NOW (in sdk); markers: app:personal-docs, token:weak; home a private repo (none holds it yet) |
-| claude-md-harness-rules | sdk:wkappbot-workflow/claude-md-harness-rules.skill.json@v1.38#2ba7d2 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| claude-md-harness-rules-howto | sdk:wkappbot-workflow/claude-md-harness-rules-howto.skill.json@v1.0#724dd8 | n | SDK | no private marker; already in sdk |
-| claude-md-harness-rules-ref | sdk:wkappbot-workflow/claude-md-harness-rules-ref.skill.json@v1.2#a2344a | n | SDK | no private marker; already in sdk |
-| claude-md-how-to-edit-bootstrap-triage | sdk:wkappbot-workflow/claude-md-how-to-edit-bootstrap-triage.skill.json@v1.0#64e591 | n | SDK | no private marker; already in sdk |
-| claude-md-todo-sync | sdk:wkappbot-workflow/claude-md-todo-sync.skill.json@v1.6#78a5eb | n | SDK | no private marker; already in sdk |
-| claude-named-tool-shim-symlink-install-non-wkwrap-tools | sdk:wkappbot-workflow/claude-named-tool-shim-symlink-install-non-wkwrap-tools.skill.json@v1.0#f8d40e | n | SDK | no private marker; already in sdk |
-| claude-pace | sdk:wkappbot-workflow/claude-pace.skill.json@v1.0#b59f13 | n | SDK | no private marker; already in sdk |
-| claude-proxy-context-limit-auto-handoff-to-gemini-agent | sdk:wkappbot-workflow/claude-proxy-context-limit-auto-handoff-to-gemini-agent.skill.json@v1.0#98e8cd | n | SDK | no private marker; already in sdk |
-| claude-session-handoff | sdk:wkappbot/claude-session-handoff.skill.json@v1.2#747753 | n | SDK | no private marker; already in sdk |
-| claude-terminal-via-appbot-primary | sdk:wkappbot-workflow/claude-terminal-via-appbot-primary.skill.json@v1.1#c57ab4 | n | SDK | no private marker; already in sdk |
-| claude-token-optimization | sdk:wkappbot-workflow/claude-token-optimization.skill.json@v1.4#4aca4f | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| claude-tool-shim-cmd-pattern | sdk:wkappbot-workflow/claude-tool-shim-cmd-pattern.skill.json@v1.0#0156ef | n | SDK | no private marker; already in sdk |
-| claude-usage-slack-alert-state-file-dedup-after-reset | sdk:wkappbot-core/claude-usage-slack-alert-state-file-dedup-after-reset.skill.json@v1.0#1fdefa | n | SDK | no private marker; already in sdk |
-| cls-path-glob-matching | sdk:wkappbot/cls-path-glob-matching.skill.json@v1.0#5d7c93 | n | SDK | no private marker; already in sdk |
-| codex-agents-md-tool-rules | sdk:wkappbot-workflow/codex-agents-md-tool-rules.skill.json@v1.2#9dffd9 | n | SDK | no private marker; already in sdk |
-| codex-auto-approval | sdk:wkappbot-webbot/codex-auto-approval.skill.json@v1.7#2b40a6 | n | PRIVATE | PUBLIC NOW (in sdk); markers: machine path; home a private repo (none holds it yet) |
-| codex-auto-approval-safe | sdk:wkappbot-webbot/codex-auto-approval-safe.skill.json@v1.1#15648a | n | SDK | no private marker; already in sdk |
-| codex-cli-wkappbot-usage | sdk:wkappbot-workflow/codex-cli-wkappbot-usage.skill.json@v1.69#d44627 | n | SDK | no private marker; already in sdk |
-| codex-cli-wkappbot-usage-howto | sdk:wkappbot-workflow/codex-cli-wkappbot-usage-howto.skill.json@v1.13#043ff1 | n | SDK | no private marker; already in sdk |
-| codex-cli-wkappbot-usage-ref | sdk:wkappbot-workflow/codex-cli-wkappbot-usage-ref.skill.json@v1.0#f24324 | n | SDK | no private marker; already in sdk |
-| codex-default-deny-allow-override-spec | sdk:wkappbot-workflow/codex-default-deny-allow-override-spec.skill.json@v1.27#6e5aed | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| codex-friendly-skill-template | sdk:wkappbot-core/codex-friendly-skill-template.skill.json@v1.4#7ca776 | n | SDK | no private marker; already in sdk |
-| codex-global-approval | sdk:wkappbot-core/codex-global-approval.skill.json@v1.7#b0bf13 | n | PRIVATE | PUBLIC NOW (in sdk); markers: machine path; home a private repo (none holds it yet) |
-| codex-global-approval --exit-event wkappbot-exit-59736 | sdk:wkappbot-core/codex-global-approval --exit-event wkappbot-exit-59736.skill.json@v1.0#87e394 | n | PRIVATE | PUBLIC NOW (in sdk); markers: machine path; home a private repo (none holds it yet) |
-| codex-opus-agent-delegation | sdk:wkappbot-workflow/codex-opus-agent-delegation.skill.json@v1.2#ba6eba | n | SDK | no private marker; already in sdk |
-| codex-opus-agent-delegation-howto | sdk:wkappbot-workflow/codex-opus-agent-delegation-howto.skill.json@v1.0#b9e4ca | n | SDK | no private marker; already in sdk |
-| codex-opus-agent-delegation-ref | sdk:wkappbot-workflow/codex-opus-agent-delegation-ref.skill.json@v1.0#1568d5 | n | SDK | no private marker; already in sdk |
-| codex-pace-guard | sdk:wkappbot-workflow/codex-pace-guard.skill.json@v1.6#642fa0 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| codex-session-guardrails | sdk:wkappbot-workflow/codex-session-guardrails.skill.json@v1.15#58653f | n | PRIVATE | PUBLIC NOW (in sdk); markers: machine path; home a private repo (none holds it yet) |
-| codex-session-tool-usage-statistics-551-sessions-analyzed | sdk:wkappbot-workflow/codex-session-tool-usage-statistics-551-sessions-analyzed.skill.json@v1.0#7c889d | n | PRIVATE | PUBLIC NOW (in sdk); markers: machine path; home a private repo (none holds it yet) |
-| codex-shell-command-harness-gap-analysis-and-fix-spec | sdk:wkappbot-workflow/codex-shell-command-harness-gap-analysis-and-fix-spec.skill.json@v1.0#7e1de1 | n | SDK | no private marker; already in sdk |
-| codex-skill-id-desc-limit-enforcement | sdk:wkappbot-workflow/codex-skill-id-desc-limit-enforcement.skill.json@v1.0#793e30<br>sdk:wkappbot-core/codex-skill-id-desc-limit-enforcement.skill.json@v1.0#5d05dd | y | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| codex-skill-registration-edit-guide | sdk:wkappbot-workflow/codex-skill-registration-edit-guide.skill.json@v1.0#b90ace | n | SDK | no private marker; already in sdk |
-| codex-spec-gate | sdk:wkappbot-workflow/codex-spec-gate.skill.json@v1.1#74f664 | n | SDK | no private marker; already in sdk |
-| codex-tool-wrappers | sdk:wkappbot-workflow/codex-tool-wrappers.skill.json@v1.103#f385fb | n | PRIVATE | PUBLIC NOW (in sdk); markers: account, token:weak; home a private repo (none holds it yet) |
-| codex-tool-wrappers-howto | sdk:wkappbot-workflow/codex-tool-wrappers-howto.skill.json@v1.5#c2cfa3 | n | PRIVATE | PUBLIC NOW (in sdk); markers: machine path; home a private repo (none holds it yet) |
-| codex-tool-wrappers-ref | sdk:wkappbot-workflow/codex-tool-wrappers-ref.skill.json@v1.0#47ec75 | n | SDK | no private marker; already in sdk |
-| commandhelpmap-entry-required-for-every-dispatched-command | sdk:wkappbot-core/commandhelpmap-entry-required-for-every-dispatched-command.skill.json@v1.6#ccf653 | n | SDK | no private marker; already in sdk |
-| commandhelpmap-entry-required-ref | sdk:wkappbot-core/commandhelpmap-entry-required-ref.skill.json@v1.1#48223d | n | SDK | no private marker; already in sdk |
-| commit-push-hook-policy-overview | sdk:wkappbot-workflow/commit-push-hook-policy-overview.skill.json@v1.0#2c416b | n | SDK | no private marker; already in sdk |
-| compete-roadmap-2026q2 | sdk:wkappbot/compete-roadmap-2026q2.skill.json@v1.0#a0392f | n | SDK | no private marker; already in sdk |
-| competitive-analysis-css-selectors-rust-perf-scenario-expect-xp-sharing | sdk:wkappbot/competitive-analysis-css-selectors-rust-perf-scenario-expect-xp-sharing.skill.json@v1.1#8fd4fe | n | SDK | no private marker; already in sdk |
-| competitor-analysis-desktop-ai-agents-2026 | sdk:wkappbot/competitor-analysis-desktop-ai-agents-2026.skill.json@v1.1#f0dc16 | n | SDK | no private marker; already in sdk |
-| concurrent-ai-isolation-env-var-detection-beats-parent-chain | sdk:wkappbot/concurrent-ai-isolation-env-var-detection-beats-parent-chain.skill.json@v1.1#05c3fd | n | SDK | no private marker; already in sdk |
-| conpty-enter-intercept-two-phase-decide-then-commit | sdk:wkappbot-core/conpty-enter-intercept-two-phase-decide-then-commit.skill.json@v1.0#f4f995 | n | SDK | no private marker; already in sdk |
-| control-ui-without-stealing-focus-3-tier-focusless-strategy | sdk:wkappbot/control-ui-without-stealing-focus-3-tier-focusless-strategy.skill.json@v1.2#f03bac | n | SDK | no private marker; already in sdk |
-| cookbook-install-input-protection-on-a-new-a11y-action-beginner | sdk:wkappbot-core/cookbook-install-input-protection-on-a-new-a11y-action-beginner.skill.json@v2#62cd7d | n | SDK | no private marker; already in sdk |
-| cookie-consent-ai-strategy | sdk:wkappbot-core/cookie-consent-ai-strategy.skill.json@v1.0#faee3b | n | SDK | no private marker; already in sdk |
-| core-pre-command-flag-skip | sdk:wkappbot-core/core-pre-command-flag-skip.skill.json@v1.2#ca49a6 | n | SDK | no private marker; already in sdk |
-| core-worker-logging-launcher-chain | sdk:wkappbot-core/core-worker-logging-launcher-chain.skill.json@v1.8#d0e0a7 | n | SDK | no private marker; already in sdk |
-| cp949-save-guard | sdk:wkappbot-workflow/cp949-save-guard.skill.json@v1.4#ed3d2c | n | SDK | no private marker; already in sdk |
-| crash-reboot-recovery-cascade | sdk:wkappbot-core/crash-reboot-recovery-cascade.skill.json@v1.0#8ff1db | n | PRIVATE | PUBLIC NOW (in sdk); markers: machine path; home a private repo (none holds it yet) |
-| cross-family-harness-integration | sdk:wkappbot/cross-family-harness-integration.skill.json@v1.0#b31321 | n | SDK | no private marker; already in sdk |
-| cross-family-harness-integration-howto | sdk:wkappbot/cross-family-harness-integration-howto.skill.json@v1.2#b0751b | n | SDK | no private marker; already in sdk |
-| cross-family-harness-integration-ref | sdk:wkappbot/cross-family-harness-integration-ref.skill.json@v1.11#13c30c | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| cross-repo-claude-notify | sdk:wkappbot-sdk/cross-repo-claude-notify.skill.json@v1.11#d17569 | n | SDK | no private marker; already in sdk |
-| cross-repo-launcher-build | sdk:wkappbot-sdk/cross-repo-launcher-build.skill.json@v1.0#6e3d19 | n | SDK | no private marker; already in sdk |
-| declarative-automation-claude-md-harness-as-scheduler | sdk:wkappbot-workflow/declarative-automation-claude-md-harness-as-scheduler.skill.json@v1.1#5499f0 | n | SDK | no private marker; already in sdk |
-| delegation-policy-all-commands-use-mandatory-haiku-codex-opus-routing-in-claude-md | sdk:wkappbot-workflow/delegation-policy-all-commands-use-mandatory-haiku-codex-opus-routing-in-claude-md.skill.json@v1.3#a52e8c | n | SDK | no private marker; already in sdk |
-| delegation-preflight-oneshot | sdk:personal-docs/delegation-preflight-oneshot.skill.json@v1.13#fe1ef4 | n | PRIVATE | PUBLIC NOW (in sdk); markers: app:personal-docs, token:weak; home a private repo (none holds it yet) |
-| developer-skill-template | sdk:wkappbot-core/developer-skill-template.skill.json@v1.0#ac34c9 | n | SDK | no private marker; already in sdk |
-| diagnostic-commands-cheatsheet | sdk:wkappbot-workflow/diagnostic-commands-cheatsheet.skill.json@v1.0#5902d7 | n | SDK | no private marker; already in sdk |
-| diagnostics-subcommand-and-setup-ps1-implementation | sdk:wkappbot-sdk/diagnostics-subcommand-and-setup-ps1-implementation.skill.json@v1.2#c15a83 | n | PRIVATE | PUBLIC NOW (in sdk); markers: customer; home a private repo (none holds it yet) |
-| dialectic-guard-gotchas-relay-truncation-brief-labels-evidence-window | sdk:wkappbot-workflow/dialectic-guard-gotchas-relay-truncation-brief-labels-evidence-window.skill.json@v1.0#0a60db | n | SDK | no private marker; already in sdk |
-| diet-score-guard-dated-spec-todos-and-incident-history | sdk:wkappbot-workflow/diet-score-guard-dated-spec-todos-and-incident-history.skill.json@v1.0#697909 | n | SDK | no private marker; already in sdk |
-| ecfs-bojeong-submit-procedure | sdk:wkappbot-workflow/ecfs-bojeong-submit-procedure.skill.json@v1.0#fe6c2e | n | SDK | no private marker; already in sdk |
-| edit-bg-guard | sdk:wkappbot-workflow/edit-bg-guard.skill.json@v1.0#6e1033 | n | SDK | no private marker; already in sdk |
-| edit-write-bypass-ref | sdk:wkappbot/edit-write-bypass-ref.skill.json@v1.0#c79384 | n | SDK | no private marker; already in sdk |
-| elevated-eye-admin-pipe-server | sdk:wkappbot-core/elevated-eye-admin-pipe-server.skill.json@v1.5#3daa31 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| elevated-proxy-subprocess-timeout-hasexited-check | sdk:wkappbot-core/elevated-proxy-subprocess-timeout-hasexited-check.skill.json@v1.3#408a35 | n | SDK | no private marker; already in sdk |
-| emergency-write-freeze-escape-ladder-for-non-pro-new-file-creation | sdk:wkappbot-workflow/emergency-write-freeze-escape-ladder-for-non-pro-new-file-creation.skill.json@v1.9#cd4cef | n | SDK | no private marker; already in sdk |
-| errors-jsonl-triage | sdk:wkappbot-workflow/errors-jsonl-triage.skill.json@v1.15#a92792 | n | SDK | no private marker; already in sdk |
-| ev-contrib-ux-2056366 | sdk:test-ev/ev-contrib-ux-2056366.skill.json@v1.0#29302f | n | SDK | no private marker; already in sdk |
-| ev-contrib-ux-2073971 | sdk:test-ev/ev-contrib-ux-2073971.skill.json@v1.0#f274f7 | n | SDK | no private marker; already in sdk |
-| ev-contrib-ux-277 | sdk:test-ev/ev-contrib-ux-277.skill.json@v1.0#32d1cb | n | SDK | no private marker; already in sdk |
-| ev-contrib-ux-3755 | sdk:test-ev/ev-contrib-ux-3755.skill.json@v1.0#b5764f | n | SDK | no private marker; already in sdk |
-| ev-contrib-ux-4653 | sdk:test-ev/ev-contrib-ux-4653.skill.json@v1.0#8186f5 | n | SDK | no private marker; already in sdk |
-| ev-contrib-ux-673658 | sdk:test-ev/ev-contrib-ux-673658.skill.json@v1.0#6a1bbc | n | SDK | no private marker; already in sdk |
-| ev-contrib-ux-684781 | sdk:test-ev/ev-contrib-ux-684781.skill.json@v1.0#77a93b | n | SDK | no private marker; already in sdk |
-| ev-contrib-ux-70943 | sdk:test-ev/ev-contrib-ux-70943.skill.json@v1.0#f5a47d | n | SDK | no private marker; already in sdk |
-| ev-contrib-ux2-2056366 | sdk:test-ev/ev-contrib-ux2-2056366.skill.json@v1.0#16527f | n | SDK | no private marker; already in sdk |
-| ev-contrib-ux2-2073971 | sdk:test-ev/ev-contrib-ux2-2073971.skill.json@v1.0#695961 | n | SDK | no private marker; already in sdk |
-| ev-contrib-ux2-3755 | sdk:test-ev/ev-contrib-ux2-3755.skill.json@v1.0#906a09 | n | SDK | no private marker; already in sdk |
-| ev-contrib-ux2-4653 | sdk:test-ev/ev-contrib-ux2-4653.skill.json@v1.0#93b232 | n | SDK | no private marker; already in sdk |
-| ev-contrib-ux2-673658 | sdk:test-ev/ev-contrib-ux2-673658.skill.json@v1.0#aaf001 | n | SDK | no private marker; already in sdk |
-| ev-contrib-ux2-684781 | sdk:test-ev/ev-contrib-ux2-684781.skill.json@v1.0#2f7961 | n | SDK | no private marker; already in sdk |
-| ev-contrib-ux2-70943 | sdk:test-ev/ev-contrib-ux2-70943.skill.json@v1.0#ca5230 | n | SDK | no private marker; already in sdk |
-| ev-draft-2056315 | sdk:test-ev/ev-draft-2056315.skill.json@v1.0#6f6c7a | n | SDK | no private marker; already in sdk |
-| ev-draft-2073949 | sdk:test-ev/ev-draft-2073949.skill.json@v1.0#179870 | n | SDK | no private marker; already in sdk |
-| ev-draft-3743 | sdk:test-ev/ev-draft-3743.skill.json@v1.0#1a0a3f | n | SDK | no private marker; already in sdk |
-| ev-draft-4641 | sdk:test-ev/ev-draft-4641.skill.json@v1.0#6f91ac | n | SDK | no private marker; already in sdk |
-| ev-draft-673537 | sdk:test-ev/ev-draft-673537.skill.json@v1.0#dcd186 | n | SDK | no private marker; already in sdk |
-| ev-draft-684694 | sdk:test-ev/ev-draft-684694.skill.json@v1.0#b04ee5 | n | SDK | no private marker; already in sdk |
-| ev-draft-70931 | sdk:test-ev/ev-draft-70931.skill.json@v1.0#e29654 | n | SDK | no private marker; already in sdk |
-| eye-crash-recovery-via-mutex-force-release | sdk:wkappbot-core/eye-crash-recovery-via-mutex-force-release.skill.json@v1.11#60d19c | n | SDK | no private marker; already in sdk |
-| eye-dpi-drift-snap-timing-fix | sdk:wkappbot-core/eye-dpi-drift-snap-timing-fix.skill.json@v1.6#f8e0ad | n | SDK | no private marker; already in sdk |
-| eye-findallprompts-blocking-fix-cooldown-10s-mcp-warmup-guard | sdk:wkappbot-core/eye-findallprompts-blocking-fix-cooldown-10s-mcp-warmup-guard.skill.json@v1.3#1daf09 | n | SDK | no private marker; already in sdk |
-| eye-handoff-age-guard | sdk:wkappbot-core/eye-handoff-age-guard.skill.json@v1.1#999b0e | n | SDK | no private marker; already in sdk |
-| eye-health-mousecca-storm | sdk:wkappbot-core/eye-health-mousecca-storm.skill.json@v1.1#2fa73c | n | SDK | no private marker; already in sdk |
-| eye-hotswap-stamp-10min-expiry | sdk:wkappbot-core/eye-hotswap-stamp-10min-expiry.skill.json@v1.2#3da15e | n | SDK | no private marker; already in sdk |
-| eye-ipc-caller-hwnd-resolution | sdk:wkappbot/eye-ipc-caller-hwnd-resolution.skill.json@v1.23#36930f | n | SDK | no private marker; already in sdk |
-| eye-ipc-caller-hwnd-resolution-ref | sdk:wkappbot/eye-ipc-caller-hwnd-resolution-ref.skill.json@v1.0#526afe | n | SDK | no private marker; already in sdk |
-| eye-mutex-force-release-recovery | sdk:wkappbot-core/eye-mutex-force-release-recovery.skill.json@v1.1#07d670 | n | SDK | no private marker; already in sdk |
-| eye-screensaver-must-not-detect-then-act-on-user-windows-by-fragile-heuristics | sdk:wkappbot-core/eye-screensaver-must-not-detect-then-act-on-user-windows-by-fragile-heuristics.skill.json@v1.0#69302c | n | SDK | no private marker; already in sdk |
-| eye-slack-thread-streaming-structure | sdk:wkappbot/eye-slack-thread-streaming-structure.skill.json@v1.11#f6e816 | n | SDK | no private marker; already in sdk |
-| eye-tick-context-warned-dedup-persist | sdk:wkappbot-workflow/eye-tick-context-warned-dedup-persist.skill.json@v1.4#17c580 | n | SDK | no private marker; already in sdk |
-| eye-tick-elevated-pipe-parallel-accept | sdk:wkappbot-workflow/eye-tick-elevated-pipe-parallel-accept.skill.json@v1.4#16bba4 | n | SDK | no private marker; already in sdk |
-| eye-tick-evict-null-cmdline-admin-skip | sdk:wkappbot-workflow/eye-tick-evict-null-cmdline-admin-skip.skill.json@v1.4#938604 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| family-settings-file-is-the-harness-gate-no-yolo-no-blanket-allow-no-permanent-approval | sdk:wkappbot-workflow/family-settings-file-is-the-harness-gate-no-yolo-no-blanket-allow-no-permanent-approval.skill.json@v1.0#7fdbec | n | SDK | no private marker; already in sdk |
-| file-as-scheduler-pending-prompts-pattern | sdk:wkappbot-core/file-as-scheduler-pending-prompts-pattern.skill.json@v1.12#f2c318 | n | SDK | no private marker; already in sdk |
-| file-command-cheatsheet | sdk:wkappbot-workflow/file-command-cheatsheet.skill.json@v1.9#914e7b | n | SDK | no private marker; already in sdk |
-| file-command-cheatsheet-howto | sdk:wkappbot-workflow/file-command-cheatsheet-howto.skill.json@v1.0#b9be5a | n | SDK | no private marker; already in sdk |
-| file-command-cheatsheet-ref | sdk:wkappbot-workflow/file-command-cheatsheet-ref.skill.json@v1.0#ef16bf | n | SDK | no private marker; already in sdk |
-| file-symlink-and-file-link-create-symbolic-and-hard-links | sdk:wkappbot/file-symlink-and-file-link-create-symbolic-and-hard-links.skill.json@v1.1#4247f4 | n | SDK | no private marker; already in sdk |
-| filenotfoundexception-system-net-http-during-hotswap-is-binary-corruption-false-positive | sdk:wkappbot-core/filenotfoundexception-system-net-http-during-hotswap-is-binary-corruption-false-positive.skill.json@v1.4#549c4b | n | SDK | no private marker; already in sdk |
-| find-any-window-element-your-way-grap-multi-modal-search | sdk:wkappbot/find-any-window-element-your-way-grap-multi-modal-search.skill.json@v1.4#165add | n | PRIVATE | PUBLIC NOW (in sdk); markers: account; home a private repo (none holds it yet) |
-| find-tree-grap-pitfalls | sdk:wkappbot-workflow/find-tree-grap-pitfalls.skill.json@v1.0#f520ec | n | SDK | no private marker; already in sdk |
-| focusless-first-principle | sdk:wkappbot-workflow/focusless-first-principle.skill.json@v1.5#650682 | n | SDK | no private marker; already in sdk |
-| foundation-is-roots-charge-howto | sdk:wkappbot-workflow/foundation-is-roots-charge-howto.skill.json@v1.0#9a8042 | n | SDK | no private marker; already in sdk |
-| foundation-is-roots-charge-not-a-chore | sdk:wkappbot-workflow/foundation-is-roots-charge-not-a-chore.skill.json@v1.222#d090d3 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| foundation-is-roots-charge-not-a-chore-howto | sdk:wkappbot-workflow/foundation-is-roots-charge-not-a-chore-howto.skill.json@v1.1#61b374 | n | SDK | no private marker; already in sdk |
-| foundation-is-roots-charge-not-a-chore-ref | sdk:wkappbot-workflow/foundation-is-roots-charge-not-a-chore-ref.skill.json@v1.0#4a639a | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| gate-two-tier-verify-before-block-t1 | sdk:wkappbot-workflow/gate-two-tier-verify-before-block-t1.skill.json@v1.2#a9c54b | n | SDK | no private marker; already in sdk |
-| gemini-agent-tier-onboarding | sdk:wkappbot-workflow/gemini-agent-tier-onboarding.skill.json@v1.0#589405 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| gemini-flash-reflection | sdk:wkappbot-workflow/gemini-flash-reflection.skill.json@v1.7#8384eb | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| gemini-flash-reflection-how-to | sdk:wkappbot-workflow/gemini-flash-reflection-how-to.skill.json@v1.1#88ac09 | n | SDK | no private marker; already in sdk |
-| gemini-flash-reflection-howto | sdk:wkappbot-workflow/gemini-flash-reflection-howto.skill.json@v1.1#a32c1e | n | SDK | no private marker; already in sdk |
-| gemini-flash-reflection-ref | sdk:wkappbot-workflow/gemini-flash-reflection-ref.skill.json@v1.1#15dab6 | n | SDK | no private marker; already in sdk |
-| gemini-flash-reflection-reference | sdk:wkappbot-workflow/gemini-flash-reflection-reference.skill.json@v1.1#36664a | n | SDK | no private marker; already in sdk |
-| gemini-harness-decoupling-lessons | sdk:wkappbot-kih/gemini-harness-decoupling-lessons.skill.json@v1.0#41b58b | n | PRIVATE | PUBLIC NOW (in sdk); markers: .env, account, token:credential; home a private repo (none holds it yet) |
-| gemini-pro-reflection | sdk:wkappbot-workflow/gemini-pro-reflection.skill.json@v1.25#1378e9 | n | SDK | no private marker; already in sdk |
-| gg-ecosystem-unified | sdk:wkappbot-workflow/gg-ecosystem-unified.skill.json@v1.8#5f00a6 | n | SDK | no private marker; already in sdk |
-| gg-ecosystem-unified-ref | sdk:wkappbot-workflow/gg-ecosystem-unified-ref.skill.json@v1.0#dc6d9a | n | SDK | no private marker; already in sdk |
-| gha-mail-scan-ccr-morning-briefing-daily-schedule | sdk:wkappbot-workflow/gha-mail-scan-ccr-morning-briefing-daily-schedule.skill.json@v1.0#c5645f | n | PRIVATE | PUBLIC NOW (in sdk); markers: password; home a private repo (none holds it yet) |
-| git-blocked-land-it | sdk:wkappbot-workflow/git-blocked-land-it.skill.json@v1.61#9b4680 | n | SDK | no private marker; already in sdk |
-| git-commit-conventions | sdk:wkappbot-workflow/git-commit-conventions.skill.json@v1.4#e7d8e6 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| git-lock-auto-cleanup | sdk:wkappbot-workflow/git-lock-auto-cleanup.skill.json@v1.1#45c757 | n | SDK | no private marker; already in sdk |
-| github-actions-budget-and-pat-recovery | sdk:wkappbot/github-actions-budget-and-pat-recovery.skill.json@v1.0#13c33c | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:credential; home a private repo (none holds it yet) |
-| github-pat-fine-grained-permission-edit | sdk:wkappbot/github-pat-fine-grained-permission-edit.skill.json@v1.1#a3b7ed | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:credential; home a private repo (none holds it yet) |
-| global-operator-rules | sdk:wkappbot-workflow/global-operator-rules.skill.json@v1.3#6302d5 | n | PRIVATE | PUBLIC NOW (in sdk); markers: .env, HANTOO, KIWOOM, customer, token:credential; home a private repo (none holds it yet) |
-| gmail-oauth2-manager-headhunter-scan-draft-via-gmail-api | sdk:wkappbot-workflow/gmail-oauth2-manager-headhunter-scan-draft-via-gmail-api.skill.json@v1.0#f466fb | n | PRIVATE | PUBLIC NOW (in sdk); markers: .env, password, token:credential; home a private repo (none holds it yet) |
-| gmail-support-bot | sdk:wkappbot-sdk/gmail-support-bot.skill.json@v1.1#5d47ed | n | PRIVATE | PUBLIC NOW (in sdk); markers: .env, account, token:credential; home a private repo (none holds it yet) |
-| gpt-mini-reflection | sdk:wkappbot-workflow/gpt-mini-reflection.skill.json@v1.21#276486 | n | SDK | no private marker; already in sdk |
-| gpt-reflection | sdk:wkappbot-workflow/gpt-reflection.skill.json@v1.273#e27874 | n | PRIVATE | PUBLIC NOW (in sdk); markers: machine path; home a private repo (none holds it yet) |
-| gpt-reflection-howto | sdk:wkappbot-workflow/gpt-reflection-howto.skill.json@v1.10#733036 | n | SDK | no private marker; already in sdk |
-| gpt-reflection-ref | sdk:wkappbot-workflow/gpt-reflection-ref.skill.json@v1.18#b07a5d | n | SDK | no private marker; already in sdk |
-| grap | sdk:wkappbot-workflow/grap.skill.json@v1.17#a0bf3a | n | SDK | no private marker; already in sdk |
-| grap-alias-system | sdk:wkappbot/grap-alias-system.skill.json@v1.1#796b0f | n | SDK | no private marker; already in sdk |
-| grap-howto | sdk:wkappbot-workflow/grap-howto.skill.json@v1.0#f58fd1 | n | SDK | no private marker; already in sdk |
-| grap-hwnd-volatility-hwnd-stale-between-find-and-use | sdk:wkappbot/grap-hwnd-volatility-hwnd-stale-between-find-and-use.skill.json@v1.1#b26e4a | n | SDK | no private marker; already in sdk |
-| grap-ref | sdk:wkappbot-workflow/grap-ref.skill.json@v1.0#50c3b1 | n | SDK | no private marker; already in sdk |
-| grap-target | sdk:wkappbot/grap-target.skill.json@v1.45#99460c | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| guard-block-recurrence-failure-score | sdk:wkappbot-workflow/guard-block-recurrence-failure-score.skill.json@v1.0#a1127d | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| guard-feeding-cache-confirm-before-block | sdk:wkappbot-sdk/guard-feeding-cache-confirm-before-block.skill.json@v1.2#d64b73 | n | SDK | no private marker; already in sdk |
-| haiku-as-qa-canary | sdk:wkappbot-workflow/haiku-as-qa-canary.skill.json@v1.7#0ba8d5 | n | SDK | no private marker; already in sdk |
-| haiku-handoff-on-cli-retry | sdk:wkappbot-workflow/haiku-handoff-on-cli-retry.skill.json@v1.0#977ac3 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| haiku-reflection | sdk:personal-docs/haiku-reflection.skill.json@v1.1833#cf2ac2 | n | PRIVATE | PUBLIC NOW (in sdk); markers: app:personal-docs, token:weak; home a private repo (none holds it yet) |
-| haiku-reflection-howto | sdk:personal-docs/haiku-reflection-howto.skill.json@v1.261#34c0b0 | n | PRIVATE | PUBLIC NOW (in sdk); markers: app:personal-docs, token:weak; home a private repo (none holds it yet) |
-| haiku-reflection-ref | sdk:personal-docs/haiku-reflection-ref.skill.json@v1.171#cef851 | n | PRIVATE | PUBLIC NOW (in sdk); markers: account, app:personal-docs, password, token:weak; home a private repo (none holds it yet) |
-| haiku-reflection-ref-t3 | sdk:personal-docs/haiku-reflection-ref-t3.skill.json@v1.195#500773 | n | PRIVATE | PUBLIC NOW (in sdk); markers: HANTOO, app:personal-docs, token:weak; home a private repo (none holds it yet) |
-| haiku-sandbox-problem-solving | sdk:wkappbot-workflow/haiku-sandbox-problem-solving.skill.json@v1.3#4bba8c | n | SDK | no private marker; already in sdk |
-| haiku-sandbox-problem-solving-howto | sdk:wkappbot-workflow/haiku-sandbox-problem-solving-howto.skill.json@v1.0#f53e29 | n | SDK | no private marker; already in sdk |
-| haiku-sandbox-problem-solving-ref | sdk:wkappbot-workflow/haiku-sandbox-problem-solving-ref.skill.json@v1.0#213c42 | n | SDK | no private marker; already in sdk |
-| handoff-checklist | sdk:wkappbot-workflow/handoff-checklist.skill.json@v1.6#b39551 | n | SDK | no private marker; already in sdk |
-| handoff-send-best-practice | sdk:wkappbot-workflow/handoff-send-best-practice.skill.json@v1.15#4d8ab3 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| hangul-ime-relay-architecture-and-sync-pattern | sdk:wkappbot/hangul-ime-relay-architecture-and-sync-pattern.skill.json@v1.8#f81f15 | n | SDK | no private marker; already in sdk |
-| harness | sdk:wkappbot-workflow/harness.skill.json@v1.0#e260a9 | n | SDK | no private marker; already in sdk |
-| harness-active-model-scoping | sdk:wkappbot-workflow/harness-active-model-scoping.skill.json@v1.10#636424 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| harness-active-model-scoping-howto | sdk:wkappbot-workflow/harness-active-model-scoping-howto.skill.json@v1.8#d639f1 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| harness-active-model-scoping-ref | sdk:wkappbot-workflow/harness-active-model-scoping-ref.skill.json@v1.2#d8c4c1 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| harness-agent-brief-guard | sdk:wkappbot-workflow/harness-agent-brief-guard.skill.json@v1.0#9cc76b | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| harness-agent-leak-guard | sdk:wkappbot-workflow/harness-agent-leak-guard.skill.json@v1.0#962081 | n | SDK | no private marker; already in sdk |
-| harness-bash-uses-pwsh-guard | sdk:wkappbot-workflow/harness-bash-uses-pwsh-guard.skill.json@v1.0#3c5c94 | n | SDK | no private marker; already in sdk |
-| harness-bg-task-guard | sdk:wkappbot-workflow/harness-bg-task-guard.skill.json@v1.0#b13063 | n | SDK | no private marker; already in sdk |
-| harness-busy-fleet-guard | sdk:wkappbot-workflow/harness-busy-fleet-guard.skill.json@v1.33#b3c0ea | n | SDK | no private marker; already in sdk |
-| harness-busy-fleet-guard-ref | sdk:wkappbot-workflow/harness-busy-fleet-guard-ref.skill.json@v1.0#d84d51 | n | SDK | no private marker; already in sdk |
-| harness-canonical-edit-via-sandbox-merge | sdk:wkappbot-workflow/harness-canonical-edit-via-sandbox-merge.skill.json@v1.0#ca3481 | n | SDK | no private marker; already in sdk |
-| harness-canonical-edit-via-sandbox-merge-howto | sdk:wkappbot-workflow/harness-canonical-edit-via-sandbox-merge-howto.skill.json@v1.0#fcebf6 | n | SDK | no private marker; already in sdk |
-| harness-canonical-edit-via-sandbox-merge-ref | sdk:wkappbot-workflow/harness-canonical-edit-via-sandbox-merge-ref.skill.json@v1.0#48e702 | n | SDK | no private marker; already in sdk |
-| harness-cd-noise-guard | sdk:wkappbot-workflow/harness-cd-noise-guard.skill.json@v1.0#0ec65e | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| harness-codex-pace-guard | sdk:wkappbot-workflow/harness-codex-pace-guard.skill.json@v1.19#800eea | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| harness-codex-pace-guard-howto | sdk:wkappbot-workflow/harness-codex-pace-guard-howto.skill.json@v1.6#53af3d | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| harness-codex-pace-guard-ref | sdk:wkappbot-workflow/harness-codex-pace-guard-ref.skill.json@v1.14#39a1f5 | n | SDK | no private marker; already in sdk |
-| harness-codex-spec-gate | sdk:wkappbot-workflow/harness-codex-spec-gate.skill.json@v1.0#80864e | n | SDK | no private marker; already in sdk |
-| harness-commit-push-gate-spec | sdk:wkappbot-workflow/harness-commit-push-gate-spec.skill.json@v1.8#2f8378 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| harness-cp949-guard | sdk:wkappbot-workflow/harness-cp949-guard.skill.json@v1.0#71845a | n | SDK | no private marker; already in sdk |
-| harness-dialectic-guard | sdk:wkappbot-workflow/harness-dialectic-guard.skill.json@v1.0#1b2bae | n | SDK | no private marker; already in sdk |
-| harness-diet-score-guard | sdk:wkappbot-workflow/harness-diet-score-guard.skill.json@v1.0#6d2e27 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| harness-diet-score-guard-ref | sdk:wkappbot-workflow/harness-diet-score-guard-ref.skill.json@v1.4#9e22be | n | SDK | no private marker; already in sdk |
-| harness-edit-bg-guard | sdk:wkappbot-workflow/harness-edit-bg-guard.skill.json@v1.0#5006c6 | n | SDK | no private marker; already in sdk |
-| harness-edit-write-skill-bypass | sdk:wkappbot/harness-edit-write-skill-bypass.skill.json@v1.6#783fc6 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| harness-edit-write-skill-bypass-howto | sdk:wkappbot/harness-edit-write-skill-bypass-howto.skill.json@v1.1#42b453 | n | SDK | no private marker; already in sdk |
-| harness-edit-write-skill-bypass-ref | sdk:wkappbot/harness-edit-write-skill-bypass-ref.skill.json@v1.0#706bf4 | n | SDK | no private marker; already in sdk |
-| harness-edit-write-study-lock-hole-fixed | sdk:wkappbot-workflow/harness-edit-write-study-lock-hole-fixed.skill.json@v1.0#75763d | n | SDK | no private marker; already in sdk |
-| harness-engineering-korean-interview | sdk:wkappbot-workflow/harness-engineering-korean-interview.skill.json@v1.0#9452a8 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| harness-family-identity-and-edit-scope-order | sdk:wkappbot-workflow/harness-family-identity-and-edit-scope-order.skill.json@v1.0#6b63f2 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| harness-gate-log-data-integrity | sdk:wkappbot-workflow/harness-gate-log-data-integrity.skill.json@v1.39#7f4474 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| harness-gate-log-data-integrity-howto | sdk:wkappbot-workflow/harness-gate-log-data-integrity-howto.skill.json@v1.0#839d71 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| harness-guard-exemption-ladder-implementation-howto-phases-adapters-joseki | sdk:wkappbot-workflow/harness-guard-exemption-ladder-implementation-howto-phases-adapters-joseki.skill.json@v1.0#ef9431 | n | SDK | no private marker; already in sdk |
-| harness-guard-exemption-ladder-spec | sdk:wkappbot-workflow/harness-guard-exemption-ladder-spec.skill.json@v1.68#d0c493 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| harness-guard-exemption-ladder-spec-howto | sdk:wkappbot-workflow/harness-guard-exemption-ladder-spec-howto.skill.json@v1.4#18a172 | n | SDK | no private marker; already in sdk |
-| harness-guard-exemption-ladder-spec-ref | sdk:wkappbot-workflow/harness-guard-exemption-ladder-spec-ref.skill.json@v1.2#886bd3 | n | SDK | no private marker; already in sdk |
-| harness-hardening-playbook-13-reflexes-from-the-2026-06-20-marathon | sdk:wkappbot-workflow/harness-hardening-playbook-13-reflexes-from-the-2026-06-20-marathon.skill.json@v1.6#0bd59b | n | SDK | no private marker; already in sdk |
-| harness-installer-owns-all-setup | sdk:wkappbot-sdk/harness-installer-owns-all-setup.skill.json@v1.0#05e25c | n | PRIVATE | PUBLIC NOW (in sdk); markers: customer; home a private repo (none holds it yet) |
-| harness-kill-guard | sdk:wkappbot-workflow/harness-kill-guard.skill.json@v1.0#b383e2 | n | SDK | no private marker; already in sdk |
-| harness-learn-self-evolving-skills | sdk:wkappbot-workflow/harness-learn-self-evolving-skills.skill.json@v1.20#c0c9e5 | n | SDK | no private marker; already in sdk |
-| harness-no-verify-guard | sdk:wkappbot-workflow/harness-no-verify-guard.skill.json@v1.0#cb2ef1 | n | SDK | no private marker; already in sdk |
-| harness-omega-guard | sdk:wkappbot-kih/harness-omega-guard.skill.json@v1.17#7d5b02 | n | SDK | no private marker; already in sdk |
-| harness-opus-budget-guard | sdk:wkappbot-workflow/harness-opus-budget-guard.skill.json@v1.0#f9e01a | n | SDK | no private marker; already in sdk |
-| harness-pace-guard | sdk:wkappbot-workflow/harness-pace-guard.skill.json@v1.0#01205b | n | SDK | no private marker; already in sdk |
-| harness-pace-guard-ref | sdk:wkappbot-workflow/harness-pace-guard-ref.skill.json@v1.3#581ce2 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| harness-pending-protect | sdk:wkappbot-workflow/harness-pending-protect.skill.json@v1.0#c205bc | n | SDK | no private marker; already in sdk |
-| harness-python-edit-guard | sdk:wkappbot-workflow/harness-python-edit-guard.skill.json@v1.0#b3c403 | n | SDK | no private marker; already in sdk |
-| harness-robustness-user-dist-appbot-absent | sdk:wkappbot-workflow/harness-robustness-user-dist-appbot-absent.skill.json@v1.8#88be6f | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| harness-sandbox | sdk:wkappbot-workflow/harness-sandbox.skill.json@v1.0#7f4a6d | n | SDK | no private marker; already in sdk |
-| harness-security-guard | sdk:wkappbot-workflow/harness-security-guard.skill.json@v1.0#e209e0 | n | SDK | no private marker; already in sdk |
-| harness-sed-guard | sdk:wkappbot-workflow/harness-sed-guard.skill.json@v1.0#8448fc | n | SDK | no private marker; already in sdk |
-| harness-self-heal-incident-2026-06-10 | sdk:wkappbot-workflow/harness-self-heal-incident-2026-06-10.skill.json@v1.0#dc1bbb | n | SDK | no private marker; already in sdk |
-| harness-settings-reinstall-bypass-bug | sdk:wkappbot-workflow/harness-settings-reinstall-bypass-bug.skill.json@v1.9#c266e7 | n | PRIVATE | PUBLIC NOW (in sdk); markers: machine path; home a private repo (none holds it yet) |
-| harness-skill-delete-guard | sdk:wkappbot-workflow/harness-skill-delete-guard.skill.json@v1.0#21ad0f | n | SDK | no private marker; already in sdk |
-| harness-skill-format-required-single-line-pattern | sdk:wkappbot-workflow/harness-skill-format-required-single-line-pattern.skill.json@v1.0#fdd071 | n | SDK | no private marker; already in sdk |
-| harness-skill-guard | sdk:wkappbot-workflow/harness-skill-guard.skill.json@v1.0#41074e | n | SDK | no private marker; already in sdk |
-| harness-skill-guard-cross-repo | sdk:wkappbot-core/harness-skill-guard-cross-repo.skill.json@v1.24#3862a8 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| harness-skill-guard-format | sdk:wkappbot-workflow/harness-skill-guard-format.skill.json@v1.2#e43e34 | n | SDK | no private marker; already in sdk |
-| harness-skill-list-guard | sdk:wkappbot-workflow/harness-skill-list-guard.skill.json@v1.0#ceb7ec | n | SDK | no private marker; already in sdk |
-| harness-skill-update-pending | sdk:wkappbot-workflow/harness-skill-update-pending.skill.json@v1.0#9cd2f5 | n | SDK | no private marker; already in sdk |
-| harness-source-edit-requires-skill-lock | sdk:wkappbot-workflow/harness-source-edit-requires-skill-lock.skill.json@v1.14#1454f3 | n | PRIVATE | PUBLIC NOW (in sdk); markers: HANTOO, token:weak; home a private repo (none holds it yet) |
-| harness-source-edit-requires-skill-lock-howto | sdk:wkappbot-workflow/harness-source-edit-requires-skill-lock-howto.skill.json@v1.0#bf3598 | n | SDK | no private marker; already in sdk |
-| harness-source-edit-requires-skill-lock-ref | sdk:wkappbot-workflow/harness-source-edit-requires-skill-lock-ref.skill.json@v1.0#8243c3 | n | SDK | no private marker; already in sdk |
-| harness-stall-guard | sdk:wkappbot-workflow/harness-stall-guard.skill.json@v1.930#49fd84 | n | SDK | no private marker; already in sdk |
-| harness-stop-guard | sdk:wkappbot-workflow/harness-stop-guard.skill.json@v1.836#5301a7 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| harness-stop-guard-howto | sdk:wkappbot-kih/harness-stop-guard-howto.skill.json@v1.220#6841e4 | n | PRIVATE | PUBLIC NOW (in sdk); markers: PIN, token:weak; home a private repo (none holds it yet) |
-| harness-stop-guard-ref | sdk:wkappbot-workflow/harness-stop-guard-ref.skill.json@v1.91#81d7f0 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| harness-throttle-rot-spec-drift-prevention | sdk:wkappbot-workflow/harness-throttle-rot-spec-drift-prevention.skill.json@v1.19#691706 | n | SDK | no private marker; already in sdk |
-| harness-throttle-rot-spec-drift-prevention-howto | sdk:wkappbot-workflow/harness-throttle-rot-spec-drift-prevention-howto.skill.json@v1.0#ca69b6 | n | SDK | no private marker; already in sdk |
-| harness-throttle-rot-spec-drift-prevention-ref | sdk:wkappbot-workflow/harness-throttle-rot-spec-drift-prevention-ref.skill.json@v1.0#f1f412 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| harness-tier-gate | sdk:wkappbot-workflow/harness-tier-gate.skill.json@v1.0#517627 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| harness-tier-score-guard | sdk:wkappbot-workflow/harness-tier-score-guard.skill.json@v1.0#a11765 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| harness-watchdog-guard | sdk:wkappbot-workflow/harness-watchdog-guard.skill.json@v1.0#0f6a69 | n | SDK | no private marker; already in sdk |
-| harness-wk-only-gate | sdk:wkappbot-workflow/harness-wk-only-gate.skill.json@v1.0#a6f128 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| headhunter-email-workflow-naver-imap-scan-doc-form-fill-and-reply | sdk:wkappbot-workflow/headhunter-email-workflow-naver-imap-scan-doc-form-fill-and-reply.skill.json@v1.1#3cb6e2 | n | SDK | no private marker; already in sdk |
-| headhunter-mail-manager | sdk:wkappbot-workflow/headhunter-mail-manager.skill.json@v1.10#6f9bb3 | n | PRIVATE | PUBLIC NOW (in sdk); markers: .env, password; home a private repo (none holds it yet) |
-| hippocampus-living-memory | sdk:personal-docs/hippocampus-living-memory.skill.json@v1.118#daa75a | n | PRIVATE | PUBLIC NOW (in sdk); markers: app:personal-docs, token:weak; home a private repo (none holds it yet) |
-| hippocampus-living-memory-howto | sdk:personal-docs/hippocampus-living-memory-howto.skill.json@v1.28#748dcc | n | PRIVATE | PUBLIC NOW (in sdk); markers: app:personal-docs, token:weak; home a private repo (none holds it yet) |
-| hippocampus_memory | sdk:wkappbot-workflow/hippocampus_memory.skill.json@v1.1#416264 | n | SDK | no private marker; already in sdk |
-| hn-browser-control-and-computer-use-as-mcp-tools-works-with-claude-codex-cursor-ai-computer-use-pattern-reference | sdk:wkappbot-workflow/hn-browser-control-and-computer-use-as-mcp-tools-works-with-claude-codex-cursor-ai-computer-use-pattern-reference.skill.json@v1.2#4e1355 | n | SDK | no private marker; already in sdk |
-| hn-oculos-give-ai-agents-control-of-your-desktop-via-mcp-ai-computer-use-pattern-reference | sdk:wkappbot-workflow/hn-oculos-give-ai-agents-control-of-your-desktop-via-mcp-ai-computer-use-pattern-reference.skill.json@v1.0#d555c7 | n | SDK | no private marker; already in sdk |
-| hn-self-healing-browser-harness-via-direct-cdp-ai-computer-use-pattern-reference | sdk:wkappbot-workflow/hn-self-healing-browser-harness-via-direct-cdp-ai-computer-use-pattern-reference.skill.json@v1.6#be51ee | n | SDK | no private marker; already in sdk |
-| hn-show-hn-oculos-give-ai-agents-control-of-your-desktop-via-mcp-ai-computer-use-pattern-reference | sdk:wkappbot-workflow/hn-show-hn-oculos-give-ai-agents-control-of-your-desktop-via-mcp-ai-computer-use-pattern-reference.skill.json@v1.1#21b43c | n | SDK | no private marker; already in sdk |
-| hn-show-hn-self-healing-browser-harness-via-direct-cdp-ai-computer-use-pattern-reference | sdk:wkappbot-workflow/hn-show-hn-self-healing-browser-harness-via-direct-cdp-ai-computer-use-pattern-reference.skill.json@v1.1#fcb69a | n | SDK | no private marker; already in sdk |
-| hn-ui-automata-windows-desktop-automation-for-ai-agents-ai-computer-use-pattern-reference | sdk:wkappbot-workflow/hn-ui-automata-windows-desktop-automation-for-ai-agents-ai-computer-use-pattern-reference.skill.json@v1.2#379a9d | n | SDK | no private marker; already in sdk |
-| homework-reminder-payload-hash-dedup-prevents-8x-re-fire-across-multi-instance-states | sdk:wkappbot-core/homework-reminder-payload-hash-dedup-prevents-8x-re-fire-across-multi-instance-states.skill.json@v1.3#9a427b | n | SDK | no private marker; already in sdk |
-| hongik-harness-emergency-reflex-protocol | sdk:wkappbot-core/hongik-harness-emergency-reflex-protocol.skill.json@v1.0#d1d31e | n | SDK | no private marker; already in sdk |
-| hongik-harness-modular-independence-design | sdk:wkappbot-kih/hongik-harness-modular-independence-design.skill.json@v1.0#c25f32 | n | SDK | no private marker; already in sdk |
-| hongik-reflexes | sdk:wkappbot-workflow/hongik-reflexes.skill.json@v1.2#6b00d5 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| hot-swap-stuck-orphan-mcp-workers-kill-force-swap | sdk:wkappbot-core/hot-swap-stuck-orphan-mcp-workers-kill-force-swap.skill.json@v1.17#e8c20c | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| hot-swap-zombie-guard-kill-stale-wkappbot-core-workers-after-eye-swap | sdk:wkappbot-core/hot-swap-zombie-guard-kill-stale-wkappbot-core-workers-after-eye-swap.skill.json@v1.1#770f65 | n | SDK | no private marker; already in sdk |
-| idle-mung-conpty-autoprompt | sdk:wkappbot-sdk/idle-mung-conpty-autoprompt.skill.json@v1.0#2eba45 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| incident-trauma-reflex | sdk:wkappbot-workflow/incident-trauma-reflex.skill.json@v1.24#e1f0e7 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| incident-trauma-reflex-howto | sdk:wkappbot-workflow/incident-trauma-reflex-howto.skill.json@v1.0#8dcdac | n | SDK | no private marker; already in sdk |
-| incident-trauma-reflex-ref | sdk:wkappbot-workflow/incident-trauma-reflex-ref.skill.json@v1.43#e3616b | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| inspect-before-automate | sdk:wkappbot-workflow/inspect-before-automate.skill.json@v1.5#52c8c7 | n | SDK | no private marker; already in sdk |
-| iocp-stderr-default-buffered | sdk:wkappbot-core/iocp-stderr-default-buffered.skill.json@v1.3#80ba3b | n | SDK | no private marker; already in sdk |
-| jobkorea-manager | sdk:wkappbot-workflow/jobkorea-manager.skill.json@v1.25#e6944c | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| kampala-pattern-reverse-engineer-apps-into-apis-for-automation | sdk:wkappbot-core/kampala-pattern-reverse-engineer-apps-into-apis-for-automation.skill.json@v1.1#288452 | n | SDK | no private marker; already in sdk |
-| ki-harness-labyrinth-method | sdk:wkappbot-workflow/ki-harness-labyrinth-method.skill.json@v1.0#928817 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| knowledge-aliveness-health | sdk:wkappbot-workflow/knowledge-aliveness-health.skill.json@v1.2#a8c3ae | n | SDK | no private marker; already in sdk |
-| knowledge-aliveness-health-how-to | sdk:wkappbot-workflow/knowledge-aliveness-health-how-to.skill.json@v1.0#4a0700 | n | SDK | no private marker; already in sdk |
-| knowledge-aliveness-health-ref | sdk:wkappbot-workflow/knowledge-aliveness-health-ref.skill.json@v1.0#1acd47 | n | SDK | no private marker; already in sdk |
-| knowledge-ification-procedure-jisikhwa | sdk:personal-docs/knowledge-ification-procedure-jisikhwa.skill.json@v1.62#2576c6 | n | PRIVATE | PUBLIC NOW (in sdk); markers: app:personal-docs, token:weak; home a private repo (none holds it yet) |
-| knowledge-op-approval-logic-2-consume-from-front | sdk:wkappbot-workflow/knowledge-op-approval-logic-2-consume-from-front.skill.json@v1.5#219a79 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| korean-argv-cp949-fix-tryrecoverutf8argv-at-main-entry-recovers-createprocessa-mangled-args | sdk:wkappbot-core/korean-argv-cp949-fix-tryrecoverutf8argv-at-main-entry-recovers-createprocessa-mangled-args.skill.json@v1.3#63993f | n | SDK | no private marker; already in sdk |
-| korean-argv-cp949-hell-with-wkappbot-from-bash | sdk:wkautoquant/korean-argv-cp949-hell-with-wkappbot-from-bash.skill.json@v1.1#6a6b0d | n | PRIVATE | PUBLIC NOW (in sdk); markers: app:wkautoquant; home a private repo (none holds it yet) |
-| launcher-aot-build-vswhere-path | sdk:wkappbot-core/launcher-aot-build-vswhere-path.skill.json@v1.2#bb31e6 | n | SDK | no private marker; already in sdk |
-| launcher-console-encoding-3-mode-policy-for-interactive-piped-utf-8-terminals | sdk:wkappbot/launcher-console-encoding-3-mode-policy-for-interactive-piped-utf-8-terminals.skill.json@v1.7#b88a70 | n | PRIVATE | PUBLIC NOW (in sdk); markers: machine path; home a private repo (none holds it yet) |
-| launcher-direct-core-routing-for-critical-cmds | sdk:wkappbot-core/launcher-direct-core-routing-for-critical-cmds.skill.json@v1.2#9a8ab4 | n | SDK | no private marker; already in sdk |
-| launcher-source-separation-private-core-stripped-from-public-repo | sdk:wkappbot-sdk/launcher-source-separation-private-core-stripped-from-public-repo.skill.json@v1.3#9fa6e5 | n | PRIVATE | PUBLIC NOW (in sdk); markers: KIWOOM; home a private repo (none holds it yet) |
-| launcher-sudo-cold-start-pipe-file-exists-guard | sdk:wkappbot-core/launcher-sudo-cold-start-pipe-file-exists-guard.skill.json@v1.11#0d24a3 | n | SDK | no private marker; already in sdk |
-| launcher-wkappbot-chrome-target-env-pipe-protocol | sdk:wkappbot-sdk/launcher-wkappbot-chrome-target-env-pipe-protocol.skill.json@v1.2#1eec7c | n | SDK | no private marker; already in sdk |
-| letter-edit | sdk:wkappbot-kih/letter-edit.skill.json@v1.58#7395cc | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| letter-edit-howto | sdk:wkappbot-kih/letter-edit-howto.skill.json@v1.20#111ee0 | n | PRIVATE | PUBLIC NOW (in sdk); markers: HANTOO, token:weak; home a private repo (none holds it yet) |
-| license-pending-invite-detect-and-guide-user-to-accept | sdk:wkappbot-sdk/license-pending-invite-detect-and-guide-user-to-accept.skill.json@v1.5#88841d | n | PRIVATE | PUBLIC NOW (in sdk); markers: customer; home a private repo (none holds it yet) |
-| linkedin-feed-monitor | sdk:wkappbot-workflow/linkedin-feed-monitor.skill.json@v1.0#1a01d1 | n | SDK | no private marker; already in sdk |
-| linkedin-manager | sdk:wkappbot-workflow/linkedin-manager.skill.json@v1.4#1e7981 | n | SDK | no private marker; already in sdk |
-| lm-wiki-personal-knowledge-base | sdk:wkappbot-workflow/lm-wiki-personal-knowledge-base.skill.json@v1.0#d41e85 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| logcat-command-cheatsheet | sdk:wkappbot-workflow/logcat-command-cheatsheet.skill.json@v1.5#a94f54 | n | SDK | no private marker; already in sdk |
-| macos-ci-via-sdk-relay | sdk:wkappbot-sdk/macos-ci-via-sdk-relay.skill.json@v1.13#be8a85 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| macos-ci-via-sdk-relay-howto | sdk:wkappbot-sdk/macos-ci-via-sdk-relay-howto.skill.json@v1.1#c73992 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:credential; home a private repo (none holds it yet) |
-| macos-ci-via-sdk-relay-ref | sdk:wkappbot-sdk/macos-ci-via-sdk-relay-ref.skill.json@v1.1#a64785 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:credential; home a private repo (none holds it yet) |
-| mcp-admin-core-swap-elevation-triggered-graceful-cutover | sdk:wkappbot-core/mcp-admin-core-swap-elevation-triggered-graceful-cutover.skill.json@v1.1#7c3d4a | n | SDK | no private marker; already in sdk |
-| mcp-automation-patterns | sdk:wkappbot-core/mcp-automation-patterns.skill.json@v1.2#a3daa3 | n | SDK | no private marker; already in sdk |
-| mcp-automation-patterns-t1-core | sdk:wkappbot-core/mcp-automation-patterns-t1-core.skill.json@v1.0#433f9a | n | SDK | no private marker; already in sdk |
-| mcp-automation-patterns-t2-desktop-control | sdk:wkappbot-core/mcp-automation-patterns-t2-desktop-control.skill.json@v1.0#57836b | n | SDK | no private marker; already in sdk |
-| mcp-automation-patterns-t3-stability-ops | sdk:wkappbot-core/mcp-automation-patterns-t3-stability-ops.skill.json@v1.0#802e66 | n | SDK | no private marker; already in sdk |
-| mcp-standard-for-desktop-and-browser-automation-integration-patterns | sdk:wkappbot-core/mcp-standard-for-desktop-and-browser-automation-integration-patterns.skill.json@v1.5#3ed704 | n | SDK | no private marker; already in sdk |
-| md-heal | sdk:wkappbot-workflow/md-heal.skill.json@v1.4#ef45c0 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| md-heal-howto | sdk:wkappbot-workflow/md-heal-howto.skill.json@v1.0#b5cbba | n | SDK | no private marker; already in sdk |
-| md-heal-ref | sdk:wkappbot-workflow/md-heal-ref.skill.json@v1.0#4a0d7e | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| mdi-child-focusless-raise-swp-noactivate | sdk:wkappbot-core/mdi-child-focusless-raise-swp-noactivate.skill.json@v1.0#f2b933 | n | SDK | no private marker; already in sdk |
-| multi-family-harness-coexistence | sdk:wkappbot-workflow/multi-family-harness-coexistence.skill.json@v1.14#2802ae | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| multi-tab-assistant-implementation-checklist | sdk:wkappbot-workflow/multi-tab-assistant-implementation-checklist.skill.json@v1.1#432a96 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| multi-tab-assistant-interface-mvp | sdk:wkappbot-workflow/multi-tab-assistant-interface-mvp.skill.json@v1.1#07942c | n | SDK | no private marker; already in sdk |
-| mystery-window-diagnosis | sdk:wkappbot-workflow/mystery-window-diagnosis.skill.json@v1.0#e31d55 | n | SDK | no private marker; already in sdk |
-| native-tool-deny-codex-only | sdk:wkappbot-workflow/native-tool-deny-codex-only.skill.json@v1.10#34a505 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| native-tool-deny-codex-only-howto | sdk:wkappbot-workflow/native-tool-deny-codex-only-howto.skill.json@v1.0#5ad35f | n | SDK | no private marker; already in sdk |
-| native-tool-deny-codex-only-ref | sdk:wkappbot-workflow/native-tool-deny-codex-only-ref.skill.json@v1.0#400fc4 | n | SDK | no private marker; already in sdk |
-| native-tool-deny-is-codex-only-and-harness-logic-outranks-claude-md | sdk:wkappbot-workflow/native-tool-deny-is-codex-only-and-harness-logic-outranks-claude-md.skill.json@v1.2#132cf5 | n | SDK | no private marker; already in sdk |
-| naver-imap-app-password-via-cdp-2fa-imap-enable | sdk:wkappbot-webbot/naver-imap-app-password-via-cdp-2fa-imap-enable.skill.json@v1.0#401a34 | n | PRIVATE | PUBLIC NOW (in sdk); markers: .env, password; home a private repo (none holds it yet) |
-| naver-mail-compose-spa-read-fiber | sdk:wkappbot-webbot/naver-mail-compose-spa-read-fiber.skill.json@v1.4#3e08d1 | n | SDK | no private marker; already in sdk |
-| newchat-cwd-validation-guard | sdk:wkappbot-core/newchat-cwd-validation-guard.skill.json@v1.0#601435 | n | SDK | no private marker; already in sdk |
-| news-20260420-sudo-encoding | sdk:wkappbot/news-20260420-sudo-encoding.skill.json@v1.0#058764 | n | SDK | no private marker; already in sdk |
-| nfrunlite-reconnect-popup-dismiss | sdk:wkappbot-core/nfrunlite-reconnect-popup-dismiss.skill.json@v1.11#e3a35a | n | SDK | no private marker; already in sdk |
-| nightly-schedule-guard | sdk:wkappbot-workflow/nightly-schedule-guard.skill.json@v1.2#dd4920 | n | SDK | no private marker; already in sdk |
-| nlrc-evidence-webbot | sdk:wkappbot-webbot/nlrc-evidence-webbot.skill.json@v1.2#8551eb | n | SDK | no private marker; already in sdk |
-| no-verify-guard | sdk:wkappbot-workflow/no-verify-guard.skill.json@v1.0#f24bf4 | n | SDK | no private marker; already in sdk |
-| nvidia-overlay-blackscreen-kill | sdk:wkappbot-core/nvidia-overlay-blackscreen-kill.skill.json@v1.9#b1fec9 | n | SDK | no private marker; already in sdk |
-| nvidia-overlay-blackscreen-kill-howto | sdk:wkappbot-core/nvidia-overlay-blackscreen-kill-howto.skill.json@v1.0#6be119 | n | SDK | no private marker; already in sdk |
-| nvidia-overlay-blackscreen-kill-ref | sdk:wkappbot-core/nvidia-overlay-blackscreen-kill-ref.skill.json@v1.0#9ee508 | n | SDK | no private marker; already in sdk |
-| ocr-usage | sdk:wkappbot/ocr-usage.skill.json@v1.27#5101c6 | n | SDK | no private marker; already in sdk |
-| ocr-usage-howto | sdk:wkappbot/ocr-usage-howto.skill.json@v1.0#3ed0fa | n | SDK | no private marker; already in sdk |
-| ocr-usage-ref | sdk:wkappbot/ocr-usage-ref.skill.json@v1.18#7bc547 | n | SDK | no private marker; already in sdk |
-| on-load | sdk:wkappbot-workflow/on-load.skill.json@v1.619#0a31fe | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| on-load-howto | sdk:wkappbot-workflow/on-load-howto.skill.json@v1.23#2587f3 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| on-load-ref | sdk:wkappbot-workflow/on-load-ref.skill.json@v1.2#ae6121 | n | SDK | no private marker; already in sdk |
-| operator-skill-template | sdk:wkappbot-core/operator-skill-template.skill.json@v1.2#cf13c9 | n | SDK | no private marker; already in sdk |
-| opus-files-bugs-on-sight | sdk:wkappbot-workflow/opus-files-bugs-on-sight.skill.json@v1.0#4622a1 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| opus-mechanical-self-drag-antipattern | sdk:wkappbot-workflow/opus-mechanical-self-drag-antipattern.skill.json@v1.3#d10c7f | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| opus-over-pace-is-not-a-stop-delegate-real-work-to-gate-exempt-haiku-codex-agents | sdk:wkappbot-workflow/opus-over-pace-is-not-a-stop-delegate-real-work-to-gate-exempt-haiku-codex-agents.skill.json@v1.3#081f95 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| opus-self-reflection | sdk:personal-docs/opus-self-reflection.skill.json@v1.9#217fc8 | n | PRIVATE | PUBLIC NOW (in sdk); markers: app:personal-docs, token:weak; home a private repo (none holds it yet) |
-| opus-self-reflection-ref | sdk:personal-docs/opus-self-reflection-ref.skill.json@v1.26#f6f2fd | n | PRIVATE | PUBLIC NOW (in sdk); markers: app:personal-docs, token:weak; home a private repo (none holds it yet) |
-| orchestrate-sectors-parallel-while-knowledgeifying | sdk:wkappbot-workflow/orchestrate-sectors-parallel-while-knowledgeifying.skill.json@v1.29#ab4f20 | n | SDK | no private marker; already in sdk |
-| orchestrate-sectors-parallel-while-knowledgeifying-howto | sdk:wkappbot-workflow/orchestrate-sectors-parallel-while-knowledgeifying-howto.skill.json@v1.0#c42f42 | n | SDK | no private marker; already in sdk |
-| orchestrate-sectors-parallel-while-knowledgeifying-ref | sdk:wkappbot-workflow/orchestrate-sectors-parallel-while-knowledgeifying-ref.skill.json@v1.0#778ccc | n | SDK | no private marker; already in sdk |
-| pace-95-circuit-breaker | sdk:wkappbot-workflow/pace-95-circuit-breaker.skill.json@v1.12#6af6fa | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| pace-95-circuit-breaker-ref | sdk:wkappbot-workflow/pace-95-circuit-breaker-ref.skill.json@v1.0#26ed34 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| pace-deadlock-escapes-harness-editable-and-jisikhwa-free | sdk:wkappbot-workflow/pace-deadlock-escapes-harness-editable-and-jisikhwa-free.skill.json@v1.3#0a41e4 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| pace-deadlock-escapes-ref | sdk:wkappbot-workflow/pace-deadlock-escapes-ref.skill.json@v1.0#042b77 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| partial-class-file-splitting-400-line-soft-cap | sdk:wkappbot-workflow/partial-class-file-splitting-400-line-soft-cap.skill.json@v1.7#5824ba | n | SDK | no private marker; already in sdk |
-| payment-to-license-activation-flow-kis-transfer-github-collaborator-auto-grant | sdk:wkappbot-sdk/payment-to-license-activation-flow-kis-transfer-github-collaborator-auto-grant.skill.json@v1.8#48f9df | n | PRIVATE | PUBLIC NOW (in sdk); markers: account, token:credential; home a private repo (none holds it yet) |
-| paypal-developer-cdp-login | sdk:paypal-developer/paypal-developer-cdp-login.skill.json@v1.8#70a054 | n | PRIVATE | PUBLIC NOW (in sdk); markers: account, app:paypal-developer, password; home a private repo (none holds it yet) |
-| per-repository-window-persistence | sdk:wkappbot-workflow/per-repository-window-persistence.skill.json@v1.0#2a72f2 | n | SDK | no private marker; already in sdk |
-| placement-one-shot-no-multi-reposition | sdk:wkappbot-webbot/placement-one-shot-no-multi-reposition.skill.json@v1.6#cd3d44 | n | SDK | no private marker; already in sdk |
-| placement-port-pid-filter | sdk:wkappbot-sdk/placement-port-pid-filter.skill.json@v1.0#c1965c | n | SDK | no private marker; already in sdk |
-| playbook-actions-read-uia-text-shell-external-command | sdk:wkappbot/playbook-actions-read-uia-text-shell-external-command.skill.json@v2#6fdb0d | n | SDK | no private marker; already in sdk |
-| post-compaction-recovery | sdk:wkappbot-workflow/post-compaction-recovery.skill.json@v1.2#fb76d8<br>sdk:wkappbot-core/post-compaction-recovery.skill.json@v1.0#a49ee4 | y | PRIVATE | PUBLIC NOW (in sdk); markers: machine path; home a private repo (none holds it yet) |
-| powershell-here-string-multiline | sdk:wkappbot-workflow/powershell-here-string-multiline.skill.json@v1.1#267db5 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| pre-push-orphan-gc-quarantine-full-mark-and-sweep | sdk:wkappbot-workflow/pre-push-orphan-gc-quarantine-full-mark-and-sweep.skill.json@v1.4#cdf7ff | n | SDK | no private marker; already in sdk |
-| pre-push-orphan-gc-quarantine-full-mark-and-sweep-howto | sdk:wkappbot-workflow/pre-push-orphan-gc-quarantine-full-mark-and-sweep-howto.skill.json@v1.0#d7123f | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| pre-push-orphan-gc-quarantine-full-mark-and-sweep-ref | sdk:wkappbot-workflow/pre-push-orphan-gc-quarantine-full-mark-and-sweep-ref.skill.json@v1.0#5202d9 | n | SDK | no private marker; already in sdk |
-| predicted-vs-actual-commando-calibration-ledger | sdk:wkappbot-workflow/predicted-vs-actual-commando-calibration-ledger.skill.json@v1.10#561534 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| proc-path-glob-matching | sdk:wkappbot/proc-path-glob-matching.skill.json@v1.0#983e51 | n | SDK | no private marker; already in sdk |
-| project-skill-template | sdk:wkappbot-core/project-skill-template.skill.json@v1.2#bd6162 | n | SDK | no private marker; already in sdk |
-| prompt-send-self-prompting | sdk:wkappbot-workflow/prompt-send-self-prompting.skill.json@v1.5#21937d | n | SDK | no private marker; already in sdk |
-| proto-cleanup-discipline-howto | sdk:wkappbot-kih/proto-cleanup-discipline-howto.skill.json@v1.0#cfaec6 | n | SDK | no private marker; already in sdk |
-| proto-cleanup-discipline-ref | sdk:wkappbot-kih/proto-cleanup-discipline-ref.skill.json@v1.0#e2fcf7 | n | SDK | no private marker; already in sdk |
-| proto-to-live-wiring | sdk:wkappbot-kih/proto-to-live-wiring.skill.json@v1.1668#b79636 | n | SDK | no private marker; already in sdk |
-| ps-script-mojibake-is-output-encoding-first-not-argv | sdk:wkappbot-workflow/ps-script-mojibake-is-output-encoding-first-not-argv.skill.json@v1.0#8abd04 | n | SDK | no private marker; already in sdk |
-| public-launcher-datadir-use-wkappbot-home-or-userprofile-wkappbot | sdk:wkappbot/public-launcher-datadir-use-wkappbot-home-or-userprofile-wkappbot.skill.json@v1.3#6a7c92 | n | SDK | no private marker; already in sdk |
-| public-repo-checklist-pre-release-audit-for-secrets-and-pii | sdk:wkappbot/public-repo-checklist-pre-release-audit-for-secrets-and-pii.skill.json@v1.3#e6f0e8 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| pulsestep-force-mode-ring-trail | sdk:wkappbot-core/pulsestep-force-mode-ring-trail.skill.json@v1.3#47d588 | n | SDK | no private marker; already in sdk |
-| punk-pattern-remote-claude-code-control-via-lightweight-proxy | sdk:wkappbot-core/punk-pattern-remote-claude-code-control-via-lightweight-proxy.skill.json@v1.1#5dc9de | n | SDK | no private marker; already in sdk |
-| qmd-local-codebase-search-install-index-and-query | sdk:wkappbot-workflow/qmd-local-codebase-search-install-index-and-query.skill.json@v1.0#bd2344 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| quantbot-user-input-protection-guard | sdk:wkappbot-workflow/quantbot-user-input-protection-guard.skill.json@v1.0#22cf20 | n | PRIVATE | PUBLIC NOW (in sdk); markers: PIN; home a private repo (none holds it yet) |
-| react-spa-automation-fiber-props-click-controlled-input-fill | sdk:wkappbot/react-spa-automation-fiber-props-click-controlled-input-fill.skill.json@v1.0#3ac2b1 | n | SDK | no private marker; already in sdk |
-| record-triad-insight-as-skill | sdk:wkappbot-workflow/record-triad-insight-as-skill.skill.json@v1.5#2dea4a | n | SDK | no private marker; already in sdk |
-| recover-korean-console-after-crash-reboot | sdk:wkappbot-core/recover-korean-console-after-crash-reboot.skill.json@v1.0#1d5e45 | n | SDK | no private marker; already in sdk |
-| reddit-flair-modal-add-button-uia-invisible-cdp-trusted-click-fails-only-physical-click-works | sdk:wkappbot-core/reddit-flair-modal-add-button-uia-invisible-cdp-trusted-click-fails-only-physical-click-works.skill.json@v1.0#aeab12 | n | SDK | no private marker; already in sdk |
-| reduce-before-refactor-dedup-analyze-rebundle-order | sdk:wkappbot-sdk/reduce-before-refactor-dedup-analyze-rebundle-order.skill.json@v1.1#2038a3 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| reflex-audit-transfer-quiz-template | sdk:wkappbot-workflow/reflex-audit-transfer-quiz-template.skill.json@v1.0#8f6409 | n | SDK | no private marker; already in sdk |
-| releasing-under-harness-pace-guards | sdk:wkappbot-sdk/releasing-under-harness-pace-guards.skill.json@v1.4#3472c2 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| repair-korean-ime-running-wt-tsf-rebind | sdk:wkappbot-core/repair-korean-ime-running-wt-tsf-rebind.skill.json@v1.0#442885 | n | SDK | no private marker; already in sdk |
-| repo-garbage-collector-unused-file-quarantine | sdk:wkappbot-workflow/repo-garbage-collector-unused-file-quarantine.skill.json@v1.0#99fa7d | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| repo-health-doctor | sdk:wkappbot-workflow/repo-health-doctor.skill.json@v1.17#780e9f | n | SDK | no private marker; already in sdk |
-| repo-maintenance-gc-cleanup-and-pre-release-git-audit | sdk:wkappbot/repo-maintenance-gc-cleanup-and-pre-release-git-audit.skill.json@v1.1#45f30c | n | PRIVATE | PUBLIC NOW (in sdk); markers: .env; home a private repo (none holds it yet) |
-| repo-management-skill-series | sdk:wkappbot-workflow/repo-management-skill-series.skill.json@v1.2#0ed171 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| resolve-stale-bug-auto-merge-noise | sdk:wkappbot-workflow/resolve-stale-bug-auto-merge-noise.skill.json@v1.1#ee9d19 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:credential; home a private repo (none holds it yet) |
-| root-wk-tool-delegation-gate | sdk:wkappbot-workflow/root-wk-tool-delegation-gate.skill.json@v1.0#adc074 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| rotating-log-append | sdk:wkappbot-workflow/rotating-log-append.skill.json@v1.0#cd2cc0 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| run-postcase-testing | sdk:wkappbot-workflow/run-postcase-testing.skill.json@v1.3#d8ae1a | n | SDK | no private marker; already in sdk |
-| runaway-subagent-reap-postmortem-kill-switch-pace-blocked | sdk:wkappbot-workflow/runaway-subagent-reap-postmortem-kill-switch-pace-blocked.skill.json@v1.1#7b310a | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| safe-bugfix-protocol | sdk:wkappbot-core/safe-bugfix-protocol.skill.json@v1.20#03f5ff | n | SDK | no private marker; already in sdk |
-| safety-first-work-order-stabilize-fix-prevent-dispatch-first | sdk:wkappbot-workflow/safety-first-work-order-stabilize-fix-prevent-dispatch-first.skill.json@v1.4#b5d2bb | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| scenariorunner-process-key-no-dup-flag-for-existing-process-adoption | sdk:wkappbot-core/scenariorunner-process-key-no-dup-flag-for-existing-process-adoption.skill.json@v1.4#4ed1fc | n | SDK | no private marker; already in sdk |
-| schedule-cmd-bash-windows | sdk:wkappbot/schedule-cmd-bash-windows.skill.json@v1.2#8ceae8 | n | SDK | no private marker; already in sdk |
-| schedule-command-cheatsheet | sdk:wkappbot/schedule-command-cheatsheet.skill.json@v1.18#45a001 | n | SDK | no private marker; already in sdk |
-| schedule-past-time-requeue-advance | sdk:wkappbot-core/schedule-past-time-requeue-advance.skill.json@v1.0#8a992b | n | SDK | no private marker; already in sdk |
-| screensaver-close-command | sdk:wkappbot-core/screensaver-close-command.skill.json@v1.24#4206a6 | n | SDK | no private marker; already in sdk |
-| screensaver-close-command-ref | sdk:wkappbot-core/screensaver-close-command-ref.skill.json@v1.0#ad58eb | n | SDK | no private marker; already in sdk |
-| screensaver-command | sdk:wkappbot-core/screensaver-command.skill.json@v1.21#42ede1 | n | SDK | no private marker; already in sdk |
-| screenshot-grap-bbox | sdk:wkappbot-core/screenshot-grap-bbox.skill.json@v1.6#3c8950 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| screenshot-mask-transparency | sdk:wkappbot-core/screenshot-mask-transparency.skill.json@v1.0#19a5ba | n | SDK | no private marker; already in sdk |
-| sdk-deployment-session-2026-04-28 | sdk:wkappbot-sdk/sdk-deployment-session-2026-04-28.skill.json@v1.1#f22389 | n | PRIVATE | PUBLIC NOW (in sdk); markers: .env; home a private repo (none holds it yet) |
-| sdk-find-stable-build-green-verification | sdk:wkappbot-sdk/sdk-find-stable-build-green-verification.skill.json@v1.4#f39d55 | n | SDK | no private marker; already in sdk |
-| sdk-first-run-onboarding-zero-to-first-command | sdk:wkappbot-sdk/sdk-first-run-onboarding-zero-to-first-command.skill.json@v1.2#58d128 | n | PRIVATE | PUBLIC NOW (in sdk); markers: account, customer, token:weak; home a private repo (none holds it yet) |
-| sdk-gg-main-automation | sdk:wkappbot-sdk/sdk-gg-main-automation.skill.json@v1.71#267b5b | n | SDK | no private marker; already in sdk |
-| sdk-gg-main-automation-howto | sdk:wkappbot-sdk/sdk-gg-main-automation-howto.skill.json@v1.0#e0d87c | n | SDK | no private marker; already in sdk |
-| sdk-gg-main-automation-ref | sdk:wkappbot-sdk/sdk-gg-main-automation-ref.skill.json@v1.1#3c9de0 | n | SDK | no private marker; already in sdk |
-| sdk-gg-main-automation-t2-howto | sdk:wkappbot-sdk/sdk-gg-main-automation-t2-howto.skill.json@v1.5#4fdf26 | n | SDK | no private marker; already in sdk |
-| sdk-gg-main-automation-t3-ref | sdk:wkappbot-sdk/sdk-gg-main-automation-t3-ref.skill.json@v1.4#4c2ad2 | n | SDK | no private marker; already in sdk |
-| sdk-launcher-emergency-recovery | sdk:wkappbot-sdk/sdk-launcher-emergency-recovery.skill.json@v1.0#d1b7ed | n | SDK | no private marker; already in sdk |
-| sdk-launcher-maintenance | sdk:wkappbot-sdk/sdk-launcher-maintenance.skill.json@v1.4#3c620b | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:credential; home a private repo (none holds it yet) |
-| sdk-marketing-strategy | sdk:wkappbot-sdk/sdk-marketing-strategy.skill.json@v1.0#cc244d | n | SDK | no private marker; already in sdk |
-| sdk-marketing-strategy-howto | sdk:wkappbot-sdk/sdk-marketing-strategy-howto.skill.json@v1.0#280098 | n | SDK | no private marker; already in sdk |
-| sdk-marketing-strategy-ref | sdk:wkappbot-sdk/sdk-marketing-strategy-ref.skill.json@v1.0#fa93d1 | n | SDK | no private marker; already in sdk |
-| sdk-operator-license-management-invite-tier-offboard | sdk:wkappbot-sdk/sdk-operator-license-management-invite-tier-offboard.skill.json@v1.1#32f442 | n | PRIVATE | PUBLIC NOW (in sdk); markers: customer; home a private repo (none holds it yet) |
-| sdk-payment-collection-flow-mvp-manual-process | sdk:wkappbot-sdk/sdk-payment-collection-flow-mvp-manual-process.skill.json@v1.1#22f4c9 | n | PRIVATE | PUBLIC NOW (in sdk); markers: account, customer; home a private repo (none holds it yet) |
-| sdk-public-skill-index | sdk:wkappbot-sdk/sdk-public-skill-index.skill.json@v1.0#083247 | n | SDK | no private marker; already in sdk |
-| sdk-release-playbook | sdk:wkappbot-sdk/sdk-release-playbook.skill.json@v1.4#d57a99 | n | SDK | no private marker; already in sdk |
-| sdk-release-playbook-howto | sdk:wkappbot-sdk/sdk-release-playbook-howto.skill.json@v1.0#b685fa | n | SDK | no private marker; already in sdk |
-| sdk-release-playbook-ref | sdk:wkappbot-sdk/sdk-release-playbook-ref.skill.json@v1.0#6d17fc | n | SDK | no private marker; already in sdk |
-| sdk-skill-browser-pipeline | sdk:wkappbot-sdk/sdk-skill-browser-pipeline.skill.json@v1.8#c2ac19 | n | PRIVATE | PUBLIC NOW (in sdk); markers: .env, token:credential; home a private repo (none holds it yet) |
-| sdk-skill-browser-pipeline-howto | sdk:wkappbot-sdk/sdk-skill-browser-pipeline-howto.skill.json@v1.0#dcf7f8 | n | SDK | no private marker; already in sdk |
-| sdk-skill-browser-pipeline-ref | sdk:wkappbot-sdk/sdk-skill-browser-pipeline-ref.skill.json@v1.0#8d34c4 | n | PRIVATE | PUBLIC NOW (in sdk); markers: .env; home a private repo (none holds it yet) |
-| sdk-suggest-skill-filing-rules | sdk:wkappbot-sdk/sdk-suggest-skill-filing-rules.skill.json@v1.1#10b90c | n | SDK | no private marker; already in sdk |
-| sdk-user-perspective-test-playbook | sdk:wkappbot-sdk/sdk-user-perspective-test-playbook.skill.json@v1.18#ba249b | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:credential; home a private repo (none holds it yet) |
-| security-guard | sdk:wkappbot-workflow/security-guard.skill.json@v1.0#47943d | n | SDK | no private marker; already in sdk |
-| sed-guard | sdk:wkappbot-workflow/sed-guard.skill.json@v1.0#1a82d8 | n | SDK | no private marker; already in sdk |
-| session-2026-06-07-git-contribute-split-gotchas | sdk:wkappbot-workflow/session-2026-06-07-git-contribute-split-gotchas.skill.json@v1.0#8f773c | n | SDK | no private marker; already in sdk |
-| session-continuity-persist-command-history-and-agent-state | sdk:wkappbot/session-continuity-persist-command-history-and-agent-state.skill.json@v1.1#87ccff | n | SDK | no private marker; already in sdk |
-| session-lock-cleared-2026-05-20 | sdk:wkappbot-workflow/session-lock-cleared-2026-05-20.skill.json@v1.0#cdbe64 | n | SDK | no private marker; already in sdk |
-| session-pattern-mining-skill-promotion | sdk:wkappbot-workflow/session-pattern-mining-skill-promotion.skill.json@v1.0#92c8d0 | n | SDK | no private marker; already in sdk |
-| shell-is-a-scenario-step-action-not-a-cli-command | sdk:wkappbot/shell-is-a-scenario-step-action-not-a-cli-command.skill.json@v1.5#0a7ab2 | n | SDK | no private marker; already in sdk |
-| show-hn-and-producthunt-launch-strategy | sdk:wkappbot-sdk/show-hn-and-producthunt-launch-strategy.skill.json@v1.2#e508a5 | n | SDK | no private marker; already in sdk |
-| skill-audience-taxonomy | sdk:wkappbot-core/skill-audience-taxonomy.skill.json@v1.4#433060 | n | SDK | no private marker; already in sdk |
-| skill-browser-dev-process | sdk:wkappbot-sdk/skill-browser-dev-process.skill.json@v1.0#4bfc05 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| skill-browser-gha-auto-build | sdk:wkappbot-sdk/skill-browser-gha-auto-build.skill.json@v1.0#795d1d | n | SDK | no private marker; already in sdk |
-| skill-browser-launch-checklist | sdk:wkappbot-sdk/skill-browser-launch-checklist.skill.json@v1.0#ad3cae | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| skill-browser-qa | sdk:wkappbot-sdk/skill-browser-qa.skill.json@v1.0#aaf069 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:credential; home a private repo (none holds it yet) |
-| skill-browser-qa-howto | sdk:wkappbot-sdk/skill-browser-qa-howto.skill.json@v1.0#61b371 | n | SDK | no private marker; already in sdk |
-| skill-browser-qa-ref | sdk:wkappbot-sdk/skill-browser-qa-ref.skill.json@v1.0#2b54cc | n | SDK | no private marker; already in sdk |
-| skill-comment | sdk:wkappbot-workflow/skill-comment.skill.json@v1.0#09b354 | n | SDK | no private marker; already in sdk |
-| skill-contribute-edit | sdk:wkappbot-workflow/skill-contribute-edit.skill.json@v1.2#4637c2<br>sdk:wkappbot-core/skill-contribute-edit.skill.json@v1.13#47813d | y | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| skill-contribute-edit-encoding-guard-korean-ui-relaxed-threshold | sdk:wkappbot/skill-contribute-edit-encoding-guard-korean-ui-relaxed-threshold.skill.json@v2#aa73e5 | n | PRIVATE | PUBLIC NOW (in sdk); markers: KIWOOM; home a private repo (none holds it yet) |
-| skill-coverage-ranking-news | sdk:wkappbot/skill-coverage-ranking-news.skill.json@v1.5#a163c1 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| skill-delete-guard | sdk:wkappbot-workflow/skill-delete-guard.skill.json@v1.0#78965c | n | SDK | no private marker; already in sdk |
-| skill-edit-add-step-dedup | sdk:wkappbot-core/skill-edit-add-step-dedup.skill.json@v1.0#e590fe | n | SDK | no private marker; already in sdk |
-| skill-edit-step-ordering-spec | sdk:wkappbot/skill-edit-step-ordering-spec.skill.json@v1.0#63819a | n | SDK | no private marker; already in sdk |
-| skill-guard | sdk:wkappbot-workflow/skill-guard.skill.json@v1.0#277bf3 | n | SDK | no private marker; already in sdk |
-| skill-guard-direct-skill-json-edit-blocked | sdk:wkappbot-workflow/skill-guard-direct-skill-json-edit-blocked.skill.json@v1.0#44b7ed | n | SDK | no private marker; already in sdk |
-| skill-heal-nightly | sdk:wkappbot-sdk/skill-heal-nightly.skill.json@v1.34#050702 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| skill-heal-nightly-howto | sdk:wkappbot-sdk/skill-heal-nightly-howto.skill.json@v1.0#a75f0b | n | SDK | no private marker; already in sdk |
-| skill-heal-nightly-ref | sdk:wkappbot-sdk/skill-heal-nightly-ref.skill.json@v1.0#d358ce | n | SDK | no private marker; already in sdk |
-| skill-list-guard | sdk:wkappbot-workflow/skill-list-guard.skill.json@v1.0#a9ca30 | n | SDK | no private marker; already in sdk |
-| skill-lock-audit-and-auto-registration-for-critical-source-files | sdk:wkappbot-workflow/skill-lock-audit-and-auto-registration-for-critical-source-files.skill.json@v1.3#e5559d | n | SDK | no private marker; already in sdk |
-| skill-migration-3tier | sdk:personal-docs/skill-migration-3tier.skill.json@v1.20#13d447 | n | PRIVATE | PUBLIC NOW (in sdk); markers: HANTOO, app:personal-docs, token:weak; home a private repo (none holds it yet) |
-| skill-read-auto-export-to-claude-code-claude-skills | sdk:wkappbot-core/skill-read-auto-export-to-claude-code-claude-skills.skill.json@v1.2#4aba4f | n | SDK | no private marker; already in sdk |
-| skill-read-if-newer | sdk:wkappbot-core/skill-read-if-newer.skill.json@v1.0#a4aabc | n | SDK | no private marker; already in sdk |
-| skill-readability-optimization-and-healing | sdk:wkappbot-core/skill-readability-optimization-and-healing.skill.json@v1.0#42f4ca | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| skill-reminder-news-and-invocation-log-discoverability-system | sdk:wkappbot-core/skill-reminder-news-and-invocation-log-discoverability-system.skill.json@v1.4#bc74a6 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| skill-review-completed-codex-cli-wkappbot-usage-updated-to-v1-4 | sdk:wkappbot-workflow/skill-review-completed-codex-cli-wkappbot-usage-updated-to-v1-4.skill.json@v1.3#a9e14d | n | SDK | no private marker; already in sdk |
-| skill-search-coverage-guide | sdk:wkappbot-workflow/skill-search-coverage-guide.skill.json@v1.11#36d2ac | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| skill-search-usage | sdk:wkappbot-workflow/skill-search-usage.skill.json@v1.11#35bb5f | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| skill-sync-split-brain-cleanup | sdk:wkappbot-workflow/skill-sync-split-brain-cleanup.skill.json@v1.0#f3d991 | n | SDK | no private marker; already in sdk |
-| skill-sync-warning-triage | sdk:wkappbot-workflow/skill-sync-warning-triage.skill.json@v1.0#bac399 | n | SDK | no private marker; already in sdk |
-| slack-app-token-renewal | sdk:wkappbot-workflow/slack-app-token-renewal.skill.json@v1.0#747cdf<br>sdk:wkappbot-core/slack-app-token-renewal.skill.json@v1.0#6de78e | y | PRIVATE | PUBLIC NOW (in sdk); markers: token:credential; home a private repo (none holds it yet) |
-| slack-bot-self-mention-no-socket | sdk:wkappbot-workflow/slack-bot-self-mention-no-socket.skill.json@v1.0#543e8f | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:credential; home a private repo (none holds it yet) |
-| slack-command-cheatsheet | sdk:wkappbot-workflow/slack-command-cheatsheet.skill.json@v1.5#35e9c6 | n | SDK | no private marker; already in sdk |
-| slack-send-reply-per-cwd-reply-context-no-misroute | sdk:wkappbot-core/slack-send-reply-per-cwd-reply-context-no-misroute.skill.json@v1.1#740b98 | n | SDK | no private marker; already in sdk |
-| smart-wksplit-ref | sdk:wkappbot-sdk/smart-wksplit-ref.skill.json@v1.0#e94db1 | n | SDK | no private marker; already in sdk |
-| sonnet-bug-stop-policy-ref | sdk:personal-docs/sonnet-bug-stop-policy-ref.skill.json@v1.11#fcd7f7 | n | PRIVATE | PUBLIC NOW (in sdk); markers: HANTOO, KIWOOM, account, app:personal-docs, token:weak; home a private repo (none holds it yet) |
-| sonnet-reflection | sdk:wkappbot-sdk/sonnet-reflection.skill.json@v1.4709#c202c1 | n | PRIVATE | PUBLIC NOW (in sdk); markers: HANTOO, account, token:weak; home a private repo (none holds it yet) |
-| sonnet-reflection-howto | sdk:wkappbot-sdk/sonnet-reflection-howto.skill.json@v1.99#f98fb4 | n | PRIVATE | PUBLIC NOW (in sdk); markers: password, token:weak; home a private repo (none holds it yet) |
-| sonnet-reflection-ref | sdk:wkappbot-sdk/sonnet-reflection-ref.skill.json@v1.2#d0ed57 | n | PRIVATE | PUBLIC NOW (in sdk); markers: password; home a private repo (none holds it yet) |
-| sonnet-self-reflection-howto | sdk:wkappbot-sdk/sonnet-self-reflection-howto.skill.json@v1.1#1fbf22 | n | SDK | no private marker; already in sdk |
-| sonnet-self-reflection-ref | sdk:wkappbot-sdk/sonnet-self-reflection-ref.skill.json@v1.1#62b0a1 | n | SDK | no private marker; already in sdk |
-| source-edit-skill-lock-live-hole | sdk:wkappbot-workflow/source-edit-skill-lock-live-hole.skill.json@v1.0#4ed522 | n | SDK | no private marker; already in sdk |
-| source-splitter-untangles-bug-labyrinth | sdk:wkappbot-sdk/source-splitter-untangles-bug-labyrinth.skill.json@v1.2#280ae0 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| spam-popup-dismiss-patterns | sdk:wkappbot-core/spam-popup-dismiss-patterns.skill.json@v1.1#69595c | n | SDK | no private marker; already in sdk |
-| speak-bg-interrupt-via-x-esc-caller-exit | sdk:wkappbot-core/speak-bg-interrupt-via-x-esc-caller-exit.skill.json@v1.5#28f3fa | n | SDK | no private marker; already in sdk |
-| speak-timeout-dynamic-safety | sdk:wkappbot-core/speak-timeout-dynamic-safety.skill.json@v1.2#f3f1c5 | n | SDK | no private marker; already in sdk |
-| splitter-feature-discovery-plus-delegation-distribution-for-token-frugal-bug-analysis | sdk:wkappbot-workflow/splitter-feature-discovery-plus-delegation-distribution-for-token-frugal-bug-analysis.skill.json@v1.2#15d7b6 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| stall-guard | sdk:wkappbot-workflow/stall-guard.skill.json@v1.4#f6a4be | n | SDK | no private marker; already in sdk |
-| stall-guard-wk-exemption | sdk:wkappbot-workflow/stall-guard-wk-exemption.skill.json@v1.11#16e9fc | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| stall-guard-wk-exemption-howto | sdk:wkappbot-workflow/stall-guard-wk-exemption-howto.skill.json@v1.0#561e7f | n | SDK | no private marker; already in sdk |
-| stall-guard-wk-exemption-ref | sdk:wkappbot-workflow/stall-guard-wk-exemption-ref.skill.json@v1.0#6ed899 | n | SDK | no private marker; already in sdk |
-| standard-appbot-window | sdk:wkappbot/standard-appbot-window.skill.json@v1.6#2d6e98 | n | SDK | no private marker; already in sdk |
-| standard-appbot-window-howto | sdk:wkappbot/standard-appbot-window-howto.skill.json@v1.0#4a8471 | n | SDK | no private marker; already in sdk |
-| standard-appbot-window-ref | sdk:wkappbot/standard-appbot-window-ref.skill.json@v1.0#5dce26 | n | SDK | no private marker; already in sdk |
-| standard-appbot-window-t1-core | sdk:wkappbot/standard-appbot-window-t1-core.skill.json@v1.0#d8b8a3 | n | SDK | no private marker; already in sdk |
-| standard-chrome-window | sdk:wkappbot/standard-chrome-window.skill.json@v1.4#f1f291 | n | SDK | no private marker; already in sdk |
-| standard-chrome-window-howto | sdk:wkappbot/standard-chrome-window-howto.skill.json@v1.0#bb429d | n | SDK | no private marker; already in sdk |
-| standard-chrome-window-ref | sdk:wkappbot/standard-chrome-window-ref.skill.json@v1.0#02fd84 | n | SDK | no private marker; already in sdk |
-| stop-ai-from-clicking-the-wrong-button-6-layer-target-safety-net | sdk:wkappbot/stop-ai-from-clicking-the-wrong-button-6-layer-target-safety-net.skill.json@v1.2#79c5fc | n | SDK | no private marker; already in sdk |
-| sudo-elevation-four-layers | sdk:wkappbot-core/sudo-elevation-four-layers.skill.json@v2#2e2231 | n | SDK | no private marker; already in sdk |
-| sudo-proxy-cp949-stdout-fix-elevatedeyeproxy-standardoutputencoding-utf8 | sdk:wkappbot-core/sudo-proxy-cp949-stdout-fix-elevatedeyeproxy-standardoutputencoding-utf8.skill.json@v1.3#cb9278 | n | SDK | no private marker; already in sdk |
-| suggest-cmd-guard-word-boundary | sdk:wkappbot-core/suggest-cmd-guard-word-boundary.skill.json@v1.4#0c9fcb | n | SDK | no private marker; already in sdk |
-| suggest-co-resolve-2of2 | sdk:wkappbot-core/suggest-co-resolve-2of2.skill.json@v1.63#1778d2 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| suggest-co-resolve-2of2-howto | sdk:wkappbot-core/suggest-co-resolve-2of2-howto.skill.json@v1.0#65dbfe | n | SDK | no private marker; already in sdk |
-| suggest-co-resolve-2of2-ref | sdk:wkappbot-core/suggest-co-resolve-2of2-ref.skill.json@v1.6#bb3132 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| suggest-forward-acknowledge-and-close-stale-cross-system-forwards | sdk:wkappbot/suggest-forward-acknowledge-and-close-stale-cross-system-forwards.skill.json@v1.1#07818c | n | SDK | no private marker; already in sdk |
-| suggest-requirement-error-format | sdk:wkappbot-core/suggest-requirement-error-format.skill.json@v1.4#42cffb | n | SDK | no private marker; already in sdk |
-| suggest-resolve-cdp-bugs | sdk:wkappbot-workflow/suggest-resolve-cdp-bugs.skill.json@v1.18#cfa45b | n | SDK | no private marker; already in sdk |
-| suggest-resolve-evidence-conventions | sdk:wkappbot-workflow/suggest-resolve-evidence-conventions.skill.json@v1.16#0365ed | n | SDK | no private marker; already in sdk |
-| suggest-resolve-pre-flight-checklist | sdk:wkappbot-workflow/suggest-resolve-pre-flight-checklist.skill.json@v1.17#0eec70 | n | SDK | no private marker; already in sdk |
-| suggest-resolve-pre-flight-checklist-ref | sdk:wkappbot-workflow/suggest-resolve-pre-flight-checklist-ref.skill.json@v1.0#462836 | n | SDK | no private marker; already in sdk |
-| suggest-safety-defense-system | sdk:wkappbot-core/suggest-safety-defense-system.skill.json@v1.8#89d705 | n | SDK | no private marker; already in sdk |
-| suggest-submit-similarity-nudge | sdk:wkappbot-core/suggest-submit-similarity-nudge.skill.json@v1.3#220367 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| suggest-triage-playbook | sdk:wkappbot-workflow/suggest-triage-playbook.skill.json@v1.36#cf903c | n | SDK | no private marker; already in sdk |
-| suggest-triage-playbook-t2-howto | sdk:wkappbot-workflow/suggest-triage-playbook-t2-howto.skill.json@v1.0#a43ac0 | n | SDK | no private marker; already in sdk |
-| suggest-triage-playbook-t3-ref | sdk:wkappbot-workflow/suggest-triage-playbook-t3-ref.skill.json@v1.0#fdbdbe | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| suggest-workflow | sdk:wkappbot-workflow/suggest-workflow.skill.json@v1.136#612514 | n | SDK | no private marker; already in sdk |
-| suggest-workflow-howto | sdk:wkappbot-workflow/suggest-workflow-howto.skill.json@v1.8#1c28bb | n | SDK | no private marker; already in sdk |
-| suggest-workflow-ref | sdk:wkappbot-workflow/suggest-workflow-ref.skill.json@v1.4#ecf2f3 | n | SDK | no private marker; already in sdk |
-| suggestions-jsonl-json-escape-guard | sdk:wkappbot-core/suggestions-jsonl-json-escape-guard.skill.json@v1.0#9f4659 | n | SDK | no private marker; already in sdk |
-| syntax-rollback-cover-bash-writes | sdk:wkappbot-workflow/syntax-rollback-cover-bash-writes.skill.json@v1.4#03a7bf | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| taskkill-compat-shim-a11y-first-kill-routing | sdk:wkappbot-core/taskkill-compat-shim-a11y-first-kill-routing.skill.json@v1.14#b9ef99 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| taskkill-compat-shim-a11y-first-kill-routing-ref | sdk:wkappbot-core/taskkill-compat-shim-a11y-first-kill-routing-ref.skill.json@v1.0#0aed30 | n | SDK | no private marker; already in sdk |
-| think-eye-card-overlay | sdk:wkappbot-core/think-eye-card-overlay.skill.json@v1.2#f53732 | n | SDK | no private marker; already in sdk |
-| tier-gate | sdk:wkappbot-workflow/tier-gate.skill.json@v1.0#077b0d | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| triad-ask-simultaneous-q-debate-tool-loop-agent-mode | sdk:wkappbot-core/triad-ask-simultaneous-q-debate-tool-loop-agent-mode.skill.json@v1.7#bd7228 | n | SDK | no private marker; already in sdk |
-| user-skill-template | sdk:wkappbot-core/user-skill-template.skill.json@v1.0#667756 | n | SDK | no private marker; already in sdk |
-| verify-live-harness-file-kih-is-body | sdk:wkappbot-workflow/verify-live-harness-file-kih-is-body.skill.json@v1.4#e6be96 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| verify-tool-or-guard-synthetic-live-static | sdk:wkappbot-sdk/verify-tool-or-guard-synthetic-live-static.skill.json@v1.6#a440f2 | n | SDK | no private marker; already in sdk |
-| verify-tool-or-guard-synthetic-live-static-howto | sdk:wkappbot-sdk/verify-tool-or-guard-synthetic-live-static-howto.skill.json@v1.252#b80592 | n | PRIVATE | PUBLIC NOW (in sdk); markers: account, token:weak; home a private repo (none holds it yet) |
-| verify-tool-or-guard-synthetic-live-static-ref | sdk:wkappbot-sdk/verify-tool-or-guard-synthetic-live-static-ref.skill.json@v1.0#51aacb | n | PRIVATE | PUBLIC NOW (in sdk); markers: HANTOO; home a private repo (none holds it yet) |
-| watchdog-harness-keep-build | sdk:wkappbot-sdk/watchdog-harness-keep-build.skill.json@v1.9#b49625 | n | SDK | no private marker; already in sdk |
-| web-ai-ask-infrastructure-pump-cdp-worker-editor-send-paths | sdk:wkappbot-core/web-ai-ask-infrastructure-pump-cdp-worker-editor-send-paths.skill.json@v1.6#0fd105 | n | SDK | no private marker; already in sdk |
-| web-command-cheatsheet | sdk:wkappbot-workflow/web-command-cheatsheet.skill.json@v1.19#838df1 | n | SDK | no private marker; already in sdk |
-| web-command-cheatsheet-ref | sdk:wkappbot-workflow/web-command-cheatsheet-ref.skill.json@v1.0#525f01 | n | SDK | no private marker; already in sdk |
-| web-ocr-tesseract-cdp | sdk:wkappbot/web-ocr-tesseract-cdp.skill.json@v1.0#0d53e3 | n | SDK | no private marker; already in sdk |
-| web-open-idle-keepalive | sdk:wkappbot-core/web-open-idle-keepalive.skill.json@v1.5#37fe58 | n | SDK | no private marker; already in sdk |
-| web-to-cdp-rename | sdk:wkappbot-webbot/web-to-cdp-rename.skill.json@v1.1#502fa8 | n | SDK | no private marker; already in sdk |
-| willkim-tool-harness-independence-install-location | sdk:wkappbot-workflow/willkim-tool-harness-independence-install-location.skill.json@v1.1#2c8f17 | n | SDK | no private marker; already in sdk |
-| win-click-auto-dismiss-empty-title-transparent-overlay-nfrunlite-nkrunlite | sdk:wkappbot-core/win-click-auto-dismiss-empty-title-transparent-overlay-nfrunlite-nkrunlite.skill.json@v1.1#c2cbd3 | n | SDK | no private marker; already in sdk |
-| win-click-coordinate-system-window-relative-vs-abs-screen-coords | sdk:wkappbot/win-click-coordinate-system-window-relative-vs-abs-screen-coords.skill.json@v1.1#527dc1 | n | SDK | no private marker; already in sdk |
-| win-click-dismiss-blocker-auto-dismiss-blocking-popup-dialogs | sdk:wkappbot/win-click-dismiss-blocker-auto-dismiss-blocking-popup-dialogs.skill.json@v1.1#8513cb | n | SDK | no private marker; already in sdk |
-| win-click-postmessage-mfc-nfrunlite | sdk:wkappbot-core/win-click-postmessage-mfc-nfrunlite.skill.json@v1.2#3318e1 | n | SDK | no private marker; already in sdk |
-| windows-settings-automation | sdk:wkappbot-workflow/windows-settings-automation.skill.json@v1.1#3e6daa | n | PRIVATE | PUBLIC NOW (in sdk); markers: PIN, account, password; home a private repo (none holds it yet) |
-| wk-ai-tools | sdk:wkappbot-workflow/wk-ai-tools.skill.json@v1.16#a829e1 | n | SDK | no private marker; already in sdk |
-| wk-ai-tools-budget | sdk:wkappbot-workflow/wk-ai-tools-budget.skill.json@v1.0#4cc5f2 | n | SDK | no private marker; already in sdk |
-| wk-ai-tools-recovery | sdk:wkappbot-workflow/wk-ai-tools-recovery.skill.json@v1.0#8a4923 | n | SDK | no private marker; already in sdk |
-| wk-ai-tools-routing | sdk:wkappbot-workflow/wk-ai-tools-routing.skill.json@v1.7#5ba8ba | n | SDK | no private marker; already in sdk |
-| wk-cdp-fix-deploy-cdp-fix-deploy-launcher | sdk:wkappbot/wk-cdp-fix-deploy-cdp-fix-deploy-launcher.skill.json@v1.0#6a6d32 | n | SDK | no private marker; already in sdk |
-| wk-cdp-placement-verify | sdk:wkappbot-workflow/wk-cdp-placement-verify.skill.json@v1.0#210d09 | n | SDK | no private marker; already in sdk |
-| wk-cleanbaseline-test | sdk:wkappbot-kih/wk-cleanbaseline-test.skill.json@v1.1#84423d | n | SDK | no private marker; already in sdk |
-| wk-codexbal | sdk:wkappbot-workflow/wk-codexbal.skill.json@v1.0#7e0767 | n | SDK | no private marker; already in sdk |
-| wk-gg-main-script | sdk:wkappbot-workflow/wk-gg-main-script.skill.json@v1.0#8e5a4c | n | SDK | no private marker; already in sdk |
-| wk-gitsync | sdk:wkappbot-workflow/wk-gitsync.skill.json@v1.17#2befa6 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| wk-only-gate | sdk:wkappbot-workflow/wk-only-gate.skill.json@v1.0#522f96 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| wk-parsecheck | sdk:wkappbot-kih/wk-parsecheck.skill.json@v1.5#1e95a4 | n | SDK | no private marker; already in sdk |
-| wk-pstest | sdk:wkappbot-kih/wk-pstest.skill.json@v1.0#b720d0 | n | SDK | no private marker; already in sdk |
-| wk-ptybuild | sdk:wkappbot-workflow/wk-ptybuild.skill.json@v1.0#785377 | n | SDK | no private marker; already in sdk |
-| wk-skilllock-audit | sdk:wkappbot-workflow/wk-skilllock-audit.skill.json@v1.0#9ca0cd | n | SDK | no private marker; already in sdk |
-| wk-sourceread-test-launcher | sdk:wkappbot-kih/wk-sourceread-test-launcher.skill.json@v1.1#1ccf64 | n | SDK | no private marker; already in sdk |
-| wk-tool-first-use-skill-nudge | sdk:wkappbot-workflow/wk-tool-first-use-skill-nudge.skill.json@v1.20#65f91f | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| wk-tool-first-use-skill-nudge-howto | sdk:wkappbot-workflow/wk-tool-first-use-skill-nudge-howto.skill.json@v1.0#421c97 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| wk-tool-first-use-skill-nudge-ref | sdk:wkappbot-workflow/wk-tool-first-use-skill-nudge-ref.skill.json@v1.0#c233eb | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| wk-tool-sub-1s-response-time-mandate | sdk:wkappbot-workflow/wk-tool-sub-1s-response-time-mandate.skill.json@v1.17#a2421b | n | SDK | no private marker; already in sdk |
-| wk-tool-sub-1s-response-time-mandate-howto | sdk:wkappbot-workflow/wk-tool-sub-1s-response-time-mandate-howto.skill.json@v1.0#03bb47 | n | SDK | no private marker; already in sdk |
-| wk-tool-sub-1s-response-time-mandate-ref | sdk:wkappbot-workflow/wk-tool-sub-1s-response-time-mandate-ref.skill.json@v1.0#fed209 | n | SDK | no private marker; already in sdk |
-| wkagent-name-python-prototype | sdk:wkappbot-sdk/wkagent-name-python-prototype.skill.json@v1.0#3759e7 | n | SDK | no private marker; already in sdk |
-| wkagent-name-tool | sdk:personal-docs/wkagent-name-tool.skill.json@v1.44#991308 | n | PRIVATE | PUBLIC NOW (in sdk); markers: app:personal-docs; home a private repo (none holds it yet) |
-| wkagent-name-tool-howto | sdk:personal-docs/wkagent-name-tool-howto.skill.json@v1.7#76b3a8 | n | PRIVATE | PUBLIC NOW (in sdk); markers: app:personal-docs; home a private repo (none holds it yet) |
-| wkappbot-ask-gpt-zombie-process-4-5-gb-memory-leak-detection-and-fix | sdk:wkappbot-workflow/wkappbot-ask-gpt-zombie-process-4-5-gb-memory-leak-detection-and-fix.skill.json@v1.0#7d5892 | n | SDK | no private marker; already in sdk |
-| wkappbot-beginner-onboarding-from-zero-to-first-automation | sdk:wkappbot-sdk/wkappbot-beginner-onboarding-from-zero-to-first-automation.skill.json@v1.3#929b19 | n | PRIVATE | PUBLIC NOW (in sdk); markers: account; home a private repo (none holds it yet) |
-| wkappbot-build-verify-workflow | sdk:wkappbot-core/wkappbot-build-verify-workflow.skill.json@v1.64#b96e7e | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| wkappbot-build-verify-workflow-howto | sdk:wkappbot-core/wkappbot-build-verify-workflow-howto.skill.json@v1.2#5b66ab | n | SDK | no private marker; already in sdk |
-| wkappbot-build-verify-workflow-ref | sdk:wkappbot-core/wkappbot-build-verify-workflow-ref.skill.json@v1.0#00c83d | n | SDK | no private marker; already in sdk |
-| wkappbot-business-plan-draft | sdk:wkappbot/wkappbot-business-plan-draft.skill.json@v1.21#f80fe8 | n | PRIVATE | PUBLIC NOW (in sdk); markers: KIWOOM, account, customer, token:credential; home a private repo (none holds it yet) |
-| wkappbot-deployment-architecture | sdk:wkappbot-kih/wkappbot-deployment-architecture.skill.json@v1.0#504fb3 | n | SDK | no private marker; already in sdk |
-| wkappbot-file-write-read-silent-no-op-through-eye-pipe-root-cause | sdk:wkappbot-core/wkappbot-file-write-read-silent-no-op-through-eye-pipe-root-cause.skill.json@v1.1#68ced2 | n | SDK | no private marker; already in sdk |
-| wkappbot-log-search | sdk:wkappbot-workflow/wkappbot-log-search.skill.json@v1.5#0dc10b | n | SDK | no private marker; already in sdk |
-| wkappbot-public-launch-checklist | sdk:wkappbot/wkappbot-public-launch-checklist.skill.json@v1.5#1c4427 | n | PRIVATE | PUBLIC NOW (in sdk); markers: .env, HANTOO, account, customer, token:weak; home a private repo (none holds it yet) |
-| wkappbot-run-process-launcher-with-integrated-tracking | sdk:wkappbot/wkappbot-run-process-launcher-with-integrated-tracking.skill.json@v1.1#ddaf42 | n | SDK | no private marker; already in sdk |
-| wkappbot-sdk-daily-system-heal-checklist | sdk:wkappbot-sdk/wkappbot-sdk-daily-system-heal-checklist.skill.json@v1.21#560080 | n | PRIVATE | PUBLIC NOW (in sdk); markers: account; home a private repo (none holds it yet) |
-| wkappbot-sdk-multi-repo-deploy | sdk:wkappbot-core/wkappbot-sdk-multi-repo-deploy.skill.json@v1.4#7aef63 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:credential; home a private repo (none holds it yet) |
-| wkappbot-speak-tts-bugs-harness-95-auto-speak-loop-karaoke-drift | sdk:wkappbot-core/wkappbot-speak-tts-bugs-harness-95-auto-speak-loop-karaoke-drift.skill.json@v1.2#5682f4 | n | SDK | no private marker; already in sdk |
-| wkappbot-system-total-check | sdk:wkappbot/wkappbot-system-total-check.skill.json@v1.1#5218c3 | n | SDK | no private marker; already in sdk |
-| wkappbot-taskkill-usage | sdk:wkappbot/wkappbot-taskkill-usage.skill.json@v1.27#2b40cf | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| wkappbot-the-artificial-knowledge-platform | sdk:wkappbot-sdk/wkappbot-the-artificial-knowledge-platform.skill.json@v1.9#b0b539 | n | PRIVATE | PUBLIC NOW (in sdk); markers: customer; home a private repo (none holds it yet) |
-| wkappbot-windows-focus-flag-and-no-filter-relevance-mode | sdk:wkappbot-workflow/wkappbot-windows-focus-flag-and-no-filter-relevance-mode.skill.json@v1.0#1ad0b8 | n | SDK | no private marker; already in sdk |
-| wkappbot-workflow-appbot-shared-reflection | sdk:wkappbot-workflow/wkappbot-workflow-appbot-shared-reflection.skill.json@v1.2#ba50cb | n | SDK | no private marker; already in sdk |
-| wkaq-printwindow-gdi | sdk:wkappbot-core/wkaq-printwindow-gdi.skill.json@v1.6#58faad | n | PRIVATE | PUBLIC NOW (in sdk); markers: KIWOOM; home a private repo (none holds it yet) |
-| wkbuild | sdk:wkappbot-workflow/wkbuild.skill.json@v1.10#368e54 | n | SDK | no private marker; already in sdk |
-| wkcdp-mon | sdk:wkappbot/wkcdp-mon.skill.json@v1.6#d0195f | n | SDK | no private marker; already in sdk |
-| wkchat-auto-startup-registration | sdk:wkappbot-core/wkchat-auto-startup-registration.skill.json@v1.1#be4c1f | n | SDK | no private marker; already in sdk |
-| wkchat-conpty-enter-intercept-rename-first-hardlink-live-swap | sdk:wkappbot-core/wkchat-conpty-enter-intercept-rename-first-hardlink-live-swap.skill.json@v1.0#20337d | n | SDK | no private marker; already in sdk |
-| wkchat-conpty-enter-intercept-two-phase | sdk:wkappbot-core/wkchat-conpty-enter-intercept-two-phase.skill.json@v1.1#e460f7 | n | SDK | no private marker; already in sdk |
-| wkchat-session-routing-guard | sdk:wkappbot-core/wkchat-session-routing-guard.skill.json@v1.8#a814cd | n | SDK | no private marker; already in sdk |
-| wkchat-shortcut-geometry-lnk-update | sdk:wkappbot-core/wkchat-shortcut-geometry-lnk-update.skill.json@v1.1#985570 | n | SDK | no private marker; already in sdk |
-| wkchat-welcome-banner | sdk:wkappbot-core/wkchat-welcome-banner.skill.json@v1.1#51b97d | n | SDK | no private marker; already in sdk |
-| wkchat-window-geometry-persistence | sdk:wkappbot-core/wkchat-window-geometry-persistence.skill.json@v1.0#ee9e27 | n | SDK | no private marker; already in sdk |
-| wkdoctor | sdk:wkappbot-sdk/wkdoctor.skill.json@v1.0#99b7be | n | SDK | no private marker; already in sdk |
-| wkdoctor-emergency-physician-spawn-storm-kill | sdk:wkappbot-sdk/wkdoctor-emergency-physician-spawn-storm-kill.skill.json@v1.4#e0f239 | n | SDK | no private marker; already in sdk |
-| wkdoctor-sdk-environment-health-check | sdk:wkappbot-sdk/wkdoctor-sdk-environment-health-check.skill.json@v1.7#b59973 | n | SDK | no private marker; already in sdk |
-| wkdoctor-sdk-environment-health-check-howto | sdk:wkappbot-sdk/wkdoctor-sdk-environment-health-check-howto.skill.json@v1.0#99c1ee | n | SDK | no private marker; already in sdk |
-| wkdoctor-sdk-environment-health-check-ref | sdk:wkappbot-sdk/wkdoctor-sdk-environment-health-check-ref.skill.json@v1.0#70bc4c | n | SDK | no private marker; already in sdk |
-| wkdoctor-system-physician | sdk:wkappbot-sdk/wkdoctor-system-physician.skill.json@v1.0#b8ba06 | n | SDK | no private marker; already in sdk |
-| wkdoctor-system-physician-howto | sdk:wkappbot-sdk/wkdoctor-system-physician-howto.skill.json@v1.0#2062a3 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| wkdoctor-system-physician-ref | sdk:wkappbot-sdk/wkdoctor-system-physician-ref.skill.json@v1.0#c3dff2 | n | SDK | no private marker; already in sdk |
-| wkdr-emergency-doctor-wkappbot-core-spawn-storm-kill | sdk:wkappbot-sdk/wkdr-emergency-doctor-wkappbot-core-spawn-storm-kill.skill.json@v1.3#f3bb22 | n | SDK | no private marker; already in sdk |
-| wkedit | sdk:wkappbot-workflow/wkedit.skill.json@v1.6#9e4dff | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| wkedit-autocorrect | sdk:wkappbot-workflow/wkedit-autocorrect.skill.json@v1.4#e90950 | n | SDK | no private marker; already in sdk |
-| wkedit-encoding-hell | sdk:wkappbot-workflow/wkedit-encoding-hell.skill.json@v1.1#22d447 | n | SDK | no private marker; already in sdk |
-| wkedit-howto | sdk:wkappbot-workflow/wkedit-howto.skill.json@v1.0#48ceff | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| wkedit-shell-distortion-recovery | sdk:wkappbot/wkedit-shell-distortion-recovery.skill.json@v1.2#3722c8 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| wkfind | sdk:wkappbot-workflow/wkfind.skill.json@v1.5#4fb514 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| wkfind-caller-hwnd-validation-3tier-pattern | sdk:wkappbot/wkfind-caller-hwnd-validation-3tier-pattern.skill.json@v1.6#47339a | n | PRIVATE | PUBLIC NOW (in sdk); markers: customer; home a private repo (none holds it yet) |
-| wkfind-caller-hwnd-validation-3tier-pattern-ref | sdk:wkappbot/wkfind-caller-hwnd-validation-3tier-pattern-ref.skill.json@v1.0#2a57ab | n | SDK | no private marker; already in sdk |
-| wkfind-ps1-investigation-tool | sdk:wkappbot-workflow/wkfind-ps1-investigation-tool.skill.json@v1.1#7fc799 | n | SDK | no private marker; already in sdk |
-| wkfind-quick-process-chain-caller-window-detection-patterns | sdk:wkappbot/wkfind-quick-process-chain-caller-window-detection-patterns.skill.json@v1.1#265dc4 | n | SDK | no private marker; already in sdk |
-| wkharness-agent-bulletin-shared-live-steering-channel-for-background-agents | sdk:wkappbot-workflow/wkharness-agent-bulletin-shared-live-steering-channel-for-background-agents.skill.json@v1.0#57e6c7 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| wkharness-agent-leak-guard | sdk:wkappbot-workflow/wkharness-agent-leak-guard.skill.json@v1.2#440448 | n | SDK | no private marker; already in sdk |
-| wkharness-bash-uses-pwsh-guard | sdk:wkappbot-workflow/wkharness-bash-uses-pwsh-guard.skill.json@v1.2#09431b | n | SDK | no private marker; already in sdk |
-| wkharness-busy-fleet-guard | sdk:wkappbot-workflow/wkharness-busy-fleet-guard.skill.json@v1.2#b86e54 | n | SDK | no private marker; already in sdk |
-| wkharness-cd-noise-guard | sdk:wkappbot-workflow/wkharness-cd-noise-guard.skill.json@v1.1#4a220f | n | SDK | no private marker; already in sdk |
-| wkharness-codex-pace-guard | sdk:wkappbot-workflow/wkharness-codex-pace-guard.skill.json@v1.2#4619b6 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| wkharness-codex-spec-gate | sdk:wkappbot-workflow/wkharness-codex-spec-gate.skill.json@v1.2#442ec4 | n | SDK | no private marker; already in sdk |
-| wkharness-edit-bg-guard | sdk:wkappbot-workflow/wkharness-edit-bg-guard.skill.json@v1.1#d03199 | n | SDK | no private marker; already in sdk |
-| wkharness-guards | sdk:wkappbot-workflow/wkharness-guards.skill.json@v1.613#c65ab4 | n | SDK | no private marker; already in sdk |
-| wkharness-guards-howto | sdk:wkappbot-workflow/wkharness-guards-howto.skill.json@v1.7#b79d67 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| wkharness-guards-ref | sdk:wkappbot-workflow/wkharness-guards-ref.skill.json@v1.4#6fd7e4 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| wkharness-no-verify-guard | sdk:wkappbot-workflow/wkharness-no-verify-guard.skill.json@v1.2#00fd06 | n | SDK | no private marker; already in sdk |
-| wkharness-pre-commit-source-gate | sdk:wkappbot-workflow/wkharness-pre-commit-source-gate.skill.json@v1.15#30c994 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| wkharness-security-guard | sdk:wkappbot-workflow/wkharness-security-guard.skill.json@v1.2#b25af5 | n | SDK | no private marker; already in sdk |
-| wkharness-sed-guard | sdk:wkappbot-workflow/wkharness-sed-guard.skill.json@v1.0#d2620a | n | SDK | no private marker; already in sdk |
-| wkharness-skill-delete-guard | sdk:wkappbot-workflow/wkharness-skill-delete-guard.skill.json@v1.2#dbfa18 | n | SDK | no private marker; already in sdk |
-| wkharness-skill-guard | sdk:wkappbot-workflow/wkharness-skill-guard.skill.json@v1.2#458e38 | n | SDK | no private marker; already in sdk |
-| wkharness-skill-list-guard | sdk:wkappbot-workflow/wkharness-skill-list-guard.skill.json@v1.2#a726e2 | n | SDK | no private marker; already in sdk |
-| wkharness-source-sandbox-suffix-cheap-edits-only-word-gitignored-root-merges | sdk:wkappbot-workflow/wkharness-source-sandbox-suffix-cheap-edits-only-word-gitignored-root-merges.skill.json@v1.0#1050f1 | n | SDK | no private marker; already in sdk |
-| wkharness-stall-guard | sdk:wkappbot-workflow/wkharness-stall-guard.skill.json@v1.1#a1df48 | n | SDK | no private marker; already in sdk |
-| wkharness-tier-gate | sdk:wkappbot-workflow/wkharness-tier-gate.skill.json@v1.2#99f287 | n | SDK | no private marker; already in sdk |
-| wkharness-wk-only-gate | sdk:wkappbot-workflow/wkharness-wk-only-gate.skill.json@v1.2#313e6b | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| wkjobs-ai-process-monitor | sdk:wkappbot-sdk/wkjobs-ai-process-monitor.skill.json@v1.15#0058ea | n | SDK | no private marker; already in sdk |
-| wkjobs-ai-process-monitor-ref | sdk:wkappbot-sdk/wkjobs-ai-process-monitor-ref.skill.json@v1.0#3591a2 | n | SDK | no private marker; already in sdk |
-| wknotification-unified-dispatcher-and-file-scheduler | sdk:wkappbot-core/wknotification-unified-dispatcher-and-file-scheduler.skill.json@v1.3#86839b | n | SDK | no private marker; already in sdk |
-| wkpace-codex | sdk:wkappbot-workflow/wkpace-codex.skill.json@v1.1#ace8d1 | n | SDK | no private marker; already in sdk |
-| wkpush-git-push-race-winner | sdk:wkappbot-workflow/wkpush-git-push-race-winner.skill.json@v1.2#bcfd29 | n | SDK | no private marker; already in sdk |
-| wkpushsdk | sdk:wkappbot-workflow/wkpushsdk.skill.json@v1.2#c6182b | n | SDK | no private marker; already in sdk |
-| wksplit-cs-utility | sdk:wkappbot/wksplit-cs-utility.skill.json@v1.35#359490 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| wksplit-cs-utility-howto | sdk:wkappbot/wksplit-cs-utility-howto.skill.json@v1.0#687a8a | n | SDK | no private marker; already in sdk |
-| wksplit-cs-utility-ref | sdk:wkappbot/wksplit-cs-utility-ref.skill.json@v1.0#a4a2b4 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| wksplit-multi-language-dedup-round-trip-howto | sdk:wkappbot-sdk/wksplit-multi-language-dedup-round-trip-howto.skill.json@v1.1#9c5ea3 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| wksplit-smart-multi-language-dedup-round-trip-spec | sdk:wkappbot-sdk/wksplit-smart-multi-language-dedup-round-trip-spec.skill.json@v1.2#44bcd5 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| wksplit-smart-multi-language-dedup-round-trip-spec-howto | sdk:wkappbot-sdk/wksplit-smart-multi-language-dedup-round-trip-spec-howto.skill.json@v1.1#58f5be | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| wksplit-smart-multi-language-dedup-round-trip-spec-ref | sdk:wkappbot-sdk/wksplit-smart-multi-language-dedup-round-trip-spec-ref.skill.json@v1.0#52ad41 | n | PRIVATE | PUBLIC NOW (in sdk); markers: HANTOO; home a private repo (none holds it yet) |
-| wkstdpty-shared-pty-bridge | sdk:wkappbot-workflow/wkstdpty-shared-pty-bridge.skill.json@v1.0#eda7e8 | n | SDK | no private marker; already in sdk |
-| wktasklist-cached-process-snapshot | sdk:wkappbot-sdk/wktasklist-cached-process-snapshot.skill.json@v1.5#9b32c3 | n | SDK | no private marker; already in sdk |
-| wktasklist-intelligent-management | sdk:wkappbot-sdk/wktasklist-intelligent-management.skill.json@v1.0#57177a | n | PRIVATE | PUBLIC NOW (in sdk); markers: KIWOOM; home a private repo (none holds it yet) |
-| wktasklist-intelligent-management-howto | sdk:wkappbot-sdk/wktasklist-intelligent-management-howto.skill.json@v1.0#6ffc05 | n | SDK | no private marker; already in sdk |
-| wktasklist-intelligent-management-ref | sdk:wkappbot-sdk/wktasklist-intelligent-management-ref.skill.json@v1.0#179004 | n | PRIVATE | PUBLIC NOW (in sdk); markers: KIWOOM; home a private repo (none holds it yet) |
-| wktasklist-tasklist-exe-full-compatibility-and-self-test | sdk:wkappbot-sdk/wktasklist-tasklist-exe-full-compatibility-and-self-test.skill.json@v1.0#55b2bf | n | SDK | no private marker; already in sdk |
-| wktest-promote | sdk:wkappbot/wktest-promote.skill.json@v1.11#cd1e7c | n | SDK | no private marker; already in sdk |
-| wktest-promote-staging-binary-promotion | sdk:wkappbot/wktest-promote-staging-binary-promotion.skill.json@v1.0#b8b3f2 | n | SDK | no private marker; already in sdk |
-| wktest-staging-build-pipeline | sdk:wkappbot-core/wktest-staging-build-pipeline.skill.json@v1.0#193ae3 | n | SDK | no private marker; already in sdk |
-| wktest-staging-build-storm-safe-deploy-pipeline | sdk:wkappbot-workflow/wktest-staging-build-storm-safe-deploy-pipeline.skill.json@v1.4#a62502<br>sdk:wkappbot-core/wktest-staging-build-storm-safe-deploy-pipeline.skill.json@v1.0#2d1af3 | y | SDK | no private marker; already in sdk |
-| wktool-pattern | sdk:wkappbot-workflow/wktool-pattern.skill.json@v1.19#92c67b | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| wktool-qa-pattern | sdk:wkappbot-workflow/wktool-qa-pattern.skill.json@v1.4#2f8d3e | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| wkwrap | sdk:wkappbot-workflow/wkwrap.skill.json@v1.8#cfc9b5 | n | SDK | no private marker; already in sdk |
-| wkwrap-ai-native-wrappers | sdk:wkappbot-workflow/wkwrap-ai-native-wrappers.skill.json@v1.0#16b3ce | n | SDK | no private marker; already in sdk |
-| wkwrap-important-tool-connection-doctor-reconnect | sdk:wkappbot-sdk/wkwrap-important-tool-connection-doctor-reconnect.skill.json@v1.0#a9f041 | n | SDK | no private marker; already in sdk |
-| wkzombie-stall-guard-delegation | sdk:wkappbot-workflow/wkzombie-stall-guard-delegation.skill.json@v1.2#902763 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
-| write-location-floor-spec-non-source-writes-go-only-under-tmp | sdk:wkappbot-workflow/write-location-floor-spec-non-source-writes-go-only-under-tmp.skill.json@v1.0#e013de | n | SDK | no private marker; already in sdk |
-| wt-terminal-a11y-type-read-design | sdk:wkappbot-sdk/wt-terminal-a11y-type-read-design.skill.json@v1.0#78d3ac | n | SDK | no private marker; already in sdk |
-| youtube-ad-skipper | sdk:wkappbot-sdk/youtube-ad-skipper.skill.json@v1.10#a59b5e | n | SDK | no private marker; already in sdk |
-| yt-controller | sdk:wkappbot-webbot/yt-controller.skill.json@v1.0#e241d5 | n | SDK | no private marker; already in sdk |
+| a11y-action-auto-diff | sdk:wkappbot-core/a11y-action-auto-diff.skill.json@v1.2#b281ef | n | SDK | no private marker; already in sdk |
+| a11y-ancestor-blocker-bypass | sdk:wkappbot-core/a11y-ancestor-blocker-bypass.skill.json@v1.13#ea4eab | n | SDK | no private marker; already in sdk |
+| a11y-auto-find-grap-verify-skip-miss-report-for-empty-pattern-wpf-overlays | sdk:wkappbot-core/a11y-auto-find-grap-verify-skip-miss-report-for-empty-pattern-wpf-overlays.skill.json@v1.1#034252 | n | SDK | no private marker; already in sdk |
+| a11y-callout | sdk:wkappbot-core/a11y-callout.skill.json@v1.19#29120f | n | SDK | no private marker; already in sdk |
+| a11y-chrome-cdp-overlay-uia-native-dialog-blocker-detection | sdk:wkappbot-core/a11y-chrome-cdp-overlay-uia-native-dialog-blocker-detection.skill.json@v1.8#062c98 | n | SDK | no private marker; already in sdk |
+| a11y-click-react-fiber-cdp-trusted-fallback | sdk:wkappbot-core/a11y-click-react-fiber-cdp-trusted-fallback.skill.json@v1.5#9a05fa | n | SDK | no private marker; already in sdk |
+| a11y-close-focus-steal-guard | sdk:wkappbot-core/a11y-close-focus-steal-guard.skill.json@v1.2#c42525 | n | SDK | no private marker; already in sdk |
+| a11y-close-safety-ambiguity-focus-node-diagnostics | sdk:wkappbot/a11y-close-safety-ambiguity-focus-node-diagnostics.skill.json@v1.2#1c2017 | n | SDK | no private marker; already in sdk |
+| a11y-command-always-print-resolved-target-full-path-grap-spec | sdk:wkappbot-core/a11y-command-always-print-resolved-target-full-path-grap-spec.skill.json@v1.4#aca09d | n | SDK | no private marker; already in sdk |
+| a11y-command-cheatsheet | sdk:wkappbot-workflow/a11y-command-cheatsheet.skill.json@v2.14#842c7a | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| a11y-command-cheatsheet-howto | sdk:wkappbot-workflow/a11y-command-cheatsheet-howto.skill.json@v1.0#135969 | n | SDK | no private marker; already in sdk |
+| a11y-command-cheatsheet-ref | sdk:wkappbot-workflow/a11y-command-cheatsheet-ref.skill.json@v1.0#2bd1ef | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| a11y-find | sdk:wkappbot/a11y-find.skill.json@v1.27#a36d77 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| a11y-find-cdp-runtime-eval-focus-guard | sdk:wkappbot-workflow/a11y-find-cdp-runtime-eval-focus-guard.skill.json@v1.6#f4b9f8 | n | SDK | no private marker; already in sdk |
+| a11y-find-deprecated-eval-removal-guard | sdk:wkappbot-workflow/a11y-find-deprecated-eval-removal-guard.skill.json@v1.16#aa0a3c | n | SDK | no private marker; already in sdk |
+| a11y-find-mfc-deep-descendant-grandchildren-via-enumchildwindows | sdk:wkappbot/a11y-find-mfc-deep-descendant-grandchildren-via-enumchildwindows.skill.json@v1.4#94f9e5 | n | SDK | no private marker; already in sdk |
+| a11y-find-performance-fastpath | sdk:wkappbot-core/a11y-find-performance-fastpath.skill.json@v1.9#481bb3 | n | SDK | no private marker; already in sdk |
+| a11y-find-verify-miss-empty-grap-guard | sdk:wkappbot-workflow/a11y-find-verify-miss-empty-grap-guard.skill.json@v1.4#63be8f | n | SDK | no private marker; already in sdk |
+| a11y-focus-steal-user-active-silent-yield | sdk:wkappbot-core/a11y-focus-steal-user-active-silent-yield.skill.json@v1.18#1aa250 | n | SDK | no private marker; already in sdk |
+| a11y-focus-steal-user-active-silent-yield-howto | sdk:wkappbot-workflow/a11y-focus-steal-user-active-silent-yield-howto.skill.json@v1.0#7b5d60 | n | SDK | no private marker; already in sdk |
+| a11y-focus-steal-user-active-silent-yield-ref | sdk:wkappbot-workflow/a11y-focus-steal-user-active-silent-yield-ref.skill.json@v1.0#3da802 | n | SDK | no private marker; already in sdk |
+| a11y-focus-tier-chain | sdk:wkappbot-core/a11y-focus-tier-chain.skill.json@v1.34#d4d898 | n | SDK | no private marker; already in sdk |
+| a11y-focus-tier-chain-howto | sdk:wkappbot-workflow/a11y-focus-tier-chain-howto.skill.json@v1.0#883120 | n | SDK | no private marker; already in sdk |
+| a11y-focus-tier-chain-ref | sdk:wkappbot-workflow/a11y-focus-tier-chain-ref.skill.json@v1.0#38b1dc | n | SDK | no private marker; already in sdk |
+| a11y-grap-hwnd-authoritative-no-and-reject-on-drifted-fields | sdk:wkappbot/a11y-grap-hwnd-authoritative-no-and-reject-on-drifted-fields.skill.json@v1.0#e86f57 | n | SDK | no private marker; already in sdk |
+| a11y-grid-read-clipboard-bridge-for-owner-drawn-hts-grids | sdk:wkappbot/a11y-grid-read-clipboard-bridge-for-owner-drawn-hts-grids.skill.json@v2#2839db | n | SDK | no private marker; already in sdk |
+| a11y-hack-ocr-opt-in-vision-worker-sentinel-bridge | sdk:wkappbot-core/a11y-hack-ocr-opt-in-vision-worker-sentinel-bridge.skill.json@v2#f4373f | n | SDK | no private marker; already in sdk |
+| a11y-kill-json5-grap-support | sdk:wkappbot-core/a11y-kill-json5-grap-support.skill.json@v1.4#064829 | n | SDK | no private marker; already in sdk |
+| a11y-node-first-content-gating | sdk:wkappbot-core/a11y-node-first-content-gating.skill.json@v1.21#1ad5bc | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| a11y-playbook-writing | sdk:wkappbot/a11y-playbook-writing.skill.json@v2.2#bf1839 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| a11y-read-inspect-improvement-ideas | sdk:wkappbot/a11y-read-inspect-improvement-ideas.skill.json@v1.3#f7c6ad | n | SDK | no private marker; already in sdk |
+| a11y-screenshot-crash-safe-layered-alpha-restore-guard | sdk:wkappbot-core/a11y-screenshot-crash-safe-layered-alpha-restore-guard.skill.json@v1.12#3ed5e7 | n | SDK | no private marker; already in sdk |
+| a11y-screenshot-focusless-window-capture | sdk:wkappbot/a11y-screenshot-focusless-window-capture.skill.json@v1.13#e84eb8 | n | SDK | no private marker; already in sdk |
+| a11y-screenshot-usage | sdk:wkappbot/a11y-screenshot-usage.skill.json@v1.6#75a88b | n | SDK | no private marker; already in sdk |
+| a11y-screenshot-usage-ref | sdk:wkappbot/a11y-screenshot-usage-ref.skill.json@v1.0#340ced | n | SDK | no private marker; already in sdk |
+| a11y-set-value-50ms-delay-read-back-warning-for-win11-richtextbox-and-chrome-stale-valuepattern | sdk:wkappbot-core/a11y-set-value-50ms-delay-read-back-warning-for-win11-richtextbox-and-chrome-stale-valuepattern.skill.json@v1.3#0db5c8 | n | SDK | no private marker; already in sdk |
+| a11y-type-force-hwnd-scope-bypass | sdk:wkappbot-workflow/a11y-type-force-hwnd-scope-bypass.skill.json@v1.6#c99349 | n | PRIVATE | PUBLIC NOW (in sdk); markers: PIN; home a private repo (none holds it yet) |
+| adb-android-automation-was-intentionally-stripped-from-main-docs-still-stale | sdk:wkappbot-workflow/adb-android-automation-was-intentionally-stripped-from-main-docs-still-stale.skill.json@v1.3#72f99b | n | SDK | no private marker; already in sdk |
+| admin-eye-broadcast-close-handover | sdk:wkappbot-core/admin-eye-broadcast-close-handover.skill.json@v1.0#3d05bc | n | SDK | no private marker; already in sdk |
+| admin-eye-hot-swap-known-gap-options-for-fix | sdk:wkappbot/admin-eye-hot-swap-known-gap-options-for-fix.skill.json@v1.1#306fe6 | n | SDK | no private marker; already in sdk |
+| admin-eye-init-test-verify-sudo-pipe-encoding-after-startup | sdk:wkappbot/admin-eye-init-test-verify-sudo-pipe-encoding-after-startup.skill.json@v1.0#c56686 | n | SDK | no private marker; already in sdk |
+| agent-brief | sdk:wkappbot-workflow/agent-brief.skill.json@v1.0#495a9a | n | SDK | no private marker; already in sdk |
+| agent-brief-standard-template | sdk:wkappbot-workflow/agent-brief-standard-template.skill.json@v1.1117#d50a44 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| agent-brief-standard-template-ref | sdk:wkappbot-workflow/agent-brief-standard-template-ref.skill.json@v1.32#c97921 | n | PRIVATE | PUBLIC NOW (in sdk); markers: HANTOO, account, token:weak; home a private repo (none holds it yet) |
+| agent-canonical-dispatch | sdk:wkappbot-workflow/agent-canonical-dispatch.skill.json@v1.3#483eb4 | n | SDK | no private marker; already in sdk |
+| agent-cmd | sdk:harness/agent-cmd.skill.json@v1.9#c5788d | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| agent-cmd-howto | sdk:wkappbot-workflow/agent-cmd-howto.skill.json@v1.0#cdb3c7 | n | SDK | no private marker; already in sdk |
+| agent-cmd-pace-exempt | sdk:wkappbot-workflow/agent-cmd-pace-exempt.skill.json@v1.1#e423a4 | n | SDK | no private marker; already in sdk |
+| agent-dispatch-preflight | sdk:wkappbot-workflow/agent-dispatch-preflight.skill.json@v1.4#75e2f7 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| agent-dispatch-preflight-pre-research | sdk:wkappbot-workflow/agent-dispatch-preflight-pre-research.skill.json@v1.2#895bc7 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| agent-dispatch-preflight-ref | sdk:wkappbot-workflow/agent-dispatch-preflight-ref.skill.json@v1.1#f97956 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| agent-failure-reflection-gate | sdk:wkappbot-workflow/agent-failure-reflection-gate.skill.json@v1.29#0e53b7 | n | SDK | no private marker; already in sdk |
+| agent-failure-reflection-gate-howto | sdk:wkappbot-workflow/agent-failure-reflection-gate-howto.skill.json@v1.2#bbc523 | n | SDK | no private marker; already in sdk |
+| agent-failure-reflection-gate-ref | sdk:wkappbot-workflow/agent-failure-reflection-gate-ref.skill.json@v1.1#7691f7 | n | SDK | no private marker; already in sdk |
+| agent-leak-guard | sdk:wkappbot-workflow/agent-leak-guard.skill.json@v1.0#5e0bd2 | n | SDK | no private marker; already in sdk |
+| agent-on-load | sdk:wkappbot-workflow/agent-on-load.skill.json@v1.6#3e2aa4 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| agent-on-load-howto | sdk:wkappbot-workflow/agent-on-load-howto.skill.json@v1.0#b15c41 | n | SDK | no private marker; already in sdk |
+| agent-on-load-ref | sdk:wkappbot-workflow/agent-on-load-ref.skill.json@v1.0#41d645 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| agy-gemini-agy-proxy-reflection | sdk:wkappbot-workflow/agy-gemini-agy-proxy-reflection.skill.json@v1.0#e11f88 | n | SDK | no private marker; already in sdk |
+| agy-gemini-flash-reflection | sdk:wkappbot-workflow/agy-gemini-flash-reflection.skill.json@v1.2#27448d | n | SDK | no private marker; already in sdk |
+| agy-gemini-pro-reflection | sdk:wkappbot-workflow/agy-gemini-pro-reflection.skill.json@v1.2#29df52 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| agy-opus-reflection | sdk:wkappbot-workflow/agy-opus-reflection.skill.json@v1.1#686724 | n | SDK | no private marker; already in sdk |
+| agy-root-reflection | sdk:wkappbot-workflow/agy-root-reflection.skill.json@v1.10#fb1a92 | n | SDK | no private marker; already in sdk |
+| agy-root-reflection-ref | sdk:wkappbot-workflow/agy-root-reflection-ref.skill.json@v1.0#0ec934 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| ai-agent-automation-patterns | sdk:wkappbot-core/ai-agent-automation-patterns.skill.json@v1.0#8ece11 | n | SDK | no private marker; already in sdk |
+| ai-agent-desktop-automation-landscape-competitor-and-pattern-reference-2026-04 | sdk:wkappbot-core/ai-agent-desktop-automation-landscape-competitor-and-pattern-reference-2026-04.skill.json@v1.5#ee7d39 | n | SDK | no private marker; already in sdk |
+| ai-auto-router-fallback-on-model-error | sdk:wkappbot-workflow/ai-auto-router-fallback-on-model-error.skill.json@v1.0#872cb7 | n | SDK | no private marker; already in sdk |
+| ai-ecosystem-updates-april-2026-briefing-backlog-reference | sdk:wkappbot-workflow/ai-ecosystem-updates-april-2026-briefing-backlog-reference.skill.json@v1.4#e08228 | n | SDK | no private marker; already in sdk |
+| ai-news-briefing | sdk:wkappbot-workflow/ai-news-briefing.skill.json@v1.4#fae161 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| ai-news-competitive-eval | sdk:wkappbot-core/ai-news-competitive-eval.skill.json@v1.5#23e137 | n | SDK | no private marker; already in sdk |
+| ai-news-to-suggests | sdk:wkappbot-workflow/ai-news-to-suggests.skill.json@v1.2#7a8009 | n | SDK | no private marker; already in sdk |
+| all-ai-global-approval-setup | sdk:wkappbot-workflow/all-ai-global-approval-setup.skill.json@v1.2#97aa2f | n | PRIVATE | PUBLIC NOW (in sdk); markers: machine path; home a private repo (none holds it yet) |
+| all-sudo-proxy-subprocess-timeout-hasexited-check | sdk:wkappbot-core/all-sudo-proxy-subprocess-timeout-hasexited-check.skill.json@v1.9#b5c416 | n | PRIVATE | PUBLIC NOW (in sdk); markers: KIWOOM; home a private repo (none holds it yet) |
+| always-on-ai-automation-daemon-appbot-eye-internals | sdk:wkappbot/always-on-ai-automation-daemon-appbot-eye-internals.skill.json@v1.19#c1de62 | n | SDK | no private marker; already in sdk |
+| ansi-color-output-auto-disable-on-pipe-no-color | sdk:wkappbot-core/ansi-color-output-auto-disable-on-pipe-no-color.skill.json@v1.2#71403a | n | SDK | no private marker; already in sdk |
+| anthropic-computer-use-cross-platform | sdk:wkappbot-workflow/anthropic-computer-use-cross-platform.skill.json@v1.0#a73ddd | n | PRIVATE | PUBLIC NOW (in sdk); markers: account, token:weak; home a private repo (none holds it yet) |
+| anti-knowledge-pattern-special-management | sdk:wkappbot-workflow/anti-knowledge-pattern-special-management.skill.json@v1.8#4e173c | n | SDK | no private marker; already in sdk |
+| anti-knowledge-pattern-special-management-howto | sdk:wkappbot-workflow/anti-knowledge-pattern-special-management-howto.skill.json@v1.6#b92edf | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| anti-knowledge-pattern-special-management-ref | sdk:wkappbot-workflow/anti-knowledge-pattern-special-management-ref.skill.json@v1.2#9834e3 | n | SDK | no private marker; already in sdk |
+| appbot-skills-interconnection-map | sdk:wkappbot-core/appbot-skills-interconnection-map.skill.json@v1.0#056b6e | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| appbot-telemetry-promotion | sdk:wkappbot-workflow/appbot-telemetry-promotion.skill.json@v1.2#8b9026 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| ascii-only-source-no-decorative-unicode | sdk:wkappbot-workflow/ascii-only-source-no-decorative-unicode.skill.json@v1.0#c9ebbf | n | SDK | no private marker; already in sdk |
+| ask-anon-tab-preserve-on-failure | sdk:wkappbot-core/ask-anon-tab-preserve-on-failure.skill.json@v1.2#b583d3 | n | SDK | no private marker; already in sdk |
+| ask-cdp-uia-focus-steal-coverage-via-sentinel | sdk:wkappbot-core/ask-cdp-uia-focus-steal-coverage-via-sentinel.skill.json@v1.23#81ffdb | n | SDK | no private marker; already in sdk |
+| ask-cdp-uia-focus-steal-coverage-via-sentinel-howto | sdk:wkappbot-workflow/ask-cdp-uia-focus-steal-coverage-via-sentinel-howto.skill.json@v1.0#73214a | n | SDK | no private marker; already in sdk |
+| ask-cdp-uia-focus-steal-coverage-via-sentinel-ref | sdk:wkappbot-workflow/ask-cdp-uia-focus-steal-coverage-via-sentinel-ref.skill.json@v1.0#c7aa52 | n | SDK | no private marker; already in sdk |
+| ask-command-cheatsheet | sdk:wkappbot-workflow/ask-command-cheatsheet.skill.json@v1.12#e759f6 | n | SDK | no private marker; already in sdk |
+| ask-gpt-editor-wait-tag-and-rescue-fallback | sdk:wkappbot-webbot/ask-gpt-editor-wait-tag-and-rescue-fallback.skill.json@v1.13#2db1bf | n | SDK | no private marker; already in sdk |
+| ask-health-check | sdk:wkappbot-workflow/ask-health-check.skill.json@v1.5#6961a6 | n | SDK | no private marker; already in sdk |
+| ask-prompt-pump-watchdog-dismiss-resend-recovery | sdk:wkappbot-core/ask-prompt-pump-watchdog-dismiss-resend-recovery.skill.json@v2.1#e807af | n | SDK | no private marker; already in sdk |
+| ask-run-start-pwsh-path-resolution | sdk:wkappbot-core/ask-run-start-pwsh-path-resolution.skill.json@v1.0#53885e | n | SDK | no private marker; already in sdk |
+| ask-suggest-priority-batching | sdk:wkappbot-workflow/ask-suggest-priority-batching.skill.json@v1.85#f6cb71 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| ask-suggest-priority-batching-howto | sdk:wkappbot-workflow/ask-suggest-priority-batching-howto.skill.json@v1.1#9c0798 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| ask-suggest-priority-batching-ref | sdk:wkappbot-workflow/ask-suggest-priority-batching-ref.skill.json@v1.1#016584 | n | SDK | no private marker; already in sdk |
+| ask-triad-when-uncertain | sdk:wkappbot-workflow/ask-triad-when-uncertain.skill.json@v1.7#1d1a81 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| ask-web-chrome-launch-focusless-guard-allowlist | sdk:wkappbot-core/ask-web-chrome-launch-focusless-guard-allowlist.skill.json@v1.13#f1e5e9 | n | SDK | no private marker; already in sdk |
+| attic-finance-subsystem-extracted-to-wkappbot-finance | sdk:wkappbot-core/attic-finance-subsystem-extracted-to-wkappbot-finance.skill.json@v1.0#6ffcd7 | n | PRIVATE | PUBLIC NOW (in sdk); markers: KIWOOM; home a private repo (none holds it yet) |
+| autoheal-userinput-protection | sdk:wkappbot-core/autoheal-userinput-protection.skill.json@v2#f7c443 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| automating-legacy-mfc-apps-with-no-uia-hts-playbook | sdk:wkappbot/automating-legacy-mfc-apps-with-no-uia-hts-playbook.skill.json@v1.2#7045a6 | n | SDK | no private marker; already in sdk |
+| bash-uses-pwsh-guard | sdk:wkappbot-workflow/bash-uses-pwsh-guard.skill.json@v1.0#1572a6 | n | SDK | no private marker; already in sdk |
+| black-desktop-progman-stuck | sdk:wkappbot-core/black-desktop-progman-stuck.skill.json@v1.1#10e00c | n | SDK | no private marker; already in sdk |
+| business-hours-triage-emergency-first | sdk:wkappbot-workflow/business-hours-triage-emergency-first.skill.json@v1.4#4cd436 | n | PRIVATE | PUBLIC NOW (in sdk); markers: HANTOO, account, token:credential; home a private repo (none holds it yet) |
+| busy-fleet-guard | sdk:wkappbot-workflow/busy-fleet-guard.skill.json@v1.0#5b56a8 | n | SDK | no private marker; already in sdk |
+| caller-window-rect-dpi-piping-ipc-extension-for-precise-chrome-placement | sdk:wkappbot/caller-window-rect-dpi-piping-ipc-extension-for-precise-chrome-placement.skill.json@v1.0#8cc691 | n | SDK | no private marker; already in sdk |
+| cd-noise-guard | sdk:wkappbot-workflow/cd-noise-guard.skill.json@v1.0#0a3626 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| cdp-abnormal-tab-remediation | sdk:wkappbot-webbot/cdp-abnormal-tab-remediation.skill.json@v1.14#559229 | n | SDK | no private marker; already in sdk |
+| cdp-appbot-sleep | sdk:wkappbot-webbot/cdp-appbot-sleep.skill.json@v1.0#753da3 | n | SDK | no private marker; already in sdk |
+| cdp-chrome-blank-white-recovery | sdk:wkappbot-webbot/cdp-chrome-blank-white-recovery.skill.json@v1.0#d43bbb | n | SDK | no private marker; already in sdk |
+| cdp-command-guide | sdk:wkappbot-workflow/cdp-command-guide.skill.json@v1.42#637409 | n | SDK | no private marker; already in sdk |
+| cdp-command-guide-howto | sdk:wkappbot-workflow/cdp-command-guide-howto.skill.json@v1.0#e904fc | n | SDK | no private marker; already in sdk |
+| cdp-command-guide-ref | sdk:wkappbot-workflow/cdp-command-guide-ref.skill.json@v1.0#2c949b | n | SDK | no private marker; already in sdk |
+| cdp-console-log-stderr-forwarding | sdk:wkappbot-core/cdp-console-log-stderr-forwarding.skill.json@v1.0#97bb88 | n | SDK | no private marker; already in sdk |
+| cdp-cookie-auto-sync | sdk:wkappbot-webbot/cdp-cookie-auto-sync.skill.json@v1.8#cfcdf1 | n | SDK | no private marker; already in sdk |
+| cdp-dispatchkeyevent-timeout-transient-wkautoquant-ask | sdk:wkappbot/cdp-dispatchkeyevent-timeout-transient-wkautoquant-ask.skill.json@v1.1#912bb2 | n | SDK | no private marker; already in sdk |
+| cdp-evalasync-retry-policy | sdk:wkappbot-webbot/cdp-evalasync-retry-policy.skill.json@v1.18#d2f31e | n | SDK | no private marker; already in sdk |
+| cdp-evalasync-retry-policy-ref | sdk:wkappbot-webbot/cdp-evalasync-retry-policy-ref.skill.json@v1.0#501279 | n | SDK | no private marker; already in sdk |
+| cdp-event-loop-dialog-handler-handle-chrome-js-dialogs-via-page-javascriptdialogopening-events | sdk:wkappbot-workflow/cdp-event-loop-dialog-handler-handle-chrome-js-dialogs-via-page-javascriptdialogopening-events.skill.json@v1.1#7de66a | n | SDK | no private marker; already in sdk |
+| cdp-focus-steal-guard-runtime-evaluate-in-isfocusstealingmethod-weminimized-500ms-wait | sdk:wkappbot-core/cdp-focus-steal-guard-runtime-evaluate-in-isfocusstealingmethod-weminimized-500ms-wait.skill.json@v1.3#b57352 | n | SDK | no private marker; already in sdk |
+| cdp-geturlasync-uses-target-gettargetinfo-to-bypass-busy-renderer | sdk:wkappbot-core/cdp-geturlasync-uses-target-gettargetinfo-to-bypass-busy-renderer.skill.json@v1.2#c720da | n | SDK | no private marker; already in sdk |
+| cdp-health-check | sdk:wkappbot-sdk/cdp-health-check.skill.json@v1.0#0daf1c | n | SDK | no private marker; already in sdk |
+| cdp-latency-over-1s-is-a-state-detection-bug-not-a-cdp-block | sdk:wkappbot-webbot/cdp-latency-over-1s-is-a-state-detection-bug-not-a-cdp-block.skill.json@v1.1#f76b45 | n | SDK | no private marker; already in sdk |
+| cdp-open-reuse-existing-chrome-tab | sdk:wkappbot-webbot/cdp-open-reuse-existing-chrome-tab.skill.json@v1.9#4fb92d | n | SDK | no private marker; already in sdk |
+| cdp-popup-auto-dismiss-strategy | sdk:wkappbot-core/cdp-popup-auto-dismiss-strategy.skill.json@v1.0#c856fd | n | PRIVATE | PUBLIC NOW (in sdk); markers: account; home a private repo (none holds it yet) |
+| cdp-port-block-foreign-chrome-clear | sdk:wkappbot-workflow/cdp-port-block-foreign-chrome-clear.skill.json@v1.0#39a960 | n | SDK | no private marker; already in sdk |
+| cdp-port-isolation-sha256-4-port-block-per-project-cwd | sdk:wkappbot/cdp-port-isolation-sha256-4-port-block-per-project-cwd.skill.json@v1.0#fa9e88 | n | SDK | no private marker; already in sdk |
+| cdp-port-isolation-window-property | sdk:wkappbot-webbot/cdp-port-isolation-window-property.skill.json@v1.5#1b9b26 | n | SDK | no private marker; already in sdk |
+| cdp-probe-port-9-guard-discard-low-port-values-to-prevent-httprequestexception | sdk:wkappbot-core/cdp-probe-port-9-guard-discard-low-port-values-to-prevent-httprequestexception.skill.json@v1.3#0ceded | n | SDK | no private marker; already in sdk |
+| cdp-prompt-pump-focusless-enter | sdk:wkappbot-core/cdp-prompt-pump-focusless-enter.skill.json@v1.0#2200ff | n | SDK | no private marker; already in sdk |
+| cdp-runtime-enable-with-retry | sdk:wkappbot-webbot/cdp-runtime-enable-with-retry.skill.json@v1.9#cf69c0 | n | SDK | no private marker; already in sdk |
+| cdp-runtime-enable-with-retry-ref | sdk:wkappbot-webbot/cdp-runtime-enable-with-retry-ref.skill.json@v1.0#d1226e | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| cdp-smoke-ci-binary-fetch-pattern | sdk:wkappbot-workflow/cdp-smoke-ci-binary-fetch-pattern.skill.json@v1.1#bf146d | n | SDK | no private marker; already in sdk |
+| cdp-smoke-ci-runbook | sdk:wkappbot-workflow/cdp-smoke-ci-runbook.skill.json@v1.7#515941 | n | SDK | no private marker; already in sdk |
+| cdp-smoke-test | sdk:wkappbot-webbot/cdp-smoke-test.skill.json@v1.2#54f15a | n | SDK | no private marker; already in sdk |
+| cdp-tab-identity-design | sdk:wkappbot-sdk/cdp-tab-identity-design.skill.json@v1.21#327e69 | n | SDK | no private marker; already in sdk |
+| central-secrets-registry-d-github-env-consolidation-pattern | sdk:wkappbot-workflow/central-secrets-registry-d-github-env-consolidation-pattern.skill.json@v1.0#75b707 | n | PRIVATE | PUBLIC NOW (in sdk); markers: .env, HANTOO, KIWOOM; home a private repo (none holds it yet) |
+| chat-session-guard-centralised | sdk:wkappbot-core/chat-session-guard-centralised.skill.json@v1.0#cc385e | n | SDK | no private marker; already in sdk |
+| chatgpt-blank-false-positive-guard | sdk:wkappbot-webbot/chatgpt-blank-false-positive-guard.skill.json@v2#e6a60b | n | SDK | no private marker; already in sdk |
+| chatgpt-stop-button-drain-before-send | sdk:wkappbot-webbot/chatgpt-stop-button-drain-before-send.skill.json@v1.2#523de1 | n | SDK | no private marker; already in sdk |
+| cheap-commit-todo-gate | sdk:wkappbot-workflow/cheap-commit-todo-gate.skill.json@v1.0#449bb0 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| cheap-commit-todo-gate-block-commit-if-claude-md-pending-not-refreshed | sdk:wkappbot-workflow/cheap-commit-todo-gate-block-commit-if-claude-md-pending-not-refreshed.skill.json@v1.3#00f94e | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| chore-resolved-claude-md-delegation-rules-already-mandatory | sdk:wkappbot-core/chore-resolved-claude-md-delegation-rules-already-mandatory.skill.json@v1.4#0678a8 | n | SDK | no private marker; already in sdk |
+| chrome-pos-ioe-stale-duplicate | sdk:wkappbot-core/chrome-pos-ioe-stale-duplicate.skill.json@v1.0#5cf417 | n | SDK | no private marker; already in sdk |
+| chrome-process-architecture | sdk:wkappbot/chrome-process-architecture.skill.json@v1.7#f411a3 | n | SDK | no private marker; already in sdk |
+| chrome-profile-auth-sync-architecture | sdk:wkappbot-workflow/chrome-profile-auth-sync-architecture.skill.json@v1.8#9130bf | n | SDK | no private marker; already in sdk |
+| chrome-session-restore-position-fix | sdk:wkappbot-webbot/chrome-session-restore-position-fix.skill.json@v1.2#bed523 | n | SDK | no private marker; already in sdk |
+| claude-agent-team-no-code | sdk:wkappbot-workflow/claude-agent-team-no-code.skill.json@v1.1#03cd64 | n | SDK | no private marker; already in sdk |
+| claude-audit-log-hook | sdk:wkappbot-workflow/claude-audit-log-hook.skill.json@v1.0#d71020 | n | PRIVATE | PUBLIC NOW (in sdk); markers: machine path; home a private repo (none holds it yet) |
+| claude-cli-automation-patterns-wkappbot-integration | sdk:wkappbot-workflow/claude-cli-automation-patterns-wkappbot-integration.skill.json@v1.1#064d14 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| claude-code-agent-tier-routing | sdk:wkappbot-workflow/claude-code-agent-tier-routing.skill.json@v1.144#26a586 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| claude-code-agent-tier-routing-howto | sdk:wkappbot-workflow/claude-code-agent-tier-routing-howto.skill.json@v1.34#1fd563 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| claude-code-agent-tier-routing-ref | sdk:wkappbot-workflow/claude-code-agent-tier-routing-ref.skill.json@v1.21#95122e | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| claude-code-agent-tier-routing-t2-howto | sdk:wkappbot-workflow/claude-code-agent-tier-routing-t2-howto.skill.json@v1.0#155112 | n | SDK | no private marker; already in sdk |
+| claude-code-ai-audit-log-unified-tool-call-logging | sdk:wkappbot-workflow/claude-code-ai-audit-log-unified-tool-call-logging.skill.json@v1.1#5fed91 | n | SDK | no private marker; already in sdk |
+| claude-code-global-approval-state | sdk:wkappbot-workflow/claude-code-global-approval-state.skill.json@v1.2#bd2d12 | n | PRIVATE | PUBLIC NOW (in sdk); markers: machine path; home a private repo (none holds it yet) |
+| claude-code-kill-guard-hook-block-taskkill-stop-process-for-out-of-cwd-processes | sdk:wkappbot-workflow/claude-code-kill-guard-hook-block-taskkill-stop-process-for-out-of-cwd-processes.skill.json@v1.1#d3429f | n | SDK | no private marker; already in sdk |
+| claude-family-model-ids | sdk:wkappbot-workflow/claude-family-model-ids.skill.json@v1.0#f0ab14 | n | SDK | no private marker; already in sdk |
+| claude-kill-guard-hook | sdk:wkappbot-workflow/claude-kill-guard-hook.skill.json@v1.9#73e5ef | n | PRIVATE | PUBLIC NOW (in sdk); markers: machine path; home a private repo (none holds it yet) |
+| claude-md-diet-score-deadlock-reflex | sdk:wkappbot-workflow/claude-md-diet-score-deadlock-reflex.skill.json@v1.4#2135ad | n | SDK | no private marker; already in sdk |
+| claude-md-guide | sdk:wkappbot-workflow/claude-md-guide.skill.json@v1.25#d6e87f<br>sdk:personal-docs/claude-md-guide.skill.json@v1.53#1e2005 | y | PRIVATE | PUBLIC NOW (in sdk); markers: app:personal-docs, token:weak; home a private repo (none holds it yet) |
+| claude-md-guide-howto | sdk:wkappbot-workflow/claude-md-guide-howto.skill.json@v1.1#042992<br>sdk:personal-docs/claude-md-guide-howto.skill.json@v1.0#3dcd9c | y | PRIVATE | PUBLIC NOW (in sdk); markers: app:personal-docs; home a private repo (none holds it yet) |
+| claude-md-guide-ref | sdk:personal-docs/claude-md-guide-ref.skill.json@v1.0#05c0e2 | n | PRIVATE | PUBLIC NOW (in sdk); markers: app:personal-docs, token:weak; home a private repo (none holds it yet) |
+| claude-md-harness-rules | sdk:wkappbot-workflow/claude-md-harness-rules.skill.json@v1.38#e8f446 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| claude-md-harness-rules-howto | sdk:wkappbot-workflow/claude-md-harness-rules-howto.skill.json@v1.0#f4005b | n | SDK | no private marker; already in sdk |
+| claude-md-harness-rules-ref | sdk:wkappbot-workflow/claude-md-harness-rules-ref.skill.json@v1.2#0f76dd | n | SDK | no private marker; already in sdk |
+| claude-md-how-to-edit-bootstrap-triage | sdk:wkappbot-workflow/claude-md-how-to-edit-bootstrap-triage.skill.json@v1.0#c04676 | n | SDK | no private marker; already in sdk |
+| claude-md-todo-sync | sdk:wkappbot-workflow/claude-md-todo-sync.skill.json@v1.6#cb7d1a | n | SDK | no private marker; already in sdk |
+| claude-named-tool-shim-symlink-install-non-wkwrap-tools | sdk:wkappbot-workflow/claude-named-tool-shim-symlink-install-non-wkwrap-tools.skill.json@v1.0#298782 | n | SDK | no private marker; already in sdk |
+| claude-pace | sdk:wkappbot-workflow/claude-pace.skill.json@v1.0#5fcbee | n | SDK | no private marker; already in sdk |
+| claude-proxy-context-limit-auto-handoff-to-gemini-agent | sdk:wkappbot-workflow/claude-proxy-context-limit-auto-handoff-to-gemini-agent.skill.json@v1.0#8f3ce7 | n | SDK | no private marker; already in sdk |
+| claude-session-handoff | sdk:wkappbot/claude-session-handoff.skill.json@v1.2#5ad859 | n | SDK | no private marker; already in sdk |
+| claude-terminal-via-appbot-primary | sdk:wkappbot-workflow/claude-terminal-via-appbot-primary.skill.json@v1.1#464fe3 | n | SDK | no private marker; already in sdk |
+| claude-token-optimization | sdk:wkappbot-workflow/claude-token-optimization.skill.json@v1.4#ef6cb1 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| claude-tool-shim-cmd-pattern | sdk:wkappbot-workflow/claude-tool-shim-cmd-pattern.skill.json@v1.0#630465 | n | SDK | no private marker; already in sdk |
+| claude-usage-slack-alert-state-file-dedup-after-reset | sdk:wkappbot-core/claude-usage-slack-alert-state-file-dedup-after-reset.skill.json@v1.0#3b9838 | n | SDK | no private marker; already in sdk |
+| cls-path-glob-matching | sdk:wkappbot/cls-path-glob-matching.skill.json@v1.0#bf3071 | n | SDK | no private marker; already in sdk |
+| codex-agents-md-tool-rules | sdk:wkappbot-workflow/codex-agents-md-tool-rules.skill.json@v1.2#c0b6c3 | n | SDK | no private marker; already in sdk |
+| codex-auto-approval | sdk:wkappbot-webbot/codex-auto-approval.skill.json@v1.7#b2de17 | n | PRIVATE | PUBLIC NOW (in sdk); markers: machine path; home a private repo (none holds it yet) |
+| codex-auto-approval-safe | sdk:wkappbot-webbot/codex-auto-approval-safe.skill.json@v1.1#7d6be0 | n | SDK | no private marker; already in sdk |
+| codex-cli-wkappbot-usage | sdk:wkappbot-workflow/codex-cli-wkappbot-usage.skill.json@v1.69#bbc99b | n | SDK | no private marker; already in sdk |
+| codex-cli-wkappbot-usage-howto | sdk:wkappbot-workflow/codex-cli-wkappbot-usage-howto.skill.json@v1.13#3fccd5 | n | SDK | no private marker; already in sdk |
+| codex-cli-wkappbot-usage-ref | sdk:wkappbot-workflow/codex-cli-wkappbot-usage-ref.skill.json@v1.0#a3f554 | n | SDK | no private marker; already in sdk |
+| codex-default-deny-allow-override-spec | sdk:wkappbot-workflow/codex-default-deny-allow-override-spec.skill.json@v1.27#6ad5cd | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| codex-friendly-skill-template | sdk:wkappbot-core/codex-friendly-skill-template.skill.json@v1.4#b2885a | n | SDK | no private marker; already in sdk |
+| codex-global-approval | sdk:wkappbot-core/codex-global-approval.skill.json@v1.7#b5a110 | n | PRIVATE | PUBLIC NOW (in sdk); markers: machine path; home a private repo (none holds it yet) |
+| codex-global-approval --exit-event wkappbot-exit-59736 | sdk:wkappbot-core/codex-global-approval --exit-event wkappbot-exit-59736.skill.json@v1.0#43443d | n | PRIVATE | PUBLIC NOW (in sdk); markers: machine path; home a private repo (none holds it yet) |
+| codex-opus-agent-delegation | sdk:wkappbot-workflow/codex-opus-agent-delegation.skill.json@v1.2#dbfe61 | n | SDK | no private marker; already in sdk |
+| codex-opus-agent-delegation-howto | sdk:wkappbot-workflow/codex-opus-agent-delegation-howto.skill.json@v1.0#c1c558 | n | SDK | no private marker; already in sdk |
+| codex-opus-agent-delegation-ref | sdk:wkappbot-workflow/codex-opus-agent-delegation-ref.skill.json@v1.0#267e65 | n | SDK | no private marker; already in sdk |
+| codex-pace-guard | sdk:wkappbot-workflow/codex-pace-guard.skill.json@v1.6#565411 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| codex-session-guardrails | sdk:wkappbot-workflow/codex-session-guardrails.skill.json@v1.15#a693b7 | n | PRIVATE | PUBLIC NOW (in sdk); markers: machine path; home a private repo (none holds it yet) |
+| codex-session-tool-usage-statistics-551-sessions-analyzed | sdk:wkappbot-workflow/codex-session-tool-usage-statistics-551-sessions-analyzed.skill.json@v1.0#9031bd | n | PRIVATE | PUBLIC NOW (in sdk); markers: machine path; home a private repo (none holds it yet) |
+| codex-shell-command-harness-gap-analysis-and-fix-spec | sdk:wkappbot-workflow/codex-shell-command-harness-gap-analysis-and-fix-spec.skill.json@v1.0#4218c0 | n | SDK | no private marker; already in sdk |
+| codex-skill-id-desc-limit-enforcement | sdk:wkappbot-workflow/codex-skill-id-desc-limit-enforcement.skill.json@v1.0#a3a5f1<br>sdk:wkappbot-core/codex-skill-id-desc-limit-enforcement.skill.json@v1.0#1abd94 | y | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| codex-skill-registration-edit-guide | sdk:wkappbot-workflow/codex-skill-registration-edit-guide.skill.json@v1.0#733644 | n | SDK | no private marker; already in sdk |
+| codex-spec-gate | sdk:wkappbot-workflow/codex-spec-gate.skill.json@v1.1#8db818 | n | SDK | no private marker; already in sdk |
+| codex-tool-wrappers | sdk:wkappbot-workflow/codex-tool-wrappers.skill.json@v1.103#f77193 | n | PRIVATE | PUBLIC NOW (in sdk); markers: account, token:weak; home a private repo (none holds it yet) |
+| codex-tool-wrappers-howto | sdk:wkappbot-workflow/codex-tool-wrappers-howto.skill.json@v1.5#fb5cc8 | n | PRIVATE | PUBLIC NOW (in sdk); markers: machine path; home a private repo (none holds it yet) |
+| codex-tool-wrappers-ref | sdk:wkappbot-workflow/codex-tool-wrappers-ref.skill.json@v1.0#5fa902 | n | SDK | no private marker; already in sdk |
+| commandhelpmap-entry-required-for-every-dispatched-command | sdk:wkappbot-core/commandhelpmap-entry-required-for-every-dispatched-command.skill.json@v1.6#bcf793 | n | SDK | no private marker; already in sdk |
+| commandhelpmap-entry-required-ref | sdk:wkappbot-core/commandhelpmap-entry-required-ref.skill.json@v1.1#d86dce | n | SDK | no private marker; already in sdk |
+| commit-push-hook-policy-overview | sdk:wkappbot-workflow/commit-push-hook-policy-overview.skill.json@v1.0#2b9313 | n | SDK | no private marker; already in sdk |
+| compete-roadmap-2026q2 | sdk:wkappbot/compete-roadmap-2026q2.skill.json@v1.0#051d53 | n | SDK | no private marker; already in sdk |
+| competitive-analysis-css-selectors-rust-perf-scenario-expect-xp-sharing | sdk:wkappbot/competitive-analysis-css-selectors-rust-perf-scenario-expect-xp-sharing.skill.json@v1.1#aa8d2b | n | SDK | no private marker; already in sdk |
+| competitor-analysis-desktop-ai-agents-2026 | sdk:wkappbot/competitor-analysis-desktop-ai-agents-2026.skill.json@v1.1#b918f8 | n | SDK | no private marker; already in sdk |
+| concurrent-ai-isolation-env-var-detection-beats-parent-chain | sdk:wkappbot/concurrent-ai-isolation-env-var-detection-beats-parent-chain.skill.json@v1.1#e9865f | n | SDK | no private marker; already in sdk |
+| conpty-enter-intercept-two-phase-decide-then-commit | sdk:wkappbot-core/conpty-enter-intercept-two-phase-decide-then-commit.skill.json@v1.0#9ed677 | n | SDK | no private marker; already in sdk |
+| control-ui-without-stealing-focus-3-tier-focusless-strategy | sdk:wkappbot/control-ui-without-stealing-focus-3-tier-focusless-strategy.skill.json@v1.2#96bfa3 | n | SDK | no private marker; already in sdk |
+| cookbook-install-input-protection-on-a-new-a11y-action-beginner | sdk:wkappbot-core/cookbook-install-input-protection-on-a-new-a11y-action-beginner.skill.json@v2#db6c4d | n | SDK | no private marker; already in sdk |
+| cookie-consent-ai-strategy | sdk:wkappbot-core/cookie-consent-ai-strategy.skill.json@v1.0#9670c5 | n | SDK | no private marker; already in sdk |
+| core-pre-command-flag-skip | sdk:wkappbot-core/core-pre-command-flag-skip.skill.json@v1.2#de1066 | n | SDK | no private marker; already in sdk |
+| core-worker-logging-launcher-chain | sdk:wkappbot-core/core-worker-logging-launcher-chain.skill.json@v1.8#8aa806 | n | SDK | no private marker; already in sdk |
+| cp949-save-guard | sdk:wkappbot-workflow/cp949-save-guard.skill.json@v1.4#d54135 | n | SDK | no private marker; already in sdk |
+| crash-reboot-recovery-cascade | sdk:wkappbot-core/crash-reboot-recovery-cascade.skill.json@v1.0#421f43 | n | PRIVATE | PUBLIC NOW (in sdk); markers: machine path; home a private repo (none holds it yet) |
+| cross-family-harness-integration | sdk:wkappbot/cross-family-harness-integration.skill.json@v1.0#a88467 | n | SDK | no private marker; already in sdk |
+| cross-family-harness-integration-howto | sdk:wkappbot/cross-family-harness-integration-howto.skill.json@v1.2#fd9b4f | n | SDK | no private marker; already in sdk |
+| cross-family-harness-integration-ref | sdk:wkappbot/cross-family-harness-integration-ref.skill.json@v1.11#5ef35e | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| cross-repo-claude-notify | sdk:wkappbot-sdk/cross-repo-claude-notify.skill.json@v1.11#c9e92c | n | SDK | no private marker; already in sdk |
+| cross-repo-launcher-build | sdk:wkappbot-sdk/cross-repo-launcher-build.skill.json@v1.0#f05020 | n | SDK | no private marker; already in sdk |
+| declarative-automation-claude-md-harness-as-scheduler | sdk:wkappbot-workflow/declarative-automation-claude-md-harness-as-scheduler.skill.json@v1.1#ccf5b1 | n | SDK | no private marker; already in sdk |
+| delegation-policy-all-commands-use-mandatory-haiku-codex-opus-routing-in-claude-md | sdk:wkappbot-workflow/delegation-policy-all-commands-use-mandatory-haiku-codex-opus-routing-in-claude-md.skill.json@v1.3#b2042c | n | SDK | no private marker; already in sdk |
+| delegation-preflight-oneshot | sdk:personal-docs/delegation-preflight-oneshot.skill.json@v1.13#c19574 | n | PRIVATE | PUBLIC NOW (in sdk); markers: app:personal-docs, token:weak; home a private repo (none holds it yet) |
+| developer-skill-template | sdk:wkappbot-core/developer-skill-template.skill.json@v1.0#24e26d | n | SDK | no private marker; already in sdk |
+| diagnostic-commands-cheatsheet | sdk:wkappbot-workflow/diagnostic-commands-cheatsheet.skill.json@v1.0#df8208 | n | SDK | no private marker; already in sdk |
+| diagnostics-subcommand-and-setup-ps1-implementation | sdk:wkappbot-sdk/diagnostics-subcommand-and-setup-ps1-implementation.skill.json@v1.2#b9c62c | n | PRIVATE | PUBLIC NOW (in sdk); markers: customer; home a private repo (none holds it yet) |
+| dialectic-guard-gotchas-relay-truncation-brief-labels-evidence-window | sdk:wkappbot-workflow/dialectic-guard-gotchas-relay-truncation-brief-labels-evidence-window.skill.json@v1.0#366efc | n | SDK | no private marker; already in sdk |
+| diet-score-guard-dated-spec-todos-and-incident-history | sdk:wkappbot-workflow/diet-score-guard-dated-spec-todos-and-incident-history.skill.json@v1.0#1cd353 | n | SDK | no private marker; already in sdk |
+| ecfs-bojeong-submit-procedure | sdk:wkappbot-workflow/ecfs-bojeong-submit-procedure.skill.json@v1.0#5ea73c | n | SDK | no private marker; already in sdk |
+| edit-bg-guard | sdk:wkappbot-workflow/edit-bg-guard.skill.json@v1.0#7836b4 | n | SDK | no private marker; already in sdk |
+| edit-write-bypass-ref | sdk:wkappbot/edit-write-bypass-ref.skill.json@v1.0#b76dd4 | n | SDK | no private marker; already in sdk |
+| elevated-eye-admin-pipe-server | sdk:wkappbot-core/elevated-eye-admin-pipe-server.skill.json@v1.5#5d4239 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| elevated-proxy-subprocess-timeout-hasexited-check | sdk:wkappbot-core/elevated-proxy-subprocess-timeout-hasexited-check.skill.json@v1.3#254653 | n | SDK | no private marker; already in sdk |
+| emergency-write-freeze-escape-ladder-for-non-pro-new-file-creation | sdk:wkappbot-workflow/emergency-write-freeze-escape-ladder-for-non-pro-new-file-creation.skill.json@v1.9#ec196b | n | SDK | no private marker; already in sdk |
+| errors-jsonl-triage | sdk:wkappbot-workflow/errors-jsonl-triage.skill.json@v1.15#f30405 | n | SDK | no private marker; already in sdk |
+| ev-contrib-ux-2056366 | sdk:test-ev/ev-contrib-ux-2056366.skill.json@v1.0#4654da | n | SDK | no private marker; already in sdk |
+| ev-contrib-ux-2073971 | sdk:test-ev/ev-contrib-ux-2073971.skill.json@v1.0#4019b9 | n | SDK | no private marker; already in sdk |
+| ev-contrib-ux-277 | sdk:test-ev/ev-contrib-ux-277.skill.json@v1.0#88b418 | n | SDK | no private marker; already in sdk |
+| ev-contrib-ux-3755 | sdk:test-ev/ev-contrib-ux-3755.skill.json@v1.0#8888e5 | n | SDK | no private marker; already in sdk |
+| ev-contrib-ux-4653 | sdk:test-ev/ev-contrib-ux-4653.skill.json@v1.0#26f8f9 | n | SDK | no private marker; already in sdk |
+| ev-contrib-ux-673658 | sdk:test-ev/ev-contrib-ux-673658.skill.json@v1.0#14bbbb | n | SDK | no private marker; already in sdk |
+| ev-contrib-ux-684781 | sdk:test-ev/ev-contrib-ux-684781.skill.json@v1.0#bd4790 | n | SDK | no private marker; already in sdk |
+| ev-contrib-ux-70943 | sdk:test-ev/ev-contrib-ux-70943.skill.json@v1.0#bf8dde | n | SDK | no private marker; already in sdk |
+| ev-contrib-ux2-2056366 | sdk:test-ev/ev-contrib-ux2-2056366.skill.json@v1.0#6007b3 | n | SDK | no private marker; already in sdk |
+| ev-contrib-ux2-2073971 | sdk:test-ev/ev-contrib-ux2-2073971.skill.json@v1.0#c94a29 | n | SDK | no private marker; already in sdk |
+| ev-contrib-ux2-3755 | sdk:test-ev/ev-contrib-ux2-3755.skill.json@v1.0#29841a | n | SDK | no private marker; already in sdk |
+| ev-contrib-ux2-4653 | sdk:test-ev/ev-contrib-ux2-4653.skill.json@v1.0#76e8d7 | n | SDK | no private marker; already in sdk |
+| ev-contrib-ux2-673658 | sdk:test-ev/ev-contrib-ux2-673658.skill.json@v1.0#0d68b6 | n | SDK | no private marker; already in sdk |
+| ev-contrib-ux2-684781 | sdk:test-ev/ev-contrib-ux2-684781.skill.json@v1.0#c4fcff | n | SDK | no private marker; already in sdk |
+| ev-contrib-ux2-70943 | sdk:test-ev/ev-contrib-ux2-70943.skill.json@v1.0#775355 | n | SDK | no private marker; already in sdk |
+| ev-draft-2056315 | sdk:test-ev/ev-draft-2056315.skill.json@v1.0#66cc05 | n | SDK | no private marker; already in sdk |
+| ev-draft-2073949 | sdk:test-ev/ev-draft-2073949.skill.json@v1.0#2e37e4 | n | SDK | no private marker; already in sdk |
+| ev-draft-3743 | sdk:test-ev/ev-draft-3743.skill.json@v1.0#e5fd21 | n | SDK | no private marker; already in sdk |
+| ev-draft-4641 | sdk:test-ev/ev-draft-4641.skill.json@v1.0#5b3c62 | n | SDK | no private marker; already in sdk |
+| ev-draft-673537 | sdk:test-ev/ev-draft-673537.skill.json@v1.0#4c19d9 | n | SDK | no private marker; already in sdk |
+| ev-draft-684694 | sdk:test-ev/ev-draft-684694.skill.json@v1.0#b83a3e | n | SDK | no private marker; already in sdk |
+| ev-draft-70931 | sdk:test-ev/ev-draft-70931.skill.json@v1.0#ea606e | n | SDK | no private marker; already in sdk |
+| eye-crash-recovery-via-mutex-force-release | sdk:wkappbot-core/eye-crash-recovery-via-mutex-force-release.skill.json@v1.11#5e06b8 | n | SDK | no private marker; already in sdk |
+| eye-dpi-drift-snap-timing-fix | sdk:wkappbot-core/eye-dpi-drift-snap-timing-fix.skill.json@v1.6#4187f7 | n | SDK | no private marker; already in sdk |
+| eye-findallprompts-blocking-fix-cooldown-10s-mcp-warmup-guard | sdk:wkappbot-core/eye-findallprompts-blocking-fix-cooldown-10s-mcp-warmup-guard.skill.json@v1.3#164264 | n | SDK | no private marker; already in sdk |
+| eye-handoff-age-guard | sdk:wkappbot-core/eye-handoff-age-guard.skill.json@v1.1#8456c2 | n | SDK | no private marker; already in sdk |
+| eye-health-mousecca-storm | sdk:wkappbot-core/eye-health-mousecca-storm.skill.json@v1.1#def386 | n | SDK | no private marker; already in sdk |
+| eye-hotswap-stamp-10min-expiry | sdk:wkappbot-core/eye-hotswap-stamp-10min-expiry.skill.json@v1.2#d72ef1 | n | SDK | no private marker; already in sdk |
+| eye-ipc-caller-hwnd-resolution | sdk:wkappbot/eye-ipc-caller-hwnd-resolution.skill.json@v1.23#01a252 | n | SDK | no private marker; already in sdk |
+| eye-ipc-caller-hwnd-resolution-ref | sdk:wkappbot/eye-ipc-caller-hwnd-resolution-ref.skill.json@v1.0#1d369f | n | SDK | no private marker; already in sdk |
+| eye-mutex-force-release-recovery | sdk:wkappbot-core/eye-mutex-force-release-recovery.skill.json@v1.1#3c16e6 | n | SDK | no private marker; already in sdk |
+| eye-screensaver-must-not-detect-then-act-on-user-windows-by-fragile-heuristics | sdk:wkappbot-core/eye-screensaver-must-not-detect-then-act-on-user-windows-by-fragile-heuristics.skill.json@v1.0#e500ae | n | SDK | no private marker; already in sdk |
+| eye-slack-thread-streaming-structure | sdk:wkappbot/eye-slack-thread-streaming-structure.skill.json@v1.11#c4bfef | n | SDK | no private marker; already in sdk |
+| eye-tick-context-warned-dedup-persist | sdk:wkappbot-workflow/eye-tick-context-warned-dedup-persist.skill.json@v1.4#9e4221 | n | SDK | no private marker; already in sdk |
+| eye-tick-elevated-pipe-parallel-accept | sdk:wkappbot-workflow/eye-tick-elevated-pipe-parallel-accept.skill.json@v1.4#873021 | n | SDK | no private marker; already in sdk |
+| eye-tick-evict-null-cmdline-admin-skip | sdk:wkappbot-workflow/eye-tick-evict-null-cmdline-admin-skip.skill.json@v1.4#f60638 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| family-settings-file-is-the-harness-gate-no-yolo-no-blanket-allow-no-permanent-approval | sdk:wkappbot-workflow/family-settings-file-is-the-harness-gate-no-yolo-no-blanket-allow-no-permanent-approval.skill.json@v1.0#800066 | n | SDK | no private marker; already in sdk |
+| file-as-scheduler-pending-prompts-pattern | sdk:wkappbot-core/file-as-scheduler-pending-prompts-pattern.skill.json@v1.12#c7ce28 | n | SDK | no private marker; already in sdk |
+| file-command-cheatsheet | sdk:wkappbot-workflow/file-command-cheatsheet.skill.json@v1.9#db5209 | n | SDK | no private marker; already in sdk |
+| file-command-cheatsheet-howto | sdk:wkappbot-workflow/file-command-cheatsheet-howto.skill.json@v1.0#163735 | n | SDK | no private marker; already in sdk |
+| file-command-cheatsheet-ref | sdk:wkappbot-workflow/file-command-cheatsheet-ref.skill.json@v1.0#9fd03d | n | SDK | no private marker; already in sdk |
+| file-symlink-and-file-link-create-symbolic-and-hard-links | sdk:wkappbot/file-symlink-and-file-link-create-symbolic-and-hard-links.skill.json@v1.1#58b047 | n | SDK | no private marker; already in sdk |
+| filenotfoundexception-system-net-http-during-hotswap-is-binary-corruption-false-positive | sdk:wkappbot-core/filenotfoundexception-system-net-http-during-hotswap-is-binary-corruption-false-positive.skill.json@v1.4#a27ecd | n | SDK | no private marker; already in sdk |
+| find-any-window-element-your-way-grap-multi-modal-search | sdk:wkappbot/find-any-window-element-your-way-grap-multi-modal-search.skill.json@v1.4#e703ff | n | PRIVATE | PUBLIC NOW (in sdk); markers: account; home a private repo (none holds it yet) |
+| find-tree-grap-pitfalls | sdk:wkappbot-workflow/find-tree-grap-pitfalls.skill.json@v1.0#d523a2 | n | SDK | no private marker; already in sdk |
+| focusless-first-principle | sdk:wkappbot-workflow/focusless-first-principle.skill.json@v1.5#d09324 | n | SDK | no private marker; already in sdk |
+| foundation-is-roots-charge-howto | sdk:wkappbot-workflow/foundation-is-roots-charge-howto.skill.json@v1.0#0f470f | n | SDK | no private marker; already in sdk |
+| foundation-is-roots-charge-not-a-chore | sdk:wkappbot-workflow/foundation-is-roots-charge-not-a-chore.skill.json@v1.222#e3d813 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| foundation-is-roots-charge-not-a-chore-howto | sdk:wkappbot-workflow/foundation-is-roots-charge-not-a-chore-howto.skill.json@v1.1#637eba | n | SDK | no private marker; already in sdk |
+| foundation-is-roots-charge-not-a-chore-ref | sdk:wkappbot-workflow/foundation-is-roots-charge-not-a-chore-ref.skill.json@v1.0#e8af33 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| gate-two-tier-verify-before-block-t1 | sdk:wkappbot-workflow/gate-two-tier-verify-before-block-t1.skill.json@v1.2#e82a69 | n | SDK | no private marker; already in sdk |
+| gemini-agent-tier-onboarding | sdk:wkappbot-workflow/gemini-agent-tier-onboarding.skill.json@v1.0#56c7d8 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| gemini-flash-reflection | sdk:wkappbot-workflow/gemini-flash-reflection.skill.json@v1.7#976ac4 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| gemini-flash-reflection-how-to | sdk:wkappbot-workflow/gemini-flash-reflection-how-to.skill.json@v1.1#eec96d | n | SDK | no private marker; already in sdk |
+| gemini-flash-reflection-howto | sdk:wkappbot-workflow/gemini-flash-reflection-howto.skill.json@v1.1#1cb5e1 | n | SDK | no private marker; already in sdk |
+| gemini-flash-reflection-ref | sdk:wkappbot-workflow/gemini-flash-reflection-ref.skill.json@v1.1#dbe063 | n | SDK | no private marker; already in sdk |
+| gemini-flash-reflection-reference | sdk:wkappbot-workflow/gemini-flash-reflection-reference.skill.json@v1.1#f1e96f | n | SDK | no private marker; already in sdk |
+| gemini-harness-decoupling-lessons | sdk:wkappbot-kih/gemini-harness-decoupling-lessons.skill.json@v1.0#798301 | n | PRIVATE | PUBLIC NOW (in sdk); markers: .env, account, token:credential; home a private repo (none holds it yet) |
+| gemini-pro-reflection | sdk:wkappbot-workflow/gemini-pro-reflection.skill.json@v1.25#ad3241 | n | SDK | no private marker; already in sdk |
+| gg-ecosystem-unified | sdk:wkappbot-workflow/gg-ecosystem-unified.skill.json@v1.8#943d4a | n | SDK | no private marker; already in sdk |
+| gg-ecosystem-unified-ref | sdk:wkappbot-workflow/gg-ecosystem-unified-ref.skill.json@v1.0#9ace3d | n | SDK | no private marker; already in sdk |
+| gha-mail-scan-ccr-morning-briefing-daily-schedule | sdk:wkappbot-workflow/gha-mail-scan-ccr-morning-briefing-daily-schedule.skill.json@v1.0#cd96e1 | n | PRIVATE | PUBLIC NOW (in sdk); markers: password, token:credential; home a private repo (none holds it yet) |
+| git-blocked-land-it | sdk:wkappbot-workflow/git-blocked-land-it.skill.json@v1.61#c288ed | n | SDK | no private marker; already in sdk |
+| git-commit-conventions | sdk:wkappbot-workflow/git-commit-conventions.skill.json@v1.4#63f01a | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| git-lock-auto-cleanup | sdk:wkappbot-workflow/git-lock-auto-cleanup.skill.json@v1.1#fdc9b1 | n | SDK | no private marker; already in sdk |
+| github-actions-budget-and-pat-recovery | sdk:wkappbot/github-actions-budget-and-pat-recovery.skill.json@v1.0#b24cae | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:credential; home a private repo (none holds it yet) |
+| github-pat-fine-grained-permission-edit | sdk:wkappbot/github-pat-fine-grained-permission-edit.skill.json@v1.1#cd7831 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:credential; home a private repo (none holds it yet) |
+| global-operator-rules | sdk:wkappbot-workflow/global-operator-rules.skill.json@v1.3#9586c5 | n | PRIVATE | PUBLIC NOW (in sdk); markers: .env, HANTOO, KIWOOM, customer, token:credential; home a private repo (none holds it yet) |
+| gmail-oauth2-manager-headhunter-scan-draft-via-gmail-api | sdk:wkappbot-workflow/gmail-oauth2-manager-headhunter-scan-draft-via-gmail-api.skill.json@v1.0#208dd0 | n | PRIVATE | PUBLIC NOW (in sdk); markers: .env, password, token:credential; home a private repo (none holds it yet) |
+| gmail-support-bot | sdk:wkappbot-sdk/gmail-support-bot.skill.json@v1.1#1cafd5 | n | PRIVATE | PUBLIC NOW (in sdk); markers: .env, account, token:credential; home a private repo (none holds it yet) |
+| gpt-mini-reflection | sdk:wkappbot-workflow/gpt-mini-reflection.skill.json@v1.21#0198d0 | n | SDK | no private marker; already in sdk |
+| gpt-reflection | sdk:wkappbot-workflow/gpt-reflection.skill.json@v1.273#ac351d | n | PRIVATE | PUBLIC NOW (in sdk); markers: machine path; home a private repo (none holds it yet) |
+| gpt-reflection-howto | sdk:wkappbot-workflow/gpt-reflection-howto.skill.json@v1.10#b9499c | n | SDK | no private marker; already in sdk |
+| gpt-reflection-ref | sdk:wkappbot-workflow/gpt-reflection-ref.skill.json@v1.18#93b6c4 | n | SDK | no private marker; already in sdk |
+| grap | sdk:wkappbot-workflow/grap.skill.json@v1.17#260fcc | n | SDK | no private marker; already in sdk |
+| grap-alias-system | sdk:wkappbot/grap-alias-system.skill.json@v1.1#357193 | n | SDK | no private marker; already in sdk |
+| grap-howto | sdk:wkappbot-workflow/grap-howto.skill.json@v1.0#23eb24 | n | SDK | no private marker; already in sdk |
+| grap-hwnd-volatility-hwnd-stale-between-find-and-use | sdk:wkappbot/grap-hwnd-volatility-hwnd-stale-between-find-and-use.skill.json@v1.1#9ce023 | n | SDK | no private marker; already in sdk |
+| grap-ref | sdk:wkappbot-workflow/grap-ref.skill.json@v1.0#1fe1d4 | n | SDK | no private marker; already in sdk |
+| grap-target | sdk:wkappbot/grap-target.skill.json@v1.45#ba8132 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| guard-block-recurrence-failure-score | sdk:wkappbot-workflow/guard-block-recurrence-failure-score.skill.json@v1.0#fbe8cd | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| guard-feeding-cache-confirm-before-block | sdk:wkappbot-sdk/guard-feeding-cache-confirm-before-block.skill.json@v1.2#815880 | n | SDK | no private marker; already in sdk |
+| haiku-as-qa-canary | sdk:wkappbot-workflow/haiku-as-qa-canary.skill.json@v1.7#518fa4 | n | SDK | no private marker; already in sdk |
+| haiku-handoff-on-cli-retry | sdk:wkappbot-workflow/haiku-handoff-on-cli-retry.skill.json@v1.0#55b942 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| haiku-reflection | sdk:personal-docs/haiku-reflection.skill.json@v1.1833#7f5578 | n | PRIVATE | PUBLIC NOW (in sdk); markers: app:personal-docs, token:weak; home a private repo (none holds it yet) |
+| haiku-reflection-howto | sdk:personal-docs/haiku-reflection-howto.skill.json@v1.261#eb24ca | n | PRIVATE | PUBLIC NOW (in sdk); markers: app:personal-docs, token:weak; home a private repo (none holds it yet) |
+| haiku-reflection-ref | sdk:personal-docs/haiku-reflection-ref.skill.json@v1.171#083751 | n | PRIVATE | PUBLIC NOW (in sdk); markers: account, app:personal-docs, password, token:weak; home a private repo (none holds it yet) |
+| haiku-reflection-ref-t3 | sdk:personal-docs/haiku-reflection-ref-t3.skill.json@v1.195#fb7184 | n | PRIVATE | PUBLIC NOW (in sdk); markers: HANTOO, app:personal-docs, token:weak; home a private repo (none holds it yet) |
+| haiku-sandbox-problem-solving | sdk:wkappbot-workflow/haiku-sandbox-problem-solving.skill.json@v1.3#696c72 | n | SDK | no private marker; already in sdk |
+| haiku-sandbox-problem-solving-howto | sdk:wkappbot-workflow/haiku-sandbox-problem-solving-howto.skill.json@v1.0#00d19b | n | SDK | no private marker; already in sdk |
+| haiku-sandbox-problem-solving-ref | sdk:wkappbot-workflow/haiku-sandbox-problem-solving-ref.skill.json@v1.0#c53e46 | n | SDK | no private marker; already in sdk |
+| handoff-checklist | sdk:wkappbot-workflow/handoff-checklist.skill.json@v1.6#26f233 | n | SDK | no private marker; already in sdk |
+| handoff-send-best-practice | sdk:wkappbot-workflow/handoff-send-best-practice.skill.json@v1.15#904572 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| hangul-ime-relay-architecture-and-sync-pattern | sdk:wkappbot/hangul-ime-relay-architecture-and-sync-pattern.skill.json@v1.8#e562e1 | n | SDK | no private marker; already in sdk |
+| harness | sdk:wkappbot-workflow/harness.skill.json@v1.0#8b25ec | n | SDK | no private marker; already in sdk |
+| harness-active-model-scoping | sdk:wkappbot-workflow/harness-active-model-scoping.skill.json@v1.10#f97c80 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| harness-active-model-scoping-howto | sdk:wkappbot-workflow/harness-active-model-scoping-howto.skill.json@v1.8#289f09 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| harness-active-model-scoping-ref | sdk:wkappbot-workflow/harness-active-model-scoping-ref.skill.json@v1.2#b96774 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| harness-agent-brief-guard | sdk:wkappbot-workflow/harness-agent-brief-guard.skill.json@v1.0#8618ca | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| harness-agent-leak-guard | sdk:wkappbot-workflow/harness-agent-leak-guard.skill.json@v1.0#d21e0e | n | SDK | no private marker; already in sdk |
+| harness-bash-uses-pwsh-guard | sdk:wkappbot-workflow/harness-bash-uses-pwsh-guard.skill.json@v1.0#506a10 | n | SDK | no private marker; already in sdk |
+| harness-bg-task-guard | sdk:wkappbot-workflow/harness-bg-task-guard.skill.json@v1.0#358f62 | n | SDK | no private marker; already in sdk |
+| harness-busy-fleet-guard | sdk:wkappbot-workflow/harness-busy-fleet-guard.skill.json@v1.33#18e6a6 | n | SDK | no private marker; already in sdk |
+| harness-busy-fleet-guard-ref | sdk:wkappbot-workflow/harness-busy-fleet-guard-ref.skill.json@v1.0#751f8a | n | SDK | no private marker; already in sdk |
+| harness-canonical-edit-via-sandbox-merge | sdk:wkappbot-workflow/harness-canonical-edit-via-sandbox-merge.skill.json@v1.0#17cac0 | n | SDK | no private marker; already in sdk |
+| harness-canonical-edit-via-sandbox-merge-howto | sdk:wkappbot-workflow/harness-canonical-edit-via-sandbox-merge-howto.skill.json@v1.0#a8c92c | n | SDK | no private marker; already in sdk |
+| harness-canonical-edit-via-sandbox-merge-ref | sdk:wkappbot-workflow/harness-canonical-edit-via-sandbox-merge-ref.skill.json@v1.0#d08103 | n | SDK | no private marker; already in sdk |
+| harness-cd-noise-guard | sdk:wkappbot-workflow/harness-cd-noise-guard.skill.json@v1.0#c8888b | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| harness-codex-pace-guard | sdk:wkappbot-workflow/harness-codex-pace-guard.skill.json@v1.19#1c8796 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| harness-codex-pace-guard-howto | sdk:wkappbot-workflow/harness-codex-pace-guard-howto.skill.json@v1.6#375fdd | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| harness-codex-pace-guard-ref | sdk:wkappbot-workflow/harness-codex-pace-guard-ref.skill.json@v1.14#34bf43 | n | SDK | no private marker; already in sdk |
+| harness-codex-spec-gate | sdk:wkappbot-workflow/harness-codex-spec-gate.skill.json@v1.0#98b9bf | n | SDK | no private marker; already in sdk |
+| harness-commit-push-gate-spec | sdk:wkappbot-workflow/harness-commit-push-gate-spec.skill.json@v1.8#35e76b | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| harness-cp949-guard | sdk:wkappbot-workflow/harness-cp949-guard.skill.json@v1.0#ea8fa2 | n | SDK | no private marker; already in sdk |
+| harness-dialectic-guard | sdk:wkappbot-workflow/harness-dialectic-guard.skill.json@v1.0#507676 | n | SDK | no private marker; already in sdk |
+| harness-diet-score-guard | sdk:wkappbot-workflow/harness-diet-score-guard.skill.json@v1.0#576a18 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| harness-diet-score-guard-ref | sdk:wkappbot-workflow/harness-diet-score-guard-ref.skill.json@v1.4#ae3d92 | n | SDK | no private marker; already in sdk |
+| harness-edit-bg-guard | sdk:wkappbot-workflow/harness-edit-bg-guard.skill.json@v1.0#6d63c2 | n | SDK | no private marker; already in sdk |
+| harness-edit-write-skill-bypass | sdk:wkappbot/harness-edit-write-skill-bypass.skill.json@v1.6#f264e7 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| harness-edit-write-skill-bypass-howto | sdk:wkappbot/harness-edit-write-skill-bypass-howto.skill.json@v1.1#f0a748 | n | SDK | no private marker; already in sdk |
+| harness-edit-write-skill-bypass-ref | sdk:wkappbot/harness-edit-write-skill-bypass-ref.skill.json@v1.0#fb22d4 | n | SDK | no private marker; already in sdk |
+| harness-edit-write-study-lock-hole-fixed | sdk:wkappbot-workflow/harness-edit-write-study-lock-hole-fixed.skill.json@v1.0#44b28d | n | SDK | no private marker; already in sdk |
+| harness-engineering-korean-interview | sdk:wkappbot-workflow/harness-engineering-korean-interview.skill.json@v1.0#5cc909 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| harness-family-identity-and-edit-scope-order | sdk:wkappbot-workflow/harness-family-identity-and-edit-scope-order.skill.json@v1.0#021daa | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| harness-gate-log-data-integrity | sdk:wkappbot-workflow/harness-gate-log-data-integrity.skill.json@v1.39#d32f03 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| harness-gate-log-data-integrity-howto | sdk:wkappbot-workflow/harness-gate-log-data-integrity-howto.skill.json@v1.0#268323 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| harness-guard-exemption-ladder-implementation-howto-phases-adapters-joseki | sdk:wkappbot-workflow/harness-guard-exemption-ladder-implementation-howto-phases-adapters-joseki.skill.json@v1.0#27890b | n | SDK | no private marker; already in sdk |
+| harness-guard-exemption-ladder-spec | sdk:wkappbot-workflow/harness-guard-exemption-ladder-spec.skill.json@v1.68#70c51a | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| harness-guard-exemption-ladder-spec-howto | sdk:wkappbot-workflow/harness-guard-exemption-ladder-spec-howto.skill.json@v1.4#0886fc | n | SDK | no private marker; already in sdk |
+| harness-guard-exemption-ladder-spec-ref | sdk:wkappbot-workflow/harness-guard-exemption-ladder-spec-ref.skill.json@v1.2#c53dd7 | n | SDK | no private marker; already in sdk |
+| harness-hardening-playbook-13-reflexes-from-the-2026-06-20-marathon | sdk:wkappbot-workflow/harness-hardening-playbook-13-reflexes-from-the-2026-06-20-marathon.skill.json@v1.6#61bd08 | n | SDK | no private marker; already in sdk |
+| harness-installer-owns-all-setup | sdk:wkappbot-sdk/harness-installer-owns-all-setup.skill.json@v1.0#0b6c88 | n | PRIVATE | PUBLIC NOW (in sdk); markers: customer; home a private repo (none holds it yet) |
+| harness-kill-guard | sdk:wkappbot-workflow/harness-kill-guard.skill.json@v1.0#a6d3ca | n | SDK | no private marker; already in sdk |
+| harness-learn-self-evolving-skills | sdk:wkappbot-workflow/harness-learn-self-evolving-skills.skill.json@v1.20#73db71 | n | SDK | no private marker; already in sdk |
+| harness-no-verify-guard | sdk:wkappbot-workflow/harness-no-verify-guard.skill.json@v1.0#cba55c | n | SDK | no private marker; already in sdk |
+| harness-omega-guard | sdk:wkappbot-kih/harness-omega-guard.skill.json@v1.17#97005d | n | SDK | no private marker; already in sdk |
+| harness-opus-budget-guard | sdk:wkappbot-workflow/harness-opus-budget-guard.skill.json@v1.0#550c0c | n | SDK | no private marker; already in sdk |
+| harness-pace-guard | sdk:wkappbot-workflow/harness-pace-guard.skill.json@v1.0#3489ad | n | SDK | no private marker; already in sdk |
+| harness-pace-guard-ref | sdk:wkappbot-workflow/harness-pace-guard-ref.skill.json@v1.3#54b2ec | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| harness-pending-protect | sdk:wkappbot-workflow/harness-pending-protect.skill.json@v1.0#c9308d | n | SDK | no private marker; already in sdk |
+| harness-python-edit-guard | sdk:wkappbot-workflow/harness-python-edit-guard.skill.json@v1.0#f52390 | n | SDK | no private marker; already in sdk |
+| harness-robustness-user-dist-appbot-absent | sdk:wkappbot-workflow/harness-robustness-user-dist-appbot-absent.skill.json@v1.8#7f3af5 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| harness-sandbox | sdk:wkappbot-workflow/harness-sandbox.skill.json@v1.0#c55bf3 | n | SDK | no private marker; already in sdk |
+| harness-security-guard | sdk:wkappbot-workflow/harness-security-guard.skill.json@v1.0#273ca6 | n | SDK | no private marker; already in sdk |
+| harness-sed-guard | sdk:wkappbot-workflow/harness-sed-guard.skill.json@v1.0#8fc3dd | n | SDK | no private marker; already in sdk |
+| harness-self-heal-incident-2026-06-10 | sdk:wkappbot-workflow/harness-self-heal-incident-2026-06-10.skill.json@v1.0#611764 | n | SDK | no private marker; already in sdk |
+| harness-settings-reinstall-bypass-bug | sdk:wkappbot-workflow/harness-settings-reinstall-bypass-bug.skill.json@v1.9#c5c4ba | n | PRIVATE | PUBLIC NOW (in sdk); markers: machine path; home a private repo (none holds it yet) |
+| harness-skill-delete-guard | sdk:wkappbot-workflow/harness-skill-delete-guard.skill.json@v1.0#73b3cc | n | SDK | no private marker; already in sdk |
+| harness-skill-format-required-single-line-pattern | sdk:wkappbot-workflow/harness-skill-format-required-single-line-pattern.skill.json@v1.0#42f3a5 | n | SDK | no private marker; already in sdk |
+| harness-skill-guard | sdk:wkappbot-workflow/harness-skill-guard.skill.json@v1.0#a00513 | n | SDK | no private marker; already in sdk |
+| harness-skill-guard-cross-repo | sdk:wkappbot-core/harness-skill-guard-cross-repo.skill.json@v1.24#7fc2f8 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| harness-skill-guard-format | sdk:wkappbot-workflow/harness-skill-guard-format.skill.json@v1.2#5563d1 | n | SDK | no private marker; already in sdk |
+| harness-skill-list-guard | sdk:wkappbot-workflow/harness-skill-list-guard.skill.json@v1.0#4df8d9 | n | SDK | no private marker; already in sdk |
+| harness-skill-update-pending | sdk:wkappbot-workflow/harness-skill-update-pending.skill.json@v1.0#e42dea | n | SDK | no private marker; already in sdk |
+| harness-source-edit-requires-skill-lock | sdk:wkappbot-workflow/harness-source-edit-requires-skill-lock.skill.json@v1.14#c12dc6 | n | PRIVATE | PUBLIC NOW (in sdk); markers: HANTOO, token:weak; home a private repo (none holds it yet) |
+| harness-source-edit-requires-skill-lock-howto | sdk:wkappbot-workflow/harness-source-edit-requires-skill-lock-howto.skill.json@v1.0#0136ac | n | SDK | no private marker; already in sdk |
+| harness-source-edit-requires-skill-lock-ref | sdk:wkappbot-workflow/harness-source-edit-requires-skill-lock-ref.skill.json@v1.0#80130f | n | SDK | no private marker; already in sdk |
+| harness-stall-guard | sdk:wkappbot-workflow/harness-stall-guard.skill.json@v1.930#4e2976 | n | SDK | no private marker; already in sdk |
+| harness-stop-guard | sdk:wkappbot-workflow/harness-stop-guard.skill.json@v1.836#faa0c4 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| harness-stop-guard-howto | sdk:wkappbot-kih/harness-stop-guard-howto.skill.json@v1.220#0117b6 | n | PRIVATE | PUBLIC NOW (in sdk); markers: PIN, token:weak; home a private repo (none holds it yet) |
+| harness-stop-guard-ref | sdk:wkappbot-workflow/harness-stop-guard-ref.skill.json@v1.91#5647c4 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| harness-throttle-rot-spec-drift-prevention | sdk:wkappbot-workflow/harness-throttle-rot-spec-drift-prevention.skill.json@v1.19#dc9b18 | n | SDK | no private marker; already in sdk |
+| harness-throttle-rot-spec-drift-prevention-howto | sdk:wkappbot-workflow/harness-throttle-rot-spec-drift-prevention-howto.skill.json@v1.0#6c0be7 | n | SDK | no private marker; already in sdk |
+| harness-throttle-rot-spec-drift-prevention-ref | sdk:wkappbot-workflow/harness-throttle-rot-spec-drift-prevention-ref.skill.json@v1.0#b51412 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| harness-tier-gate | sdk:wkappbot-workflow/harness-tier-gate.skill.json@v1.0#ff3791 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| harness-tier-score-guard | sdk:wkappbot-workflow/harness-tier-score-guard.skill.json@v1.0#6188cb | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| harness-watchdog-guard | sdk:wkappbot-workflow/harness-watchdog-guard.skill.json@v1.0#922275 | n | SDK | no private marker; already in sdk |
+| harness-wk-only-gate | sdk:wkappbot-workflow/harness-wk-only-gate.skill.json@v1.0#cb04f8 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| headhunter-email-workflow-naver-imap-scan-doc-form-fill-and-reply | sdk:wkappbot-workflow/headhunter-email-workflow-naver-imap-scan-doc-form-fill-and-reply.skill.json@v1.1#4b0bb3 | n | SDK | no private marker; already in sdk |
+| headhunter-mail-manager | sdk:wkappbot-workflow/headhunter-mail-manager.skill.json@v1.10#824902 | n | PRIVATE | PUBLIC NOW (in sdk); markers: .env, password; home a private repo (none holds it yet) |
+| hippocampus-living-memory | sdk:personal-docs/hippocampus-living-memory.skill.json@v1.118#412086 | n | PRIVATE | PUBLIC NOW (in sdk); markers: app:personal-docs, token:weak; home a private repo (none holds it yet) |
+| hippocampus-living-memory-howto | sdk:personal-docs/hippocampus-living-memory-howto.skill.json@v1.28#da8933 | n | PRIVATE | PUBLIC NOW (in sdk); markers: app:personal-docs, token:weak; home a private repo (none holds it yet) |
+| hippocampus_memory | sdk:wkappbot-workflow/hippocampus_memory.skill.json@v1.1#6c4b53 | n | SDK | no private marker; already in sdk |
+| hn-browser-control-and-computer-use-as-mcp-tools-works-with-claude-codex-cursor-ai-computer-use-pattern-reference | sdk:wkappbot-workflow/hn-browser-control-and-computer-use-as-mcp-tools-works-with-claude-codex-cursor-ai-computer-use-pattern-reference.skill.json@v1.2#d2ac38 | n | SDK | no private marker; already in sdk |
+| hn-oculos-give-ai-agents-control-of-your-desktop-via-mcp-ai-computer-use-pattern-reference | sdk:wkappbot-workflow/hn-oculos-give-ai-agents-control-of-your-desktop-via-mcp-ai-computer-use-pattern-reference.skill.json@v1.0#f132b7 | n | SDK | no private marker; already in sdk |
+| hn-self-healing-browser-harness-via-direct-cdp-ai-computer-use-pattern-reference | sdk:wkappbot-workflow/hn-self-healing-browser-harness-via-direct-cdp-ai-computer-use-pattern-reference.skill.json@v1.6#b9239e | n | SDK | no private marker; already in sdk |
+| hn-show-hn-oculos-give-ai-agents-control-of-your-desktop-via-mcp-ai-computer-use-pattern-reference | sdk:wkappbot-workflow/hn-show-hn-oculos-give-ai-agents-control-of-your-desktop-via-mcp-ai-computer-use-pattern-reference.skill.json@v1.1#785b4e | n | SDK | no private marker; already in sdk |
+| hn-show-hn-self-healing-browser-harness-via-direct-cdp-ai-computer-use-pattern-reference | sdk:wkappbot-workflow/hn-show-hn-self-healing-browser-harness-via-direct-cdp-ai-computer-use-pattern-reference.skill.json@v1.1#2f1227 | n | SDK | no private marker; already in sdk |
+| hn-ui-automata-windows-desktop-automation-for-ai-agents-ai-computer-use-pattern-reference | sdk:wkappbot-workflow/hn-ui-automata-windows-desktop-automation-for-ai-agents-ai-computer-use-pattern-reference.skill.json@v1.2#d73c4b | n | SDK | no private marker; already in sdk |
+| homework-reminder-payload-hash-dedup-prevents-8x-re-fire-across-multi-instance-states | sdk:wkappbot-core/homework-reminder-payload-hash-dedup-prevents-8x-re-fire-across-multi-instance-states.skill.json@v1.3#cfa957 | n | SDK | no private marker; already in sdk |
+| hongik-harness-emergency-reflex-protocol | sdk:wkappbot-core/hongik-harness-emergency-reflex-protocol.skill.json@v1.0#6cac24 | n | SDK | no private marker; already in sdk |
+| hongik-harness-modular-independence-design | sdk:wkappbot-kih/hongik-harness-modular-independence-design.skill.json@v1.0#0a2ee0 | n | SDK | no private marker; already in sdk |
+| hongik-reflexes | sdk:wkappbot-workflow/hongik-reflexes.skill.json@v1.2#8dc68c | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| hot-swap-stuck-orphan-mcp-workers-kill-force-swap | sdk:wkappbot-core/hot-swap-stuck-orphan-mcp-workers-kill-force-swap.skill.json@v1.17#501d4a | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| hot-swap-zombie-guard-kill-stale-wkappbot-core-workers-after-eye-swap | sdk:wkappbot-core/hot-swap-zombie-guard-kill-stale-wkappbot-core-workers-after-eye-swap.skill.json@v1.1#62dc0d | n | SDK | no private marker; already in sdk |
+| idle-mung-conpty-autoprompt | sdk:wkappbot-sdk/idle-mung-conpty-autoprompt.skill.json@v1.0#b12257 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| incident-trauma-reflex | sdk:wkappbot-workflow/incident-trauma-reflex.skill.json@v1.24#350b97 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| incident-trauma-reflex-howto | sdk:wkappbot-workflow/incident-trauma-reflex-howto.skill.json@v1.0#22f354 | n | SDK | no private marker; already in sdk |
+| incident-trauma-reflex-ref | sdk:wkappbot-workflow/incident-trauma-reflex-ref.skill.json@v1.43#ef0f2f | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| inspect-before-automate | sdk:wkappbot-workflow/inspect-before-automate.skill.json@v1.5#a58e76 | n | SDK | no private marker; already in sdk |
+| iocp-stderr-default-buffered | sdk:wkappbot-core/iocp-stderr-default-buffered.skill.json@v1.3#d08735 | n | SDK | no private marker; already in sdk |
+| jobkorea-manager | sdk:wkappbot-workflow/jobkorea-manager.skill.json@v1.25#8a99ef | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| kampala-pattern-reverse-engineer-apps-into-apis-for-automation | sdk:wkappbot-core/kampala-pattern-reverse-engineer-apps-into-apis-for-automation.skill.json@v1.1#dcaddf | n | SDK | no private marker; already in sdk |
+| ki-harness-labyrinth-method | sdk:wkappbot-workflow/ki-harness-labyrinth-method.skill.json@v1.0#d97e6b | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| knowledge-aliveness-health | sdk:wkappbot-workflow/knowledge-aliveness-health.skill.json@v1.2#d29cde | n | SDK | no private marker; already in sdk |
+| knowledge-aliveness-health-how-to | sdk:wkappbot-workflow/knowledge-aliveness-health-how-to.skill.json@v1.0#d321b1 | n | SDK | no private marker; already in sdk |
+| knowledge-aliveness-health-ref | sdk:wkappbot-workflow/knowledge-aliveness-health-ref.skill.json@v1.0#03899f | n | SDK | no private marker; already in sdk |
+| knowledge-ification-procedure-jisikhwa | sdk:personal-docs/knowledge-ification-procedure-jisikhwa.skill.json@v1.62#6e6da4 | n | PRIVATE | PUBLIC NOW (in sdk); markers: app:personal-docs, token:weak; home a private repo (none holds it yet) |
+| knowledge-op-approval-logic-2-consume-from-front | sdk:wkappbot-workflow/knowledge-op-approval-logic-2-consume-from-front.skill.json@v1.5#726b8f | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| korean-argv-cp949-fix-tryrecoverutf8argv-at-main-entry-recovers-createprocessa-mangled-args | sdk:wkappbot-core/korean-argv-cp949-fix-tryrecoverutf8argv-at-main-entry-recovers-createprocessa-mangled-args.skill.json@v1.3#249411 | n | SDK | no private marker; already in sdk |
+| korean-argv-cp949-hell-with-wkappbot-from-bash | sdk:wkautoquant/korean-argv-cp949-hell-with-wkappbot-from-bash.skill.json@v1.1#3ae9e1 | n | PRIVATE | PUBLIC NOW (in sdk); markers: app:wkautoquant; home a private repo (none holds it yet) |
+| launcher-aot-build-vswhere-path | sdk:wkappbot-core/launcher-aot-build-vswhere-path.skill.json@v1.2#345d03 | n | SDK | no private marker; already in sdk |
+| launcher-console-encoding-3-mode-policy-for-interactive-piped-utf-8-terminals | sdk:wkappbot/launcher-console-encoding-3-mode-policy-for-interactive-piped-utf-8-terminals.skill.json@v1.7#5fe39c | n | PRIVATE | PUBLIC NOW (in sdk); markers: machine path; home a private repo (none holds it yet) |
+| launcher-direct-core-routing-for-critical-cmds | sdk:wkappbot-core/launcher-direct-core-routing-for-critical-cmds.skill.json@v1.2#af2b28 | n | SDK | no private marker; already in sdk |
+| launcher-source-separation-private-core-stripped-from-public-repo | sdk:wkappbot-sdk/launcher-source-separation-private-core-stripped-from-public-repo.skill.json@v1.3#b08742 | n | PRIVATE | PUBLIC NOW (in sdk); markers: KIWOOM; home a private repo (none holds it yet) |
+| launcher-sudo-cold-start-pipe-file-exists-guard | sdk:wkappbot-core/launcher-sudo-cold-start-pipe-file-exists-guard.skill.json@v1.11#1ffc0c | n | SDK | no private marker; already in sdk |
+| launcher-wkappbot-chrome-target-env-pipe-protocol | sdk:wkappbot-sdk/launcher-wkappbot-chrome-target-env-pipe-protocol.skill.json@v1.2#46cf62 | n | SDK | no private marker; already in sdk |
+| letter-edit | sdk:wkappbot-kih/letter-edit.skill.json@v1.58#ef0535 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| letter-edit-howto | sdk:wkappbot-kih/letter-edit-howto.skill.json@v1.20#2309ea | n | PRIVATE | PUBLIC NOW (in sdk); markers: HANTOO, token:weak; home a private repo (none holds it yet) |
+| license-pending-invite-detect-and-guide-user-to-accept | sdk:wkappbot-sdk/license-pending-invite-detect-and-guide-user-to-accept.skill.json@v1.5#851b35 | n | PRIVATE | PUBLIC NOW (in sdk); markers: customer; home a private repo (none holds it yet) |
+| linkedin-feed-monitor | sdk:wkappbot-workflow/linkedin-feed-monitor.skill.json@v1.0#04119b | n | SDK | no private marker; already in sdk |
+| linkedin-manager | sdk:wkappbot-workflow/linkedin-manager.skill.json@v1.4#5a13eb | n | SDK | no private marker; already in sdk |
+| lm-wiki-personal-knowledge-base | sdk:wkappbot-workflow/lm-wiki-personal-knowledge-base.skill.json@v1.0#3e08b4 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| logcat-command-cheatsheet | sdk:wkappbot-workflow/logcat-command-cheatsheet.skill.json@v1.5#bac75e | n | SDK | no private marker; already in sdk |
+| macos-ci-via-sdk-relay | sdk:wkappbot-sdk/macos-ci-via-sdk-relay.skill.json@v1.13#548db5 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| macos-ci-via-sdk-relay-howto | sdk:wkappbot-sdk/macos-ci-via-sdk-relay-howto.skill.json@v1.1#997861 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:credential; home a private repo (none holds it yet) |
+| macos-ci-via-sdk-relay-ref | sdk:wkappbot-sdk/macos-ci-via-sdk-relay-ref.skill.json@v1.1#279dcd | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:credential; home a private repo (none holds it yet) |
+| mcp-admin-core-swap-elevation-triggered-graceful-cutover | sdk:wkappbot-core/mcp-admin-core-swap-elevation-triggered-graceful-cutover.skill.json@v1.1#153baa | n | SDK | no private marker; already in sdk |
+| mcp-automation-patterns | sdk:wkappbot-core/mcp-automation-patterns.skill.json@v1.2#7d5436 | n | SDK | no private marker; already in sdk |
+| mcp-automation-patterns-t1-core | sdk:wkappbot-core/mcp-automation-patterns-t1-core.skill.json@v1.0#e21626 | n | SDK | no private marker; already in sdk |
+| mcp-automation-patterns-t2-desktop-control | sdk:wkappbot-core/mcp-automation-patterns-t2-desktop-control.skill.json@v1.0#7a76ab | n | SDK | no private marker; already in sdk |
+| mcp-automation-patterns-t3-stability-ops | sdk:wkappbot-core/mcp-automation-patterns-t3-stability-ops.skill.json@v1.0#dadbcb | n | SDK | no private marker; already in sdk |
+| mcp-standard-for-desktop-and-browser-automation-integration-patterns | sdk:wkappbot-core/mcp-standard-for-desktop-and-browser-automation-integration-patterns.skill.json@v1.5#7a66b1 | n | SDK | no private marker; already in sdk |
+| md-heal | sdk:wkappbot-workflow/md-heal.skill.json@v1.4#109b07 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| md-heal-howto | sdk:wkappbot-workflow/md-heal-howto.skill.json@v1.0#54eff7 | n | SDK | no private marker; already in sdk |
+| md-heal-ref | sdk:wkappbot-workflow/md-heal-ref.skill.json@v1.0#c0234b | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| mdi-child-focusless-raise-swp-noactivate | sdk:wkappbot-core/mdi-child-focusless-raise-swp-noactivate.skill.json@v1.0#08af9f | n | SDK | no private marker; already in sdk |
+| multi-family-harness-coexistence | sdk:wkappbot-workflow/multi-family-harness-coexistence.skill.json@v1.14#261938 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| multi-tab-assistant-implementation-checklist | sdk:wkappbot-workflow/multi-tab-assistant-implementation-checklist.skill.json@v1.1#9570c9 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| multi-tab-assistant-interface-mvp | sdk:wkappbot-workflow/multi-tab-assistant-interface-mvp.skill.json@v1.1#d9adba | n | SDK | no private marker; already in sdk |
+| mystery-window-diagnosis | sdk:wkappbot-workflow/mystery-window-diagnosis.skill.json@v1.0#5d4053 | n | SDK | no private marker; already in sdk |
+| native-tool-deny-codex-only | sdk:wkappbot-workflow/native-tool-deny-codex-only.skill.json@v1.10#790d3d | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| native-tool-deny-codex-only-howto | sdk:wkappbot-workflow/native-tool-deny-codex-only-howto.skill.json@v1.0#e8ecbe | n | SDK | no private marker; already in sdk |
+| native-tool-deny-codex-only-ref | sdk:wkappbot-workflow/native-tool-deny-codex-only-ref.skill.json@v1.0#bba194 | n | SDK | no private marker; already in sdk |
+| native-tool-deny-is-codex-only-and-harness-logic-outranks-claude-md | sdk:wkappbot-workflow/native-tool-deny-is-codex-only-and-harness-logic-outranks-claude-md.skill.json@v1.2#b8c560 | n | SDK | no private marker; already in sdk |
+| naver-imap-app-password-via-cdp-2fa-imap-enable | sdk:wkappbot-webbot/naver-imap-app-password-via-cdp-2fa-imap-enable.skill.json@v1.0#771965 | n | PRIVATE | PUBLIC NOW (in sdk); markers: .env, password; home a private repo (none holds it yet) |
+| naver-mail-compose-spa-read-fiber | sdk:wkappbot-webbot/naver-mail-compose-spa-read-fiber.skill.json@v1.4#077eaf | n | SDK | no private marker; already in sdk |
+| newchat-cwd-validation-guard | sdk:wkappbot-core/newchat-cwd-validation-guard.skill.json@v1.0#d860d3 | n | SDK | no private marker; already in sdk |
+| news-20260420-sudo-encoding | sdk:wkappbot/news-20260420-sudo-encoding.skill.json@v1.0#8e3701 | n | SDK | no private marker; already in sdk |
+| nfrunlite-reconnect-popup-dismiss | sdk:wkappbot-core/nfrunlite-reconnect-popup-dismiss.skill.json@v1.11#9dfe16 | n | SDK | no private marker; already in sdk |
+| nightly-schedule-guard | sdk:wkappbot-workflow/nightly-schedule-guard.skill.json@v1.2#adad1a | n | SDK | no private marker; already in sdk |
+| nlrc-evidence-webbot | sdk:wkappbot-webbot/nlrc-evidence-webbot.skill.json@v1.2#451910 | n | SDK | no private marker; already in sdk |
+| no-verify-guard | sdk:wkappbot-workflow/no-verify-guard.skill.json@v1.0#d8e84d | n | SDK | no private marker; already in sdk |
+| nvidia-overlay-blackscreen-kill | sdk:wkappbot-core/nvidia-overlay-blackscreen-kill.skill.json@v1.9#239780 | n | SDK | no private marker; already in sdk |
+| nvidia-overlay-blackscreen-kill-howto | sdk:wkappbot-core/nvidia-overlay-blackscreen-kill-howto.skill.json@v1.0#551469 | n | SDK | no private marker; already in sdk |
+| nvidia-overlay-blackscreen-kill-ref | sdk:wkappbot-core/nvidia-overlay-blackscreen-kill-ref.skill.json@v1.0#595b3c | n | SDK | no private marker; already in sdk |
+| ocr-usage | sdk:wkappbot/ocr-usage.skill.json@v1.27#9b7c4a | n | SDK | no private marker; already in sdk |
+| ocr-usage-howto | sdk:wkappbot/ocr-usage-howto.skill.json@v1.0#476517 | n | SDK | no private marker; already in sdk |
+| ocr-usage-ref | sdk:wkappbot/ocr-usage-ref.skill.json@v1.18#bf9a46 | n | SDK | no private marker; already in sdk |
+| on-load | sdk:wkappbot-workflow/on-load.skill.json@v1.619#bd831b | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| on-load-howto | sdk:wkappbot-workflow/on-load-howto.skill.json@v1.23#6ccc39 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| on-load-ref | sdk:wkappbot-workflow/on-load-ref.skill.json@v1.2#d0dc03 | n | SDK | no private marker; already in sdk |
+| operator-skill-template | sdk:wkappbot-core/operator-skill-template.skill.json@v1.2#e64f63 | n | SDK | no private marker; already in sdk |
+| opus-files-bugs-on-sight | sdk:wkappbot-workflow/opus-files-bugs-on-sight.skill.json@v1.0#be6989 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| opus-mechanical-self-drag-antipattern | sdk:wkappbot-workflow/opus-mechanical-self-drag-antipattern.skill.json@v1.3#d74a70 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| opus-over-pace-is-not-a-stop-delegate-real-work-to-gate-exempt-haiku-codex-agents | sdk:wkappbot-workflow/opus-over-pace-is-not-a-stop-delegate-real-work-to-gate-exempt-haiku-codex-agents.skill.json@v1.3#3e303d | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| opus-self-reflection | sdk:personal-docs/opus-self-reflection.skill.json@v1.9#d6a136 | n | PRIVATE | PUBLIC NOW (in sdk); markers: app:personal-docs, token:weak; home a private repo (none holds it yet) |
+| opus-self-reflection-ref | sdk:personal-docs/opus-self-reflection-ref.skill.json@v1.26#826aa2 | n | PRIVATE | PUBLIC NOW (in sdk); markers: app:personal-docs, token:weak; home a private repo (none holds it yet) |
+| orchestrate-sectors-parallel-while-knowledgeifying | sdk:wkappbot-workflow/orchestrate-sectors-parallel-while-knowledgeifying.skill.json@v1.29#7a28f3 | n | SDK | no private marker; already in sdk |
+| orchestrate-sectors-parallel-while-knowledgeifying-howto | sdk:wkappbot-workflow/orchestrate-sectors-parallel-while-knowledgeifying-howto.skill.json@v1.0#44bf9b | n | SDK | no private marker; already in sdk |
+| orchestrate-sectors-parallel-while-knowledgeifying-ref | sdk:wkappbot-workflow/orchestrate-sectors-parallel-while-knowledgeifying-ref.skill.json@v1.0#0ac778 | n | SDK | no private marker; already in sdk |
+| pace-95-circuit-breaker | sdk:wkappbot-workflow/pace-95-circuit-breaker.skill.json@v1.12#eda03c | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| pace-95-circuit-breaker-ref | sdk:wkappbot-workflow/pace-95-circuit-breaker-ref.skill.json@v1.0#31aca5 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| pace-deadlock-escapes-harness-editable-and-jisikhwa-free | sdk:wkappbot-workflow/pace-deadlock-escapes-harness-editable-and-jisikhwa-free.skill.json@v1.3#cd1ed9 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| pace-deadlock-escapes-ref | sdk:wkappbot-workflow/pace-deadlock-escapes-ref.skill.json@v1.0#794145 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| partial-class-file-splitting-400-line-soft-cap | sdk:wkappbot-workflow/partial-class-file-splitting-400-line-soft-cap.skill.json@v1.7#4c78d7 | n | SDK | no private marker; already in sdk |
+| payment-to-license-activation-flow-kis-transfer-github-collaborator-auto-grant | sdk:wkappbot-sdk/payment-to-license-activation-flow-kis-transfer-github-collaborator-auto-grant.skill.json@v1.8#bcf131 | n | PRIVATE | PUBLIC NOW (in sdk); markers: account, token:credential; home a private repo (none holds it yet) |
+| paypal-developer-cdp-login | sdk:paypal-developer/paypal-developer-cdp-login.skill.json@v1.8#6c9913 | n | PRIVATE | PUBLIC NOW (in sdk); markers: account, app:paypal-developer, password; home a private repo (none holds it yet) |
+| per-repository-window-persistence | sdk:wkappbot-workflow/per-repository-window-persistence.skill.json@v1.0#f494a3 | n | SDK | no private marker; already in sdk |
+| placement-one-shot-no-multi-reposition | sdk:wkappbot-webbot/placement-one-shot-no-multi-reposition.skill.json@v1.6#74d1b5 | n | SDK | no private marker; already in sdk |
+| placement-port-pid-filter | sdk:wkappbot-sdk/placement-port-pid-filter.skill.json@v1.0#ab6566 | n | SDK | no private marker; already in sdk |
+| playbook-actions-read-uia-text-shell-external-command | sdk:wkappbot/playbook-actions-read-uia-text-shell-external-command.skill.json@v2#4f83ce | n | SDK | no private marker; already in sdk |
+| post-compaction-recovery | sdk:wkappbot-workflow/post-compaction-recovery.skill.json@v1.2#fd11d9<br>sdk:wkappbot-core/post-compaction-recovery.skill.json@v1.0#d89b8f | y | PRIVATE | PUBLIC NOW (in sdk); markers: machine path; home a private repo (none holds it yet) |
+| powershell-here-string-multiline | sdk:wkappbot-workflow/powershell-here-string-multiline.skill.json@v1.1#d09cfb | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| pre-push-orphan-gc-quarantine-full-mark-and-sweep | sdk:wkappbot-workflow/pre-push-orphan-gc-quarantine-full-mark-and-sweep.skill.json@v1.4#55298a | n | SDK | no private marker; already in sdk |
+| pre-push-orphan-gc-quarantine-full-mark-and-sweep-howto | sdk:wkappbot-workflow/pre-push-orphan-gc-quarantine-full-mark-and-sweep-howto.skill.json@v1.0#7485bc | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| pre-push-orphan-gc-quarantine-full-mark-and-sweep-ref | sdk:wkappbot-workflow/pre-push-orphan-gc-quarantine-full-mark-and-sweep-ref.skill.json@v1.0#eb8682 | n | SDK | no private marker; already in sdk |
+| predicted-vs-actual-commando-calibration-ledger | sdk:wkappbot-workflow/predicted-vs-actual-commando-calibration-ledger.skill.json@v1.10#ee3359 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| proc-path-glob-matching | sdk:wkappbot/proc-path-glob-matching.skill.json@v1.0#3d0895 | n | SDK | no private marker; already in sdk |
+| project-skill-template | sdk:wkappbot-core/project-skill-template.skill.json@v1.2#61ec85 | n | SDK | no private marker; already in sdk |
+| prompt-send-self-prompting | sdk:wkappbot-workflow/prompt-send-self-prompting.skill.json@v1.5#9d4d34 | n | SDK | no private marker; already in sdk |
+| proto-cleanup-discipline-howto | sdk:wkappbot-kih/proto-cleanup-discipline-howto.skill.json@v1.0#37e31c | n | SDK | no private marker; already in sdk |
+| proto-cleanup-discipline-ref | sdk:wkappbot-kih/proto-cleanup-discipline-ref.skill.json@v1.0#7469e8 | n | SDK | no private marker; already in sdk |
+| proto-to-live-wiring | sdk:wkappbot-kih/proto-to-live-wiring.skill.json@v1.1668#73de41 | n | PRIVATE | PUBLIC NOW (in sdk); markers: account; home a private repo (none holds it yet) |
+| ps-script-mojibake-is-output-encoding-first-not-argv | sdk:wkappbot-workflow/ps-script-mojibake-is-output-encoding-first-not-argv.skill.json@v1.0#6c0ce1 | n | SDK | no private marker; already in sdk |
+| public-launcher-datadir-use-wkappbot-home-or-userprofile-wkappbot | sdk:wkappbot/public-launcher-datadir-use-wkappbot-home-or-userprofile-wkappbot.skill.json@v1.3#837be1 | n | SDK | no private marker; already in sdk |
+| public-repo-checklist-pre-release-audit-for-secrets-and-pii | sdk:wkappbot/public-repo-checklist-pre-release-audit-for-secrets-and-pii.skill.json@v1.3#63dffd | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| pulsestep-force-mode-ring-trail | sdk:wkappbot-core/pulsestep-force-mode-ring-trail.skill.json@v1.3#add538 | n | SDK | no private marker; already in sdk |
+| punk-pattern-remote-claude-code-control-via-lightweight-proxy | sdk:wkappbot-core/punk-pattern-remote-claude-code-control-via-lightweight-proxy.skill.json@v1.1#c5b705 | n | SDK | no private marker; already in sdk |
+| qmd-local-codebase-search-install-index-and-query | sdk:wkappbot-workflow/qmd-local-codebase-search-install-index-and-query.skill.json@v1.0#2f03d5 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| quantbot-user-input-protection-guard | sdk:wkappbot-workflow/quantbot-user-input-protection-guard.skill.json@v1.0#a6158a | n | PRIVATE | PUBLIC NOW (in sdk); markers: PIN; home a private repo (none holds it yet) |
+| react-spa-automation-fiber-props-click-controlled-input-fill | sdk:wkappbot/react-spa-automation-fiber-props-click-controlled-input-fill.skill.json@v1.0#77bcf2 | n | SDK | no private marker; already in sdk |
+| record-triad-insight-as-skill | sdk:wkappbot-workflow/record-triad-insight-as-skill.skill.json@v1.5#5b8212 | n | SDK | no private marker; already in sdk |
+| recover-korean-console-after-crash-reboot | sdk:wkappbot-core/recover-korean-console-after-crash-reboot.skill.json@v1.0#a3aec5 | n | SDK | no private marker; already in sdk |
+| reddit-flair-modal-add-button-uia-invisible-cdp-trusted-click-fails-only-physical-click-works | sdk:wkappbot-core/reddit-flair-modal-add-button-uia-invisible-cdp-trusted-click-fails-only-physical-click-works.skill.json@v1.0#fa2656 | n | SDK | no private marker; already in sdk |
+| reduce-before-refactor-dedup-analyze-rebundle-order | sdk:wkappbot-sdk/reduce-before-refactor-dedup-analyze-rebundle-order.skill.json@v1.1#280ecf | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| reflex-audit-transfer-quiz-template | sdk:wkappbot-workflow/reflex-audit-transfer-quiz-template.skill.json@v1.0#3a16cf | n | SDK | no private marker; already in sdk |
+| releasing-under-harness-pace-guards | sdk:wkappbot-sdk/releasing-under-harness-pace-guards.skill.json@v1.4#44b76f | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| repair-korean-ime-running-wt-tsf-rebind | sdk:wkappbot-core/repair-korean-ime-running-wt-tsf-rebind.skill.json@v1.0#a2a7a5 | n | SDK | no private marker; already in sdk |
+| repo-garbage-collector-unused-file-quarantine | sdk:wkappbot-workflow/repo-garbage-collector-unused-file-quarantine.skill.json@v1.0#02cd41 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| repo-health-doctor | sdk:wkappbot-workflow/repo-health-doctor.skill.json@v1.17#8bb1d8 | n | SDK | no private marker; already in sdk |
+| repo-maintenance-gc-cleanup-and-pre-release-git-audit | sdk:wkappbot/repo-maintenance-gc-cleanup-and-pre-release-git-audit.skill.json@v1.1#14393f | n | PRIVATE | PUBLIC NOW (in sdk); markers: .env; home a private repo (none holds it yet) |
+| repo-management-skill-series | sdk:wkappbot-workflow/repo-management-skill-series.skill.json@v1.2#9d6d2c | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| resolve-stale-bug-auto-merge-noise | sdk:wkappbot-workflow/resolve-stale-bug-auto-merge-noise.skill.json@v1.1#e168c7 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:credential; home a private repo (none holds it yet) |
+| root-wk-tool-delegation-gate | sdk:wkappbot-workflow/root-wk-tool-delegation-gate.skill.json@v1.0#0fe187 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| rotating-log-append | sdk:wkappbot-workflow/rotating-log-append.skill.json@v1.0#a7de33 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| run-postcase-testing | sdk:wkappbot-workflow/run-postcase-testing.skill.json@v1.3#04a80b | n | SDK | no private marker; already in sdk |
+| runaway-subagent-reap-postmortem-kill-switch-pace-blocked | sdk:wkappbot-workflow/runaway-subagent-reap-postmortem-kill-switch-pace-blocked.skill.json@v1.1#04e05a | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| safe-bugfix-protocol | sdk:wkappbot-core/safe-bugfix-protocol.skill.json@v1.20#3279f3 | n | SDK | no private marker; already in sdk |
+| safety-first-work-order-stabilize-fix-prevent-dispatch-first | sdk:wkappbot-workflow/safety-first-work-order-stabilize-fix-prevent-dispatch-first.skill.json@v1.4#f323f3 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| scenariorunner-process-key-no-dup-flag-for-existing-process-adoption | sdk:wkappbot-core/scenariorunner-process-key-no-dup-flag-for-existing-process-adoption.skill.json@v1.4#495929 | n | SDK | no private marker; already in sdk |
+| schedule-cmd-bash-windows | sdk:wkappbot/schedule-cmd-bash-windows.skill.json@v1.2#9c15ed | n | SDK | no private marker; already in sdk |
+| schedule-command-cheatsheet | sdk:wkappbot/schedule-command-cheatsheet.skill.json@v1.18#21d20e | n | SDK | no private marker; already in sdk |
+| schedule-past-time-requeue-advance | sdk:wkappbot-core/schedule-past-time-requeue-advance.skill.json@v1.0#eee3d6 | n | SDK | no private marker; already in sdk |
+| screensaver-close-command | sdk:wkappbot-core/screensaver-close-command.skill.json@v1.24#840a84 | n | SDK | no private marker; already in sdk |
+| screensaver-close-command-ref | sdk:wkappbot-core/screensaver-close-command-ref.skill.json@v1.0#a84606 | n | SDK | no private marker; already in sdk |
+| screensaver-command | sdk:wkappbot-core/screensaver-command.skill.json@v1.21#68f022 | n | SDK | no private marker; already in sdk |
+| screenshot-grap-bbox | sdk:wkappbot-core/screenshot-grap-bbox.skill.json@v1.6#20c719 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| screenshot-mask-transparency | sdk:wkappbot-core/screenshot-mask-transparency.skill.json@v1.0#2cc6b2 | n | SDK | no private marker; already in sdk |
+| sdk-deployment-session-2026-04-28 | sdk:wkappbot-sdk/sdk-deployment-session-2026-04-28.skill.json@v1.1#b5d74c | n | PRIVATE | PUBLIC NOW (in sdk); markers: .env; home a private repo (none holds it yet) |
+| sdk-find-stable-build-green-verification | sdk:wkappbot-sdk/sdk-find-stable-build-green-verification.skill.json@v1.4#358c9c | n | SDK | no private marker; already in sdk |
+| sdk-first-run-onboarding-zero-to-first-command | sdk:wkappbot-sdk/sdk-first-run-onboarding-zero-to-first-command.skill.json@v1.2#fc01e4 | n | PRIVATE | PUBLIC NOW (in sdk); markers: account, customer, token:weak; home a private repo (none holds it yet) |
+| sdk-gg-main-automation | sdk:wkappbot-sdk/sdk-gg-main-automation.skill.json@v1.71#6955e9 | n | SDK | no private marker; already in sdk |
+| sdk-gg-main-automation-howto | sdk:wkappbot-sdk/sdk-gg-main-automation-howto.skill.json@v1.0#30fbac | n | SDK | no private marker; already in sdk |
+| sdk-gg-main-automation-ref | sdk:wkappbot-sdk/sdk-gg-main-automation-ref.skill.json@v1.1#a15ab0 | n | SDK | no private marker; already in sdk |
+| sdk-gg-main-automation-t2-howto | sdk:wkappbot-sdk/sdk-gg-main-automation-t2-howto.skill.json@v1.5#743fd6 | n | SDK | no private marker; already in sdk |
+| sdk-gg-main-automation-t3-ref | sdk:wkappbot-sdk/sdk-gg-main-automation-t3-ref.skill.json@v1.4#cc6021 | n | SDK | no private marker; already in sdk |
+| sdk-launcher-emergency-recovery | sdk:wkappbot-sdk/sdk-launcher-emergency-recovery.skill.json@v1.0#d45e26 | n | SDK | no private marker; already in sdk |
+| sdk-launcher-maintenance | sdk:wkappbot-sdk/sdk-launcher-maintenance.skill.json@v1.4#82e6f1 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:credential; home a private repo (none holds it yet) |
+| sdk-marketing-strategy | sdk:wkappbot-sdk/sdk-marketing-strategy.skill.json@v1.0#78232d | n | SDK | no private marker; already in sdk |
+| sdk-marketing-strategy-howto | sdk:wkappbot-sdk/sdk-marketing-strategy-howto.skill.json@v1.0#9a26c3 | n | SDK | no private marker; already in sdk |
+| sdk-marketing-strategy-ref | sdk:wkappbot-sdk/sdk-marketing-strategy-ref.skill.json@v1.0#2b55cf | n | SDK | no private marker; already in sdk |
+| sdk-operator-license-management-invite-tier-offboard | sdk:wkappbot-sdk/sdk-operator-license-management-invite-tier-offboard.skill.json@v1.1#41d81d | n | PRIVATE | PUBLIC NOW (in sdk); markers: customer; home a private repo (none holds it yet) |
+| sdk-payment-collection-flow-mvp-manual-process | sdk:wkappbot-sdk/sdk-payment-collection-flow-mvp-manual-process.skill.json@v1.1#510a69 | n | PRIVATE | PUBLIC NOW (in sdk); markers: account, customer; home a private repo (none holds it yet) |
+| sdk-public-skill-index | sdk:wkappbot-sdk/sdk-public-skill-index.skill.json@v1.0#695608 | n | SDK | no private marker; already in sdk |
+| sdk-release-playbook | sdk:wkappbot-sdk/sdk-release-playbook.skill.json@v1.4#a1c829 | n | SDK | no private marker; already in sdk |
+| sdk-release-playbook-howto | sdk:wkappbot-sdk/sdk-release-playbook-howto.skill.json@v1.0#4689b8 | n | SDK | no private marker; already in sdk |
+| sdk-release-playbook-ref | sdk:wkappbot-sdk/sdk-release-playbook-ref.skill.json@v1.0#692ac9 | n | SDK | no private marker; already in sdk |
+| sdk-skill-browser-pipeline | sdk:wkappbot-sdk/sdk-skill-browser-pipeline.skill.json@v1.8#8c9664 | n | PRIVATE | PUBLIC NOW (in sdk); markers: .env, token:credential; home a private repo (none holds it yet) |
+| sdk-skill-browser-pipeline-howto | sdk:wkappbot-sdk/sdk-skill-browser-pipeline-howto.skill.json@v1.0#527d74 | n | SDK | no private marker; already in sdk |
+| sdk-skill-browser-pipeline-ref | sdk:wkappbot-sdk/sdk-skill-browser-pipeline-ref.skill.json@v1.0#e368bf | n | PRIVATE | PUBLIC NOW (in sdk); markers: .env; home a private repo (none holds it yet) |
+| sdk-suggest-skill-filing-rules | sdk:wkappbot-sdk/sdk-suggest-skill-filing-rules.skill.json@v1.1#2abca0 | n | SDK | no private marker; already in sdk |
+| sdk-user-perspective-test-playbook | sdk:wkappbot-sdk/sdk-user-perspective-test-playbook.skill.json@v1.18#d9ce85 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:credential; home a private repo (none holds it yet) |
+| security-guard | sdk:wkappbot-workflow/security-guard.skill.json@v1.0#c90862 | n | SDK | no private marker; already in sdk |
+| sed-guard | sdk:wkappbot-workflow/sed-guard.skill.json@v1.0#a697d6 | n | SDK | no private marker; already in sdk |
+| session-2026-06-07-git-contribute-split-gotchas | sdk:wkappbot-workflow/session-2026-06-07-git-contribute-split-gotchas.skill.json@v1.0#318a7d | n | SDK | no private marker; already in sdk |
+| session-continuity-persist-command-history-and-agent-state | sdk:wkappbot/session-continuity-persist-command-history-and-agent-state.skill.json@v1.1#e9d7b3 | n | SDK | no private marker; already in sdk |
+| session-lock-cleared-2026-05-20 | sdk:wkappbot-workflow/session-lock-cleared-2026-05-20.skill.json@v1.0#3a7c8a | n | SDK | no private marker; already in sdk |
+| session-pattern-mining-skill-promotion | sdk:wkappbot-workflow/session-pattern-mining-skill-promotion.skill.json@v1.0#8970b5 | n | SDK | no private marker; already in sdk |
+| shell-is-a-scenario-step-action-not-a-cli-command | sdk:wkappbot/shell-is-a-scenario-step-action-not-a-cli-command.skill.json@v1.5#635b23 | n | SDK | no private marker; already in sdk |
+| show-hn-and-producthunt-launch-strategy | sdk:wkappbot-sdk/show-hn-and-producthunt-launch-strategy.skill.json@v1.2#2907dd | n | SDK | no private marker; already in sdk |
+| skill-audience-taxonomy | sdk:wkappbot-core/skill-audience-taxonomy.skill.json@v1.4#5b3832 | n | SDK | no private marker; already in sdk |
+| skill-browser-dev-process | sdk:wkappbot-sdk/skill-browser-dev-process.skill.json@v1.0#db3814 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| skill-browser-gha-auto-build | sdk:wkappbot-sdk/skill-browser-gha-auto-build.skill.json@v1.0#683610 | n | SDK | no private marker; already in sdk |
+| skill-browser-launch-checklist | sdk:wkappbot-sdk/skill-browser-launch-checklist.skill.json@v1.0#e8d6f4 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| skill-browser-qa | sdk:wkappbot-sdk/skill-browser-qa.skill.json@v1.0#872721 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:credential; home a private repo (none holds it yet) |
+| skill-browser-qa-howto | sdk:wkappbot-sdk/skill-browser-qa-howto.skill.json@v1.0#a35983 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:credential; home a private repo (none holds it yet) |
+| skill-browser-qa-ref | sdk:wkappbot-sdk/skill-browser-qa-ref.skill.json@v1.0#be025f | n | SDK | no private marker; already in sdk |
+| skill-comment | sdk:wkappbot-workflow/skill-comment.skill.json@v1.0#8571d1 | n | SDK | no private marker; already in sdk |
+| skill-contribute-edit | sdk:wkappbot-workflow/skill-contribute-edit.skill.json@v1.2#c8a1b4<br>sdk:wkappbot-core/skill-contribute-edit.skill.json@v1.13#87ce6a | y | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| skill-contribute-edit-encoding-guard-korean-ui-relaxed-threshold | sdk:wkappbot/skill-contribute-edit-encoding-guard-korean-ui-relaxed-threshold.skill.json@v2#f55af7 | n | PRIVATE | PUBLIC NOW (in sdk); markers: KIWOOM; home a private repo (none holds it yet) |
+| skill-coverage-ranking-news | sdk:wkappbot/skill-coverage-ranking-news.skill.json@v1.5#6792bb | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| skill-delete-guard | sdk:wkappbot-workflow/skill-delete-guard.skill.json@v1.0#13ee75 | n | SDK | no private marker; already in sdk |
+| skill-edit-add-step-dedup | sdk:wkappbot-core/skill-edit-add-step-dedup.skill.json@v1.0#752de6 | n | SDK | no private marker; already in sdk |
+| skill-edit-step-ordering-spec | sdk:wkappbot/skill-edit-step-ordering-spec.skill.json@v1.0#62c918 | n | SDK | no private marker; already in sdk |
+| skill-guard | sdk:wkappbot-workflow/skill-guard.skill.json@v1.0#5a62d5 | n | SDK | no private marker; already in sdk |
+| skill-guard-direct-skill-json-edit-blocked | sdk:wkappbot-workflow/skill-guard-direct-skill-json-edit-blocked.skill.json@v1.0#398870 | n | SDK | no private marker; already in sdk |
+| skill-heal-nightly | sdk:wkappbot-sdk/skill-heal-nightly.skill.json@v1.34#28ce84 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| skill-heal-nightly-howto | sdk:wkappbot-sdk/skill-heal-nightly-howto.skill.json@v1.0#acef73 | n | SDK | no private marker; already in sdk |
+| skill-heal-nightly-ref | sdk:wkappbot-sdk/skill-heal-nightly-ref.skill.json@v1.0#367c31 | n | SDK | no private marker; already in sdk |
+| skill-list-guard | sdk:wkappbot-workflow/skill-list-guard.skill.json@v1.0#1d0c01 | n | SDK | no private marker; already in sdk |
+| skill-lock-audit-and-auto-registration-for-critical-source-files | sdk:wkappbot-workflow/skill-lock-audit-and-auto-registration-for-critical-source-files.skill.json@v1.3#99b6d0 | n | SDK | no private marker; already in sdk |
+| skill-migration-3tier | sdk:personal-docs/skill-migration-3tier.skill.json@v1.20#415f3d | n | PRIVATE | PUBLIC NOW (in sdk); markers: HANTOO, app:personal-docs, token:weak; home a private repo (none holds it yet) |
+| skill-read-auto-export-to-claude-code-claude-skills | sdk:wkappbot-core/skill-read-auto-export-to-claude-code-claude-skills.skill.json@v1.2#dcdbf7 | n | SDK | no private marker; already in sdk |
+| skill-read-if-newer | sdk:wkappbot-core/skill-read-if-newer.skill.json@v1.0#351b5a | n | SDK | no private marker; already in sdk |
+| skill-readability-optimization-and-healing | sdk:wkappbot-core/skill-readability-optimization-and-healing.skill.json@v1.0#f78fb4 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| skill-reminder-news-and-invocation-log-discoverability-system | sdk:wkappbot-core/skill-reminder-news-and-invocation-log-discoverability-system.skill.json@v1.4#6df86a | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| skill-review-completed-codex-cli-wkappbot-usage-updated-to-v1-4 | sdk:wkappbot-workflow/skill-review-completed-codex-cli-wkappbot-usage-updated-to-v1-4.skill.json@v1.3#893572 | n | SDK | no private marker; already in sdk |
+| skill-search-coverage-guide | sdk:wkappbot-workflow/skill-search-coverage-guide.skill.json@v1.11#3cd3a1 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| skill-search-usage | sdk:wkappbot-workflow/skill-search-usage.skill.json@v1.11#6d0536 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| skill-sync-split-brain-cleanup | sdk:wkappbot-workflow/skill-sync-split-brain-cleanup.skill.json@v1.0#85a851 | n | SDK | no private marker; already in sdk |
+| skill-sync-warning-triage | sdk:wkappbot-workflow/skill-sync-warning-triage.skill.json@v1.0#3aa328 | n | SDK | no private marker; already in sdk |
+| slack-app-token-renewal | sdk:wkappbot-workflow/slack-app-token-renewal.skill.json@v1.0#ebc850<br>sdk:wkappbot-core/slack-app-token-renewal.skill.json@v1.0#236e7d | y | PRIVATE | PUBLIC NOW (in sdk); markers: token:credential; home a private repo (none holds it yet) |
+| slack-bot-self-mention-no-socket | sdk:wkappbot-workflow/slack-bot-self-mention-no-socket.skill.json@v1.0#40762e | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:credential; home a private repo (none holds it yet) |
+| slack-command-cheatsheet | sdk:wkappbot-workflow/slack-command-cheatsheet.skill.json@v1.5#b9903e | n | SDK | no private marker; already in sdk |
+| slack-send-reply-per-cwd-reply-context-no-misroute | sdk:wkappbot-core/slack-send-reply-per-cwd-reply-context-no-misroute.skill.json@v1.1#edefa9 | n | SDK | no private marker; already in sdk |
+| smart-wksplit-ref | sdk:wkappbot-sdk/smart-wksplit-ref.skill.json@v1.0#da00b3 | n | SDK | no private marker; already in sdk |
+| sonnet-bug-stop-policy-ref | sdk:personal-docs/sonnet-bug-stop-policy-ref.skill.json@v1.11#e7824b | n | PRIVATE | PUBLIC NOW (in sdk); markers: HANTOO, KIWOOM, account, app:personal-docs, token:weak; home a private repo (none holds it yet) |
+| sonnet-reflection | sdk:wkappbot-sdk/sonnet-reflection.skill.json@v1.4709#216e12 | n | PRIVATE | PUBLIC NOW (in sdk); markers: HANTOO, account, token:weak; home a private repo (none holds it yet) |
+| sonnet-reflection-howto | sdk:wkappbot-sdk/sonnet-reflection-howto.skill.json@v1.99#ed97bd | n | PRIVATE | PUBLIC NOW (in sdk); markers: password, token:weak; home a private repo (none holds it yet) |
+| sonnet-reflection-ref | sdk:wkappbot-sdk/sonnet-reflection-ref.skill.json@v1.2#68b29a | n | PRIVATE | PUBLIC NOW (in sdk); markers: password; home a private repo (none holds it yet) |
+| sonnet-self-reflection-howto | sdk:wkappbot-sdk/sonnet-self-reflection-howto.skill.json@v1.1#8a224a | n | SDK | no private marker; already in sdk |
+| sonnet-self-reflection-ref | sdk:wkappbot-sdk/sonnet-self-reflection-ref.skill.json@v1.1#2ae90e | n | SDK | no private marker; already in sdk |
+| source-edit-skill-lock-live-hole | sdk:wkappbot-workflow/source-edit-skill-lock-live-hole.skill.json@v1.0#ed58e3 | n | SDK | no private marker; already in sdk |
+| source-splitter-untangles-bug-labyrinth | sdk:wkappbot-sdk/source-splitter-untangles-bug-labyrinth.skill.json@v1.2#a5bc6a | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| spam-popup-dismiss-patterns | sdk:wkappbot-core/spam-popup-dismiss-patterns.skill.json@v1.1#88a807 | n | SDK | no private marker; already in sdk |
+| speak-bg-interrupt-via-x-esc-caller-exit | sdk:wkappbot-core/speak-bg-interrupt-via-x-esc-caller-exit.skill.json@v1.5#a1f709 | n | SDK | no private marker; already in sdk |
+| speak-timeout-dynamic-safety | sdk:wkappbot-core/speak-timeout-dynamic-safety.skill.json@v1.2#027cdd | n | SDK | no private marker; already in sdk |
+| splitter-feature-discovery-plus-delegation-distribution-for-token-frugal-bug-analysis | sdk:wkappbot-workflow/splitter-feature-discovery-plus-delegation-distribution-for-token-frugal-bug-analysis.skill.json@v1.2#568fa4 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| stall-guard | sdk:wkappbot-workflow/stall-guard.skill.json@v1.4#b332eb | n | SDK | no private marker; already in sdk |
+| stall-guard-wk-exemption | sdk:wkappbot-workflow/stall-guard-wk-exemption.skill.json@v1.11#8beeac | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| stall-guard-wk-exemption-howto | sdk:wkappbot-workflow/stall-guard-wk-exemption-howto.skill.json@v1.0#b26413 | n | SDK | no private marker; already in sdk |
+| stall-guard-wk-exemption-ref | sdk:wkappbot-workflow/stall-guard-wk-exemption-ref.skill.json@v1.0#04e1e9 | n | SDK | no private marker; already in sdk |
+| standard-appbot-window | sdk:wkappbot/standard-appbot-window.skill.json@v1.6#e68dfc | n | SDK | no private marker; already in sdk |
+| standard-appbot-window-howto | sdk:wkappbot/standard-appbot-window-howto.skill.json@v1.0#1ead14 | n | SDK | no private marker; already in sdk |
+| standard-appbot-window-ref | sdk:wkappbot/standard-appbot-window-ref.skill.json@v1.0#23a6b4 | n | SDK | no private marker; already in sdk |
+| standard-appbot-window-t1-core | sdk:wkappbot/standard-appbot-window-t1-core.skill.json@v1.0#aa1a76 | n | SDK | no private marker; already in sdk |
+| standard-chrome-window | sdk:wkappbot/standard-chrome-window.skill.json@v1.4#6a9a03 | n | SDK | no private marker; already in sdk |
+| standard-chrome-window-howto | sdk:wkappbot/standard-chrome-window-howto.skill.json@v1.0#7aa162 | n | SDK | no private marker; already in sdk |
+| standard-chrome-window-ref | sdk:wkappbot/standard-chrome-window-ref.skill.json@v1.0#f678cd | n | SDK | no private marker; already in sdk |
+| stop-ai-from-clicking-the-wrong-button-6-layer-target-safety-net | sdk:wkappbot/stop-ai-from-clicking-the-wrong-button-6-layer-target-safety-net.skill.json@v1.2#25d8d3 | n | SDK | no private marker; already in sdk |
+| sudo-elevation-four-layers | sdk:wkappbot-core/sudo-elevation-four-layers.skill.json@v2#fd840e | n | SDK | no private marker; already in sdk |
+| sudo-proxy-cp949-stdout-fix-elevatedeyeproxy-standardoutputencoding-utf8 | sdk:wkappbot-core/sudo-proxy-cp949-stdout-fix-elevatedeyeproxy-standardoutputencoding-utf8.skill.json@v1.3#5e9ed3 | n | SDK | no private marker; already in sdk |
+| suggest-cmd-guard-word-boundary | sdk:wkappbot-core/suggest-cmd-guard-word-boundary.skill.json@v1.4#e58a6b | n | SDK | no private marker; already in sdk |
+| suggest-co-resolve-2of2 | sdk:wkappbot-core/suggest-co-resolve-2of2.skill.json@v1.63#d89d72 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| suggest-co-resolve-2of2-howto | sdk:wkappbot-core/suggest-co-resolve-2of2-howto.skill.json@v1.0#85c548 | n | SDK | no private marker; already in sdk |
+| suggest-co-resolve-2of2-ref | sdk:wkappbot-core/suggest-co-resolve-2of2-ref.skill.json@v1.6#cfe9f8 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| suggest-forward-acknowledge-and-close-stale-cross-system-forwards | sdk:wkappbot/suggest-forward-acknowledge-and-close-stale-cross-system-forwards.skill.json@v1.1#a785b1 | n | SDK | no private marker; already in sdk |
+| suggest-requirement-error-format | sdk:wkappbot-core/suggest-requirement-error-format.skill.json@v1.4#649d34 | n | SDK | no private marker; already in sdk |
+| suggest-resolve-cdp-bugs | sdk:wkappbot-workflow/suggest-resolve-cdp-bugs.skill.json@v1.18#118116 | n | SDK | no private marker; already in sdk |
+| suggest-resolve-evidence-conventions | sdk:wkappbot-workflow/suggest-resolve-evidence-conventions.skill.json@v1.16#fcbb9c | n | SDK | no private marker; already in sdk |
+| suggest-resolve-pre-flight-checklist | sdk:wkappbot-workflow/suggest-resolve-pre-flight-checklist.skill.json@v1.17#8c5846 | n | SDK | no private marker; already in sdk |
+| suggest-resolve-pre-flight-checklist-ref | sdk:wkappbot-workflow/suggest-resolve-pre-flight-checklist-ref.skill.json@v1.0#018a5d | n | SDK | no private marker; already in sdk |
+| suggest-safety-defense-system | sdk:wkappbot-core/suggest-safety-defense-system.skill.json@v1.8#71ce95 | n | SDK | no private marker; already in sdk |
+| suggest-submit-similarity-nudge | sdk:wkappbot-core/suggest-submit-similarity-nudge.skill.json@v1.3#637ce7 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| suggest-triage-playbook | sdk:wkappbot-workflow/suggest-triage-playbook.skill.json@v1.36#630fe8 | n | SDK | no private marker; already in sdk |
+| suggest-triage-playbook-t2-howto | sdk:wkappbot-workflow/suggest-triage-playbook-t2-howto.skill.json@v1.0#8a694f | n | SDK | no private marker; already in sdk |
+| suggest-triage-playbook-t3-ref | sdk:wkappbot-workflow/suggest-triage-playbook-t3-ref.skill.json@v1.0#a35e8f | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| suggest-workflow | sdk:wkappbot-workflow/suggest-workflow.skill.json@v1.136#a8338c | n | SDK | no private marker; already in sdk |
+| suggest-workflow-howto | sdk:wkappbot-workflow/suggest-workflow-howto.skill.json@v1.8#95a86f | n | SDK | no private marker; already in sdk |
+| suggest-workflow-ref | sdk:wkappbot-workflow/suggest-workflow-ref.skill.json@v1.4#af644d | n | SDK | no private marker; already in sdk |
+| suggestions-jsonl-json-escape-guard | sdk:wkappbot-core/suggestions-jsonl-json-escape-guard.skill.json@v1.0#482ff7 | n | SDK | no private marker; already in sdk |
+| syntax-rollback-cover-bash-writes | sdk:wkappbot-workflow/syntax-rollback-cover-bash-writes.skill.json@v1.4#acc2f6 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| taskkill-compat-shim-a11y-first-kill-routing | sdk:wkappbot-core/taskkill-compat-shim-a11y-first-kill-routing.skill.json@v1.14#26866b | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| taskkill-compat-shim-a11y-first-kill-routing-ref | sdk:wkappbot-core/taskkill-compat-shim-a11y-first-kill-routing-ref.skill.json@v1.0#e45d30 | n | SDK | no private marker; already in sdk |
+| think-eye-card-overlay | sdk:wkappbot-core/think-eye-card-overlay.skill.json@v1.2#f7ba74 | n | SDK | no private marker; already in sdk |
+| tier-gate | sdk:wkappbot-workflow/tier-gate.skill.json@v1.0#34ed13 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| triad-ask-simultaneous-q-debate-tool-loop-agent-mode | sdk:wkappbot-core/triad-ask-simultaneous-q-debate-tool-loop-agent-mode.skill.json@v1.7#c08520 | n | SDK | no private marker; already in sdk |
+| user-skill-template | sdk:wkappbot-core/user-skill-template.skill.json@v1.0#9039e7 | n | SDK | no private marker; already in sdk |
+| verify-live-harness-file-kih-is-body | sdk:wkappbot-workflow/verify-live-harness-file-kih-is-body.skill.json@v1.4#d8eb34 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| verify-tool-or-guard-synthetic-live-static | sdk:wkappbot-sdk/verify-tool-or-guard-synthetic-live-static.skill.json@v1.6#0389c0 | n | SDK | no private marker; already in sdk |
+| verify-tool-or-guard-synthetic-live-static-howto | sdk:wkappbot-sdk/verify-tool-or-guard-synthetic-live-static-howto.skill.json@v1.252#003f77 | n | PRIVATE | PUBLIC NOW (in sdk); markers: account, token:weak; home a private repo (none holds it yet) |
+| verify-tool-or-guard-synthetic-live-static-ref | sdk:wkappbot-sdk/verify-tool-or-guard-synthetic-live-static-ref.skill.json@v1.0#72ea9a | n | PRIVATE | PUBLIC NOW (in sdk); markers: HANTOO; home a private repo (none holds it yet) |
+| watchdog-harness-keep-build | sdk:wkappbot-sdk/watchdog-harness-keep-build.skill.json@v1.9#500dff | n | SDK | no private marker; already in sdk |
+| web-ai-ask-infrastructure-pump-cdp-worker-editor-send-paths | sdk:wkappbot-core/web-ai-ask-infrastructure-pump-cdp-worker-editor-send-paths.skill.json@v1.6#c25e8e | n | SDK | no private marker; already in sdk |
+| web-command-cheatsheet | sdk:wkappbot-workflow/web-command-cheatsheet.skill.json@v1.19#2643e3 | n | SDK | no private marker; already in sdk |
+| web-command-cheatsheet-ref | sdk:wkappbot-workflow/web-command-cheatsheet-ref.skill.json@v1.0#288bb5 | n | SDK | no private marker; already in sdk |
+| web-ocr-tesseract-cdp | sdk:wkappbot/web-ocr-tesseract-cdp.skill.json@v1.0#717a83 | n | SDK | no private marker; already in sdk |
+| web-open-idle-keepalive | sdk:wkappbot-core/web-open-idle-keepalive.skill.json@v1.5#44959a | n | SDK | no private marker; already in sdk |
+| web-to-cdp-rename | sdk:wkappbot-webbot/web-to-cdp-rename.skill.json@v1.1#f4f8eb | n | SDK | no private marker; already in sdk |
+| willkim-tool-harness-independence-install-location | sdk:wkappbot-workflow/willkim-tool-harness-independence-install-location.skill.json@v1.1#203060 | n | SDK | no private marker; already in sdk |
+| win-click-auto-dismiss-empty-title-transparent-overlay-nfrunlite-nkrunlite | sdk:wkappbot-core/win-click-auto-dismiss-empty-title-transparent-overlay-nfrunlite-nkrunlite.skill.json@v1.1#7d35ce | n | SDK | no private marker; already in sdk |
+| win-click-coordinate-system-window-relative-vs-abs-screen-coords | sdk:wkappbot/win-click-coordinate-system-window-relative-vs-abs-screen-coords.skill.json@v1.1#f0c308 | n | SDK | no private marker; already in sdk |
+| win-click-dismiss-blocker-auto-dismiss-blocking-popup-dialogs | sdk:wkappbot/win-click-dismiss-blocker-auto-dismiss-blocking-popup-dialogs.skill.json@v1.1#426109 | n | SDK | no private marker; already in sdk |
+| win-click-postmessage-mfc-nfrunlite | sdk:wkappbot-core/win-click-postmessage-mfc-nfrunlite.skill.json@v1.2#c63f5d | n | SDK | no private marker; already in sdk |
+| windows-settings-automation | sdk:wkappbot-workflow/windows-settings-automation.skill.json@v1.1#b08958 | n | PRIVATE | PUBLIC NOW (in sdk); markers: PIN, account, password; home a private repo (none holds it yet) |
+| wk-ai-tools | sdk:wkappbot-workflow/wk-ai-tools.skill.json@v1.16#9e2d4c | n | SDK | no private marker; already in sdk |
+| wk-ai-tools-budget | sdk:wkappbot-workflow/wk-ai-tools-budget.skill.json@v1.0#059bef | n | SDK | no private marker; already in sdk |
+| wk-ai-tools-recovery | sdk:wkappbot-workflow/wk-ai-tools-recovery.skill.json@v1.0#2d3c5f | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| wk-ai-tools-routing | sdk:wkappbot-workflow/wk-ai-tools-routing.skill.json@v1.7#e22c39 | n | SDK | no private marker; already in sdk |
+| wk-cdp-fix-deploy-cdp-fix-deploy-launcher | sdk:wkappbot/wk-cdp-fix-deploy-cdp-fix-deploy-launcher.skill.json@v1.0#e19304 | n | SDK | no private marker; already in sdk |
+| wk-cdp-placement-verify | sdk:wkappbot-workflow/wk-cdp-placement-verify.skill.json@v1.0#d3fa2a | n | SDK | no private marker; already in sdk |
+| wk-cleanbaseline-test | sdk:wkappbot-kih/wk-cleanbaseline-test.skill.json@v1.1#9baa5f | n | SDK | no private marker; already in sdk |
+| wk-codexbal | sdk:wkappbot-workflow/wk-codexbal.skill.json@v1.0#f9cac6 | n | SDK | no private marker; already in sdk |
+| wk-gg-main-script | sdk:wkappbot-workflow/wk-gg-main-script.skill.json@v1.0#b7b27e | n | SDK | no private marker; already in sdk |
+| wk-gitsync | sdk:wkappbot-workflow/wk-gitsync.skill.json@v1.17#75b7f9 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| wk-only-gate | sdk:wkappbot-workflow/wk-only-gate.skill.json@v1.0#ab5bbd | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| wk-parsecheck | sdk:wkappbot-kih/wk-parsecheck.skill.json@v1.5#aac1f4 | n | SDK | no private marker; already in sdk |
+| wk-pstest | sdk:wkappbot-kih/wk-pstest.skill.json@v1.0#a1cb8e | n | SDK | no private marker; already in sdk |
+| wk-ptybuild | sdk:wkappbot-workflow/wk-ptybuild.skill.json@v1.0#7909a7 | n | SDK | no private marker; already in sdk |
+| wk-skilllock-audit | sdk:wkappbot-workflow/wk-skilllock-audit.skill.json@v1.0#3cefcb | n | SDK | no private marker; already in sdk |
+| wk-sourceread-test-launcher | sdk:wkappbot-kih/wk-sourceread-test-launcher.skill.json@v1.1#9e677e | n | SDK | no private marker; already in sdk |
+| wk-tool-first-use-skill-nudge | sdk:wkappbot-workflow/wk-tool-first-use-skill-nudge.skill.json@v1.20#2760f5 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| wk-tool-first-use-skill-nudge-howto | sdk:wkappbot-workflow/wk-tool-first-use-skill-nudge-howto.skill.json@v1.0#1ebfd9 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| wk-tool-first-use-skill-nudge-ref | sdk:wkappbot-workflow/wk-tool-first-use-skill-nudge-ref.skill.json@v1.0#fb8dda | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| wk-tool-sub-1s-response-time-mandate | sdk:wkappbot-workflow/wk-tool-sub-1s-response-time-mandate.skill.json@v1.17#0640b1 | n | SDK | no private marker; already in sdk |
+| wk-tool-sub-1s-response-time-mandate-howto | sdk:wkappbot-workflow/wk-tool-sub-1s-response-time-mandate-howto.skill.json@v1.0#8254f9 | n | SDK | no private marker; already in sdk |
+| wk-tool-sub-1s-response-time-mandate-ref | sdk:wkappbot-workflow/wk-tool-sub-1s-response-time-mandate-ref.skill.json@v1.0#67f659 | n | SDK | no private marker; already in sdk |
+| wkagent-name-python-prototype | sdk:wkappbot-sdk/wkagent-name-python-prototype.skill.json@v1.0#9f1e69 | n | SDK | no private marker; already in sdk |
+| wkagent-name-tool | sdk:personal-docs/wkagent-name-tool.skill.json@v1.44#b06d39 | n | PRIVATE | PUBLIC NOW (in sdk); markers: app:personal-docs; home a private repo (none holds it yet) |
+| wkagent-name-tool-howto | sdk:personal-docs/wkagent-name-tool-howto.skill.json@v1.7#c8f54a | n | PRIVATE | PUBLIC NOW (in sdk); markers: app:personal-docs; home a private repo (none holds it yet) |
+| wkappbot-ask-gpt-zombie-process-4-5-gb-memory-leak-detection-and-fix | sdk:wkappbot-workflow/wkappbot-ask-gpt-zombie-process-4-5-gb-memory-leak-detection-and-fix.skill.json@v1.0#8d9b23 | n | SDK | no private marker; already in sdk |
+| wkappbot-beginner-onboarding-from-zero-to-first-automation | sdk:wkappbot-sdk/wkappbot-beginner-onboarding-from-zero-to-first-automation.skill.json@v1.3#178913 | n | PRIVATE | PUBLIC NOW (in sdk); markers: account; home a private repo (none holds it yet) |
+| wkappbot-build-verify-workflow | sdk:wkappbot-core/wkappbot-build-verify-workflow.skill.json@v1.64#7fdd7d | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| wkappbot-build-verify-workflow-howto | sdk:wkappbot-core/wkappbot-build-verify-workflow-howto.skill.json@v1.2#9adcf2 | n | SDK | no private marker; already in sdk |
+| wkappbot-build-verify-workflow-ref | sdk:wkappbot-core/wkappbot-build-verify-workflow-ref.skill.json@v1.0#220378 | n | SDK | no private marker; already in sdk |
+| wkappbot-business-plan-draft | sdk:wkappbot/wkappbot-business-plan-draft.skill.json@v1.21#9ec487 | n | PRIVATE | PUBLIC NOW (in sdk); markers: KIWOOM, account, customer, token:credential; home a private repo (none holds it yet) |
+| wkappbot-deployment-architecture | sdk:wkappbot-kih/wkappbot-deployment-architecture.skill.json@v1.0#54cad8 | n | SDK | no private marker; already in sdk |
+| wkappbot-file-write-read-silent-no-op-through-eye-pipe-root-cause | sdk:wkappbot-core/wkappbot-file-write-read-silent-no-op-through-eye-pipe-root-cause.skill.json@v1.1#08725b | n | SDK | no private marker; already in sdk |
+| wkappbot-log-search | sdk:wkappbot-workflow/wkappbot-log-search.skill.json@v1.5#310d0d | n | SDK | no private marker; already in sdk |
+| wkappbot-public-launch-checklist | sdk:wkappbot/wkappbot-public-launch-checklist.skill.json@v1.5#d2d89f | n | PRIVATE | PUBLIC NOW (in sdk); markers: .env, HANTOO, account, customer, token:weak; home a private repo (none holds it yet) |
+| wkappbot-run-process-launcher-with-integrated-tracking | sdk:wkappbot/wkappbot-run-process-launcher-with-integrated-tracking.skill.json@v1.1#130ef4 | n | SDK | no private marker; already in sdk |
+| wkappbot-sdk-daily-system-heal-checklist | sdk:wkappbot-sdk/wkappbot-sdk-daily-system-heal-checklist.skill.json@v1.21#7af79f | n | PRIVATE | PUBLIC NOW (in sdk); markers: account; home a private repo (none holds it yet) |
+| wkappbot-sdk-multi-repo-deploy | sdk:wkappbot-core/wkappbot-sdk-multi-repo-deploy.skill.json@v1.4#6de910 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:credential; home a private repo (none holds it yet) |
+| wkappbot-speak-tts-bugs-harness-95-auto-speak-loop-karaoke-drift | sdk:wkappbot-core/wkappbot-speak-tts-bugs-harness-95-auto-speak-loop-karaoke-drift.skill.json@v1.2#8d5e84 | n | SDK | no private marker; already in sdk |
+| wkappbot-system-total-check | sdk:wkappbot/wkappbot-system-total-check.skill.json@v1.1#2abb7a | n | SDK | no private marker; already in sdk |
+| wkappbot-taskkill-usage | sdk:wkappbot/wkappbot-taskkill-usage.skill.json@v1.27#19978e | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| wkappbot-the-artificial-knowledge-platform | sdk:wkappbot-sdk/wkappbot-the-artificial-knowledge-platform.skill.json@v1.9#59b7d7 | n | PRIVATE | PUBLIC NOW (in sdk); markers: customer; home a private repo (none holds it yet) |
+| wkappbot-windows-focus-flag-and-no-filter-relevance-mode | sdk:wkappbot-workflow/wkappbot-windows-focus-flag-and-no-filter-relevance-mode.skill.json@v1.0#e10f20 | n | SDK | no private marker; already in sdk |
+| wkappbot-workflow-appbot-shared-reflection | sdk:wkappbot-workflow/wkappbot-workflow-appbot-shared-reflection.skill.json@v1.2#e80d93 | n | SDK | no private marker; already in sdk |
+| wkaq-printwindow-gdi | sdk:wkappbot-core/wkaq-printwindow-gdi.skill.json@v1.6#65b856 | n | PRIVATE | PUBLIC NOW (in sdk); markers: KIWOOM; home a private repo (none holds it yet) |
+| wkbuild | sdk:wkappbot-workflow/wkbuild.skill.json@v1.10#bfd352 | n | SDK | no private marker; already in sdk |
+| wkcdp-mon | sdk:wkappbot/wkcdp-mon.skill.json@v1.6#4a62db | n | SDK | no private marker; already in sdk |
+| wkchat-auto-startup-registration | sdk:wkappbot-core/wkchat-auto-startup-registration.skill.json@v1.1#438582 | n | SDK | no private marker; already in sdk |
+| wkchat-conpty-enter-intercept-rename-first-hardlink-live-swap | sdk:wkappbot-core/wkchat-conpty-enter-intercept-rename-first-hardlink-live-swap.skill.json@v1.0#eb4c53 | n | SDK | no private marker; already in sdk |
+| wkchat-conpty-enter-intercept-two-phase | sdk:wkappbot-core/wkchat-conpty-enter-intercept-two-phase.skill.json@v1.1#452cbe | n | SDK | no private marker; already in sdk |
+| wkchat-session-routing-guard | sdk:wkappbot-core/wkchat-session-routing-guard.skill.json@v1.8#7495ed | n | SDK | no private marker; already in sdk |
+| wkchat-shortcut-geometry-lnk-update | sdk:wkappbot-core/wkchat-shortcut-geometry-lnk-update.skill.json@v1.1#6b4481 | n | SDK | no private marker; already in sdk |
+| wkchat-welcome-banner | sdk:wkappbot-core/wkchat-welcome-banner.skill.json@v1.1#c2104d | n | SDK | no private marker; already in sdk |
+| wkchat-window-geometry-persistence | sdk:wkappbot-core/wkchat-window-geometry-persistence.skill.json@v1.0#760501 | n | SDK | no private marker; already in sdk |
+| wkdoctor | sdk:wkappbot-sdk/wkdoctor.skill.json@v1.0#886e3c | n | SDK | no private marker; already in sdk |
+| wkdoctor-emergency-physician-spawn-storm-kill | sdk:wkappbot-sdk/wkdoctor-emergency-physician-spawn-storm-kill.skill.json@v1.4#fb6487 | n | SDK | no private marker; already in sdk |
+| wkdoctor-sdk-environment-health-check | sdk:wkappbot-sdk/wkdoctor-sdk-environment-health-check.skill.json@v1.7#2ab6cb | n | SDK | no private marker; already in sdk |
+| wkdoctor-sdk-environment-health-check-howto | sdk:wkappbot-sdk/wkdoctor-sdk-environment-health-check-howto.skill.json@v1.0#b262a0 | n | SDK | no private marker; already in sdk |
+| wkdoctor-sdk-environment-health-check-ref | sdk:wkappbot-sdk/wkdoctor-sdk-environment-health-check-ref.skill.json@v1.0#3ad4bd | n | SDK | no private marker; already in sdk |
+| wkdoctor-system-physician | sdk:wkappbot-sdk/wkdoctor-system-physician.skill.json@v1.0#4d703a | n | SDK | no private marker; already in sdk |
+| wkdoctor-system-physician-howto | sdk:wkappbot-sdk/wkdoctor-system-physician-howto.skill.json@v1.0#d6b405 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| wkdoctor-system-physician-ref | sdk:wkappbot-sdk/wkdoctor-system-physician-ref.skill.json@v1.0#fd0d10 | n | SDK | no private marker; already in sdk |
+| wkdr-emergency-doctor-wkappbot-core-spawn-storm-kill | sdk:wkappbot-sdk/wkdr-emergency-doctor-wkappbot-core-spawn-storm-kill.skill.json@v1.3#c473c2 | n | SDK | no private marker; already in sdk |
+| wkedit | sdk:wkappbot-workflow/wkedit.skill.json@v1.6#d5ec06 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| wkedit-autocorrect | sdk:wkappbot-workflow/wkedit-autocorrect.skill.json@v1.4#292004 | n | SDK | no private marker; already in sdk |
+| wkedit-encoding-hell | sdk:wkappbot-workflow/wkedit-encoding-hell.skill.json@v1.1#5154b7 | n | SDK | no private marker; already in sdk |
+| wkedit-howto | sdk:wkappbot-workflow/wkedit-howto.skill.json@v1.0#f8f775 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| wkedit-shell-distortion-recovery | sdk:wkappbot/wkedit-shell-distortion-recovery.skill.json@v1.2#c85c9d | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| wkfind | sdk:wkappbot-workflow/wkfind.skill.json@v1.5#72c415 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| wkfind-caller-hwnd-validation-3tier-pattern | sdk:wkappbot/wkfind-caller-hwnd-validation-3tier-pattern.skill.json@v1.6#0b6b91 | n | PRIVATE | PUBLIC NOW (in sdk); markers: customer; home a private repo (none holds it yet) |
+| wkfind-caller-hwnd-validation-3tier-pattern-ref | sdk:wkappbot/wkfind-caller-hwnd-validation-3tier-pattern-ref.skill.json@v1.0#6ff758 | n | SDK | no private marker; already in sdk |
+| wkfind-ps1-investigation-tool | sdk:wkappbot-workflow/wkfind-ps1-investigation-tool.skill.json@v1.1#36ae46 | n | SDK | no private marker; already in sdk |
+| wkfind-quick-process-chain-caller-window-detection-patterns | sdk:wkappbot/wkfind-quick-process-chain-caller-window-detection-patterns.skill.json@v1.1#465f27 | n | SDK | no private marker; already in sdk |
+| wkharness-agent-bulletin-shared-live-steering-channel-for-background-agents | sdk:wkappbot-workflow/wkharness-agent-bulletin-shared-live-steering-channel-for-background-agents.skill.json@v1.0#102427 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| wkharness-agent-leak-guard | sdk:wkappbot-workflow/wkharness-agent-leak-guard.skill.json@v1.2#221146 | n | SDK | no private marker; already in sdk |
+| wkharness-bash-uses-pwsh-guard | sdk:wkappbot-workflow/wkharness-bash-uses-pwsh-guard.skill.json@v1.2#679c9f | n | SDK | no private marker; already in sdk |
+| wkharness-busy-fleet-guard | sdk:wkappbot-workflow/wkharness-busy-fleet-guard.skill.json@v1.2#72bd91 | n | SDK | no private marker; already in sdk |
+| wkharness-cd-noise-guard | sdk:wkappbot-workflow/wkharness-cd-noise-guard.skill.json@v1.1#4f5b76 | n | SDK | no private marker; already in sdk |
+| wkharness-codex-pace-guard | sdk:wkappbot-workflow/wkharness-codex-pace-guard.skill.json@v1.2#3c99af | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| wkharness-codex-spec-gate | sdk:wkappbot-workflow/wkharness-codex-spec-gate.skill.json@v1.2#695e60 | n | SDK | no private marker; already in sdk |
+| wkharness-edit-bg-guard | sdk:wkappbot-workflow/wkharness-edit-bg-guard.skill.json@v1.1#f321ac | n | SDK | no private marker; already in sdk |
+| wkharness-guards | sdk:wkappbot-workflow/wkharness-guards.skill.json@v1.613#cb7b2a | n | SDK | no private marker; already in sdk |
+| wkharness-guards-howto | sdk:wkappbot-workflow/wkharness-guards-howto.skill.json@v1.7#0aa6d1 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| wkharness-guards-ref | sdk:wkappbot-workflow/wkharness-guards-ref.skill.json@v1.4#2d7dd6 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| wkharness-no-verify-guard | sdk:wkappbot-workflow/wkharness-no-verify-guard.skill.json@v1.2#7e642e | n | SDK | no private marker; already in sdk |
+| wkharness-pre-commit-source-gate | sdk:wkappbot-workflow/wkharness-pre-commit-source-gate.skill.json@v1.15#71c994 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| wkharness-security-guard | sdk:wkappbot-workflow/wkharness-security-guard.skill.json@v1.2#289af7 | n | SDK | no private marker; already in sdk |
+| wkharness-sed-guard | sdk:wkappbot-workflow/wkharness-sed-guard.skill.json@v1.0#2a8a0e | n | SDK | no private marker; already in sdk |
+| wkharness-skill-delete-guard | sdk:wkappbot-workflow/wkharness-skill-delete-guard.skill.json@v1.2#cfc9c9 | n | SDK | no private marker; already in sdk |
+| wkharness-skill-guard | sdk:wkappbot-workflow/wkharness-skill-guard.skill.json@v1.2#fd1045 | n | SDK | no private marker; already in sdk |
+| wkharness-skill-list-guard | sdk:wkappbot-workflow/wkharness-skill-list-guard.skill.json@v1.2#cd27ca | n | SDK | no private marker; already in sdk |
+| wkharness-source-sandbox-suffix-cheap-edits-only-word-gitignored-root-merges | sdk:wkappbot-workflow/wkharness-source-sandbox-suffix-cheap-edits-only-word-gitignored-root-merges.skill.json@v1.0#db887d | n | SDK | no private marker; already in sdk |
+| wkharness-stall-guard | sdk:wkappbot-workflow/wkharness-stall-guard.skill.json@v1.1#fb7e1c | n | SDK | no private marker; already in sdk |
+| wkharness-tier-gate | sdk:wkappbot-workflow/wkharness-tier-gate.skill.json@v1.2#d0abd3 | n | SDK | no private marker; already in sdk |
+| wkharness-wk-only-gate | sdk:wkappbot-workflow/wkharness-wk-only-gate.skill.json@v1.2#bea4dc | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| wkjobs-ai-process-monitor | sdk:wkappbot-sdk/wkjobs-ai-process-monitor.skill.json@v1.15#e1110e | n | SDK | no private marker; already in sdk |
+| wkjobs-ai-process-monitor-ref | sdk:wkappbot-sdk/wkjobs-ai-process-monitor-ref.skill.json@v1.0#e6023b | n | SDK | no private marker; already in sdk |
+| wknotification-unified-dispatcher-and-file-scheduler | sdk:wkappbot-core/wknotification-unified-dispatcher-and-file-scheduler.skill.json@v1.3#87e9a7 | n | SDK | no private marker; already in sdk |
+| wkpace-codex | sdk:wkappbot-workflow/wkpace-codex.skill.json@v1.1#80a544 | n | SDK | no private marker; already in sdk |
+| wkpush-git-push-race-winner | sdk:wkappbot-workflow/wkpush-git-push-race-winner.skill.json@v1.2#cfe0a7 | n | SDK | no private marker; already in sdk |
+| wkpushsdk | sdk:wkappbot-workflow/wkpushsdk.skill.json@v1.2#21a1a7 | n | SDK | no private marker; already in sdk |
+| wksplit-cs-utility | sdk:wkappbot/wksplit-cs-utility.skill.json@v1.35#43a642 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| wksplit-cs-utility-howto | sdk:wkappbot/wksplit-cs-utility-howto.skill.json@v1.0#2c1930 | n | SDK | no private marker; already in sdk |
+| wksplit-cs-utility-ref | sdk:wkappbot/wksplit-cs-utility-ref.skill.json@v1.0#ebddaf | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| wksplit-multi-language-dedup-round-trip-howto | sdk:wkappbot-sdk/wksplit-multi-language-dedup-round-trip-howto.skill.json@v1.1#94b306 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| wksplit-smart-multi-language-dedup-round-trip-spec | sdk:wkappbot-sdk/wksplit-smart-multi-language-dedup-round-trip-spec.skill.json@v1.2#93146e | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| wksplit-smart-multi-language-dedup-round-trip-spec-howto | sdk:wkappbot-sdk/wksplit-smart-multi-language-dedup-round-trip-spec-howto.skill.json@v1.1#477f00 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| wksplit-smart-multi-language-dedup-round-trip-spec-ref | sdk:wkappbot-sdk/wksplit-smart-multi-language-dedup-round-trip-spec-ref.skill.json@v1.0#d4eaf8 | n | PRIVATE | PUBLIC NOW (in sdk); markers: HANTOO; home a private repo (none holds it yet) |
+| wkstdpty-shared-pty-bridge | sdk:wkappbot-workflow/wkstdpty-shared-pty-bridge.skill.json@v1.0#086884 | n | SDK | no private marker; already in sdk |
+| wktasklist-cached-process-snapshot | sdk:wkappbot-sdk/wktasklist-cached-process-snapshot.skill.json@v1.5#3afeef | n | SDK | no private marker; already in sdk |
+| wktasklist-intelligent-management | sdk:wkappbot-sdk/wktasklist-intelligent-management.skill.json@v1.0#37164e | n | PRIVATE | PUBLIC NOW (in sdk); markers: KIWOOM; home a private repo (none holds it yet) |
+| wktasklist-intelligent-management-howto | sdk:wkappbot-sdk/wktasklist-intelligent-management-howto.skill.json@v1.0#3ba041 | n | SDK | no private marker; already in sdk |
+| wktasklist-intelligent-management-ref | sdk:wkappbot-sdk/wktasklist-intelligent-management-ref.skill.json@v1.0#689f68 | n | PRIVATE | PUBLIC NOW (in sdk); markers: KIWOOM; home a private repo (none holds it yet) |
+| wktasklist-tasklist-exe-full-compatibility-and-self-test | sdk:wkappbot-sdk/wktasklist-tasklist-exe-full-compatibility-and-self-test.skill.json@v1.0#5b1e0d | n | SDK | no private marker; already in sdk |
+| wktest-promote | sdk:wkappbot/wktest-promote.skill.json@v1.11#fa2309 | n | SDK | no private marker; already in sdk |
+| wktest-promote-staging-binary-promotion | sdk:wkappbot/wktest-promote-staging-binary-promotion.skill.json@v1.0#41aa5a | n | SDK | no private marker; already in sdk |
+| wktest-staging-build-pipeline | sdk:wkappbot-core/wktest-staging-build-pipeline.skill.json@v1.0#ba7f2f | n | SDK | no private marker; already in sdk |
+| wktest-staging-build-storm-safe-deploy-pipeline | sdk:wkappbot-workflow/wktest-staging-build-storm-safe-deploy-pipeline.skill.json@v1.4#90012a<br>sdk:wkappbot-core/wktest-staging-build-storm-safe-deploy-pipeline.skill.json@v1.0#5fa03f | y | SDK | no private marker; already in sdk |
+| wktool-pattern | sdk:wkappbot-workflow/wktool-pattern.skill.json@v1.19#483c9e | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| wktool-qa-pattern | sdk:wkappbot-workflow/wktool-qa-pattern.skill.json@v1.4#3beeec | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| wkwrap | sdk:wkappbot-workflow/wkwrap.skill.json@v1.8#7d4e0f | n | SDK | no private marker; already in sdk |
+| wkwrap-ai-native-wrappers | sdk:wkappbot-workflow/wkwrap-ai-native-wrappers.skill.json@v1.0#2b6a9a | n | SDK | no private marker; already in sdk |
+| wkwrap-important-tool-connection-doctor-reconnect | sdk:wkappbot-sdk/wkwrap-important-tool-connection-doctor-reconnect.skill.json@v1.0#7dae4b | n | SDK | no private marker; already in sdk |
+| wkzombie-stall-guard-delegation | sdk:wkappbot-workflow/wkzombie-stall-guard-delegation.skill.json@v1.2#5d0e80 | n | PRIVATE | PUBLIC NOW (in sdk); markers: token:weak; home a private repo (none holds it yet); review: only weak 'token' wording, no credential context found |
+| write-location-floor-spec-non-source-writes-go-only-under-tmp | sdk:wkappbot-workflow/write-location-floor-spec-non-source-writes-go-only-under-tmp.skill.json@v1.0#f08cbb | n | SDK | no private marker; already in sdk |
+| wt-terminal-a11y-type-read-design | sdk:wkappbot-sdk/wt-terminal-a11y-type-read-design.skill.json@v1.0#c37c5b | n | SDK | no private marker; already in sdk |
+| youtube-ad-skipper | sdk:wkappbot-sdk/youtube-ad-skipper.skill.json@v1.10#87b8ef | n | SDK | no private marker; already in sdk |
+| yt-controller | sdk:wkappbot-webbot/yt-controller.skill.json@v1.0#a0f7e9 | n | SDK | no private marker; already in sdk |
