@@ -88,8 +88,10 @@ writes `.qa/xplat-baseline.txt` into kih and WKAppBot; commit it there.
 `python3 qa/skill_home_plan.py [--hq DIR] [--kih-root DIR] [--wkappbot-root DIR] [--source LABEL=DIR]`
 lists every skill id with all its copies (sdk, kih, core, HQ cache, extra sources), flags ids
 whose copies diverge (content hash ignoring location and volatile keys such as `app`, `updated`),
-and proposes one home per id (spec v1.5): the repo whose name matches the App folder
-(`wkappbot-kih`, `wkappbot-sdk`, `wkappbot` -> WKAppBot), anything else `PRIVATE HOME`. The
+and proposes one home per id (spec v1.9): the sibling repo whose folder name equals the App
+after lowercasing and dropping `-`, `_`, `.` (two siblings normalizing equal = ambiguous); any
+other App goes to the repo the copy was found in. Siblings default to the git dirs next to this
+repo; `--sibling-names WKAppBot,wkappbot-kih,wkappbot-sdk` sets them explicitly. The
 `install-eligible` column is `y` only when no owner-mandated marker (HANTOO, KIWOOM, token,
 account, .env, password, PIN, customer, owner-private rules, a personal machine path, a private
 app folder) and no kih public-skill gate word matches; `token` is split into `token:credential`

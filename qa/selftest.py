@@ -380,16 +380,17 @@ class SkillHomePlan(Base):
         self.write(sdk, "wkappbot-core", "dup", "a")
         self.write(kih, "wkappbot-kih", "dup", "b")
         self.write(sdk, "wkappbot-core", "llm", "keep the prompt token budget small")
-        rows = {r["id"]: r for r in skill_home_plan.plan([("sdk", sdk), ("kih", kih)])}
-        self.assertEqual(rows["generic"]["home"], "SPLIT: PRIVATE HOME + wkappbot-kih")
+        sibs = ["WKAppBot", "wkappbot-kih", "wkappbot-sdk"]
+        rows = {r["id"]: r for r in skill_home_plan.plan([("sdk", sdk), ("kih", kih)], sibs)}
+        self.assertEqual(rows["generic"]["home"], "SPLIT: wkappbot-kih + wkappbot-sdk")
         self.assertTrue(rows["generic"]["eligible"])
         self.assertFalse(rows["generic"]["diverges"])
-        self.assertEqual(rows["broker"]["home"], "PRIVATE HOME")
+        self.assertEqual(rows["broker"]["home"], "wkappbot-sdk")  # App wkappbot-core matches no sibling
         self.assertFalse(rows["broker"]["eligible"])
         self.assertIn("gate: hantoo", rows["broker"]["reason"])
         self.assertEqual(rows["secret-only"]["home"], "wkappbot-kih")
         self.write(sdk, "wkappbot-sdk", "sdk-leak", "set KIWOOM_PIN")
-        r = {x["id"]: x for x in skill_home_plan.plan([("sdk", sdk)])}["sdk-leak"]
+        r = {x["id"]: x for x in skill_home_plan.plan([("sdk", sdk)], sibs)}["sdk-leak"]
         self.assertEqual(r["home"], "wkappbot-sdk")
         self.assertIn("CONFLICT", r["reason"])
         self.assertTrue(rows["broker"]["reason"].startswith("PUBLIC NOW"))
@@ -403,6 +404,15 @@ class SkillHomePlan(Base):
         self.assertIn("private#", text)
         self.assertEqual(counts["total"], 5)
         self.assertIn("| install-eligible |", text)
+
+    def test_sibling_normalization(self):
+        idx = skill_home_plan.sibling_index(["WKAppBot", "wkappbot-kih", "wk.app_bot"])
+        self.assertIsNone(idx["wkappbot"])  # WKAppBot and wk.app_bot normalize equal -> ambiguous
+        self.assertEqual(idx["wkappbotkih"], "wkappbot-kih")
+        c = {"source": "kih", "path": "wkappbot/x.skill.json", "app_field": "wkappbot"}
+        self.assertEqual(skill_home_plan.home_of(c, idx)[0], "wkappbot-kih")  # ambiguous -> current repo
+        idx = skill_home_plan.sibling_index(["WKAppBot", "wkappbot-kih"])
+        self.assertEqual(skill_home_plan.home_of(c, idx)[0], "WKAppBot")
 
     def test_markers_inside_env_names(self):
         for text, mark in [("set KIWOOM_PIN first", "PIN"), ("read HANTOO_ACCOUNT_NO", "account"),

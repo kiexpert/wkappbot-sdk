@@ -3,8 +3,8 @@
 
 Lists every skill id with all its copies across the given sources, flags ids whose copies
 diverge, and proposes one home per id:
-  home = the repo whose name matches the App folder (wkappbot-kih, wkappbot-sdk, wkappbot -> WKAppBot);
-         anything else = PRIVATE HOME (spec v1.5, kih 6d10f44)
+  home = the sibling repo whose folder name equals the App (lowercased, '-', '_', '.' dropped);
+         any other App -> the current repo the copy was found in (spec v1.9, kih b64ed94)
   install-eligible = y when no owner-mandated marker and no kih public-skill gate word (kih 20fd779)
          matches; only those may reach the SDK via `skill install`.
 
@@ -49,10 +49,33 @@ PRIVATE_APPS = {"personal-docs", "wkautoquant", "paypal-developer"}
 # kih .githooks/lib/public-skill-gate.sh (kih 20fd779): refuses these skill files on the SDK remote.
 GATE = re.compile(r'(?i)"private"\s*:\s*true|repo-only|hantoo_cache|hantoo|kiwoom|KIS_WEB_PIN|KIWOOM_CERT_PIN|GH_PAT|'
                   r'SLACK_BOT_TOKEN|appsecret|wavevault|WkFeedQuant|WkAutoQuant|scalper')
-# Spec v1.5 (kih 6d10f44): home = the repo whose name matches the App folder (case-insensitive);
-# anything else = PRIVATE HOME, which reaches the SDK only via `skill install` after the markers pass.
-FOLDER_REPO = {"wkappbot-kih": "wkappbot-kih", "wkappbot-sdk": "wkappbot-sdk", "wkappbot": "WKAppBot"}
-PRIVATE_HOME = "PRIVATE HOME"
+# Spec v1.9 (kih b64ed94): home = the SIBLING repo whose folder name equals the App after
+# lowercasing and dropping '-', '_', '.'; two siblings normalizing equal = ambiguous. Every other
+# App (none, ambiguous, matching nothing) -> the CURRENT repo the copy was found in.
+SOURCE_REPO = {"sdk": "wkappbot-sdk", "kih": "wkappbot-kih", "core": "WKAppBot", "hq": "HQ cache (no repo)"}
+
+
+def norm_name(s):
+    return re.sub(r"[-_.]", "", (s or "").lower())
+
+
+def sibling_index(names):
+    """{normalized: repo name or None if ambiguous}"""
+    idx = {}
+    for n in names:
+        k = norm_name(n)
+        idx[k] = None if k in idx and idx[k] != n else n
+    return idx
+
+
+def home_of(copy, siblings):
+    app = copy.get("app_field") or copy["path"].split("/")[0]
+    cur = SOURCE_REPO.get(copy["source"], copy["source"])
+    hit = siblings.get(norm_name(app), "") if app else ""
+    if hit:
+        return hit, f"App {app} = sibling {hit}"
+    why = "no App" if not app else ("ambiguous App " + app if hit is None else f"App {app} matches no sibling")
+    return cur, f"{why} -> current repo"
 RE_CRED_TOKEN = re.compile(r"(?i)\b(api|access|auth|bearer|refresh|slack|github|gh|oauth|secret|bot|session|app|"
                            r"personal|xox[bpa]|hantoo|kiwoom)[ _-]?tokens?\b|\btoken\s*[:=]\s*\S")
 RE_ENV_TOKEN = re.compile(r"\b[A-Z][A-Z0-9_]*_TOKEN\b|\bTOKEN_[A-Z0-9_]+\b")  # case-sensitive env names
@@ -74,7 +97,7 @@ def load_skills(label, root):
         sid = d.get("id") or f.name[: -len(".skill.json")]
         norm = json.dumps({k: v for k, v in d.items() if k not in VOLATILE}, sort_keys=True, ensure_ascii=False)
         out.setdefault(sid, []).append({
-            "source": label, "path": str(f.relative_to(root)).replace("\\", "/"), "app": d.get("app") or f.parent.name,
+            "source": label, "path": str(f.relative_to(root)).replace("\\", "/"), "app": d.get("app") or f.parent.name, "app_field": d.get("app"),
             "version": str(d.get("version", "")), "hash": hashlib.sha1(norm.encode()).hexdigest()[:10],
             "text": raw, "error": d.get("_error"),
         })
@@ -102,7 +125,8 @@ def strong(mk):
     return [m for m in mk if m not in ("token:weak",)]
 
 
-def plan(sources):
+def plan(sources, siblings=None):
+    siblings = sibling_index(siblings or [])
     ids = {}
     for label, root in sources:
         for sid, copies in load_skills(label, root).items():
@@ -119,8 +143,10 @@ def plan(sources):
         gate_files = sum(1 for c in copies if c["source"] == "sdk" and GATE.search(c["text"]))
         if gate:
             mk = sorted(set(mk) | {"gate"})
-        homes = sorted({FOLDER_REPO.get(c["path"].split("/")[0].lower(), PRIVATE_HOME) for c in copies})
+        decided = [home_of(c, siblings) for c in copies]
+        homes = sorted({h for h, _ in decided})
         home = homes[0] if len(homes) == 1 else "SPLIT: " + " + ".join(homes)
+        home_why = "; ".join(sorted({w for _, w in decided}))
         eligible = not mk
         words = [m for m in mk if m != "gate"] + (["gate: " + ", ".join(gate)] if gate else [])
         reason = "passes markers" if eligible else "matched: " + "; ".join(words)
@@ -130,6 +156,7 @@ def plan(sources):
             reason += "; SDK edits refused by kih gate"
         if not eligible and in_sdk:
             reason = "PUBLIC NOW (in sdk); " + reason
+        reason += "; home: " + home_why
         if home == "wkappbot-sdk" and not eligible:
             reason += "; CONFLICT: home is the public SDK but fails the markers"
         if any(c["error"] for c in copies):
@@ -142,7 +169,7 @@ def plan(sources):
     return rows
 
 
-def write_md(rows, sources, out, redact):
+def write_md(rows, sources, out, redact, sibling_names=()):
     def copy_txt(c):
         return f"{c['source']}:{c['path']}@v{c['version'] or '?'}#{c['hash'][:6]}"
 
@@ -170,9 +197,12 @@ def write_md(rows, sources, out, redact):
         f"| {n} | {elig} | {inel} | {div} | {leak} | {leak_strong} | {gate_files} / {gate_ids} | {conflict} |",
         "",
         "Proposed homes: " + ", ".join(f"{h} {c}" for h, c in sorted(homes.items(), key=lambda x: -x[1]))
-        + ". Spec v1.5 (kih 6d10f44): home = the repo whose name matches the App folder, case-insensitive"
-        " (wkappbot-kih, wkappbot-sdk, wkappbot -> WKAppBot); anything else = PRIVATE HOME, which reaches the SDK"
-        " only by `skill install` after passing the marker list (install-eligible = y).",
+        + ". Spec v1.9 (kih b64ed94): home = the sibling repo whose folder name equals the App after lowercasing"
+        " and dropping '-', '_', '.'; any other App (none, ambiguous, no match) -> the current repo the copy was"
+        " found in. A private skill reaches the SDK only by `skill install` after passing the marker list"
+        " (install-eligible = y).",
+        "",
+        "Siblings used: " + (", ".join(f"`{s}`" for s in sibling_names) or "none") + ".",
         "",
         "Copy format: `source:path@vVERSION#contenthash` (content hash ignores location and volatile keys: `app`, `updated`, read counters).",
         "Private markers (owner mandate, any hit = PRIVATE): " + ", ".join(m for m, _ in MARKERS)
@@ -208,6 +238,7 @@ def main():
     ap.add_argument("--out", default=str(HERE / "results" / "skill-home-plan.md"))
     ap.add_argument("--json", help="also write the full plan as JSON (never redacted; keep it private)")
     ap.add_argument("--no-redact", action="store_true")
+    ap.add_argument("--sibling-names", help="comma list of sibling repo folder names (default: dirs next to this repo)")
     a = ap.parse_args()
     kih, _ = resolve_repo("KIH_ROOT", "wkappbot-kih", a.kih_root)
     core, _ = resolve_repo("WKAPPBOT_ROOT", "WKAppBot", a.wkappbot_root)
@@ -215,10 +246,14 @@ def main():
     sources = [("sdk", SDK_ROOT / "skills"), ("kih", kih), ("core", core), ("hq", Path(hq) if hq else None)]
     sources += [tuple(s.split("=", 1)) for s in a.source]
     sources = [(l, Path(r) if r and Path(r).is_dir() else None) for l, r in sources]
-    rows = plan([(l, r) for l, r in sources if r])
+    if a.sibling_names:
+        sibs = [s.strip() for s in a.sibling_names.split(",") if s.strip()]
+    else:
+        sibs = sorted(p.name for p in SDK_ROOT.parent.iterdir() if (p / ".git").exists())
+    rows = plan([(l, r) for l, r in sources if r], sibs)
     out = Path(a.out).resolve()
     redact = not a.no_redact and SDK_ROOT in out.parents
-    counts = write_md(rows, sources, out, redact)
+    counts = write_md(rows, sources, out, redact, sibs)
     if a.json:
         Path(a.json).write_text(json.dumps([{k: (v if k != "copies" else [{x: c[x] for x in c if x != "text"}
                                                                            for c in v]) for k, v in r.items()}
