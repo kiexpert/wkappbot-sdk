@@ -153,7 +153,15 @@ The chain grows. The system gets harder to break.
 
 ## What's New
 
-Current binary: `wkappbot --version` reports the installed build number; the public repo's latest tagged release is [v7.11.0-sdk](https://github.com/kiexpert/wkappbot-sdk/releases/tag/v7.11.0-sdk) (2026-09-30). Curated highlights below cover through v7.11.0 (aligned with WKAppBot core v7.11, macOS Portable Phase 1 + CLI Improvements 2026-09-30) -- see [Releases](https://github.com/kiexpert/wkappbot-sdk/releases) and the [full compare](https://github.com/kiexpert/wkappbot-sdk/compare/v7.10.0-sdk...v7.11.0-sdk) for everything since.
+Current binary: `wkappbot --version` reports the installed build number; the public repo's latest tagged release is [v7.12.0-sdk](https://github.com/kiexpert/wkappbot-sdk/releases/tag/v7.12.0-sdk) (2026-10-21). Curated highlights below cover through v7.12.0 (aligned with WKAppBot core v7.12.0, All-platform QA + Linux 2026-10-21) -- see [Releases](https://github.com/kiexpert/wkappbot-sdk/releases) and the [full compare](https://github.com/kiexpert/wkappbot-sdk/compare/v7.11.0-sdk...v7.12.0-sdk) for everything since.
+
+### v7.12.0-sdk highlights (core v7.12.0 — All-platform QA + Linux)
+
+- **All-platform QA suite** — `qa/run-qa.sh` / `qa\run-qa.cmd` checks the CLI, `wkhippo` and the kih harness per platform and prints a Windows / Linux / macOS table.
+- **Linux CLI + kih harness installer** — first Linux run recorded in `qa/results/linux.json` (34 PASS / 12 FAIL / 5 SKIP); installer tested in a throwaway HOME (install, idempotent re-install, uninstall).
+- **Public-skill gate** — `qa/skill_home_plan.py` marks a skill install-eligible only when no credential / account / private marker matches.
+- **Skill auto-commit / minimal auto-push** and **wkhippo on Linux** (core v7.12).
+- **Hygiene sweep** — personal machine paths and stray debug dumps removed from the public repo.
 
 ### v7.11.0-sdk highlights (core v7.11 — macOS Portable Phase 1 + CLI Improvements)
 
@@ -357,6 +365,24 @@ wkappbot a11y find "*Notepad*"  # resolve a window element
 ---
 
 ## Installation
+
+### Download (recommended)
+
+Launcher and core both come from this repo's public [Releases](https://github.com/kiexpert/wkappbot-sdk/releases/latest) — there is no other download source.
+
+| Platform | Status | What to download |
+|---|---|---|
+| **Windows 10/11 x64** | Supported | `wkappbot-X.Y.Z-sdk.zip` (launcher `wkappbot.exe` + core `wkappbot-core.exe`), extract into `bin\` of your clone. `wkappbot.exe` alone is the launcher only. |
+| **Linux x64** | Preview — no prebuilt binary yet | The release does not attach a Linux binary yet. The Linux minimal CLI, `wkhippo` and the kih harness installer pass the QA suite (`qa/results/linux.json`); run the scripts in `bin/*.sh` from a clone and check status with `qa/run-qa.sh`. |
+| **macOS** | Not supported yet | Portable builds are validated in CI only; there is no macOS binary and QA has not been run on macOS. |
+
+```powershell
+# Windows: download the latest bundle into bin\
+gh release download --repo kiexpert/wkappbot-sdk --pattern "wkappbot-*.zip" --dir .
+Expand-Archive wkappbot-*.zip -DestinationPath bin -Force
+```
+
+### Clone
 
 **Clone = install.** That's it.
 

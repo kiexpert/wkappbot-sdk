@@ -12,12 +12,12 @@
   ],
   "requirements": [
     {
-      "cmd": "powershell Get-Content C:\\Users\\kiexp\\.gemini\\antigravity-cli\\settings.json",
+      "cmd": "powershell Get-Content %USERPROFILE%\\.gemini\\antigravity-cli\\settings.json",
       "expect": "approvalMode",
       "prompt": null
     },
     {
-      "cmd": "powershell Get-Content C:\\Users\\kiexp\\.claude\\settings.json",
+      "cmd": "powershell Get-Content %USERPROFILE%\\.claude\\settings.json",
       "expect": "bypassPermissions",
       "prompt": null
     },

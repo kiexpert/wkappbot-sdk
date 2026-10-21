@@ -55,9 +55,9 @@ for cat in "${CATEGORIES[@]}"; do
       -e 's|D:\\GitHub\\WKAppBot|<repo-root>|g' \
       -e 's|D:/GitHub/WKAppBot|<repo-root>|g' \
       -e 's|D:\\\\SDK|<repo-root>|g' \
-      -e 's|C:\\\\Users\\\\kiexp|<user-home>|g' \
-      -e 's|C:\\Users\\kiexp|<user-home>|g' \
-      -e 's|C:/Users/kiexp|<user-home>|g' \
+      -e 's|%USERPROFILE%|<user-home>|g' \
+      -e 's|%USERPROFILE%|<user-home>|g' \
+      -e 's|%USERPROFILE%|<user-home>|g' \
       -e 's|kiexpert@kivilab\.co\.kr|<maintainer-email>|g' \
       -e 's|kiexpert@naver\.com|<contact-redacted>|g' \
       -e 's|dcmmentary@naver\.com|<contact-redacted>|g' \

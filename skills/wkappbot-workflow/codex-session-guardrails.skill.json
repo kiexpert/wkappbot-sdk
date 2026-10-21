@@ -6,7 +6,7 @@
   "desc": "Codex-specific recovery, approval, handoff, and skill-edit guardrails for WKAppBot workspaces. Use when starting or resuming Codex work, recovering from compaction, switching from Claude to Codex, or applying reusable rules learned from other workspaces.",
   "steps": [
     "Read codex-global-approval, codex-auto-approval, codex-cli-wkappbot-usage, and post-compaction-recovery before acting.",
-    "Recover continuity from the right source: use the current workspace's latest Claude session JSONL for Claude handoff, and use C:\\Users\\kiexp\\.codex\\session_index.jsonl plus C:\\Users\\kiexp\\.codex\\sessions with codex resume --last for Codex continuity.",
+    "Recover continuity from the right source: use the current workspace's latest Claude session JSONL for Claude handoff, and use %USERPROFILE%\\.codex\\session_index.jsonl plus %USERPROFILE%\\.codex\\sessions with codex resume --last for Codex continuity.",
     "Keep workspace boundaries strict: treat personal-docs, WkAutoQuant, and wkappbot-sdk as separate domains; reuse only durable rules across them.",
     "Use AppBot skill commands for skill work: wkappbot skill read, search, edit, contribute, install, and sync. Never edit .skill.json directly. After any change, install or sync and re-read the skill.",
     "If Codex hits a limit, handled failure, or sandbox friction, finish the current atomic task, write a short handoff note with unfinished items and the next step, then switch or stop according to the router policy.",

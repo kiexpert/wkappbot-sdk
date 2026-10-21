@@ -6,7 +6,7 @@
   "desc": "Claude Code PreToolUse hook: log ALL tool calls (async) to D:/GitHub/ai-audit.log for traceability",
   "steps": [
     "PURPOSE: every tool call Claude makes is appended to a shared audit log. No blocking, no slowdown -- runs async.",
-    "SCRIPT: C:/Users/kiexp/.claude/hooks/audit-log.ps1. Reads stdin JSON, extracts tool_name and first non-null of command/file_path/pattern, writes timestamped line.",
+    "SCRIPT: %USERPROFILE%/.claude/hooks/audit-log.ps1. Reads stdin JSON, extracts tool_name and first non-null of command/file_path/pattern, writes timestamped line.",
     "LOG FORMAT: 'yyyy-MM-dd HH:mm:ss <short-cwd> [ToolName]> <command>'. short-cwd = first char of each ancestor component + dash + leaf dir name (e.g. D/G/p-personal-docs).",
     "HOOK ~/.claude/settings.json: PreToolUse / NO matcher (fires for all tools) / async:true / powershell audit-log.ps1. No timeout needed (async).",
     "COEXISTENCE: lives alongside kill-guard-hook in the same PreToolUse array. Kill-guard has matcher=PowerShell; audit-log has no matcher, so both fire for PowerShell (guard first, then audit).",

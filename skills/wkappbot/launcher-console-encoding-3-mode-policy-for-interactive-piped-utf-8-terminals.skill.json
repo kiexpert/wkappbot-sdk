@@ -21,7 +21,7 @@
       "prompt": null
     },
     {
-      "cmd": "$ Get-Content C:\\Users\\kiexp\\Documents\\PowerShell\\Microsoft.PowerShell_profile.ps1 -Encoding UTF8",
+      "cmd": "$ Get-Content %USERPROFILE%\\Documents\\PowerShell\\Microsoft.PowerShell_profile.ps1 -Encoding UTF8",
       "expect": "PYTHONUTF8=1",
       "prompt": null
     },

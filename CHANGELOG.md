@@ -3,6 +3,28 @@
 All notable changes to WKAppBot SDK are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [7.12.0-sdk] - 2026-10-21
+
+### Aligned with WKAppBot core v7.12.0 — All-platform QA + Linux
+
+**Highlights**
+- **All-platform QA suite (`qa/`)** — one script-driven suite (`qa/run-qa.sh` / `qa\run-qa.cmd`) for the wkappbot CLI, `wkhippo` and the kih harness: static cross-platform path rules, public-repo hygiene, CLI command matrix, Hangul encoding round-trips, wkhippo matrix, live hook fixtures with a 1 s budget, and a sandboxed harness installer test (install / idempotent re-install / uninstall). Per-platform results land in `qa/results/<platform>.json`; `python3 qa/selftest.py` tests the suite itself.
+- **Linux CLI + kih harness installer** — first real Linux run (kih container, pwsh 7.4.6, Linux minimal CLI): 34 PASS / 12 FAIL / 5 SKIP with mutations off. Three FAILs were checker issues and are fixed; the remaining FAILs are tracked product defects or environment gaps (see `qa/results/linux.json`). Windows and macOS columns have not been run yet.
+- **Public-skill gate** — `qa/skill_home_plan.py` (dry run) proposes one home per skill id and marks a skill install-eligible only when no owner-mandated marker (credentials, account, PIN, customer, personal machine path, private app folder) and no kih public-skill gate word matches. Private-only ids are written as `private#<hash>` in this public repo.
+- **Skill auto-commit / minimal auto-push** (core v7.12) — skill edits are committed automatically and pushed with the smallest possible change set.
+- **wkhippo on Linux** (core v7.12) — the transcript indexer runs on Linux; covered by the `wkhippo` QA area.
+
+**Security / hygiene**
+- Removed every absolute path that named a personal machine user from public files (skills, generated skill pages, test scripts, `scripts/sync-public-skills.sh`) — replaced with `%USERPROFILE%`.
+- Removed two stray debug dumps (`suggest_list_tmp.txt` and a mis-named copy) that had been committed to the repo root.
+
+**Known gaps (honest status)**
+- **Linux**: no prebuilt Linux binary is attached to the release yet; the release workflow publishes Windows binaries only.
+- **macOS**: not release-ready. Portable builds are validated in CI (`macos-test.yml`), but there is no macOS binary and the QA suite has not been run on macOS.
+- `file write` does not create parent directories (known bug, tracked by the `cli` QA area).
+
+---
+
 ## [7.11.0-sdk] - 2026-09-30
 
 ### Aligned with WKAppBot core v7.11 — macOS Portable Phase 1 + CLI Improvements

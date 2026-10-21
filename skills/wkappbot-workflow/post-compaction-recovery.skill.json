@@ -12,9 +12,9 @@
     "APPBOT HEALTH STATE: Check key appbot health commands relevant to the task, such as wkappbot claude-usage, wkappbot eye tick, wkappbot skill read \u003Cneeded-skill\u003E, or wkappbot suggest list. If logs fail with UnauthorizedAccess, treat it as sandbox/log-write context first.",
     "ACTIVE SKILLS: Re-read the task-specific appbot skills before acting. Prefer wkappbot skill search/read over raw .skill.json reads unless editing the skill itself.",
     "DIRECT SKILL JSON EDIT RECOVERY: After direct .skill.json edits, run wkappbot skill install --app \u003Cname\u003E or wkappbot skill sync so search/read sees the skill.",
-    "CLAUDE/CODEX HANDOFF: Immediately run wkappbot skill read claude-session-handoff and follow it. Recover Claude JSONL context and Codex continuity from C:\\Users\\kiexp\\.codex\\session_index.jsonl plus C:\\Users\\kiexp\\.codex\\sessions when prior work may have been delegated.",
-    "CODEX GLOBAL CONFIG BASELINE: Re-check C:\\Users\\kiexp\\.codex\\config.toml after compaction. Expected model=gpt-5.4-mini, profiles worker/frontier/readonly, ask_for_approval=never, approval_policy=never, sandbox_mode=danger-full-access, trusted project entries for active repos.",
-    "APPBOT AUTO-ACCEPT BASELINE: Re-check C:\\Users\\kiexp\\.codex\\rules\\default.rules for broad wkappbot and wkappbot-core prefix_rule allow entries, and verify WKAPPBOT_AUTO_APPROVE_ALL=1. If missing, restore before appbot-heavy commands.",
+    "CLAUDE/CODEX HANDOFF: Immediately run wkappbot skill read claude-session-handoff and follow it. Recover Claude JSONL context and Codex continuity from %USERPROFILE%\\.codex\\session_index.jsonl plus %USERPROFILE%\\.codex\\sessions when prior work may have been delegated.",
+    "CODEX GLOBAL CONFIG BASELINE: Re-check %USERPROFILE%\\.codex\\config.toml after compaction. Expected model=gpt-5.4-mini, profiles worker/frontier/readonly, ask_for_approval=never, approval_policy=never, sandbox_mode=danger-full-access, trusted project entries for active repos.",
+    "APPBOT AUTO-ACCEPT BASELINE: Re-check %USERPROFILE%\\.codex\\rules\\default.rules for broad wkappbot and wkappbot-core prefix_rule allow entries, and verify WKAPPBOT_AUTO_APPROVE_ALL=1. If missing, restore before appbot-heavy commands.",
     "CURRENT SANDBOX REALITY CHECK: Even if Codex config says danger-full-access, the current outer runtime may still be read-only. If wkappbot fails with UnauthorizedAccess on logs, rerun with escalated execution; do not misdiagnose it as WKAppBot logic failure.",
     "REPORT AFTER RECOVERY: Summarize what was happening, what was left unfinished, current appbot/Codex approval state, and the next recommended action. Never dump raw JSONL or noisy logs.",
     "SUGGEST WORK AND SKILL HEALING: When continuing after compaction, run wkappbot suggest list/show if suggest work is in scope. While handling suggest items, search/read related skills and immediately update any skill that is missing steps, stale commands, requirements, or generalized lessons discovered during the fix."
@@ -31,12 +31,12 @@
       "prompt": null
     },
     {
-      "cmd": "Get-Content C:\\Users\\kiexp\\.codex\\config.toml",
+      "cmd": "Get-Content %USERPROFILE%\\.codex\\config.toml",
       "expect": "approval_policy",
       "prompt": null
     },
     {
-      "cmd": "Select-String -Path C:\\Users\\kiexp\\.codex\\rules\\default.rules -Pattern wkappbot-core",
+      "cmd": "Select-String -Path %USERPROFILE%\\.codex\\rules\\default.rules -Pattern wkappbot-core",
       "expect": "prefix_rule",
       "prompt": null
     },

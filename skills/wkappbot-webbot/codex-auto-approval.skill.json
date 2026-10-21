@@ -12,8 +12,8 @@
     "Do not add broad arbitrary-script approvals such as plain python, powershell, cmd, or destructive file operations.",
     "Record what was added, when it was added, and the backup path so the rules can be reviewed or rolled back later.",
     "Maintainer sync (2026-05-01): HQ copy is authoritative.",
-    "2026-05-06 appbot skill auto-accept update: add narrow default.rules prefix_rule allow entries for repeated wkappbot skill subcommands: read, search, edit, contribute, install, delete, sync. Cover both PATH bootstrap forms using Join-Path (Get-Location) \u0027bin\u0027 and Join-Path D:\\GitHub\\WKAppBot \u0027bin\u0027. Backup example: C:\\Users\\kiexp\\.codex\\rules\\default.rules.bak-skill-auto-20260506-111546.",
-    "2026-05-06 global-config auto-accept update: default.rules now includes narrow allow prefixes for checking Codex global config and approval rules: Get-Content config.toml, Get-Content default.rules, Select-String on config.toml/default.rules, Get-ChildItem config/rules backups, tomllib validation for config.toml, WKAPPBOT_AUTO_APPROVE_ALL set/get, and timestamped backups for config.toml/default.rules. Backup example: C:\\Users\\kiexp\\.codex\\rules\\default.rules.bak-global-config-auto-20260506-111942.",
+    "2026-05-06 appbot skill auto-accept update: add narrow default.rules prefix_rule allow entries for repeated wkappbot skill subcommands: read, search, edit, contribute, install, delete, sync. Cover both PATH bootstrap forms using Join-Path (Get-Location) \u0027bin\u0027 and Join-Path D:\\GitHub\\WKAppBot \u0027bin\u0027. Backup example: %USERPROFILE%\\.codex\\rules\\default.rules.bak-skill-auto-20260506-111546.",
+    "2026-05-06 global-config auto-accept update: default.rules now includes narrow allow prefixes for checking Codex global config and approval rules: Get-Content config.toml, Get-Content default.rules, Select-String on config.toml/default.rules, Get-ChildItem config/rules backups, tomllib validation for config.toml, WKAPPBOT_AUTO_APPROVE_ALL set/get, and timestamped backups for config.toml/default.rules. Backup example: %USERPROFILE%\\.codex\\rules\\default.rules.bak-global-config-auto-20260506-111942.",
     "2026-05-06 recent accepted patterns: keep narrow default.rules prefixes for absolute D:\\GitHub\\WKAppBot\\bin\\wkappbot.exe skill read/search/edit/contribute/install/sync and suggest list/show/resolve/add-requirement, plus exact evidence scripts and ordinary suggest-closing git add/commit flows. Do not add broad arbitrary PowerShell, Python, cmd, or destructive approvals."
   ],
   "requirements": [
@@ -33,32 +33,32 @@
       "prompt": null
     },
     {
-      "cmd": "Select-String -Path C:\\Users\\kiexp\\.codex\\rules\\default.rules -Pattern \u0027wkappbot skill contribute\u0027",
+      "cmd": "Select-String -Path %USERPROFILE%\\.codex\\rules\\default.rules -Pattern \u0027wkappbot skill contribute\u0027",
       "expect": "prefix_rule",
       "prompt": null
     },
     {
-      "cmd": "Select-String -Path C:\\Users\\kiexp\\.codex\\rules\\default.rules -Pattern \u0027wkappbot skill install\u0027",
+      "cmd": "Select-String -Path %USERPROFILE%\\.codex\\rules\\default.rules -Pattern \u0027wkappbot skill install\u0027",
       "expect": "prefix_rule",
       "prompt": null
     },
     {
-      "cmd": "Select-String -Path C:\\Users\\kiexp\\.codex\\rules\\default.rules -Pattern \u0027global-config-auto\u0027",
+      "cmd": "Select-String -Path %USERPROFILE%\\.codex\\rules\\default.rules -Pattern \u0027global-config-auto\u0027",
       "expect": "prefix_rule",
       "prompt": null
     },
     {
-      "cmd": "Select-String -Path C:\\Users\\kiexp\\.codex\\rules\\default.rules -Pattern \u0027wkappbot.exe\u0027\u0027 skill edit\u0027",
+      "cmd": "Select-String -Path %USERPROFILE%\\.codex\\rules\\default.rules -Pattern \u0027wkappbot.exe\u0027\u0027 skill edit\u0027",
       "expect": "prefix_rule",
       "prompt": null
     },
     {
-      "cmd": "Select-String -Path C:\\Users\\kiexp\\.codex\\rules\\default.rules -Pattern \u0027wkappbot.exe\u0027\u0027 suggest resolve\u0027",
+      "cmd": "Select-String -Path %USERPROFILE%\\.codex\\rules\\default.rules -Pattern \u0027wkappbot.exe\u0027\u0027 suggest resolve\u0027",
       "expect": "prefix_rule",
       "prompt": null
     },
     {
-      "cmd": "Get-Content C:\\Users\\kiexp\\.codex\\AGENTS.md",
+      "cmd": "Get-Content %USERPROFILE%\\.codex\\AGENTS.md",
       "expect": "Recent Auto Approval Patterns",
       "prompt": null
     }

@@ -5,7 +5,7 @@
   "title_ko": null,
   "desc": "Configure Codex CLI global defaults for low-friction appbot work: cheap default model, never ask for approval, danger-full-access sandbox for trusted repos, named profiles, and appbot auto-accept environment baseline.",
   "steps": [
-    "Open C:\\Users\\kiexp\\.codex\\config.toml.",
+    "Open %USERPROFILE%\\.codex\\config.toml.",
     "Set model to gpt-5.4-mini for the default worker path unless a stronger model is explicitly needed.",
     "Set ask_for_approval = never and approval_policy = never for compatibility with current and older Codex config keys.",
     "Set sandbox_mode = danger-full-access for trusted local automation sessions.",
@@ -15,17 +15,17 @@
     "Read codex-auto-approval for default.rules prefix policy before editing approval rules.",
     "Read post-compaction-recovery after context compaction to re-check this baseline.",
     "2026-05-06 appbot skill auto-accept baseline: default.rules should include narrow allow prefixes for wkappbot skill read/search/edit/contribute/install/delete/sync, for both Join-Path (Get-Location) \u0027bin\u0027 and Join-Path D:\\GitHub\\WKAppBot \u0027bin\u0027 PATH bootstrap forms. Keep WKAPPBOT_AUTO_APPROVE_ALL=1 in User environment.",
-    "2026-05-06 global-config auto-accept baseline: default.rules should include narrow allow prefixes for reading and validating C:\\Users\\kiexp\\.codex\\config.toml, inspecting C:\\Users\\kiexp\\.codex\\rules\\default.rules, setting/getting WKAPPBOT_AUTO_APPROVE_ALL, and making timestamped backups before config/rule changes.",
-    "2026-05-06 global Codex instructions baseline: keep C:\\Users\\kiexp\\.codex\\AGENTS.md as the Codex-side counterpart to C:\\Users\\kiexp\\.claude\\CLAUDE.md. It must state default model gpt-5.4-mini, Korean polite final responses, AppBot skill command discipline, auto-accept baseline, process safety, crash reboot console recovery, and handoff/compaction skill reads."
+    "2026-05-06 global-config auto-accept baseline: default.rules should include narrow allow prefixes for reading and validating %USERPROFILE%\\.codex\\config.toml, inspecting %USERPROFILE%\\.codex\\rules\\default.rules, setting/getting WKAPPBOT_AUTO_APPROVE_ALL, and making timestamped backups before config/rule changes.",
+    "2026-05-06 global Codex instructions baseline: keep %USERPROFILE%\\.codex\\AGENTS.md as the Codex-side counterpart to %USERPROFILE%\\.claude\\CLAUDE.md. It must state default model gpt-5.4-mini, Korean polite final responses, AppBot skill command discipline, auto-accept baseline, process safety, crash reboot console recovery, and handoff/compaction skill reads."
   ],
   "requirements": [
     {
-      "cmd": "Get-Content C:\\Users\\kiexp\\.codex\\config.toml",
+      "cmd": "Get-Content %USERPROFILE%\\.codex\\config.toml",
       "expect": "approval_policy",
       "prompt": null
     },
     {
-      "cmd": "Get-Content C:\\Users\\kiexp\\.codex\\config.toml",
+      "cmd": "Get-Content %USERPROFILE%\\.codex\\config.toml",
       "expect": "sandbox_mode",
       "prompt": null
     },
@@ -45,22 +45,22 @@
       "prompt": null
     },
     {
-      "cmd": "Select-String -Path C:\\Users\\kiexp\\.codex\\rules\\default.rules -Pattern \u0027wkappbot skill edit\u0027",
+      "cmd": "Select-String -Path %USERPROFILE%\\.codex\\rules\\default.rules -Pattern \u0027wkappbot skill edit\u0027",
       "expect": "prefix_rule",
       "prompt": null
     },
     {
-      "cmd": "Select-String -Path C:\\Users\\kiexp\\.codex\\rules\\default.rules -Pattern \u0027wkappbot skill sync\u0027",
+      "cmd": "Select-String -Path %USERPROFILE%\\.codex\\rules\\default.rules -Pattern \u0027wkappbot skill sync\u0027",
       "expect": "prefix_rule",
       "prompt": null
     },
     {
-      "cmd": "Select-String -Path C:\\Users\\kiexp\\.codex\\rules\\default.rules -Pattern \u0027config.toml\u0027",
+      "cmd": "Select-String -Path %USERPROFILE%\\.codex\\rules\\default.rules -Pattern \u0027config.toml\u0027",
       "expect": "prefix_rule",
       "prompt": null
     },
     {
-      "cmd": "Get-Content C:\\Users\\kiexp\\.codex\\AGENTS.md",
+      "cmd": "Get-Content %USERPROFILE%\\.codex\\AGENTS.md",
       "expect": "Global Codex Operating Rules",
       "prompt": null
     },

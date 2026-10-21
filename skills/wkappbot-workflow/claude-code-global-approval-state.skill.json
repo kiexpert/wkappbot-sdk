@@ -5,28 +5,28 @@
   "title_ko": null,
   "desc": "Current allow list in ~/.claude/settings.json and Codex ~/.codex/config.toml. Prevents repeated permission prompts. Update when adding new tools or projects.",
   "steps": [
-    "CLAUDE CODE CONFIG: C:/Users/kiexp/.claude/settings.json -- global allow list for all sessions.",
+    "CLAUDE CODE CONFIG: %USERPROFILE%/.claude/settings.json -- global allow list for all sessions.",
     "CLAUDE CODE ALLOW LIST (2026-04-28): Bash(*), PowerShell(*), Read(*), Write(*), Edit(*), Glob(*), Grep(*), WebFetch(*), WebSearch(*), mcp__wkappbot__wkappbot, mcp__wkappbot__wkappbot_cli, Bash(python *), Bash(python3 *)",
-    "CLAUDE CODE SPECIAL: PowerShell force-swap (wkappbot-core.new-\u003Eexe), PowerShell test-run-scenario. additionalDirectories: C:/Users/kiexp/.claude",
+    "CLAUDE CODE SPECIAL: PowerShell force-swap (wkappbot-core.new-\u003Eexe), PowerShell test-run-scenario. additionalDirectories: %USERPROFILE%/.claude",
     "CLAUDE CODE ADD TOOL: use /update-config skill, or edit settings.json: add ToolName(*) to allow array.",
-    "CODEX CONFIG: C:/Users/kiexp/.codex/config.toml -- global Codex CLI approval.",
+    "CODEX CONFIG: %USERPROFILE%/.codex/config.toml -- global Codex CLI approval.",
     "CODEX STATE (2026-04-28): model=gpt-5.4-mini, reasoning=medium, ask_for_approval=never. Trusted: C:\\, D:\\GitHub\\WKAppBot, D:\\GitHub\\WkAutoQuant, D:\\GitHub\\personal-docs",
     "CODEX SETUP ask_for_approval: edit ~/.codex/config.toml, set ask_for_approval = \u0027never\u0027. This disables all approval prompts globally.",
     "CODEX TRUST NEW REPO: add section [projects.\u0027D:\\GitHub\\NewRepo\u0027] trust_level = \u0027trusted\u0027 to config.toml. Or answer yes on first codex run in that dir to auto-add."
   ],
   "requirements": [
     {
-      "cmd": "cat C:/Users/kiexp/.claude/settings.json",
+      "cmd": "cat %USERPROFILE%/.claude/settings.json",
       "expect": "Bash",
       "prompt": null
     },
     {
-      "cmd": "cat C:/Users/kiexp/.codex/config.toml",
+      "cmd": "cat %USERPROFILE%/.codex/config.toml",
       "expect": "ask_for_approval",
       "prompt": null
     },
     {
-      "cmd": "cat C:/Users/kiexp/.codex/config.toml",
+      "cmd": "cat %USERPROFILE%/.codex/config.toml",
       "expect": "trust_level",
       "prompt": null
     }
