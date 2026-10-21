@@ -1,0 +1,146 @@
+{
+  "platform": "linux",
+  "when": "2026-10-21T06:37:00+00:00",
+  "source": "relayed by the kih ROOT session: run of claude/all-platform-qa @ faf7c48 in the kih container. Only per-area counts and FAIL cause lines were relayed; PASS/SKIP rows are not in this file. Mutations off.",
+  "context": {
+    "platform": "linux",
+    "host": "kih-container (pwsh 7.4.6, real kih + WKAppBot checkouts, Linux minimal CLI, live transcript)",
+    "commit": "faf7c48",
+    "allow_mutations": false
+  },
+  "area_counts": {
+    "static": [
+      1,
+      2,
+      0
+    ],
+    "hygiene": [
+      1,
+      2,
+      1
+    ],
+    "cli": [
+      10,
+      1,
+      0
+    ],
+    "encoding": [
+      3,
+      0,
+      2
+    ],
+    "wkhippo": [
+      7,
+      3,
+      1
+    ],
+    "hooks": [
+      8,
+      3,
+      1
+    ],
+    "installer": [
+      4,
+      1,
+      0
+    ]
+  },
+  "results": [
+    {
+      "area": "static-xplat",
+      "name": "wkappbot-kih",
+      "status": "FAIL",
+      "detail": "",
+      "ms": null,
+      "cause": ".githooks/lib/detect-model-sonnet.sh:94 [drive-literal] comment-only line [checker fixed after this run: comment-only lines skipped; kih also needs its own .qa/xplat-baseline.txt]"
+    },
+    {
+      "area": "static-xplat",
+      "name": "WKAppBot",
+      "status": "FAIL",
+      "detail": "",
+      "ms": null,
+      "cause": ".evidence/2026-05-05T10-55-50-oom-eye-claude-detector.sh:23 [drive-literal] REPO=D:/GitHub/WKAppBot [checker fixed after this run: .evidence/ excluded; WKAppBot also needs its own .qa/xplat-baseline.txt]"
+    },
+    {
+      "area": "hygiene",
+      "name": "wkappbot-sdk: no personal machine paths",
+      "status": "FAIL",
+      "detail": "",
+      "ms": null,
+      "cause": "35 files name machine user 'k****' (e.g. DGitHubwkappbot-sdksuggest_list_tmp.txt:32)"
+    },
+    {
+      "area": "hygiene",
+      "name": "kih .githooks executable in git",
+      "status": "FAIL",
+      "detail": "",
+      "ms": null,
+      "cause": ".githooks/commit-msg is mode 100644; fix: git update-index --chmod=+x .githooks/*"
+    },
+    {
+      "area": "cli",
+      "name": "file write creates parent dirs",
+      "status": "FAIL",
+      "detail": "",
+      "ms": null,
+      "cause": "rc=1 | known bug: file write does not create parent directories"
+    },
+    {
+      "area": "wkhippo",
+      "name": "help",
+      "status": "FAIL",
+      "detail": "",
+      "ms": null,
+      "cause": "rc=1: wkhippo.ps1: Cannot bind argument to parameter 'Path' because it is null. (checkout lacks the unpushed claude/linux-wkhippo launcher fixes)"
+    },
+    {
+      "area": "wkhippo",
+      "name": "recent --json parses",
+      "status": "FAIL",
+      "detail": "",
+      "ms": null,
+      "cause": "stdout is not JSON: 'Unknown command: a11y (Linux minimal build has: skill, file, suggest, version)' -- recent shells out to wkappbot a11y"
+    },
+    {
+      "area": "wkhippo",
+      "name": "missing transcript exits nonzero",
+      "status": "FAIL",
+      "detail": "",
+      "ms": null,
+      "cause": "rc=0 (want nonzero); same a11y line"
+    },
+    {
+      "area": "harness-hooks",
+      "name": "PreToolUse Bash pwsh where no PowerShell tool",
+      "status": "FAIL",
+      "detail": "",
+      "ms": null,
+      "cause": "want allow, got deny | known bug: bash-uses-pwsh-guard assumes a PowerShell tool exists"
+    },
+    {
+      "area": "harness-hooks",
+      "name": "latency (hook 1)",
+      "status": "FAIL",
+      "detail": "",
+      "ms": null,
+      "cause": "8384 ms > 1000 ms (1 s mandate)"
+    },
+    {
+      "area": "harness-hooks",
+      "name": "latency (hook 2)",
+      "status": "FAIL",
+      "detail": "",
+      "ms": null,
+      "cause": "1851 ms > 1000 ms (1 s mandate)"
+    },
+    {
+      "area": "installer",
+      "name": "install #1",
+      "status": "FAIL",
+      "detail": "",
+      "ms": null,
+      "cause": "no harness hooks written to settings.json (install-linux.sh writes .claude/settings.local.json) [checker fixed after this run: all four settings scopes are now watched; idempotency, user-settings and uninstall rows passed]"
+    }
+  ]
+}
