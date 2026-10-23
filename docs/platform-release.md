@@ -14,6 +14,11 @@ with the `WKAPPBOT_CORE_PAT` secret by `.github/scripts/clone-core.sh` (token ne
 | verify (x4) | native runner | Linux / macOS: `install.sh` from the artifact (checksum-verified), then `.github/scripts/portable-smoke.sh` (`--version`, `help`, `skill read on-load` against a seeded skills dir, `skill list`, Hangul file round-trip). osx-x64 runs under Rosetta 2. Windows: core `--version` and `skill read on-load` (120 s budget each), launcher file version. |
 | SHA256SUMS | ubuntu-latest | `wkappbot-core.exe` over 100 MB is shipped as `wkappbot-core.exe.xz`; sums for all assets; artifact `release-assets` |
 | release | ubuntu-latest | only on a `v*-sdk` tag: creates the release with the CHANGELOG section as notes and uploads the assets |
+| publish-to-kih | ubuntu-latest | green run on `main` (push or dispatch) or a tag: `.github/scripts/publish-to-kih.sh` runs kih `tools/wk-bin-acquire.sh publish` per changed binary (`WK_BIN_NO_PUSH=1`), then one `git push origin HEAD:main` with a rebase-retry loop. Unchanged binaries (sha256 equal to the MANIFEST row; the Windows core compared decompressed) make no commit. |
+
+Every verify job also clones kih (`KIH_PUSH_PAT`) and runs `tools/wk-harness-qa.sh --quick --json`
+with `WKAPPBOT_CORE` pointing at the binary under test (`.github/scripts/kih-harness-qa.sh`;
+exit 0 pass, 1 fail, 2 cannot evaluate).
 
 Any red job stops the release.
 
@@ -23,13 +28,19 @@ Any red job stops the release.
 `wkappbot-core.exe` (or `.xz`), `SHA256SUMS`. `install.sh` and the kih acquirer download
 `releases/latest/download/<name>`; renaming one breaks every installer.
 
+## Secrets
+
+- `WKAPPBOT_CORE_PAT`: read access to the private core repo.
+- `KIH_PUSH_PAT`: fine-grained token, Contents read/write on `kiexpert/wkappbot-kih` only.
+  `gh secret set KIH_PUSH_PAT --repo kiexpert/wkappbot-sdk` (paste the token at the prompt).
+
 ## Triggers
 
 - `workflow_dispatch` with input `core_ref` (default `main`). GitHub only offers this once the
   workflow file is on the default branch.
 - `repository_dispatch` type `core-updated`, `client_payload.ref` = core ref.
 - push of a `v*-sdk` tag: full run plus release.
-- push to `claude/release-*` touching the pipeline files: build + verify only (no release).
+- push to `main` or `claude/release-*` touching the pipeline files: build + verify (main also publishes to kih).
 
 ## Run it
 

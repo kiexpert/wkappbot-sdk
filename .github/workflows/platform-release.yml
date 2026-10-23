@@ -6,8 +6,11 @@ name: Platform Release (build / verify / release)
 #
 #   build    linux-x64 (ubuntu), osx-arm64 + osx-x64 (macos), win-x64 core + launcher (windows)
 #   verify   each binary on its native runner: --version, skill read on-load, smoke. Any red stops.
+#            + kih harness QA (kih tools/wk-harness-qa.sh --quick) against the same binary.
 #   release  tag push only: SHA256SUMS + assets on the GitHub release. The asset names are a
 #            contract (kih tools/wk-bin-acquire.sh downloads releases/latest/download/<name>).
+#   publish-to-kih  green run on main (push, dispatch) or a tag: kih bin/ + MANIFEST.md updated
+#            with kih's own wk-bin-acquire.sh publish, one push, no commit when nothing changed.
 #
 # Run book: docs/platform-release.md
 
@@ -21,11 +24,14 @@ on:
     types: [core-updated]       # client_payload.ref = core ref to build
   push:
     tags: ['v*-sdk']
-    branches: ['claude/release-*']
+    branches: [main, 'claude/release-*']
     paths:
       - '.github/workflows/platform-release.yml'
       - '.github/scripts/clone-core.sh'
       - '.github/scripts/portable-smoke.sh'
+      - '.github/scripts/clone-kih.sh'
+      - '.github/scripts/kih-harness-qa.sh'
+      - '.github/scripts/publish-to-kih.sh'
       - 'install.sh'
       - 'csharp/src/WKAppBot.Launcher/**'
 
@@ -147,6 +153,14 @@ jobs:
       - name: Smoke (--version, help, skill read on-load, skill list, Hangul file round-trip)
         shell: bash
         run: bash .github/scripts/portable-smoke.sh "$RUNNER_TEMP/bin/wkappbot"
+      - name: kih harness QA (--quick)
+        shell: bash
+        continue-on-error: true   # until wk-harness-qa.sh is green on all four runners
+        env:
+          GH_TOKEN: ${{ secrets.KIH_PUSH_PAT }}
+        run: |
+          bash .github/scripts/clone-kih.sh
+          bash .github/scripts/kih-harness-qa.sh "$RUNNER_TEMP/bin/wkappbot"
 
   verify-windows:
     name: verify win-x64 on windows-latest
@@ -179,6 +193,14 @@ jobs:
           Invoke-Budget @('--version') 'version' | Out-Null
           $s = Invoke-Budget @('skill', 'read', 'on-load') 'skill-read'
           if ($s -notmatch 'on-load') { throw 'skill read on-load did not print the skill' }
+      - name: kih harness QA (--quick)
+        shell: bash
+        continue-on-error: true   # until wk-harness-qa.sh is green on all four runners
+        env:
+          GH_TOKEN: ${{ secrets.KIH_PUSH_PAT }}
+        run: |
+          bash .github/scripts/clone-kih.sh
+          bash .github/scripts/kih-harness-qa.sh bin/wkappbot-core.exe
       - name: Launcher present and versioned
         shell: pwsh
         run: |
@@ -245,3 +267,22 @@ jobs:
             gh release create "$TAG" --title "WKAppBot $TAG" --notes-file notes.md --verify-tag
           gh release upload "$TAG" dist/* --clobber
           gh release view "$TAG" --json assets --jq '.assets[] | "\(.name) \(.size)"'
+
+  publish-to-kih:
+    name: publish binaries to kih bin/
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+    needs: [verify-portable, verify-windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4
+        with:
+          pattern: bin-*
+          path: dist
+          merge-multiple: true
+      - name: Clone kih
+        env:
+          GH_TOKEN: ${{ secrets.KIH_PUSH_PAT }}
+        run: bash .github/scripts/clone-kih.sh
+      - name: Publish (skip unchanged) and push once
+        run: bash .github/scripts/publish-to-kih.sh dist
