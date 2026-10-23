@@ -157,7 +157,8 @@ jobs:
         shell: bash
         continue-on-error: true   # until wk-harness-qa.sh is green on all four runners
         env:
-          GH_TOKEN: ${{ secrets.KIH_PUSH_PAT }}
+          # read-only clone: fall back to the core token while KIH_PUSH_PAT is not set
+          GH_TOKEN: ${{ secrets.KIH_PUSH_PAT || secrets.WKAPPBOT_CORE_PAT }}
         run: |
           bash .github/scripts/clone-kih.sh
           bash .github/scripts/kih-harness-qa.sh "$RUNNER_TEMP/bin/wkappbot"
@@ -197,7 +198,8 @@ jobs:
         shell: bash
         continue-on-error: true   # until wk-harness-qa.sh is green on all four runners
         env:
-          GH_TOKEN: ${{ secrets.KIH_PUSH_PAT }}
+          # read-only clone: fall back to the core token while KIH_PUSH_PAT is not set
+          GH_TOKEN: ${{ secrets.KIH_PUSH_PAT || secrets.WKAPPBOT_CORE_PAT }}
         run: |
           bash .github/scripts/clone-kih.sh
           bash .github/scripts/kih-harness-qa.sh bin/wkappbot-core.exe
