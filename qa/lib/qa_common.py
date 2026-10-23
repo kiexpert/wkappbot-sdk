@@ -39,7 +39,8 @@ def resolve_repo(env_name, repo_dir_name, override=None):
     """env var -> sibling checkout -> D:/GitHub/<repo>. Returns (path|None, source)."""
     candidates = []
     if override:
-        candidates.append((override, "arg"))
+        # An explicit --*-root is the answer, found or not; it never falls through to a sibling.
+        return (Path(override).resolve(), "arg") if Path(override).is_dir() else (None, f"not found (arg {override})")
     if os.environ.get(env_name):
         candidates.append((os.environ[env_name], "env " + env_name))
     candidates.append((str(SDK_ROOT.parent / repo_dir_name), "sibling"))

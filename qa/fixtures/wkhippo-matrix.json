@@ -1,16 +1,16 @@
 {
-  "_doc": "wkhippo subcommands against a real Claude transcript (TRANSCRIPT). The transcript is passed with --transcript; adjust if wkhippo locates transcripts differently. --keep writes a reflex, so it is a mutating case.",
+  "_doc": "wkhippo subcommands against a real Claude transcript (TRANSCRIPT). reflex and trace take the transcript (session id or path) as their first positional argument; recall and recent take a topic and search the session stores under HOME. --keep writes a reflex, so it is a mutating case.",
   "cases": [
     { "name": "help", "args": ["--help"], "expect_out": "(?i)reflex|recall|usage" },
-    { "name": "reflex --rows", "needs": ["TRANSCRIPT"], "args": ["reflex", "--transcript", "{TRANSCRIPT}", "--rows", "5"], "expect_out": "\\S" },
-    { "name": "reflex --since", "needs": ["TRANSCRIPT"], "args": ["reflex", "--transcript", "{TRANSCRIPT}", "--since", "24h"] },
-    { "name": "reflex --summary", "needs": ["TRANSCRIPT"], "args": ["reflex", "--transcript", "{TRANSCRIPT}", "--summary"], "expect_out": "\\S" },
-    { "name": "reflex --keep", "needs": ["TRANSCRIPT"], "mutates": true, "args": ["reflex", "--transcript", "{TRANSCRIPT}", "--keep", "qa probe {HANGUL}"] },
-    { "name": "recall", "needs": ["TRANSCRIPT"], "args": ["recall", "--transcript", "{TRANSCRIPT}", "skill"] },
-    { "name": "recent", "needs": ["TRANSCRIPT"], "args": ["recent", "--transcript", "{TRANSCRIPT}"], "expect_out": "\\S" },
-    { "name": "recent --json parses", "needs": ["TRANSCRIPT"], "args": ["recent", "--transcript", "{TRANSCRIPT}", "--json"], "json_out": true },
-    { "name": "trace", "needs": ["TRANSCRIPT"], "args": ["trace", "--transcript", "{TRANSCRIPT}"] },
-    { "name": "studied", "needs": ["TRANSCRIPT"], "args": ["studied", "--transcript", "{TRANSCRIPT}"] },
-    { "name": "missing transcript exits nonzero", "args": ["recent", "--transcript", "{TMP}/no-such.jsonl"], "expect_rc": "nonzero" }
+    { "name": "reflex --rows", "needs": ["TRANSCRIPT"], "args": ["reflex", "{TRANSCRIPT}", "--rows"], "expect_out": "\\S" },
+    { "name": "reflex --since", "needs": ["TRANSCRIPT"], "args": ["reflex", "{TRANSCRIPT}", "--since", "24h"] },
+    { "name": "reflex --summary", "needs": ["TRANSCRIPT"], "args": ["reflex", "{TRANSCRIPT}", "--summary"], "expect_out": "\\S" },
+    { "name": "reflex --keep", "needs": ["TRANSCRIPT"], "mutates": true, "args": ["reflex", "{TRANSCRIPT}", "--keep", "qa probe {HANGUL}"] },
+    { "name": "recall", "args": ["recall", "skill"] },
+    { "name": "recent", "args": ["recent", "skill"], "expect_out": "\\S" },
+    { "name": "recent --json parses", "args": ["recent", "skill", "--json"], "json_out": true },
+    { "name": "trace", "needs": ["TRANSCRIPT"], "args": ["trace", "{TRANSCRIPT}"] },
+    { "name": "studied", "args": ["studied", "on-load"] },
+    { "name": "trace of a missing session exits nonzero", "args": ["trace", "{TMP}/no-such.jsonl"], "expect_rc": "nonzero" }
   ]
 }

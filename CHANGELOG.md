@@ -23,7 +23,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - New `install.sh` (Linux / macOS): picks the asset for `uname -s` / `uname -m`, verifies it against `SHA256SUMS`, installs to `~/.local/bin`.
 - New `Platform Release` workflow (`platform-release.yml`) owns `v*-sdk` releases: builds linux-x64 (ubuntu), osx-arm64 + osx-x64 (macos) and win-x64 core + launcher (windows) from core source, verifies each binary on its native runner (`--version`, `skill read on-load`, smoke; osx-x64 under Rosetta 2), and only then publishes. Any red stops the release. `release.yml` is now a manual, Windows-only legacy path.
 
+**Fixed (all-platform QA findings)**
+- Portable CLI `--version` names the binary's own runtime (an osx-x64 build under Rosetta 2 said osx-arm64).
+- `file write` creates missing parent folders.
+- `wkhippo` on Linux / macOS: `help`; finds `~/.claude/projects` (was searching a Windows-style path); `recent --json` prints exactly one JSON array; `trace` accepts a transcript path and exits nonzero for a missing session; the wrapper runs under `pwsh` and `python3` when Windows PowerShell / `python` are absent.
+- kih harness: `--uninstall` removes everything install added; declarative bash-to-pwsh blocks no longer refuse the only shell on Linux / macOS; an empty `core.hooksPath` is blocked in every repo.
+- Public-repo hygiene: the skill sync redaction matches any user's home path and any naver.com address (it had been reduced to a placeholder by the earlier sweep); three personal job-search skills and a personal address removed; test scripts use `$HOME` instead of an unexpanded `%USERPROFILE%`.
+- QA suite: harness hooks run under a throwaway HOME and git config (a run had rewritten the machine's global `core.hooksPath`); the installer sandbox is a git repo; an explicit `--kih-root` never falls back to a sibling checkout.
+
 **Known gaps (honest status)**
+- Harness hook latency is 1.2-7 s per call on Linux (bare `pwsh` start is 0.25 s), above the 1 s mandate; owned by the kih harness.
 - The Linux / macOS build is the minimal CLI (`skill`, `file`, `suggest`, `version`); UI automation is Windows-only.
 - `file write` does not create parent directories (known bug, tracked by the `cli` QA area).
 

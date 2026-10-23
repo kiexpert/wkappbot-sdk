@@ -7,7 +7,7 @@ set -e
 
 REPO="D:/GitHub/WkAutoQuant"
 WKB="D:/GitHub/WKAppBot/bin/wkappbot-core.exe"
-PY="%USERPROFILE%/AppData/Local/Programs/Python/Python312/python.exe"
+PY="${PYTHON:-$HOME/AppData/Local/Programs/Python/Python312/python.exe}"
 cd "$REPO"
 
 echo "======= wkappbot file read: module header ======="

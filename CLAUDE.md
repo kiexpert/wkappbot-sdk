@@ -427,8 +427,9 @@ wkappbot skill read sdk-gg-main-automation then run health check: bash scripts/g
 ## harness:warn wkedit.*--line.*\\
 wkappbot file edit --old-file /tmp/old.txt --new-file /tmp/new.txt FILE
 
-## harness:block (?i)bash\b.*(?:^|[\s;&|('"\\/])(?:powershell|pwsh)(?:\.exe)?['"]?\s+-
-Use PowerShell tool directly
+## bash-uses-pwsh: enforced only by the OS-aware guard in kih tools/wkharness-guards-shell-cluster-1.ps1
+## (Windows only). A declarative harness:block cannot express an OS, and on Linux/macOS Bash is the
+## only shell tool, so the old block here refused the sole route to pwsh (all-platform QA, 2026-10-21).
 
 ## harness:block (?i)core\.hooksPath(?:=(?:""|''|\s)|\s+(?:""|''|/dev/null))|--unset(?:-all)?\s+core\.hooksPath
 Git hook security: core.hooksPath must never be empty or null. Pre-push hooks are required to block secret exposure. Verify with: git config core.hooksPath

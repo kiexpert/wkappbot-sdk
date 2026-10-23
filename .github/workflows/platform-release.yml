@@ -152,7 +152,7 @@ jobs:
           fi
       - name: Smoke (--version, help, skill read on-load, skill list, Hangul file round-trip)
         shell: bash
-        run: bash .github/scripts/portable-smoke.sh "$RUNNER_TEMP/bin/wkappbot"
+        run: bash .github/scripts/portable-smoke.sh "$RUNNER_TEMP/bin/wkappbot" ${{ matrix.rid }}
       - name: kih harness QA (--quick)
         shell: bash
         continue-on-error: true   # until wk-harness-qa.sh is green on all four runners

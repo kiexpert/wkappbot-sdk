@@ -6,7 +6,7 @@ set -e
 
 cd "$(dirname "$0")/../.."
 
-PY="%USERPROFILE%/AppData/Local/Programs/Python/Python312/python.exe"
+PY="${PYTHON:-$HOME/AppData/Local/Programs/Python/Python312/python.exe}"
 
 echo "========================================"
 echo "  Feature #1: score_signal.py SELFTEST"

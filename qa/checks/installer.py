@@ -86,7 +86,8 @@ def read_json(p):
 
 
 def copy_checkout(src, dst):
-    """git-tracked files (+ untracked non-ignored) and .claude/ of src into dst; no .git."""
+    """git-tracked files (+ untracked non-ignored) and .claude/ of src into dst, then a fresh one-commit
+    git repo there: a real install runs from a clone, and the installer asks git for its toplevel."""
     rc, out, _, _ = run(["git", "-C", str(src), "ls-files", "-z", "--cached", "--others", "--exclude-standard"])
     rels = [r for r in out.split("\0") if r] if rc == 0 else \
         [str(p.relative_to(src)) for p in Path(src).rglob("*") if p.is_file() and ".git" not in p.parts]
@@ -98,6 +99,9 @@ def copy_checkout(src, dst):
         if s.is_file() or s.is_symlink():
             d.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(s, d, follow_symlinks=False)
+    for cmd in (["init", "-q"], ["add", "-A"],
+                ["-c", "user.name=qa", "-c", "user.email=qa@localhost", "commit", "-q", "--no-verify", "-m", "qa sandbox"]):
+        run(["git", "-C", str(dst)] + cmd)
 
 
 def run_checks(ctx):
@@ -152,9 +156,11 @@ def run_checks(ctx):
         else:
             out.append(Result(area, NAMES[0], PASS, inst.name, ms))
 
+        # Hooks already committed in the repo's own .claude/settings.json are not the installer's to add or remove.
+        pre = set(all_cmds())
         rc, so, se, ms = step()
         raw1 = raw()
-        mine = sorted({c for c in all_cmds() if c and c != USER_HOOK})
+        mine = sorted({c for c in all_cmds() if c and c != USER_HOOK and c not in pre})
         if rc != 0:
             out.append(Result(area, NAMES[1], FAIL, inst.name, ms, f"rc={rc}: {first_line(se, so)}"))
         elif not mine:

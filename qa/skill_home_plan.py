@@ -8,7 +8,7 @@ diverge, and proposes one home per id:
   install-eligible = y when no owner-mandated marker and no kih public-skill gate word (kih 20fd779)
          matches; only those may reach the SDK via `skill install`.
 
-Sources (each optional; resolved env var -> sibling checkout -> D:/GitHub/<repo>):
+Sources (each optional; resolved env var -> sibling checkout -> D:/GitHub/<repo>):  qa:allow-path
   sdk  this repo                       kih  $KIH_ROOT       core $WKAPPBOT_ROOT
   hq   $WKAPPBOT_HQ / --hq DIR (the HQ skill cache; any dir holding *.skill.json)
   --source LABEL=DIR  (repeatable) for anything else

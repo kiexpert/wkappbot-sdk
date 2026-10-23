@@ -9,6 +9,7 @@ Decision: rc 2, permissionDecision deny/ask, decision block/deny, or continue:fa
 import json
 import os
 import re
+import shutil
 import tempfile
 import uuid
 from pathlib import Path
@@ -99,7 +100,17 @@ def run_checks(ctx):
     if not ctx.transcript:
         Path(transcript).write_text("", encoding="utf-8")
     sid = "qa-" + uuid.uuid4().hex[:12]
-    env = {"CLAUDE_PROJECT_DIR": str(ctx.kih_root), "QA_HARNESS_FIXTURE": "1"}
+    # Hooks run under a throwaway HOME and global git config: a harness hook may write user-level state
+    # (the session-init gate sets the GLOBAL core.hooksPath), and a QA run must not change the machine.
+    qa_home = Path(tdir) / "home"
+    (qa_home / ".claude").mkdir(parents=True, exist_ok=True)
+    for md in ("CLAUDE.md", "REFLEX.md"):  # the global rules the harness reads stay in force
+        src = Path.home() / ".claude" / md
+        if src.is_file():
+            shutil.copy2(src, qa_home / ".claude" / md)
+    env = {"CLAUDE_PROJECT_DIR": str(ctx.kih_root), "QA_HARNESS_FIXTURE": "1",
+           "HOME": str(qa_home), "USERPROFILE": str(qa_home),
+           "GIT_CONFIG_GLOBAL": str(qa_home / ".gitconfig")}
     out, latency = [], {}
     for fx in fixtures:
         ev, tool = fx["event"], fx.get("tool_name")
@@ -117,7 +128,7 @@ def run_checks(ctx):
             out.append(Result(area, fx["name"], SKIP, f"no {ev} hook matches {tool or ''}".strip()))
             continue
         want = expected_for(fx, ctx.platform)
-        decisions, crashes, total = [], [], 0
+        decisions, crashes, total, texts = [], [], 0, []
         for cmd in sel:
             rc, so, se, ms = run(cmd, cwd=str(ctx.kih_root), env=env, shell=True,
                                  stdin=json.dumps(payload).encode("utf-8"), timeout=ctx.timeout)
@@ -125,9 +136,16 @@ def run_checks(ctx):
             latency.setdefault(cmd, []).append(ms)
             d = decision(rc, so)
             decisions.append(d)
+            if d == "deny":
+                texts.append((so or "") + "\n" + (se or ""))
             if rc not in (0, 2):
                 crashes.append(f"{short(cmd)} rc={rc}: {first_line(se, so)}")
-        got = "deny" if "deny" in decisions else "allow"
+        # "refusal": judge only the guard under test; an unrelated session-state refusal (busy-fleet etc.)
+        # on a throwaway qa session id must not decide this row.
+        if fx.get("refusal"):
+            got = "deny" if any(re.search(fx["refusal"], t) for t in texts) else "allow"
+        else:
+            got = "deny" if "deny" in decisions else "allow"
         detail = f"{len(sel)} hook(s), {total} ms, got {got}"
         if crashes:
             out.append(Result(area, fx["name"], FAIL, detail, total, "hook crashed: " + crashes[0]))

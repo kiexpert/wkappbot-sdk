@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Basic smoke for an installed portable wkappbot CLI (Linux / macOS).
-# Usage: portable-smoke.sh <path-to-wkappbot>   (run from the wkappbot-sdk checkout root)
+# Usage: portable-smoke.sh <path-to-wkappbot> [expected-rid]   (run from the wkappbot-sdk checkout root)
 set -euo pipefail
-bin="${1:?usage: portable-smoke.sh <wkappbot>}"
+bin="${1:?usage: portable-smoke.sh <wkappbot> [expected-rid]}"
+want_rid="${2:-}"
 work="${RUNNER_TEMP:-$(mktemp -d)}/wkappbot-smoke"
 rm -rf "$work"; mkdir -p "$work"
 
@@ -29,6 +30,11 @@ check help       "$bin" help
 check skill-read "$bin" skill read on-load
 check skill-list "$bin" skill list
 for n in version help skill-read; do nonempty "$n"; done
+# The version label names the binary's own runtime (an osx-x64 build under Rosetta must say osx-x64).
+if [ -n "$want_rid" ]; then
+  if grep -q "($want_rid)" "$work/version.out"; then echo "PASS version label: $want_rid"
+  else echo "::error::FAIL version label: want ($want_rid), got: $(head -1 "$work/version.out")"; fail=1; fi
+fi
 
 # Hangul round-trip through file write / file read (byte-exact).
 printf '한글 라운드트립 ✓\n' > "$work/src.txt"
@@ -36,5 +42,9 @@ check file-write "$bin" file write "$work/out.txt" --source-file "$work/src.txt"
 if cmp -s "$work/src.txt" "$work/out.txt"; then echo "PASS file-write bytes"; else echo "::error::FAIL file-write bytes differ"; fail=1; fi
 check file-read  "$bin" file read "$work/out.txt"
 grep -q '한글' "$work/file-read.out" || { echo "::error::FAIL file-read lost Hangul"; fail=1; }
+
+# file write creates missing parent folders.
+check file-write-newdir "$bin" file write "$work/new/deeper/out.txt" --source-file "$work/src.txt"
+cmp -s "$work/src.txt" "$work/new/deeper/out.txt" || { echo "::error::FAIL file-write-newdir bytes"; fail=1; }
 
 exit $fail
