@@ -9,7 +9,7 @@ name: Platform Release (build / verify / release)
 #   release  tag push only: SHA256SUMS + assets on the GitHub release. The asset names are a
 #            contract (kih tools/wk-bin-acquire.sh downloads releases/latest/download/<name>).
 #
-# Run book: wkappbot skill read sdk-platform-release
+# Run book: docs/platform-release.md
 
 on:
   workflow_dispatch:
