@@ -1,8 +1,9 @@
-name: Release
+name: Release (legacy, Windows-only)
+
+# Superseded by platform-release.yml, which owns v*-sdk tag releases for every platform.
+# Kept for manual re-runs of the old Windows-only bundle.
 
 on:
-  push:
-    tags: ['v*']
   workflow_dispatch:
     inputs:
       tag:
@@ -10,15 +11,7 @@ on:
         required: true
 
 jobs:
-  # Overall QA (Windows / Linux / macOS); any red blocks the release.
-  qa:
-    uses: ./.github/workflows/portable-qa.yml
-    permissions:
-      contents: read
-    secrets: inherit
-
   release:
-    needs: qa
     runs-on: windows-latest
     permissions:
       contents: write
@@ -180,25 +173,3 @@ jobs:
         Write-Host "Uploading assets for $tag : $($assets -join ', ')"
         gh release upload $tag @assets --clobber
         Write-Host "Assets uploaded: https://github.com/${{ github.repository }}/releases/tag/$tag"
-
-  # Linux / macOS portable CLI + SHA256SUMS (the exact files QA installed and smoked).
-  portable-assets:
-    needs: [qa, release]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-    - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4
-      with:
-        name: wkappbot-portable
-        path: portable
-    - name: Upload portable assets
-      env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
-      run: |
-        cd portable
-        sha256sum -c SHA256SUMS
-        gh release upload "$TAG" wkappbot-linux-x64 wkappbot-osx-arm64 wkappbot-osx-x64 SHA256SUMS \
-          --repo "$GITHUB_REPOSITORY" --clobber
-        echo "Portable assets uploaded: https://github.com/$GITHUB_REPOSITORY/releases/tag/$TAG"

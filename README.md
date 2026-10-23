@@ -373,9 +373,9 @@ Launcher and core both come from this repo's public [Releases](https://github.co
 
 | Platform | Status | What to download |
 |---|---|---|
-| **Windows 10/11 x64** | Supported | `wkappbot-X.Y.Z-sdk.zip` (launcher `wkappbot.exe` + core `wkappbot-core.exe`), extract into `bin\` of your clone. `wkappbot.exe` alone is the launcher only. |
+| **Windows 10/11 x64** | Supported | Launcher `wkappbot.exe` + core `wkappbot-core.exe` (shipped as `wkappbot-core.exe.xz` when over 100 MB; unpack with 7-Zip or `xz -d`), both into `bin\` of your clone. Verify against `SHA256SUMS`. |
 | **Linux x64** | Preview — minimal CLI | `wkappbot-linux-x64` via `install.sh` (below). The portable build covers `skill`, `file`, `suggest` and `version` only; UI automation stays Windows-only. |
-| **macOS (Apple silicon / Intel)** | Preview — minimal CLI | `wkappbot-osx-arm64` / `wkappbot-osx-x64` via `install.sh`. Same command set as Linux. CI smokes the arm64 build on `macos-latest`; the Intel build is cross-built and checksum-verified but not run in CI. |
+| **macOS (Apple silicon / Intel)** | Preview — minimal CLI | `wkappbot-osx-arm64` / `wkappbot-osx-x64` via `install.sh`. Same command set as Linux. CI verifies both on `macos-latest` (Intel under Rosetta 2). |
 
 ```bash
 # Linux / macOS: picks the asset for your OS/CPU, verifies SHA256SUMS, installs ~/.local/bin/wkappbot
@@ -384,8 +384,7 @@ curl -fsSL https://raw.githubusercontent.com/kiexpert/wkappbot-sdk/main/install.
 
 ```powershell
 # Windows: download the latest bundle into bin\
-gh release download --repo kiexpert/wkappbot-sdk --pattern "wkappbot-*.zip" --dir .
-Expand-Archive wkappbot-*.zip -DestinationPath bin -Force
+gh release download --repo kiexpert/wkappbot-sdk --pattern "wkappbot.exe" --pattern "wkappbot-core.exe*" --pattern SHA256SUMS --dir bin
 ```
 
 ### Clone

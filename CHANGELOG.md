@@ -19,13 +19,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Removed two stray debug dumps (`suggest_list_tmp.txt` and a mis-named copy) that had been committed to the repo root.
 
 **Linux / macOS distribution**
-- Release now ships the portable CLI beside `wkappbot.exe`: `wkappbot-linux-x64`, `wkappbot-osx-arm64`, `wkappbot-osx-x64` and `SHA256SUMS` (fetched from the core release, else built from core source).
+- Release now ships the portable CLI beside `wkappbot.exe`: `wkappbot-linux-x64`, `wkappbot-osx-arm64`, `wkappbot-osx-x64` and `SHA256SUMS`; the core ships as `wkappbot-core.exe` (or `.xz` when over 100 MB).
 - New `install.sh` (Linux / macOS): picks the asset for `uname -s` / `uname -m`, verifies it against `SHA256SUMS`, installs to `~/.local/bin`.
-- New `Portable QA` workflow, run by `release.yml` before publishing: install + smoke on `ubuntu-latest` and `macos-latest`, launcher build + core `--version` on `windows-latest`. Any red blocks the release.
+- New `Platform Release` workflow (`platform-release.yml`) owns `v*-sdk` releases: builds linux-x64 (ubuntu), osx-arm64 + osx-x64 (macos) and win-x64 core + launcher (windows) from core source, verifies each binary on its native runner (`--version`, `skill read on-load`, smoke; osx-x64 under Rosetta 2), and only then publishes. Any red stops the release. `release.yml` is now a manual, Windows-only legacy path.
 
 **Known gaps (honest status)**
 - The Linux / macOS build is the minimal CLI (`skill`, `file`, `suggest`, `version`); UI automation is Windows-only.
-- `wkappbot-osx-x64` is cross-built and checksum-verified but not executed in CI.
 - `file write` does not create parent directories (known bug, tracked by the `cli` QA area).
 
 ---

@@ -1,0 +1,247 @@
+name: Platform Release (build / verify / release)
+
+# One pipeline for every platform wkappbot ships on. The SDK repo is public, so the standard
+# ubuntu / macos / windows runners are free; the private core is cloned with WKAPPBOT_CORE_PAT
+# (same relay pattern as macos-test.yml, skill macos-ci-via-sdk-relay).
+#
+#   build    linux-x64 (ubuntu), osx-arm64 + osx-x64 (macos), win-x64 core + launcher (windows)
+#   verify   each binary on its native runner: --version, skill read on-load, smoke. Any red stops.
+#   release  tag push only: SHA256SUMS + assets on the GitHub release. The asset names are a
+#            contract (kih tools/wk-bin-acquire.sh downloads releases/latest/download/<name>).
+#
+# Run book: wkappbot skill read sdk-platform-release
+
+on:
+  workflow_dispatch:
+    inputs:
+      core_ref:
+        description: 'WKAppBot ref to build (branch, tag or sha)'
+        default: main
+  repository_dispatch:
+    types: [core-updated]       # client_payload.ref = core ref to build
+  push:
+    tags: ['v*-sdk']
+    branches: ['claude/release-*']
+    paths:
+      - '.github/workflows/platform-release.yml'
+      - '.github/scripts/clone-core.sh'
+      - '.github/scripts/portable-smoke.sh'
+      - 'install.sh'
+      - 'csharp/src/WKAppBot.Launcher/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: platform-release-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+env:
+  CORE_REPO: kiexpert/WKAppBot
+  CORE_REF: ${{ inputs.core_ref || github.event.client_payload.ref || 'main' }}
+  DOTNET_NOLOGO: 'true'
+  DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+
+jobs:
+  build-portable:
+    name: build ${{ matrix.rid }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { rid: linux-x64, os: ubuntu-latest }
+          - { rid: osx-arm64, os: macos-latest }
+          - { rid: osx-x64,   os: macos-latest }
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4
+      - uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7  # v5
+        with:
+          dotnet-version: 8.0.x
+      - name: Clone core
+        env:
+          GH_TOKEN: ${{ secrets.WKAPPBOT_CORE_PAT }}
+        run: bash .github/scripts/clone-core.sh
+      - name: Publish wkappbot-${{ matrix.rid }}
+        working-directory: core/csharp/src/WKAppBot.CLI.Linux
+        run: |
+          dotnet publish WKAppBot.CLI.Linux.csproj -c Release -r ${{ matrix.rid }} --self-contained true \
+            -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o "publish/${{ matrix.rid }}"
+          mkdir -p "$GITHUB_WORKSPACE/out"
+          cp "publish/${{ matrix.rid }}/wkappbot" "$GITHUB_WORKSPACE/out/wkappbot-${{ matrix.rid }}"
+          ls -la "$GITHUB_WORKSPACE/out"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7
+        with:
+          name: bin-${{ matrix.rid }}
+          path: out/
+          retention-days: 14
+
+  build-windows:
+    name: build win-x64 (core + launcher)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4
+      - uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7  # v5
+        with:
+          dotnet-version: 8.0.x
+      - name: Clone core
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.WKAPPBOT_CORE_PAT }}
+        run: bash .github/scripts/clone-core.sh
+      - name: Build wkappbot-core.exe
+        shell: pwsh
+        run: |
+          dotnet publish core/csharp/src/WKAppBot.CLI/WKAppBot.CLI.csproj --configuration Release `
+            --verbosity minimal -p:PublishSingleFile=true -p:SkipDeployCore=true -o core-publish
+          if (!(Test-Path core-publish/wkappbot-core.exe)) { throw 'wkappbot-core.exe missing after publish' }
+      - name: Build wkappbot.exe (launcher)
+        shell: pwsh
+        run: |
+          dotnet publish csharp/src/WKAppBot.Launcher/WKAppBot.Launcher.csproj --configuration Release `
+            -p:SkipDeployLauncher=true -o launcher-publish
+          if (!(Test-Path launcher-publish/wkappbot.exe)) { throw 'wkappbot.exe missing after publish' }
+      - name: Stage
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force out | Out-Null
+          Copy-Item core-publish/wkappbot-core.exe, launcher-publish/wkappbot.exe out/
+          Get-ChildItem out | Format-Table Name, Length
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7
+        with:
+          name: bin-win-x64
+          path: out/
+          retention-days: 14
+
+  verify-portable:
+    name: verify ${{ matrix.rid }} on ${{ matrix.os }}
+    needs: build-portable
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { rid: linux-x64, os: ubuntu-latest }
+          - { rid: osx-arm64, os: macos-latest }
+          - { rid: osx-x64,   os: macos-latest }   # Intel binary under Rosetta 2 on Apple silicon
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4
+        with:
+          name: bin-${{ matrix.rid }}
+          path: dist
+      - name: Install via install.sh (checksum-verified)
+        shell: bash
+        run: |
+          asset="wkappbot-${{ matrix.rid }}"
+          (cd dist && shasum -a 256 "$asset" > SHA256SUMS)
+          echo "runner: $(uname -s) $(uname -m)"
+          if [ "${{ matrix.rid }}" = osx-x64 ]; then
+            # install.sh picks the native asset; on Apple silicon force the Intel one by name.
+            mkdir -p "$RUNNER_TEMP/bin" && cp "dist/$asset" "$RUNNER_TEMP/bin/wkappbot" && chmod +x "$RUNNER_TEMP/bin/wkappbot"
+            file "$RUNNER_TEMP/bin/wkappbot" | tee /dev/stderr | grep -q x86_64
+          else
+            WKAPPBOT_BASE_URL="file://$PWD/dist" WKAPPBOT_INSTALL_DIR="$RUNNER_TEMP/bin" sh install.sh 2>&1 | tee install.log
+            grep -q "Downloading $asset " install.log
+          fi
+      - name: Smoke (--version, help, skill read on-load, skill list, Hangul file round-trip)
+        shell: bash
+        run: bash .github/scripts/portable-smoke.sh "$RUNNER_TEMP/bin/wkappbot"
+
+  verify-windows:
+    name: verify win-x64 on windows-latest
+    needs: build-windows
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4
+        with:
+          name: bin-win-x64
+          path: bin
+      - name: Seed skills
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force bin/wkappbot.hq/skills/wkappbot-workflow | Out-Null
+          Copy-Item skills/wkappbot-workflow/on-load*.skill.json bin/wkappbot.hq/skills/wkappbot-workflow/
+      - name: Core --version and skill read on-load (120 s budget each)
+        shell: pwsh
+        run: |
+          function Invoke-Budget([string[]]$cmdArgs, [string]$name) {
+            $p = Start-Process bin/wkappbot-core.exe -ArgumentList $cmdArgs -NoNewWindow -PassThru `
+              -RedirectStandardOutput "$name.out" -RedirectStandardError "$name.err"
+            if (-not $p.WaitForExit(120000)) { $p.Kill(); throw "wkappbot-core $($cmdArgs -join ' ') hung > 120 s" }
+            $out = Get-Content "$name.out" -Raw
+            Write-Host "---- $name (rc=$($p.ExitCode))"; Write-Host $out; Get-Content "$name.err" | Write-Host
+            if ($p.ExitCode -ne 0) { throw "$name rc=$($p.ExitCode)" }
+            if (-not $out) { throw "$name printed nothing" }
+            return $out
+          }
+          Invoke-Budget @('--version') 'version' | Out-Null
+          $s = Invoke-Budget @('skill', 'read', 'on-load') 'skill-read'
+          if ($s -notmatch 'on-load') { throw 'skill read on-load did not print the skill' }
+      - name: Launcher present and versioned
+        shell: pwsh
+        run: |
+          $v = (Get-Item bin/wkappbot.exe).VersionInfo
+          Write-Host "wkappbot.exe FileVersion=$($v.FileVersion) ProductVersion=$($v.ProductVersion)"
+          if (-not $v.FileVersion) { throw 'wkappbot.exe has no file version' }
+
+  checksums:
+    name: SHA256SUMS
+    needs: [verify-portable, verify-windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4
+        with:
+          pattern: bin-*
+          path: dist
+          merge-multiple: true
+      - name: Compress core over 100 MB, then SHA256SUMS
+        run: |
+          cd dist
+          size=$(stat -c %s wkappbot-core.exe)
+          if [ "$size" -gt 104857600 ]; then
+            xz -9 -T0 wkappbot-core.exe
+            echo "wkappbot-core.exe was $size bytes -> wkappbot-core.exe.xz"
+          fi
+          chmod +x wkappbot-linux-x64 wkappbot-osx-arm64 wkappbot-osx-x64
+          sha256sum wkappbot-linux-x64 wkappbot-osx-arm64 wkappbot-osx-x64 wkappbot.exe wkappbot-core.exe* > SHA256SUMS
+          cat SHA256SUMS
+          ls -la
+          {
+            echo '### SHA256SUMS'; echo '```'; cat SHA256SUMS; echo '```'
+            echo "core: $CORE_REPO@$CORE_REF"
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7
+        with:
+          name: release-assets
+          path: dist/
+          retention-days: 30
+
+  release:
+    name: publish GitHub release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: checksums
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4
+        with:
+          name: release-assets
+          path: dist
+      - name: Create or update release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          cd dist && sha256sum -c SHA256SUMS && cd ..
+          ver="${TAG#v}"
+          # Release notes = this version's CHANGELOG section.
+          awk -v h="## [$ver]" 'index($0,h)==1{f=1;next} f&&/^## \[/{exit} f' CHANGELOG.md > notes.md
+          [ -s notes.md ] || echo "See CHANGELOG.md" > notes.md
+          gh release view "$TAG" >/dev/null 2>&1 || \
+            gh release create "$TAG" --title "WKAppBot $TAG" --notes-file notes.md --verify-tag
+          gh release upload "$TAG" dist/* --clobber
+          gh release view "$TAG" --json assets --jq '.assets[] | "\(.name) \(.size)"'
