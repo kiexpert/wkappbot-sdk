@@ -159,6 +159,7 @@ Current binary: `wkappbot --version` reports the installed build number; the pub
 
 - **All-platform QA suite** — `qa/run-qa.sh` / `qa\run-qa.cmd` checks the CLI, `wkhippo` and the kih harness per platform and prints a Windows / Linux / macOS table.
 - **Linux CLI + kih harness installer** — first Linux run recorded in `qa/results/linux.json` (34 PASS / 12 FAIL / 5 SKIP); installer tested in a throwaway HOME (install, idempotent re-install, uninstall).
+- **Linux / macOS binaries** — `wkappbot-linux-x64`, `wkappbot-osx-arm64`, `wkappbot-osx-x64` + `SHA256SUMS` on the release; one-line `install.sh`.
 - **Public-skill gate** — `qa/skill_home_plan.py` marks a skill install-eligible only when no credential / account / private marker matches.
 - **Skill auto-commit / minimal auto-push** and **wkhippo on Linux** (core v7.12).
 - **Hygiene sweep** — personal machine paths and stray debug dumps removed from the public repo.
@@ -373,8 +374,13 @@ Launcher and core both come from this repo's public [Releases](https://github.co
 | Platform | Status | What to download |
 |---|---|---|
 | **Windows 10/11 x64** | Supported | `wkappbot-X.Y.Z-sdk.zip` (launcher `wkappbot.exe` + core `wkappbot-core.exe`), extract into `bin\` of your clone. `wkappbot.exe` alone is the launcher only. |
-| **Linux x64** | Preview — no prebuilt binary yet | The release does not attach a Linux binary yet. The Linux minimal CLI, `wkhippo` and the kih harness installer pass the QA suite (`qa/results/linux.json`); run the scripts in `bin/*.sh` from a clone and check status with `qa/run-qa.sh`. |
-| **macOS** | Not supported yet | Portable builds are validated in CI only; there is no macOS binary and QA has not been run on macOS. |
+| **Linux x64** | Preview — minimal CLI | `wkappbot-linux-x64` via `install.sh` (below). The portable build covers `skill`, `file`, `suggest` and `version` only; UI automation stays Windows-only. |
+| **macOS (Apple silicon / Intel)** | Preview — minimal CLI | `wkappbot-osx-arm64` / `wkappbot-osx-x64` via `install.sh`. Same command set as Linux. CI smokes the arm64 build on `macos-latest`; the Intel build is cross-built and checksum-verified but not run in CI. |
+
+```bash
+# Linux / macOS: picks the asset for your OS/CPU, verifies SHA256SUMS, installs ~/.local/bin/wkappbot
+curl -fsSL https://raw.githubusercontent.com/kiexpert/wkappbot-sdk/main/install.sh | sh
+```
 
 ```powershell
 # Windows: download the latest bundle into bin\
