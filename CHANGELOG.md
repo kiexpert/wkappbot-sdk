@@ -34,7 +34,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 **Known gaps (honest status)**
 - Harness hook latency is 1.2-7 s per call on Linux (bare `pwsh` start is 0.25 s), above the 1 s mandate; owned by the kih harness.
 - The Linux / macOS build is the minimal CLI (`skill`, `file`, `suggest`, `version`); UI automation is Windows-only.
-- `file write` does not create parent directories (known bug, tracked by the `cli` QA area).
+- Windows: the kih installer (`install.ps1`) wires PreToolUse/PostToolUse but no Stop hook; the harness QA reports this as a WARN.
 
 ---
 

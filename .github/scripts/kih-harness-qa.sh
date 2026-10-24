@@ -26,6 +26,8 @@ for r in rows if isinstance(rows, list) else []:
     print(f"{st:5} {name}: {det}")
     if st.upper() == "FAIL":
         print(f"::error::harness QA FAIL {name}: {det}")
+    elif st.upper() == "WARN":
+        print(f"::warning::harness QA WARN {name}: {det}")
 PY
 fi
 echo "kih harness QA exit=$rc (0 pass, 1 fail, 2 cannot evaluate)"
