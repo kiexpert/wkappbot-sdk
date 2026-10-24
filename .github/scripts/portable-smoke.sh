@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 # Smoke for an installed portable wkappbot CLI (Linux / macOS), in two tiers.
 # Usage: portable-smoke.sh <path-to-wkappbot> [expected-rid]   (run from the wkappbot-sdk checkout root)
-#   SMOKE_TIER=required (default): --version (+ runtime label) and skill read on-load; any FAIL exits 1.
-#   SMOKE_TIER=advisory: help, skill list/search, suggest list, file write/read; failures are
-#     ::warning:: annotations and the script exits 0 (they never block publish or release).
+#   SMOKE_TIER=required (default): --version (+ runtime label), the skill series (read on-load, search,
+#     list) and the file series (write with byte check, read, edit + re-read, write into a new folder);
+#     any FAIL exits 1.
+#   SMOKE_TIER=advisory: help and suggest list; failures are ::warning:: annotations and the script
+#     exits 0 (they never block publish or release).
 set -euo pipefail
 bin="${1:?usage: portable-smoke.sh <wkappbot> [expected-rid]}"
 want_rid="${2:-}"
@@ -31,33 +33,37 @@ check() {  # check <name> <cmd...>: run and require rc=0; stdout kept in $work/<
 nonempty() { [ -s "$work/$1.out" ] || bad "$1 printed nothing"; }
 
 if [ "$tier" = required ]; then
-  check version    "$bin" --version
-  check skill-read "$bin" skill read on-load
-  for n in version skill-read; do nonempty "$n"; done
+  check version      "$bin" --version
+  check skill-read   "$bin" skill read on-load
+  check skill-search "$bin" skill search on-load
+  check skill-list   "$bin" skill list
+  for n in version skill-read skill-search skill-list; do nonempty "$n"; done
+  grep -q 'on-load' "$work/skill-search.out" || bad "skill search on-load did not list on-load"
   # The version label names the binary's own runtime (an osx-x64 build under Rosetta must say osx-x64).
   if [ -n "$want_rid" ]; then
     if grep -q "($want_rid)" "$work/version.out"; then echo "PASS version label: $want_rid"
     else bad "version label: want ($want_rid), got: $(head -1 "$work/version.out")"; fi
   fi
+
+  # File series: Hangul round-trip through write / read (byte-exact), edit + re-read, new folder.
+  printf '한글 라운드트립 ✓\nsecond line\n' > "$work/src.txt"
+  check file-write "$bin" file write "$work/out.txt" --source-file "$work/src.txt"
+  if cmp -s "$work/src.txt" "$work/out.txt"; then echo "PASS file-write bytes"; else bad "file-write bytes differ"; fi
+  check file-read  "$bin" file read "$work/out.txt"
+  grep -q '한글' "$work/file-read.out" || bad "file-read lost Hangul"
+  check file-edit  "$bin" file edit "$work/out.txt" --old-string "second line" --new-string "edited 편집 line"
+  check file-reread "$bin" file read "$work/out.txt"
+  if grep -q '편집' "$work/out.txt" && ! grep -q 'second line' "$work/out.txt" && grep -q '편집' "$work/file-reread.out"; then
+    echo "PASS file-edit visible on disk and in file read"
+  else bad "file edit not applied (disk: $(tr '\n' '|' < "$work/out.txt"))"; fi
+  check file-write-newdir "$bin" file write "$work/new/deeper/out.txt" --source-file "$work/src.txt"
+  cmp -s "$work/src.txt" "$work/new/deeper/out.txt" || bad "file-write-newdir bytes"
   exit $fail
 fi
 
 check help         "$bin" help
-check skill-list   "$bin" skill list
-check skill-search "$bin" skill search on-load
 check suggest-list "$bin" suggest list
-for n in help skill-search; do nonempty "$n"; done
-
-# Hangul round-trip through file write / file read (byte-exact).
-printf '한글 라운드트립 ✓\n' > "$work/src.txt"
-check file-write "$bin" file write "$work/out.txt" --source-file "$work/src.txt"
-if cmp -s "$work/src.txt" "$work/out.txt"; then echo "PASS file-write bytes"; else bad "file-write bytes differ"; fi
-check file-read  "$bin" file read "$work/out.txt"
-grep -q '한글' "$work/file-read.out" || bad "file-read lost Hangul"
-
-# file write creates missing parent folders.
-check file-write-newdir "$bin" file write "$work/new/deeper/out.txt" --source-file "$work/src.txt"
-cmp -s "$work/src.txt" "$work/new/deeper/out.txt" || bad "file-write-newdir bytes"
+nonempty help
 
 echo "advisory smoke: $([ $fail = 0 ] && echo clean || echo 'warnings above (non-blocking)')"
 exit 0

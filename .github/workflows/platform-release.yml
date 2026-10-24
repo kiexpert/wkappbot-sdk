@@ -182,10 +182,10 @@ jobs:
             WKAPPBOT_BASE_URL="file://$PWD/dist" WKAPPBOT_INSTALL_DIR="$RUNNER_TEMP/bin" sh install.sh 2>&1 | tee install.log
             grep -q "Downloading $asset " install.log
           fi
-      - name: REQUIRED smoke (--version + runtime label, skill read on-load)
+      - name: REQUIRED smoke (--version + label, skill read/search/list, file write/read/edit/new folder)
         shell: bash
         run: bash .github/scripts/portable-smoke.sh "$RUNNER_TEMP/bin/wkappbot" ${{ matrix.rid }}
-      - name: ADVISORY smoke (help, skill list/search, suggest list, file write/read)
+      - name: ADVISORY smoke (help, suggest list)
         shell: bash
         continue-on-error: true
         env:
@@ -247,6 +247,9 @@ jobs:
         run: |
           bash .github/scripts/clone-kih.sh
           bash .github/scripts/kih-harness-qa.sh bin/wkappbot-core.exe
+      - name: REQUIRED file + skill series (file write/read/edit/new folder, skill read/search/list)
+        shell: pwsh
+        run: pwsh -NoProfile -File .github/scripts/win-gui-qa.ps1 -Core bin/wkappbot-core.exe -Skills skills -Suite required
       - name: ADVISORY live GUI QA (windows, a11y read, exec lifetime, cdp open, license, skill edit fork)
         shell: pwsh
         continue-on-error: true

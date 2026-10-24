@@ -1,9 +1,14 @@
-# Live GUI QA for the Windows core on a desktop-session runner (windows-latest has one).
-# Usage: pwsh -File win-gui-qa.ps1 -Core <path to wkappbot-core.exe> -Skills <sdk skills dir>
+# Windows core QA on a desktop-session runner (windows-latest has one), in two suites:
+#   -Suite required : the file series (write + byte check, read, edit + re-read, new folder) and the
+#                     skill series (read on-load, search, list); FAIL is ::error:: and gates the release.
+#   -Suite gui      : live GUI checks (a11y find/read, exec app lifetime, cdp open, license status,
+#                     skill edit on a throwaway fork); FAIL is ::warning:: (advisory).
+# Usage: pwsh -File win-gui-qa.ps1 -Core <wkappbot-core.exe> -Skills <sdk skills dir> [-Suite gui|required]
 # Each check runs the core with a time budget; any FAIL makes the script exit 1 after all checks ran.
 param(
     [Parameter(Mandatory)][string]$Core,
     [Parameter(Mandatory)][string]$Skills,
+    [ValidateSet('gui', 'required')][string]$Suite = 'gui',
     [int]$BudgetSec = 120
 )
 $ErrorActionPreference = 'Stop'
@@ -11,6 +16,7 @@ $Core = (Resolve-Path $Core).Path
 $work = Join-Path ([IO.Path]::GetTempPath()) "wk-gui-qa-$PID"
 New-Item -ItemType Directory -Force $work | Out-Null
 $script:fails = 0
+$script:level = if ($Suite -eq 'required') { 'error' } else { 'warning' }  # the gui suite is advisory
 
 function Invoke-Core([string]$Name, [string[]]$CmdArgs) {
     $file = $Name -replace '[^\w.-]', '_'   # names like 'a11y find *' must not become wildcard paths
@@ -27,7 +33,7 @@ function Invoke-Core([string]$Name, [string[]]$CmdArgs) {
 }
 function Report([string]$Name, [bool]$Ok, [string]$Detail) {
     if ($Ok) { Write-Host "PASS $Name -- $Detail" }
-    else { Write-Host "::warning::FAIL $Name -- $Detail"; $script:fails++ }  # advisory tier: never ::error::
+    else { Write-Host "::$($script:level)::FAIL $Name -- $Detail"; $script:fails++ }
 }
 function Check([string]$Name, [string[]]$CmdArgs, [string]$Expect = '\S') {
     $r = Invoke-Core $Name $CmdArgs
@@ -42,6 +48,26 @@ function Check([string]$Name, [string[]]$CmdArgs, [string]$Expect = '\S') {
     return $r
 }
 function Get-CharmapCount { @(Get-Process charmap -ErrorAction SilentlyContinue).Count }
+
+if ($Suite -eq 'required') {
+    $f = Join-Path $work 'out.txt'; $src = Join-Path $work 'src.txt'
+    [IO.File]::WriteAllText($src, "한글 라운드트립 ✓`nsecond line`n", [Text.UTF8Encoding]::new($false))
+    Check 'file write' @('file', 'write', $f, '--source-file', $src) | Out-Null
+    $same = (Test-Path $f) -and ((Get-FileHash $f).Hash -eq (Get-FileHash $src).Hash)
+    Report 'file write bytes' $same "byte-identical copy: $same"
+    Check 'file read' @('file', 'read', $f) '한글' | Out-Null
+    Check 'file edit' @('file', 'edit', $f, '--old-string', 'second line', '--new-string', 'edited 편집 line') | Out-Null
+    $disk = [IO.File]::ReadAllText($f)
+    Report 'file edit on disk' (($disk -match '편집') -and ($disk -notmatch 'second line')) "disk now: $($disk -replace "`n", '|')"
+    Check 'file read after edit' @('file', 'read', $f) '편집' | Out-Null
+    $deep = Join-Path $work 'new/deeper/out.txt'
+    Check 'file write new folder' @('file', 'write', $deep, '--source-file', $src) | Out-Null
+    Check 'skill read on-load' @('skill', 'read', 'on-load') 'on-load' | Out-Null
+    Check 'skill search' @('skill', 'search', 'on-load') 'on-load' | Out-Null
+    Check 'skill list' @('skill', 'list') | Out-Null
+    Write-Host "required QA: $script:fails failure(s)"
+    exit ([int]($script:fails -gt 0))
+}
 
 # 1. window enumeration ('windows' and 'a11y windows' are deprecated and exit 1; the verb is 'a11y find')
 Check 'a11y find *' @('a11y', 'find', '*') | Out-Null
@@ -83,5 +109,5 @@ $marker = "qa throwaway step $PID"
 Check 'skill edit --add-step (fork)' @('skill', 'edit', 'qa-throwaway-fork', '--add-step', $marker) '.*' | Out-Null
 Check 'skill read fork shows the step' @('skill', 'read', 'qa-throwaway-fork', '--keep', $marker) ([regex]::Escape($marker)) | Out-Null
 
-Write-Host "GUI QA: $script:fails failure(s)"
+Write-Host "GUI QA (advisory): $script:fails failure(s)"
 exit ([int]($script:fails -gt 0))
