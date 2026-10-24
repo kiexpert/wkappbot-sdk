@@ -39,6 +39,7 @@ on:
       - '.github/scripts/portable-smoke.sh'
       - '.github/scripts/clone-kih.sh'
       - '.github/scripts/kih-harness-qa.sh'
+      - '.github/scripts/kih-install.sh'
       - '.github/scripts/publish-to-kih.sh'
       - '.github/scripts/win-gui-qa.ps1'
       - 'install.sh'
@@ -191,17 +192,15 @@ jobs:
         env:
           SMOKE_TIER: advisory
         run: bash .github/scripts/portable-smoke.sh "$RUNNER_TEMP/bin/wkappbot" ${{ matrix.rid }}
-      - name: kih harness QA (--quick) -- REQUIRED once kih ships its advisory split
+      - name: REQUIRED kih harness install + QA (installer wires the runner, then wk-harness-qa.sh)
         shell: bash
-        # TEMPORARY: kih wk-harness-qa.sh still FAILs 'settings' and 'githooks', install-state checks a
-        # fresh runner cannot pass. When its advisory split lands (they WARN, exit stays 0 without
-        # WK_QA_STRICT), delete this continue-on-error and the step gates publish and release again.
-        continue-on-error: true
         env:
           # read-only clone: fall back to the core token while KIH_PUSH_PAT is not set
           GH_TOKEN: ${{ secrets.KIH_PUSH_PAT || secrets.WKAPPBOT_CORE_PAT }}
+          WKAPPBOT_CORE: ${{ runner.temp }}/bin/wkappbot
         run: |
           bash .github/scripts/clone-kih.sh
+          bash .github/scripts/kih-install.sh
           bash .github/scripts/kih-harness-qa.sh "$RUNNER_TEMP/bin/wkappbot"
 
   verify-windows:
@@ -235,17 +234,14 @@ jobs:
           Invoke-Budget @('--version') 'version' | Out-Null
           $s = Invoke-Budget @('skill', 'read', 'on-load') 'skill-read'
           if ($s -notmatch 'on-load') { throw 'skill read on-load did not print the skill' }
-      - name: kih harness QA (--quick) -- REQUIRED once kih ships its advisory split
+      - name: REQUIRED kih harness install + QA (installer wires the runner, then wk-harness-qa.sh)
         shell: bash
-        # TEMPORARY: kih wk-harness-qa.sh still FAILs 'settings' and 'githooks', install-state checks a
-        # fresh runner cannot pass. When its advisory split lands (they WARN, exit stays 0 without
-        # WK_QA_STRICT), delete this continue-on-error and the step gates publish and release again.
-        continue-on-error: true
         env:
-          # read-only clone: fall back to the core token while KIH_PUSH_PAT is not set
           GH_TOKEN: ${{ secrets.KIH_PUSH_PAT || secrets.WKAPPBOT_CORE_PAT }}
         run: |
+          export WKAPPBOT_CORE="$PWD/bin/wkappbot-core.exe"
           bash .github/scripts/clone-kih.sh
+          bash .github/scripts/kih-install.sh
           bash .github/scripts/kih-harness-qa.sh bin/wkappbot-core.exe
       - name: REQUIRED file + skill series (file write/read/edit/new folder, skill read/search/list)
         shell: pwsh
@@ -331,7 +327,8 @@ jobs:
           awk -v h="## [$ver]" 'index($0,h)==1{f=1;next} f&&/^## \[/{exit} f' CHANGELOG.md > notes.md
           [ -s notes.md ] || echo "See CHANGELOG.md" > notes.md
           gh release view "$TAG" >/dev/null 2>&1 || \
-            gh release create "$TAG" --title "WKAppBot $TAG" --notes-file notes.md --verify-tag
+            gh release create "$TAG" --title "WKAppBot $TAG" --notes-file notes.md --verify-tag \
+              $(case "$TAG" in *-pre*|*-rc*|*-beta*) echo --prerelease ;; esac)
           gh release upload "$TAG" dist/* --clobber
           gh release view "$TAG" --json assets --jq '.assets[] | "\(.name) \(.size)"'
 
