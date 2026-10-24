@@ -4,6 +4,24 @@
 platform from this public repo, on the free GitHub-hosted runners. The private core is cloned
 with the `WKAPPBOT_CORE_PAT` secret by `.github/scripts/clone-core.sh` (token never printed).
 
+## Build farm
+
+This repo is the build farm for the AppBot core and launcher on every platform. Nothing deploys
+unless every platform's build and verify jobs are green.
+
+1. **Trigger.** The core repo's `.github/workflows/sdk-build-dispatch.yml` sends
+   `repository_dispatch` `core-updated` with `client_payload.ref` = the pushed core sha whenever
+   `csharp/` changes on main (secret `SDK_DISPATCH_PAT` there). The hourly cron here is the fallback.
+2. **Resolve** (`.github/scripts/resolve-core.sh`): the ref becomes one sha that every build job
+   clones, so all platforms ship the same commit. On the cron it builds only when core main differs
+   from the sha kih `bin/` was last published from (the `WKAppBot@<sha>` token in the kih bin commit
+   message) and `csharp/` changed between the two.
+3. **Build + verify + kih harness QA** per platform (jobs below).
+4. **Deploy:** `publish-to-kih` on every green run of `main` (dispatch, cron, push) or a tag; a
+   `v*-sdk` tag also cuts the GitHub release. One kih commit per run:
+   `bin: platform binaries from WKAppBot@<sha>` with the run URL in the body.
+5. **Concurrency:** one run per core ref; two core pushes queue rather than race.
+
 ## Jobs
 
 | Job | Runner | What |
@@ -14,7 +32,8 @@ with the `WKAPPBOT_CORE_PAT` secret by `.github/scripts/clone-core.sh` (token ne
 | verify (x4) | native runner | Linux / macOS: `install.sh` from the artifact (checksum-verified), then `.github/scripts/portable-smoke.sh` (`--version`, `help`, `skill read on-load` against a seeded skills dir, `skill list`, Hangul file round-trip). osx-x64 runs under Rosetta 2. Windows: core `--version` and `skill read on-load` (120 s budget each), launcher file version. |
 | SHA256SUMS | ubuntu-latest | `wkappbot-core.exe` over 100 MB is shipped as `wkappbot-core.exe.xz`; sums for all assets; artifact `release-assets` |
 | release | ubuntu-latest | only on a `v*-sdk` tag: creates the release with the CHANGELOG section as notes and uploads the assets |
-| publish-to-kih | ubuntu-latest | green run on `main` (push or dispatch) or a tag: `.github/scripts/publish-to-kih.sh` runs kih `tools/wk-bin-acquire.sh publish` per changed binary (`WK_BIN_NO_PUSH=1`), then one `git push origin HEAD:main` with a rebase-retry loop. Unchanged binaries (sha256 equal to the MANIFEST row; the Windows core compared decompressed) make no commit. |
+| resolve | ubuntu-latest | ref -> one core sha; cron decides whether anything changed |
+| publish-to-kih | ubuntu-latest | green run on `main` (push, dispatch or cron) or a tag; skipped with a warning while `KIH_PUSH_PAT` is unset: `.github/scripts/publish-to-kih.sh` runs kih `tools/wk-bin-acquire.sh publish` per changed binary (`WK_BIN_NO_PUSH=1`), then one `git push origin HEAD:main` with a rebase-retry loop. Unchanged binaries (sha256 equal to the MANIFEST row; the Windows core compared decompressed) make no commit. |
 
 Every verify job also clones kih (`KIH_PUSH_PAT`) and runs `tools/wk-harness-qa.sh --quick --json`
 with `WKAPPBOT_CORE` pointing at the binary under test (`.github/scripts/kih-harness-qa.sh`;
@@ -41,6 +60,10 @@ Any red job stops the release.
 - `repository_dispatch` type `core-updated`, `client_payload.ref` = core ref.
 - push of a `v*-sdk` tag: full run plus release.
 - push to `main` or `claude/release-*` touching the pipeline files: build + verify (main also publishes to kih).
+- hourly cron (`17 * * * *`, default branch only): builds only when the core moved (see Build farm).
+
+`repository_dispatch`, cron and `workflow_dispatch` run the workflow file from the default branch,
+so none of them works until `platform-release.yml` is on `main`.
 
 ## Run it
 

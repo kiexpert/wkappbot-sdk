@@ -18,6 +18,7 @@ manifest_sha() {  # manifest_sha REL -> sha256 column of the bin/MANIFEST.md row
 }
 
 published=0
+base="$(git rev-parse HEAD)"
 pub() {  # pub SRC PLATFORM REL
   local src="$1" plat="$2" rel="$3" have want
   have="$(sha "$src")"
@@ -46,10 +47,15 @@ if [ "$published" = 0 ]; then
   echo "kih bin/ already matches this build -- nothing to push"
   exit 0
 fi
-git log --oneline -n "$published"
+# One commit for the whole platform set, naming the core sha and this run (the hourly cron reads the
+# "WKAppBot@<sha>" token back to decide whether the core moved).
+git reset --soft "$base"
+git commit -q -m "bin: platform binaries from WKAppBot@${CORE_SHA:-unknown}" \
+  -m "$published binary file(s) published by wkappbot-sdk platform-release ${RUN_URL:-}" -m "Files: $(git diff --cached --name-only "$base" | tr '\n' ' ')"
+git log --stat -1 | head -20
 for i in 1 2 3 4 5; do
   if git push origin HEAD:main; then
-    echo "pushed $published commit(s) to kih main: $(git rev-parse --short HEAD)"
+    echo "pushed 1 commit ($published binary file(s)) to kih main: $(git rev-parse --short HEAD)"
     exit 0
   fi
   echo "push rejected (attempt $i) -- rebasing on kih main"

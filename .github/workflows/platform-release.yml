@@ -9,8 +9,13 @@ name: Platform Release (build / verify / release)
 #            + kih harness QA (kih tools/wk-harness-qa.sh --quick) against the same binary.
 #   release  tag push only: SHA256SUMS + assets on the GitHub release. The asset names are a
 #            contract (kih tools/wk-bin-acquire.sh downloads releases/latest/download/<name>).
-#   publish-to-kih  green run on main (push, dispatch) or a tag: kih bin/ + MANIFEST.md updated
-#            with kih's own wk-bin-acquire.sh publish, one push, no commit when nothing changed.
+#   publish-to-kih  green run on main (push, core-updated dispatch, cron) or a tag: kih bin/ +
+#            MANIFEST.md updated with kih's own wk-bin-acquire.sh publish, one commit naming the core
+#            sha and this run, one push; no commit when nothing changed.
+#
+# The SDK repo is the build farm for the core: the core repo fires repository_dispatch core-updated
+# (client_payload.ref = core sha) when csharp/ changes; an hourly cron is the fallback and builds
+# only when WKAppBot main moved past the sha kih bin/ was last published from AND csharp/ changed.
 #
 # Run book: docs/platform-release.md
 
@@ -22,12 +27,15 @@ on:
         default: main
   repository_dispatch:
     types: [core-updated]       # client_payload.ref = core ref to build
+  schedule:
+    - cron: '17 * * * *'        # fallback when the core repo cannot dispatch (its CI is billing-blocked)
   push:
     tags: ['v*-sdk']
     branches: [main, 'claude/release-*']
     paths:
       - '.github/workflows/platform-release.yml'
       - '.github/scripts/clone-core.sh'
+      - '.github/scripts/resolve-core.sh'
       - '.github/scripts/portable-smoke.sh'
       - '.github/scripts/clone-kih.sh'
       - '.github/scripts/kih-harness-qa.sh'
@@ -39,8 +47,9 @@ permissions:
   contents: read
 
 concurrency:
-  group: platform-release-${{ github.ref }}
-  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+  # one run per core ref: two core pushes queue instead of racing; only branch pushes cancel
+  group: platform-release-${{ github.event.client_payload.ref || inputs.core_ref || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/') }}
 
 env:
   CORE_REPO: kiexpert/WKAppBot
@@ -49,8 +58,26 @@ env:
   DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
 
 jobs:
+  resolve:
+    name: resolve core sha
+    runs-on: ubuntu-latest
+    outputs:
+      sha: ${{ steps.r.outputs.sha }}
+      build: ${{ steps.r.outputs.build }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4
+      - name: Resolve ref, and on cron skip an unchanged core
+        id: r
+        env:
+          GH_TOKEN: ${{ secrets.WKAPPBOT_CORE_PAT }}
+          KIH_TOKEN: ${{ secrets.KIH_PUSH_PAT || secrets.WKAPPBOT_CORE_PAT }}
+          EVENT: ${{ github.event_name }}
+        run: bash .github/scripts/resolve-core.sh
+
   build-portable:
     name: build ${{ matrix.rid }}
+    needs: resolve
+    if: needs.resolve.outputs.build == 'true'
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -67,6 +94,7 @@ jobs:
       - name: Clone core
         env:
           GH_TOKEN: ${{ secrets.WKAPPBOT_CORE_PAT }}
+          CORE_REF: ${{ needs.resolve.outputs.sha }}
         run: bash .github/scripts/clone-core.sh
       - name: Publish wkappbot-${{ matrix.rid }}
         working-directory: core/csharp/src/WKAppBot.CLI.Linux
@@ -84,6 +112,8 @@ jobs:
 
   build-windows:
     name: build win-x64 (core + launcher)
+    needs: resolve
+    if: needs.resolve.outputs.build == 'true'
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4
@@ -94,6 +124,7 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.WKAPPBOT_CORE_PAT }}
+          CORE_REF: ${{ needs.resolve.outputs.sha }}
         run: bash .github/scripts/clone-core.sh
       - name: Build wkappbot-core.exe
         shell: pwsh
@@ -212,7 +243,7 @@ jobs:
 
   checksums:
     name: SHA256SUMS
-    needs: [verify-portable, verify-windows]
+    needs: [resolve, verify-portable, verify-windows]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4
@@ -234,7 +265,7 @@ jobs:
           ls -la
           {
             echo '### SHA256SUMS'; echo '```'; cat SHA256SUMS; echo '```'
-            echo "core: $CORE_REPO@$CORE_REF"
+            echo "core: $CORE_REPO@${{ needs.resolve.outputs.sha }} (ref $CORE_REF)"
           } >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7
         with:
@@ -273,18 +304,30 @@ jobs:
   publish-to-kih:
     name: publish binaries to kih bin/
     if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
-    needs: [verify-portable, verify-windows]
+    needs: [resolve, verify-portable, verify-windows]
     runs-on: ubuntu-latest
+    env:
+      KIH_PUSH_PAT_SET: ${{ secrets.KIH_PUSH_PAT != '' }}
     steps:
+      - name: KIH_PUSH_PAT present?
+        if: env.KIH_PUSH_PAT_SET != 'true'
+        run: echo "::warning::publish-to-kih skipped -- secret KIH_PUSH_PAT is not set. Owner: gh secret set KIH_PUSH_PAT --repo kiexpert/wkappbot-sdk"
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4
+        if: env.KIH_PUSH_PAT_SET == 'true'
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4
+        if: env.KIH_PUSH_PAT_SET == 'true'
         with:
           pattern: bin-*
           path: dist
           merge-multiple: true
       - name: Clone kih
+        if: env.KIH_PUSH_PAT_SET == 'true'
         env:
           GH_TOKEN: ${{ secrets.KIH_PUSH_PAT }}
         run: bash .github/scripts/clone-kih.sh
       - name: Publish (skip unchanged) and push once
+        if: env.KIH_PUSH_PAT_SET == 'true'
+        env:
+          CORE_SHA: ${{ needs.resolve.outputs.sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: bash .github/scripts/publish-to-kih.sh dist
