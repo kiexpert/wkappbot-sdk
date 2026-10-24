@@ -15,7 +15,9 @@ $script:fails = 0
 function Invoke-Core([string]$Name, [string[]]$CmdArgs) {
     $out = Join-Path $work "$Name.out"; $err = Join-Path $work "$Name.err"
     $sw = [Diagnostics.Stopwatch]::StartNew()
-    $p = Start-Process $Core -ArgumentList $CmdArgs -NoNewWindow -PassThru -RedirectStandardOutput $out -RedirectStandardError $err
+    # Start-Process joins -ArgumentList with spaces and does NOT quote, so quote every arg that needs it.
+    $argLine = ($CmdArgs | ForEach-Object { if ($_ -match '[\s"]') { '"' + ($_ -replace '"', '\"') + '"' } else { $_ } }) -join ' '
+    $p = Start-Process $Core -ArgumentList $argLine -NoNewWindow -PassThru -RedirectStandardOutput $out -RedirectStandardError $err
     $done = $p.WaitForExit($BudgetSec * 1000)
     if (-not $done) { try { $p.Kill($true) } catch {} }
     $text = (Get-Content $out -Raw -ErrorAction SilentlyContinue) + ''
@@ -40,8 +42,8 @@ function Check([string]$Name, [string[]]$CmdArgs, [string]$Expect = '\S') {
 }
 function Get-CharmapCount { @(Get-Process charmap -ErrorAction SilentlyContinue).Count }
 
-# 1. window enumeration ('a11y windows' is a deprecated alias that exits 1; the verb is 'windows')
-Check 'windows' @('windows') | Out-Null
+# 1. window enumeration ('windows' and 'a11y windows' are deprecated and exit 1; the verb is 'a11y find')
+Check 'a11y find *' @('a11y', 'find', '*') | Out-Null
 
 # 2. a11y read on a window this script starts
 Get-Process charmap -ErrorAction SilentlyContinue | Stop-Process -Force
