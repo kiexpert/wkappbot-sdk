@@ -13,14 +13,16 @@ export WK_QA_REPO="$PWD/kih" WKAPPBOT_CORE="$(cd "$(dirname "$core")" && pwd)/$(
 echo "kih harness QA: $qa --quick --json, WKAPPBOT_CORE=$WKAPPBOT_CORE"
 rc=0
 bash "$qa" --quick --json > harness-qa.json || rc=$?
-cat harness-qa.json
-if command -v python3 >/dev/null 2>&1; then
+if ! command -v python3 >/dev/null 2>&1; then
+  cat harness-qa.json
+else
   python3 - harness-qa.json <<'PY' || true
 import json, sys
 try:
     rows = json.load(open(sys.argv[1], encoding="utf-8"))
 except Exception as e:
-    print(f"(json not parseable: {e})"); sys.exit(0)
+    print(f"(json not parseable: {e}); raw output follows")
+    print(open(sys.argv[1], encoding="utf-8", errors="replace").read()); sys.exit(0)
 for r in rows if isinstance(rows, list) else []:
     st = str(r.get("status", "?")); name = r.get("name", "?"); det = r.get("detail", "")
     print(f"{st:5} {name}: {det}")
