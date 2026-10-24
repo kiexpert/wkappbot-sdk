@@ -13,7 +13,8 @@ New-Item -ItemType Directory -Force $work | Out-Null
 $script:fails = 0
 
 function Invoke-Core([string]$Name, [string[]]$CmdArgs) {
-    $out = Join-Path $work "$Name.out"; $err = Join-Path $work "$Name.err"
+    $file = $Name -replace '[^\w.-]', '_'   # names like 'a11y find *' must not become wildcard paths
+    $out = Join-Path $work "$file.out"; $err = Join-Path $work "$file.err"
     $sw = [Diagnostics.Stopwatch]::StartNew()
     # Start-Process joins -ArgumentList with spaces and does NOT quote, so quote every arg that needs it.
     $argLine = ($CmdArgs | ForEach-Object { if ($_ -match '[\s"]') { '"' + ($_ -replace '"', '\"') + '"' } else { $_ } }) -join ' '
