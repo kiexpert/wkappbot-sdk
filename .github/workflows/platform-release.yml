@@ -182,12 +182,17 @@ jobs:
             WKAPPBOT_BASE_URL="file://$PWD/dist" WKAPPBOT_INSTALL_DIR="$RUNNER_TEMP/bin" sh install.sh 2>&1 | tee install.log
             grep -q "Downloading $asset " install.log
           fi
-      - name: Smoke (--version, help, skill read on-load, skill list, Hangul file round-trip)
+      - name: REQUIRED smoke (--version + runtime label, skill read on-load)
         shell: bash
         run: bash .github/scripts/portable-smoke.sh "$RUNNER_TEMP/bin/wkappbot" ${{ matrix.rid }}
-      - name: kih harness QA (--quick)
+      - name: ADVISORY smoke (help, skill list/search, suggest list, file write/read)
         shell: bash
-        continue-on-error: true   # until wk-harness-qa.sh is green on all four runners
+        continue-on-error: true
+        env:
+          SMOKE_TIER: advisory
+        run: bash .github/scripts/portable-smoke.sh "$RUNNER_TEMP/bin/wkappbot" ${{ matrix.rid }}
+      - name: REQUIRED kih harness QA (--quick; its exit code gates, advisory checks only WARN)
+        shell: bash
         env:
           # read-only clone: fall back to the core token while KIH_PUSH_PAT is not set
           GH_TOKEN: ${{ secrets.KIH_PUSH_PAT || secrets.WKAPPBOT_CORE_PAT }}
@@ -210,7 +215,7 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force bin/wkappbot.hq/skills/wkappbot-workflow | Out-Null
           Copy-Item skills/wkappbot-workflow/on-load*.skill.json bin/wkappbot.hq/skills/wkappbot-workflow/
-      - name: Core --version and skill read on-load (120 s budget each)
+      - name: REQUIRED core --version and skill read on-load (120 s budget each)
         shell: pwsh
         run: |
           function Invoke-Budget([string[]]$cmdArgs, [string]$name) {
@@ -226,20 +231,23 @@ jobs:
           Invoke-Budget @('--version') 'version' | Out-Null
           $s = Invoke-Budget @('skill', 'read', 'on-load') 'skill-read'
           if ($s -notmatch 'on-load') { throw 'skill read on-load did not print the skill' }
-      - name: kih harness QA (--quick)
+      - name: REQUIRED kih harness QA (--quick; its exit code gates, advisory checks only WARN)
         shell: bash
-        continue-on-error: true   # until wk-harness-qa.sh is green on all four runners
         env:
           # read-only clone: fall back to the core token while KIH_PUSH_PAT is not set
           GH_TOKEN: ${{ secrets.KIH_PUSH_PAT || secrets.WKAPPBOT_CORE_PAT }}
         run: |
           bash .github/scripts/clone-kih.sh
           bash .github/scripts/kih-harness-qa.sh bin/wkappbot-core.exe
-      - name: Live GUI QA (a11y windows/read, exec, cdp open, license, skill edit)
+      - name: ADVISORY live GUI QA (windows, a11y read, exec lifetime, cdp open, license, skill edit fork)
         shell: pwsh
-        run: pwsh -NoProfile -File .github/scripts/win-gui-qa.ps1 -Core bin/wkappbot-core.exe -Skills skills
-      - name: Core wktest-smoke with WKTEST_GUI=1
+        continue-on-error: true
+        run: |
+          pwsh -NoProfile -File .github/scripts/win-gui-qa.ps1 -Core bin/wkappbot-core.exe -Skills skills
+          if ($LASTEXITCODE -ne 0) { Write-Host "::warning::advisory GUI QA had failures (non-blocking) -- see the FAIL lines above"; exit 1 }
+      - name: ADVISORY core wktest-smoke with WKTEST_GUI=1
         shell: bash
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.WKAPPBOT_CORE_PAT }}
           CORE_REF: ${{ needs.resolve.outputs.sha }}

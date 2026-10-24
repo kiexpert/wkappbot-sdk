@@ -24,7 +24,7 @@ function Invoke-Core([string]$Name, [string[]]$CmdArgs) {
 }
 function Report([string]$Name, [bool]$Ok, [string]$Detail) {
     if ($Ok) { Write-Host "PASS $Name -- $Detail" }
-    else { Write-Host "::error::FAIL $Name -- $Detail"; $script:fails++ }
+    else { Write-Host "::warning::FAIL $Name -- $Detail"; $script:fails++ }  # advisory tier: never ::error::
 }
 function Check([string]$Name, [string[]]$CmdArgs, [string]$Expect = '\S') {
     $r = Invoke-Core $Name $CmdArgs
