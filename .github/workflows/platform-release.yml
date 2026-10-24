@@ -311,7 +311,8 @@ jobs:
     steps:
       - name: KIH_PUSH_PAT present?
         if: env.KIH_PUSH_PAT_SET != 'true'
-        run: echo "::warning::publish-to-kih skipped -- secret KIH_PUSH_PAT is not set. Owner: gh secret set KIH_PUSH_PAT --repo kiexpert/wkappbot-sdk"
+        run: |
+          echo "::warning::publish-to-kih skipped -- secret KIH_PUSH_PAT is not set. Owner: gh secret set KIH_PUSH_PAT --repo kiexpert/wkappbot-sdk"
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4
         if: env.KIH_PUSH_PAT_SET == 'true'
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4
