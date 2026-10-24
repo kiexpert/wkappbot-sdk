@@ -40,6 +40,7 @@ on:
       - '.github/scripts/clone-kih.sh'
       - '.github/scripts/kih-harness-qa.sh'
       - '.github/scripts/publish-to-kih.sh'
+      - '.github/scripts/win-gui-qa.ps1'
       - 'install.sh'
       - 'csharp/src/WKAppBot.Launcher/**'
 
@@ -196,7 +197,7 @@ jobs:
 
   verify-windows:
     name: verify win-x64 on windows-latest
-    needs: build-windows
+    needs: [resolve, build-windows]
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4
@@ -234,6 +235,20 @@ jobs:
         run: |
           bash .github/scripts/clone-kih.sh
           bash .github/scripts/kih-harness-qa.sh bin/wkappbot-core.exe
+      - name: Live GUI QA (a11y windows/read, exec, cdp open, license, skill edit)
+        shell: pwsh
+        run: pwsh -NoProfile -File .github/scripts/win-gui-qa.ps1 -Core bin/wkappbot-core.exe -Skills skills
+      - name: Core wktest-smoke with WKTEST_GUI=1
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.WKAPPBOT_CORE_PAT }}
+          CORE_REF: ${{ needs.resolve.outputs.sha }}
+          WKTEST_GUI: '1'
+        run: |
+          git clone --quiet --depth 1 --no-checkout "https://x-access-token:${GH_TOKEN}@github.com/${CORE_REPO}.git" core
+          git -C core fetch --quiet --depth 1 origin "$CORE_REF" && git -C core -c advice.detachedHead=false checkout --quiet FETCH_HEAD
+          cp bin/wkappbot-core.exe core/bin/wktest-core-ci.exe
+          cd core/bin && bash ./wktest-smoke.sh wktest-core-ci.exe
       - name: Launcher present and versioned
         shell: pwsh
         run: |

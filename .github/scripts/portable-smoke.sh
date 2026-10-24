@@ -29,7 +29,9 @@ check version    "$bin" --version
 check help       "$bin" help
 check skill-read "$bin" skill read on-load
 check skill-list "$bin" skill list
-for n in version help skill-read; do nonempty "$n"; done
+check skill-search "$bin" skill search on-load
+check suggest-list "$bin" suggest list
+for n in version help skill-read skill-search; do nonempty "$n"; done
 # The version label names the binary's own runtime (an osx-x64 build under Rosetta must say osx-x64).
 if [ -n "$want_rid" ]; then
   if grep -q "($want_rid)" "$work/version.out"; then echo "PASS version label: $want_rid"
