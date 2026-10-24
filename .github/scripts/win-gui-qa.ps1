@@ -30,13 +30,18 @@ function Check([string]$Name, [string[]]$CmdArgs, [string]$Expect = '\S') {
     $r = Invoke-Core $Name $CmdArgs
     $first = ($r.Out -split "`n" | Where-Object { $_.Trim() } | Select-Object -First 1)
     if (-not $r.Done) { Report $Name $false "hung > $BudgetSec s"; return $r }
-    Report $Name (($r.Rc -eq 0) -and ($r.Out -match $Expect)) "rc=$($r.Rc) $($r.Ms) ms: $first $(if ($r.Rc -ne 0) { $r.Err.Trim() })"
+    $ok = ($r.Rc -eq 0) -and ($r.Out -match $Expect)
+    Report $Name $ok "rc=$($r.Rc) $($r.Ms) ms: $first"
+    if (-not $ok) {  # full evidence for the failing check
+        Write-Host "---- $Name stdout (last 40 lines)"; ($r.Out -split "`n" | Select-Object -Last 40) | ForEach-Object { Write-Host "  $_" }
+        Write-Host "---- $Name stderr (last 20 lines)"; ($r.Err -split "`n" | Select-Object -Last 20) | ForEach-Object { Write-Host "  $_" }
+    }
     return $r
 }
 function Get-CharmapCount { @(Get-Process charmap -ErrorAction SilentlyContinue).Count }
 
-# 1. window enumeration
-Check 'a11y windows' @('a11y', 'windows') | Out-Null
+# 1. window enumeration ('a11y windows' is a deprecated alias that exits 1; the verb is 'windows')
+Check 'windows' @('windows') | Out-Null
 
 # 2. a11y read on a window this script starts
 Get-Process charmap -ErrorAction SilentlyContinue | Stop-Process -Force
@@ -46,11 +51,17 @@ Check 'a11y read charmap' @('a11y', 'read', '*Character Map*') '(?i)character|fo
 try { $cm | Stop-Process -Force } catch {}
 Start-Sleep -Seconds 1
 
-# 3. exec launches a managed app and closes it on exit
-$r = Check 'exec charmap --close-after' @('exec', 'charmap', '--close-after', '3s') '.*'
-Start-Sleep -Seconds 2
-$left = Get-CharmapCount
-Report 'exec leaves no charmap' ($left -eq 0) "charmap processes after exec: $left"
+# 3. exec app lifetime (RunCommand.JobLifetime.cs): --close-after was removed; the app exec launched
+#    lives exactly as long as exec does, so ending exec must close it.
+$ex = Start-Process $Core -ArgumentList @('exec', 'charmap') -NoNewWindow -PassThru `
+    -RedirectStandardOutput (Join-Path $work 'exec.out') -RedirectStandardError (Join-Path $work 'exec.err')
+$up = 0
+for ($i = 0; $i -lt 15 -and $up -eq 0; $i++) { Start-Sleep -Seconds 1; $up = Get-CharmapCount }
+Report 'exec charmap launches the app' ($up -gt 0) "charmap processes while exec runs: $up"
+try { Stop-Process -Id $ex.Id -Force } catch {}
+$left = 1
+for ($i = 0; $i -lt 10 -and $left -gt 0; $i++) { Start-Sleep -Seconds 1; $left = Get-CharmapCount }
+Report 'ending exec closes charmap' ($left -eq 0) "charmap processes after exec ended: $left"
 Get-Process charmap -ErrorAction SilentlyContinue | Stop-Process -Force
 
 # 4. CDP against the runner's Chrome
