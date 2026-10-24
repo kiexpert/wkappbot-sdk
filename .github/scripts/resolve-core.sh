@@ -10,6 +10,9 @@ set -euo pipefail
 ref="${CORE_REF:-main}"
 out() { echo "$1"; [ -n "${GITHUB_OUTPUT:-}" ] && echo "$1" >> "$GITHUB_OUTPUT"; return 0; }
 core_url="https://x-access-token:${GH_TOKEN}@github.com/${CORE_REPO}.git"
+# Work outside the checkout: actions/checkout leaves an http extraheader (GITHUB_TOKEN) in its repo
+# config, which would override the core token and make the private repo look "not found".
+cd "$(mktemp -d)"
 
 if [[ "$ref" =~ ^[0-9a-f]{40}$ ]]; then
   sha="$ref"
