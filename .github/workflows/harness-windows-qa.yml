@@ -1,0 +1,121 @@
+name: Harness Windows QA
+
+# Runs the harness repo's own self-tests on a Windows runner, the platform its PowerShell hooks
+# are written for, so a harness change made on a Linux cloud VM is proven on Windows too.
+# Only RESULT and CASE lines are printed; nothing from the harness repo is published.
+
+on:
+  workflow_dispatch:
+    inputs:
+      harness_ref:
+        description: 'Harness branch, tag or commit to test'
+        required: false
+        default: 'main'
+  push:
+    branches-ignore: [main]
+    paths:
+      - '.github/workflows/harness-windows-qa.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  harness-windows-qa:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout harness repo
+        uses: actions/checkout@v5
+        with:
+          repository: ${{ github.repository_owner }}/wkappbot-kih
+          ref: ${{ inputs.harness_ref || 'main' }}
+          token: ${{ secrets.WKAPPBOT_CORE_PAT }}
+          path: kih
+
+      - name: Setup Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6
+        with:
+          python-version: '3.x'
+
+      - name: python3 alias (the harness scripts call python3)
+        shell: pwsh
+        run: |
+          if (-not (Get-Command python3 -ErrorAction SilentlyContinue)) {
+            $py = (Get-Command python).Source
+            Copy-Item $py (Join-Path (Split-Path $py) 'python3.exe')
+          }
+          python3 --version
+
+      - name: 1. PowerShell parse check of the edited hooks
+        shell: pwsh
+        working-directory: kih
+        run: |
+          $files = @(
+            'tools/wkharness-common-utils.ps1',
+            'tools/wkharness-common-tierscore.ps1',
+            'tools/wkharness-spokesperson-refresh.ps1',
+            'tools/wkharness-agy-main.ps1',
+            'tools/wkharness-claude-stop/Get-WkSpokesmanStopState.ps1',
+            'tools/wkharness-common-onload-scan/Get-WkOnLoadEntriesFromReflex.ps1'
+          )
+          $bad = 0
+          foreach ($f in $files) {
+            $errs = $null
+            [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $f), [ref]$null, [ref]$errs) | Out-Null
+            $n = @($errs).Count
+            if ($n -gt 0) { $bad++ }
+            Write-Host ("CASE parse {0} {1}" -f $f, $(if ($n -eq 0) { 'PASS' } else { "FAIL ($n errors)" }))
+          }
+          Write-Host "RESULT $($files.Count - $bad)/$($files.Count)"
+          if ($bad) { exit 1 }
+
+      - name: 2. Hippo tool resolves from the harness with no WKAppBot checkout
+        shell: pwsh
+        working-directory: kih
+        run: |
+          . ./tools/wkharness-common-utils.ps1
+          $kihBin = (Resolve-Path ./bin).Path
+          $fail = 0
+          foreach ($n in @('wkhippo-reflex.py', 'wkhippo-studied-index.ps1')) {
+            $got = Get-WkAppBotBinPath -Name $n
+            $ok = ($got -like "$kihBin*") -and (Test-Path -LiteralPath $got)
+            if (-not $ok) { $fail++ }
+            Write-Host ("CASE bin-path {0} {1}" -f $n, $(if ($ok) { 'PASS' } else { 'FAIL' }))
+          }
+          Write-Host "RESULT $(2 - $fail)/2"
+          if ($fail) { exit 1 }
+
+      - name: 3. Python self-tests
+        shell: bash
+        working-directory: kih
+        run: |
+          fail=0
+          run() { out=$("$@" 2>&1 | tail -1); echo "$*: $out"; case "$out" in *RESULT*) set -- $out; [ "${2%%/*}" = "${2##*/}" ] || fail=1 ;; *) fail=1 ;; esac; }
+          run python3 tools/wkharness-claude-allows-learn.py --selftest
+          (cd bin && run python3 wkhippo_reflex_families_selftest.py)
+          (cd bin && run python3 wkhippo_reflex_claude_blocked.py)
+          (cd bin/wkhippo-lib && run python3 wkhippo_reflex_claude_blocked.py)
+          exit $fail
+
+      - name: 4. Bash self-tests (Git Bash)
+        shell: bash
+        working-directory: kih
+        run: |
+          # A small fixture transcript stands in for a live session on the runner.
+          # It sits where Claude Code keeps transcripts, so a lookup by session id finds it too.
+          mkdir -p "$HOME/.claude/projects/ci"
+          fx="$HOME/.claude/projects/ci/11111111-2222-3333-4444-555555555555.jsonl"
+          {
+            printf '{"type":"user","timestamp":"2026-10-27T01:00:00.000Z","sessionId":"11111111","uuid":"u1","message":{"content":"run the archive check"}}\n'
+            printf '{"type":"assistant","timestamp":"2026-10-27T01:00:01.000Z","sessionId":"11111111","uuid":"a1","message":{"model":"m","content":[{"type":"tool_use","id":"tu1","name":"Bash","input":{"command":"bash tools/x.sh push"}}]}}\n'
+            printf '{"type":"user","timestamp":"2026-10-27T01:00:02.000Z","sessionId":"11111111","uuid":"u2","message":{"content":[{"type":"tool_result","tool_use_id":"tu1","is_error":true,"content":"Permission for this action was denied by the Claude Code auto mode classifier. Reason: [Sensitive-Source Provenance]."}]}}\n'
+          } > "$fx"
+          git config --global user.email ci@example.com; git config --global user.name ci
+          fail=0
+          for t in "tools/wk-hippo-archive-selftest.sh $fx" tools/wk-hippo-backfill-all-selftest.sh tools/wk-haiku-seat-nudge-selftest.sh tools/wk-allows-learn-prompt-selftest.sh; do
+            out=$(bash $t 2>/dev/null)
+            echo "== $t"; printf '%s\n' "$out" | grep -E '^CASE .* FAIL|^RESULT'
+            r=$(printf '%s\n' "$out" | grep '^RESULT' | tail -1); set -- $r
+            [ -n "$r" ] && [ "${2%%/*}" = "${2##*/}" ] || fail=1
+          done
+          exit $fail
