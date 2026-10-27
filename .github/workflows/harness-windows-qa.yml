@@ -40,8 +40,10 @@ jobs:
       - name: python3 alias (the harness scripts call python3)
         shell: pwsh
         run: |
-          $py = (Get-Command python).Source
-          Copy-Item $py (Join-Path (Split-Path $py) 'python3.exe') -Force
+          if (-not (Get-Command python3 -ErrorAction SilentlyContinue)) {
+            $py = (Get-Command python).Source
+            Copy-Item $py (Join-Path (Split-Path $py) 'python3.exe')
+          }
           python3 --version
 
       - name: 1. PowerShell parse check of the edited hooks
