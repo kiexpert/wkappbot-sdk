@@ -25,7 +25,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Checkout harness repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: ${{ github.repository_owner }}/wkappbot-kih
           ref: ${{ inputs.harness_ref || 'main' }}
