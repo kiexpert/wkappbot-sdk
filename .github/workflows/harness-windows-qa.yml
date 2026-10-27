@@ -102,7 +102,9 @@ jobs:
         working-directory: kih
         run: |
           # A small fixture transcript stands in for a live session on the runner.
-          fx="$RUNNER_TEMP/11111111-2222-3333-4444-555555555555.jsonl"
+          # It sits where Claude Code keeps transcripts, so a lookup by session id finds it too.
+          mkdir -p "$HOME/.claude/projects/ci"
+          fx="$HOME/.claude/projects/ci/11111111-2222-3333-4444-555555555555.jsonl"
           {
             printf '{"type":"user","timestamp":"2026-10-27T01:00:00.000Z","sessionId":"11111111","uuid":"u1","message":{"content":"run the archive check"}}\n'
             printf '{"type":"assistant","timestamp":"2026-10-27T01:00:01.000Z","sessionId":"11111111","uuid":"a1","message":{"model":"m","content":[{"type":"tool_use","id":"tu1","name":"Bash","input":{"command":"bash tools/x.sh push"}}]}}\n'
