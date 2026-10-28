@@ -82,6 +82,12 @@ jobs:
         working-directory: kih
         run: |
           $files = @(
+            'tools/CodexHookRuntime.ps1',
+            'tools/CodexHookAdapter.ps1',
+            'tools/CodexPreToolUseAdapter.ps1',
+            'tools/CodexPostToolUseAdapter.ps1',
+            'tools/wkharness-codex-install.ps1',
+            'tools/wkharness-codex-stop-archive.ps1',
             'tools/wkharness-common-utils.ps1',
             'tools/wkharness-common-tierscore.ps1',
             'tools/wkharness-spokesperson-refresh.ps1',
@@ -127,6 +133,21 @@ jobs:
           (cd bin && run python3 wkhippo_reflex_claude_blocked.py)
           (cd bin/wkhippo-lib && run python3 wkhippo_reflex_claude_blocked.py)
           exit $fail
+
+      - name: Portable Codex installer, hook runtime and history self-tests
+        shell: bash
+        working-directory: kih
+        run: |
+          for t in tools/wkharness-codex-portable-selftest.py tools/wkharness-codex-history-selftest.py; do
+            rc=0
+            out=$(python3 "$t" 2>&1) || rc=$?
+            echo "== $t"
+            printf '%s\n' "$out" | grep -E '^CASE |^RESULT' || true
+            [ "$rc" -eq 0 ] || exit "$rc"
+            r=$(printf '%s\n' "$out" | grep '^RESULT' | tail -1)
+            set -- $r
+            [ "$#" -eq 2 ] && [ "${2%%/*}" = "${2##*/}" ] || exit 1
+          done
 
       - name: 4. Launchers -- wkhippo reflex and history-push (bash)
         shell: bash
