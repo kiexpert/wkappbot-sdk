@@ -1,7 +1,8 @@
-name: Harness Windows QA
+name: Harness QA (Windows + macOS)
 
-# Runs the harness repo's own self-tests on a Windows runner, the platform its PowerShell hooks
-# are written for, so a harness change made on a Linux cloud VM is proven on Windows too.
+# Runs the harness repo's own self-tests on Windows and macOS runners, so a harness change made on a
+# Linux cloud VM is proven on the owner's two desktop platforms too. On macOS the Bash self-tests run a
+# second time under /bin/bash 3.2, the shell a stock Mac starts hooks with.
 # Only RESULT and CASE lines are printed; nothing from the harness repo is published.
 
 on:
@@ -20,9 +21,13 @@ permissions:
   contents: read
 
 jobs:
-  harness-windows-qa:
-    runs-on: windows-latest
-    timeout-minutes: 20
+  harness-qa:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
     steps:
       - name: Checkout harness repo
         uses: actions/checkout@v5
@@ -38,6 +43,7 @@ jobs:
           python-version: '3.x'
 
       - name: python3 alias (the harness scripts call python3)
+        if: runner.os == 'Windows'
         shell: pwsh
         run: |
           if (-not (Get-Command python3 -ErrorAction SilentlyContinue)) {
@@ -46,10 +52,30 @@ jobs:
           }
           python3 --version
 
-      - name: Harness commit under test
+      - name: Harness commit and shells under test
         shell: bash
         working-directory: kih
-        run: echo "HARNESS $(git log -1 --format='%h %cs')"
+        run: |
+          echo "HARNESS $(git log -1 --format='%h %cs')"
+          echo "BASH $(bash --version | head -1)"
+          [ -x /bin/bash ] && echo "SYSTEM-BASH $(/bin/bash --version | head -1)"
+          echo "PWSH $(pwsh -NoProfile -Command '$PSVersionTable.PSVersion.ToString()')"
+          mid=$(bash -c 'source tools/wk-hippo-archive.sh; machine_id')
+          if [ -n "$mid" ]; then echo "CASE machine-id PASS ($mid)"; else echo "CASE machine-id FAIL (empty: the archive cannot file anything on this OS)"; exit 1; fi
+
+      - name: Fixture transcript (where Claude Code keeps transcripts)
+        shell: bash
+        run: |
+          mkdir -p "$HOME/.claude/projects/ci"
+          fx="$HOME/.claude/projects/ci/11111111-2222-3333-4444-555555555555.jsonl"
+          {
+            printf '{"type":"user","timestamp":"2026-10-27T01:00:00.000Z","sessionId":"11111111","uuid":"u1","message":{"content":"run the archive check"}}\n'
+            printf '{"type":"assistant","timestamp":"2026-10-27T01:00:01.000Z","sessionId":"11111111","uuid":"a1","message":{"model":"m","content":[{"type":"tool_use","id":"tu1","name":"Bash","input":{"command":"bash tools/x.sh push"}}]}}\n'
+            printf '{"type":"user","timestamp":"2026-10-27T01:00:02.000Z","sessionId":"11111111","uuid":"u2","message":{"content":[{"type":"tool_result","tool_use_id":"tu1","is_error":true,"content":"Permission for this action was denied by the Claude Code auto mode classifier. Reason: [Sensitive-Source Provenance]."}]}}\n'
+            printf '{"type":"user","timestamp":"2026-10-27T01:00:03.000Z","sessionId":"11111111","uuid":"u3","message":{"content":"@\\"/root/.claude/uploads/x/a.pdf\\" read this deck"}}\n'
+          } > "$fx"
+          echo "FX=$fx" >> "$GITHUB_ENV"
+          git config --global user.email ci@example.com; git config --global user.name ci
 
       - name: 1. PowerShell parse check of the edited hooks
         shell: pwsh
@@ -102,24 +128,54 @@ jobs:
           (cd bin/wkhippo-lib && run python3 wkhippo_reflex_claude_blocked.py)
           exit $fail
 
-      - name: 4. Bash self-tests (Git Bash)
+      - name: 4. Launchers -- wkhippo reflex and history-push (bash)
         shell: bash
         working-directory: kih
         run: |
-          # A small fixture transcript stands in for a live session on the runner.
-          # It sits where Claude Code keeps transcripts, so a lookup by session id finds it too.
-          mkdir -p "$HOME/.claude/projects/ci"
-          fx="$HOME/.claude/projects/ci/11111111-2222-3333-4444-555555555555.jsonl"
-          {
-            printf '{"type":"user","timestamp":"2026-10-27T01:00:00.000Z","sessionId":"11111111","uuid":"u1","message":{"content":"run the archive check"}}\n'
-            printf '{"type":"assistant","timestamp":"2026-10-27T01:00:01.000Z","sessionId":"11111111","uuid":"a1","message":{"model":"m","content":[{"type":"tool_use","id":"tu1","name":"Bash","input":{"command":"bash tools/x.sh push"}}]}}\n'
-            printf '{"type":"user","timestamp":"2026-10-27T01:00:02.000Z","sessionId":"11111111","uuid":"u2","message":{"content":[{"type":"tool_result","tool_use_id":"tu1","is_error":true,"content":"Permission for this action was denied by the Claude Code auto mode classifier. Reason: [Sensitive-Source Provenance]."}]}}\n'
-          } > "$fx"
-          git config --global user.email ci@example.com; git config --global user.name ci
+          pass=0; total=4
+          ok() { pass=$((pass + 1)); echo "CASE $1 PASS"; }; bad() { echo "CASE $1 FAIL ${2:-}"; }
+          n=$(bash bin/wkhippo reflex "$FX" 2>/dev/null | grep -c '^{')
+          [ "$n" -eq 4 ] && ok reflex-raw-lines || bad reflex-raw-lines "($n of 4)"
+          bash bin/wkhippo reflex "$FX" 2>/dev/null | grep -q 'uploads/x/a.pdf' && ok upload-prompt-kept || bad upload-prompt-kept
+          out=$(bash bin/wkhippo history-push --session zzz-none --dry-run 2>&1)
+          case "$out" in *"BACKFILL sessions=0 "*) ok history-push-dry-run ;; *) bad history-push-dry-run "($out)" ;; esac
+          out=$(bash bin/wkhippo history-push --session 11111111 --dry-run 2>&1)
+          case "$out" in *"PLAN "*"11111111-2222-3333-4444-555555555555 --backfill"*) ok history-push-plans-session ;; *) bad history-push-plans-session "($out)" ;; esac
+          echo "RESULT $pass/$total"; [ "$pass" -eq "$total" ]
+
+      - name: 5. Launcher -- wkhippo.cmd reflex and history-push (cmd)
+        if: runner.os == 'Windows'
+        shell: cmd
+        working-directory: kih
+        run: |
+          call bin\wkhippo.cmd reflex "%USERPROFILE%\.claude\projects\ci\11111111-2222-3333-4444-555555555555.jsonl" > "%RUNNER_TEMP%\r.txt" 2>&1
+          findstr /c:"uploads/x/a.pdf" "%RUNNER_TEMP%\r.txt" >nul && (echo CASE cmd-reflex PASS) || (echo CASE cmd-reflex FAIL & type "%RUNNER_TEMP%\r.txt" & exit /b 1)
+          call bin\wkhippo.cmd history-push --session zzz-none --dry-run > "%RUNNER_TEMP%\h.txt" 2>&1
+          findstr /c:"BACKFILL sessions=0" "%RUNNER_TEMP%\h.txt" >nul && (echo CASE cmd-history-push PASS) || (echo CASE cmd-history-push FAIL & type "%RUNNER_TEMP%\h.txt" & exit /b 1)
+          echo RESULT 2/2
+
+      - name: 6. Bash self-tests
+        shell: bash
+        working-directory: kih
+        run: |
           fail=0
-          for t in "tools/wk-hippo-archive-selftest.sh $fx" tools/wk-hippo-backfill-all-selftest.sh tools/wk-haiku-seat-nudge-selftest.sh tools/wk-allows-learn-prompt-selftest.sh; do
+          for t in "tools/wk-hippo-archive-selftest.sh $FX" tools/wk-hippo-backfill-all-selftest.sh tools/wk-haiku-seat-nudge-selftest.sh tools/wk-allows-learn-prompt-selftest.sh; do
             out=$(bash $t 2>/dev/null)
             echo "== $t"; printf '%s\n' "$out" | grep -E '^CASE .* FAIL|^RESULT'
+            r=$(printf '%s\n' "$out" | grep '^RESULT' | tail -1); set -- $r
+            [ -n "$r" ] && [ "${2%%/*}" = "${2##*/}" ] || fail=1
+          done
+          exit $fail
+
+      - name: 7. Bash self-tests under /bin/bash 3.2 (stock macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        working-directory: kih
+        run: |
+          fail=0
+          for t in "tools/wk-hippo-archive-selftest.sh $FX" tools/wk-hippo-backfill-all-selftest.sh tools/wk-haiku-seat-nudge-selftest.sh tools/wk-allows-learn-prompt-selftest.sh; do
+            out=$(/bin/bash $t 2>&1)
+            echo "== /bin/bash $t"; printf '%s\n' "$out" | grep -E '^CASE .* FAIL|^RESULT|line [0-9]+:' | head -15
             r=$(printf '%s\n' "$out" | grep '^RESULT' | tail -1); set -- $r
             [ -n "$r" ] && [ "${2%%/*}" = "${2##*/}" ] || fail=1
           done
