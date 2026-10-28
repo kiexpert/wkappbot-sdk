@@ -154,6 +154,35 @@ jobs:
           findstr /c:"BACKFILL sessions=0" "%RUNNER_TEMP%\h.txt" >nul && (echo CASE cmd-history-push PASS) || (echo CASE cmd-history-push FAIL & type "%RUNNER_TEMP%\h.txt" & exit /b 1)
           echo RESULT 2/2
 
+      - name: 5b. PC installer registers the one-source stop hook (Git Bash)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        working-directory: kih
+        run: |
+          $s = Join-Path $env:RUNNER_TEMP 'settings.json'
+          $old = "powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File `"$PWD\tools\wkharness-claude-stop.ps1`""
+          @{ hooks = @{ Stop = @(@{ hooks = @(@{ type = 'command'; command = $old; timeout = 10 }) }) } } | ConvertTo-Json -Depth 10 | Set-Content -Encoding utf8 $s
+          & ./tools/wkharness-claude-install.ps1 -SettingsPath $s -SkipRepoint | Out-Null
+          $cfg = Get-Content -Raw $s | ConvertFrom-Json
+          $stop = @($cfg.hooks.Stop | ForEach-Object { $_.hooks } | ForEach-Object { $_.command })
+          $sub = @($cfg.hooks.SubagentStop | ForEach-Object { $_.hooks } | ForEach-Object { $_.command })
+          $pass = 0
+          $c1 = ($stop.Count -eq 1) -and ($stop[0] -match 'wkharness-run\.sh" stop --global$') -and ($stop[0] -notmatch 'System32')
+          Write-Host ("CASE stop-repointed-to-run-sh {0} ({1})" -f $(if ($c1) { $pass++; 'PASS' } else { 'FAIL' }), ($stop -join ' | '))
+          $arc = @($sub | Where-Object { $_ -match 'wkharness-run\.sh" stop-archive --global$' })
+          Write-Host ("CASE subagentstop-archive-registered {0}" -f $(if ($arc.Count -eq 1) { $pass++; 'PASS' } else { 'FAIL' }))
+          & ./tools/wkharness-claude-install.ps1 -SettingsPath $s -SkipRepoint | Out-Null
+          $cfg2 = Get-Content -Raw $s | ConvertFrom-Json
+          $n2 = @($cfg2.hooks.Stop | ForEach-Object { $_.hooks }).Count + @($cfg2.hooks.SubagentStop | ForEach-Object { $_.hooks } | Where-Object { $_.command -match 'stop-archive' }).Count
+          Write-Host ("CASE second-install-idempotent {0} ($n2 hooks)" -f $(if ($n2 -eq 2) { $pass++; 'PASS' } else { 'FAIL' }))
+          # The registered string itself must launch under cmd.exe (quoted Git Bash path); harness-off makes it exit 0 at once.
+          New-Item -ItemType Directory -Force .tmp | Out-Null; New-Item -ItemType File -Force .tmp/harness-off | Out-Null
+          '{}' | cmd /c $stop[0]; $rc = $LASTEXITCODE
+          Remove-Item .tmp/harness-off
+          Write-Host ("CASE registered-command-launches {0} (rc=$rc)" -f $(if ($rc -eq 0) { $pass++; 'PASS' } else { 'FAIL' }))
+          Write-Host "RESULT $pass/4"
+          if ($pass -ne 4) { exit 1 }
+
       - name: 6. Bash self-tests
         shell: bash
         working-directory: kih
