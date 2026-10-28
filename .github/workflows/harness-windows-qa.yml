@@ -60,6 +60,8 @@ jobs:
           echo "BASH $(bash --version | head -1)"
           [ -x /bin/bash ] && echo "SYSTEM-BASH $(/bin/bash --version | head -1)"
           echo "PWSH $(pwsh -NoProfile -Command '$PSVersionTable.PSVersion.ToString()')"
+          mid=$(bash -c 'source tools/wk-hippo-archive.sh; machine_id')
+          if [ -n "$mid" ]; then echo "CASE machine-id PASS ($mid)"; else echo "CASE machine-id FAIL (empty: the archive cannot file anything on this OS)"; exit 1; fi
 
       - name: Fixture transcript (where Claude Code keeps transcripts)
         shell: bash
