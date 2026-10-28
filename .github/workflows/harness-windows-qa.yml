@@ -46,6 +46,11 @@ jobs:
           }
           python3 --version
 
+      - name: Harness commit under test
+        shell: bash
+        working-directory: kih
+        run: echo "HARNESS $(git log -1 --format='%h %cs')"
+
       - name: 1. PowerShell parse check of the edited hooks
         shell: pwsh
         working-directory: kih
