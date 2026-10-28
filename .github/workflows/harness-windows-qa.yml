@@ -58,6 +58,7 @@ jobs:
         run: |
           echo "HARNESS $(git log -1 --format='%h %cs')"
           echo "BASH $(bash --version | head -1)"
+          echo "PYTHON $(python3 --version 2>&1) home=$(python3 -c 'import os; print(os.path.expanduser("~"))')"
           [ -x /bin/bash ] && echo "SYSTEM-BASH $(/bin/bash --version | head -1)"
           echo "PWSH $(pwsh -NoProfile -Command '$PSVersionTable.PSVersion.ToString()')"
           mid=$(bash -c 'source tools/wk-hippo-archive.sh; machine_id')
