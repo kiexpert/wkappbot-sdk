@@ -217,10 +217,10 @@ jobs:
         run: |
           fail=0
           for t in "tools/wk-hippo-archive-selftest.sh $FX" tools/wk-hippo-backfill-all-selftest.sh tools/wk-haiku-seat-nudge-selftest.sh tools/wk-allows-learn-prompt-selftest.sh tools/wk-stop-archive-e2e-selftest.sh tools/wk-agent-families-history-selftest.sh; do
-            out=$(bash $t 2>/dev/null)
+            out=$(bash $t 2>&1)
             echo "== $t"; printf '%s\n' "$out" | grep -E '^CASE .* FAIL|^RESULT'
             r=$(printf '%s\n' "$out" | grep '^RESULT' | tail -1); set -- $r
-            [ -n "$r" ] && [ "${2%%/*}" = "${2##*/}" ] || fail=1
+            [ -n "$r" ] && [ "${2%%/*}" = "${2##*/}" ] || { fail=1; printf '%s\n' "$out" | grep -vE '^CASE|^RESULT' | tail -8; }
           done
           exit $fail
 
