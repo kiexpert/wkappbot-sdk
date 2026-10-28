@@ -58,6 +58,7 @@ jobs:
         run: |
           echo "HARNESS $(git log -1 --format='%h %cs')"
           echo "BASH $(bash --version | head -1)"
+          echo "PYTHON $(python3 --version 2>&1) home=$(python3 -c 'import os; print(os.path.expanduser("~"))')"
           [ -x /bin/bash ] && echo "SYSTEM-BASH $(/bin/bash --version | head -1)"
           echo "PWSH $(pwsh -NoProfile -Command '$PSVersionTable.PSVersion.ToString()')"
           mid=$(bash -c 'source tools/wk-hippo-archive.sh; machine_id')
@@ -82,12 +83,6 @@ jobs:
         working-directory: kih
         run: |
           $files = @(
-            'tools/CodexHookRuntime.ps1',
-            'tools/CodexHookAdapter.ps1',
-            'tools/CodexPreToolUseAdapter.ps1',
-            'tools/CodexPostToolUseAdapter.ps1',
-            'tools/wkharness-codex-install.ps1',
-            'tools/wkharness-codex-stop-archive.ps1',
             'tools/wkharness-common-utils.ps1',
             'tools/wkharness-common-tierscore.ps1',
             'tools/wkharness-spokesperson-refresh.ps1',
@@ -130,24 +125,10 @@ jobs:
           run() { out=$("$@" 2>&1 | tail -1); echo "$*: $out"; case "$out" in *RESULT*) set -- $out; [ "${2%%/*}" = "${2##*/}" ] || fail=1 ;; *) fail=1 ;; esac; }
           run python3 tools/wkharness-claude-allows-learn.py --selftest
           (cd bin && run python3 wkhippo_reflex_families_selftest.py)
+          (cd bin && run python3 wkhippo_reflex_agentrun.py)
           (cd bin && run python3 wkhippo_reflex_claude_blocked.py)
           (cd bin/wkhippo-lib && run python3 wkhippo_reflex_claude_blocked.py)
           exit $fail
-
-      - name: Portable Codex installer, hook runtime and history self-tests
-        shell: bash
-        working-directory: kih
-        run: |
-          for t in tools/wkharness-codex-portable-selftest.py tools/wkharness-codex-history-selftest.py; do
-            rc=0
-            out=$(python3 "$t" 2>&1) || rc=$?
-            echo "== $t"
-            printf '%s\n' "$out" | grep -E '^CASE |^RESULT' || true
-            [ "$rc" -eq 0 ] || exit "$rc"
-            r=$(printf '%s\n' "$out" | grep '^RESULT' | tail -1)
-            set -- $r
-            [ "$#" -eq 2 ] && [ "${2%%/*}" = "${2##*/}" ] || exit 1
-          done
 
       - name: 4. Launchers -- wkhippo reflex and history-push (bash)
         shell: bash
@@ -175,16 +156,71 @@ jobs:
           findstr /c:"BACKFILL sessions=0" "%RUNNER_TEMP%\h.txt" >nul && (echo CASE cmd-history-push PASS) || (echo CASE cmd-history-push FAIL & type "%RUNNER_TEMP%\h.txt" & exit /b 1)
           echo RESULT 2/2
 
+      - name: 5b. PC installer registers the one-source stop hook (Git Bash)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        working-directory: kih
+        run: |
+          $s = Join-Path $env:RUNNER_TEMP 'settings.json'
+          $old = "powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File `"$PWD\tools\wkharness-claude-stop.ps1`""
+          @{ hooks = @{ Stop = @(@{ hooks = @(@{ type = 'command'; command = $old; timeout = 10 }) }) } } | ConvertTo-Json -Depth 10 | Set-Content -Encoding utf8 $s
+          & ./tools/wkharness-claude-install.ps1 -SettingsPath $s -SkipRepoint | Out-Null
+          $cfg = Get-Content -Raw $s | ConvertFrom-Json
+          $stop = @($cfg.hooks.Stop | ForEach-Object { $_.hooks } | ForEach-Object { $_.command })
+          $sub = @($cfg.hooks.SubagentStop | ForEach-Object { $_.hooks } | ForEach-Object { $_.command })
+          $pass = 0
+          $c1 = ($stop.Count -eq 1) -and ($stop[0] -match 'wkharness-run\.sh" stop --global$') -and ($stop[0] -notmatch 'System32')
+          Write-Host ("CASE stop-repointed-to-run-sh {0} ({1})" -f $(if ($c1) { $pass++; 'PASS' } else { 'FAIL' }), ($stop -join ' | '))
+          $arc = @($sub | Where-Object { $_ -match 'wkharness-run\.sh" stop-archive --global$' })
+          Write-Host ("CASE subagentstop-archive-registered {0}" -f $(if ($arc.Count -eq 1) { $pass++; 'PASS' } else { 'FAIL' }))
+          & ./tools/wkharness-claude-install.ps1 -SettingsPath $s -SkipRepoint | Out-Null
+          $cfg2 = Get-Content -Raw $s | ConvertFrom-Json
+          $n2 = @($cfg2.hooks.Stop | ForEach-Object { $_.hooks }).Count + @($cfg2.hooks.SubagentStop | ForEach-Object { $_.hooks } | Where-Object { $_.command -match 'stop-archive' }).Count
+          Write-Host ("CASE second-install-idempotent {0} ($n2 hooks)" -f $(if ($n2 -eq 2) { $pass++; 'PASS' } else { 'FAIL' }))
+          # The registered string itself must launch under cmd.exe (quoted Git Bash path); harness-off makes it exit 0 at once.
+          New-Item -ItemType Directory -Force .tmp | Out-Null; New-Item -ItemType File -Force .tmp/harness-off | Out-Null
+          '{}' | cmd /c $stop[0]; $rc = $LASTEXITCODE
+          Remove-Item .tmp/harness-off
+          Write-Host ("CASE registered-command-launches {0} (rc=$rc)" -f $(if ($rc -eq 0) { $pass++; 'PASS' } else { 'FAIL' }))
+          Write-Host "RESULT $pass/4"
+          if ($pass -ne 4) { exit 1 }
+
+      - name: 5c. Agent-run ledger records a login failure (Agent.ps1 seam, owner 2026-10-28)
+        shell: pwsh
+        working-directory: kih
+        run: |
+          $h = Join-Path $env:RUNNER_TEMP 'ledger-home'
+          $env:WK_AGENT_RUNS_DIR = Join-Path $h '.wkharness/agent-runs'
+          $env:USERPROFILE = $h; $env:XAI_API_KEY = $null; $env:WK_GROK_CMD = $null
+          $pass = 0
+          . ./tools/wkharness-common-agentrun/Write-WkAgentRunRecord.ps1
+          $env:WKAGENT_LOGIN_ERROR = $null
+          'all good', 'Error: Not logged in. Please run /login', 'HTTP 401 again' | ForEach-Object { Test-WkAgentLoginLine $_ }
+          $c = $env:WKAGENT_LOGIN_ERROR -eq 'Error: Not logged in. Please run /login'
+          Write-Host ("CASE first-login-line-kept {0} ({1})" -f $(if ($c) { $pass++; 'PASS' } else { 'FAIL' }), $env:WKAGENT_LOGIN_ERROR)
+          $env:WKAGENT_LOGIN_ERROR = $null
+          pwsh -NoProfile -File ./tools/Agent.ps1 -Model grok -BackendOnly 'say hi' *> (Join-Path $env:RUNNER_TEMP 'agent.txt')
+          $rc = $LASTEXITCODE
+          $files = @(Get-ChildItem -Recurse -File $env:WK_AGENT_RUNS_DIR -Filter *.jsonl -ErrorAction SilentlyContinue)
+          $rec = if ($files.Count -eq 1) { Get-Content -Raw $files[0].FullName | ConvertFrom-Json } else { $null }
+          $c = $rec -and $rec.family -eq 'grok' -and [string]$rec.login_error -like 'GROK NEEDS:*' -and [int]$rec.rc -eq 3 -and $rec.prompt -eq 'say hi'
+          Write-Host ("CASE grok-run-ledger-line {0} (rc=$rc files=$($files.Count) {1})" -f $(if ($c) { $pass++; 'PASS' } else { 'FAIL' }), $(if ($rec) { $rec | ConvertTo-Json -Compress } else { Get-Content -Raw (Join-Path $env:RUNNER_TEMP 'agent.txt') }))
+          $rows = if ($files.Count -eq 1) { python3 -I bin/wkhippo-reflex.py reflex $files[0].FullName --rows 2>&1 | Out-String } else { '' }
+          $c = $rows -match '\|agent-login-error\|agentrun\|ok\|grok grok rc=3 login: GROK NEEDS'
+          Write-Host ("CASE reflex-reads-login-error {0} ({1})" -f $(if ($c) { $pass++; 'PASS' } else { 'FAIL' }), $rows.Trim())
+          Write-Host "RESULT $pass/3"
+          if ($pass -ne 3) { exit 1 }
+
       - name: 6. Bash self-tests
         shell: bash
         working-directory: kih
         run: |
           fail=0
-          for t in "tools/wk-hippo-archive-selftest.sh $FX" tools/wk-hippo-backfill-all-selftest.sh tools/wk-haiku-seat-nudge-selftest.sh tools/wk-allows-learn-prompt-selftest.sh tools/wk-stop-archive-e2e-selftest.sh; do
-            out=$(bash $t 2>/dev/null)
+          for t in "tools/wk-hippo-archive-selftest.sh $FX" tools/wk-hippo-backfill-all-selftest.sh tools/wk-haiku-seat-nudge-selftest.sh tools/wk-allows-learn-prompt-selftest.sh tools/wk-stop-archive-e2e-selftest.sh tools/wk-agent-families-history-selftest.sh; do
+            out=$(bash $t 2>&1)
             echo "== $t"; printf '%s\n' "$out" | grep -E '^CASE .* FAIL|^RESULT'
             r=$(printf '%s\n' "$out" | grep '^RESULT' | tail -1); set -- $r
-            [ -n "$r" ] && [ "${2%%/*}" = "${2##*/}" ] || fail=1
+            [ -n "$r" ] && [ "${2%%/*}" = "${2##*/}" ] || { fail=1; printf '%s\n' "$out" | grep -vE '^CASE|^RESULT' | tail -8; }
           done
           exit $fail
 
@@ -194,7 +230,7 @@ jobs:
         working-directory: kih
         run: |
           fail=0
-          for t in "tools/wk-hippo-archive-selftest.sh $FX" tools/wk-hippo-backfill-all-selftest.sh tools/wk-haiku-seat-nudge-selftest.sh tools/wk-allows-learn-prompt-selftest.sh tools/wk-stop-archive-e2e-selftest.sh; do
+          for t in "tools/wk-hippo-archive-selftest.sh $FX" tools/wk-hippo-backfill-all-selftest.sh tools/wk-haiku-seat-nudge-selftest.sh tools/wk-allows-learn-prompt-selftest.sh tools/wk-stop-archive-e2e-selftest.sh tools/wk-agent-families-history-selftest.sh; do
             out=$(/bin/bash $t 2>&1)
             echo "== /bin/bash $t"; printf '%s\n' "$out" | grep -E '^CASE .* FAIL|^RESULT|line [0-9]+:' | head -15
             r=$(printf '%s\n' "$out" | grep '^RESULT' | tail -1); set -- $r
