@@ -241,7 +241,7 @@ jobs:
       - name: 5e. Live -- each CLI run with no login lands its login error in the agent-run ledger
         shell: pwsh
         working-directory: kih
-        run: ./tools/wkharness-common-agentrun/Test-WkAgentLoginLive.ps1 -Families claude,codex,grok,muse,agy -TimeoutSec 90
+        run: ./tools/wkharness-common-agentrun/Test-WkAgentLoginLive.ps1 -Families claude,codex,grok,muse,agy -TimeoutSec 90 -Python python3
 
       - name: 6. Bash self-tests
         shell: bash
