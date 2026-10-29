@@ -249,7 +249,7 @@ jobs:
         working-directory: kih
         run: |
           fail=0
-          for t in "tools/wk-hippo-archive-selftest.sh $FX" tools/wk-hippo-backfill-all-selftest.sh tools/wk-haiku-seat-nudge-selftest.sh tools/wk-allows-learn-prompt-selftest.sh tools/wk-stop-archive-e2e-selftest.sh tools/wk-agent-families-history-selftest.sh; do
+          for t in "tools/wk-hippo-archive-selftest.sh $FX" tools/wk-hippo-backfill-all-selftest.sh tools/wk-haiku-seat-nudge-selftest.sh tools/wk-allows-learn-prompt-selftest.sh tools/wk-stop-archive-e2e-selftest.sh tools/wk-agent-families-history-selftest.sh tools/wk-harness-heal-selftest.sh; do
             out=$(bash $t 2>&1)
             echo "== $t"; printf '%s\n' "$out" | grep -E '^CASE .* FAIL|^RESULT'
             r=$(printf '%s\n' "$out" | grep '^RESULT' | tail -1); set -- $r
@@ -263,7 +263,7 @@ jobs:
         working-directory: kih
         run: |
           fail=0
-          for t in "tools/wk-hippo-archive-selftest.sh $FX" tools/wk-hippo-backfill-all-selftest.sh tools/wk-haiku-seat-nudge-selftest.sh tools/wk-allows-learn-prompt-selftest.sh tools/wk-stop-archive-e2e-selftest.sh tools/wk-agent-families-history-selftest.sh; do
+          for t in "tools/wk-hippo-archive-selftest.sh $FX" tools/wk-hippo-backfill-all-selftest.sh tools/wk-haiku-seat-nudge-selftest.sh tools/wk-allows-learn-prompt-selftest.sh tools/wk-stop-archive-e2e-selftest.sh tools/wk-agent-families-history-selftest.sh tools/wk-harness-heal-selftest.sh; do
             out=$(/bin/bash $t 2>&1)
             echo "== /bin/bash $t"; printf '%s\n' "$out" | grep -E '^CASE .* FAIL|^RESULT|line [0-9]+:' | head -15
             r=$(printf '%s\n' "$out" | grep '^RESULT' | tail -1); set -- $r
