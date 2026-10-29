@@ -216,7 +216,8 @@ jobs:
         run: |
           # Every family the harness delegates to, installed the way its vendor documents (owner 2026-10-29).
           win=0; case "$(uname -s)" in MINGW*|MSYS*|CYGWIN*) win=1 ;; esac
-          addpath() { for d in "$@"; do [ -d "$d" ] && { echo "$d" >> "$GITHUB_PATH"; export PATH="$d:$PATH"; }; done; }
+          # GITHUB_PATH takes the native form: a /c/... MSYS path left grok and agy off the next pwsh step's PATH (Windows CI run 40793654141).
+          addpath() { for d in "$@"; do [ -d "$d" ] && { if [ "$win" -eq 1 ]; then cygpath -w "$d" >> "$GITHUB_PATH"; else echo "$d" >> "$GITHUB_PATH"; fi; export PATH="$d:$PATH"; }; done; }
           found() { command -v "$1" >/dev/null 2>&1 && return 0
             f=$(find "$HOME" ${LOCALAPPDATA:+"$(cygpath -u "$LOCALAPPDATA" 2>/dev/null || echo "$LOCALAPPDATA")"} -maxdepth 5 \( -name "$1" -o -name "$1.exe" -o -name "$1.cmd" \) -type f 2>/dev/null | head -1)
             [ -n "$f" ] && addpath "$(dirname "$f")" && command -v "$1" >/dev/null 2>&1; }
