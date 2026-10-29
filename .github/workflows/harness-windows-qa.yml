@@ -211,6 +211,38 @@ jobs:
           Write-Host "RESULT $pass/3"
           if ($pass -ne 3) { exit 1 }
 
+      - name: 5d. Install the family CLIs (claude, codex, grok, muse, agy)
+        shell: bash
+        run: |
+          # Every family the harness delegates to, installed the way its vendor documents (owner 2026-10-29).
+          win=0; case "$(uname -s)" in MINGW*|MSYS*|CYGWIN*) win=1 ;; esac
+          addpath() { for d in "$@"; do [ -d "$d" ] && { echo "$d" >> "$GITHUB_PATH"; export PATH="$d:$PATH"; }; done; }
+          found() { command -v "$1" >/dev/null 2>&1 && return 0
+            f=$(find "$HOME" ${LOCALAPPDATA:+"$(cygpath -u "$LOCALAPPDATA" 2>/dev/null || echo "$LOCALAPPDATA")"} -maxdepth 5 \( -name "$1" -o -name "$1.exe" -o -name "$1.cmd" \) -type f 2>/dev/null | head -1)
+            [ -n "$f" ] && addpath "$(dirname "$f")" && command -v "$1" >/dev/null 2>&1; }
+          npm i -g @anthropic-ai/claude-code @openai/codex > "$RUNNER_TEMP/npm.log" 2>&1 || tail -5 "$RUNNER_TEMP/npm.log"
+          python3 -m pip install -q muse-cli || true
+          if [ "$win" -eq 1 ]; then
+            pwsh -NoProfile -Command "irm https://x.ai/cli/install.ps1 | iex" > "$RUNNER_TEMP/grok.log" 2>&1 || tail -5 "$RUNNER_TEMP/grok.log"
+            pwsh -NoProfile -Command "irm https://antigravity.google/cli/install.ps1 | iex" > "$RUNNER_TEMP/agy.log" 2>&1 \
+              || pwsh -NoProfile -Command "irm https://antigravity.google/install.ps1 | iex" >> "$RUNNER_TEMP/agy.log" 2>&1 || tail -5 "$RUNNER_TEMP/agy.log"
+          else
+            curl -fsSL https://x.ai/cli/install.sh | bash > "$RUNNER_TEMP/grok.log" 2>&1 || tail -5 "$RUNNER_TEMP/grok.log"
+            { curl -fsSL https://antigravity.google/cli/install.sh || curl -fsSL https://antigravity.google/install.sh; } | bash > "$RUNNER_TEMP/agy.log" 2>&1 || tail -5 "$RUNNER_TEMP/agy.log"
+          fi
+          addpath "$HOME/.local/bin" "$HOME/.grok/bin"
+          n=0
+          for c in claude codex grok agy; do
+            if found "$c"; then n=$((n + 1)); echo "INSTALL $c PASS ($(command -v "$c"): $("$c" --version 2>&1 | head -1))"; else echo "INSTALL $c FAIL"; tail -3 "$RUNNER_TEMP/$c.log" 2>/dev/null; fi
+          done
+          if python3 -c "import muse_cli" 2>/dev/null; then n=$((n + 1)); echo "INSTALL muse PASS (muse-cli $(python3 -m pip show muse-cli 2>/dev/null | sed -n "s/^Version: //p"))"; else echo "INSTALL muse FAIL"; fi
+          echo "RESULT $n/5"
+
+      - name: 5e. Live -- each CLI run with no login lands its login error in the agent-run ledger
+        shell: pwsh
+        working-directory: kih
+        run: ./tools/wkharness-common-agentrun/Test-WkAgentLoginLive.ps1 -Families claude,codex,grok,muse,agy -TimeoutSec 90
+
       - name: 6. Bash self-tests
         shell: bash
         working-directory: kih
