@@ -245,6 +245,32 @@ jobs:
         working-directory: kih
         run: ./tools/wkharness-common-agentrun/Test-WkAgentLoginLive.ps1 -Families claude,codex,grok,muse,agy -TimeoutSec 90 -Python python3
 
+      - name: 5f. One installer -- install.cmd from bash (Linux, macOS, Git Bash) and cmd
+        shell: bash
+        working-directory: kih
+        run: |
+          # Owner 2026-10-29: one installer for every platform; install.cmd is a cmd/bash polyglot and works from PowerShell too (5g).
+          pass=0; total=2
+          p=$(bash install.cmd --detect 2>&1 | tail -1)
+          case "$RUNNER_OS:$p" in Windows:windows|macOS:macos) pass=$((pass + 1)); echo "CASE bash-install-cmd-detect PASS ($p)" ;; *) echo "CASE bash-install-cmd-detect FAIL ($p)" ;; esac
+          rc=0
+          if [ "$RUNNER_OS" = Windows ]; then cmd //c install.cmd > "$RUNNER_TEMP/inst.txt" 2>&1 || rc=$?; else bash install.cmd > "$RUNNER_TEMP/inst.txt" 2>&1 || rc=$?; fi
+          tail -6 "$RUNNER_TEMP/inst.txt"
+          s="$HOME/.claude/settings.json"; [ "$RUNNER_OS" = Windows ] && s="$(cygpath -u "$USERPROFILE")/.claude/settings.json"
+          if grep -q 'wkharness-run.sh' "$s" 2>/dev/null; then pass=$((pass + 1)); echo "CASE install-cmd-wires-one-source-stop PASS (rc=$rc)"; else echo "CASE install-cmd-wires-one-source-stop FAIL (rc=$rc)"; fi
+          echo "RESULT $pass/$total"; [ "$pass" -eq "$total" ]
+
+      - name: 5g. One installer -- install.cmd from PowerShell
+        if: runner.os == 'Windows'
+        shell: pwsh
+        working-directory: kih
+        run: |
+          & ./install.cmd *> (Join-Path $env:RUNNER_TEMP 'inst-ps.txt'); $rc = $LASTEXITCODE
+          Get-Content (Join-Path $env:RUNNER_TEMP 'inst-ps.txt') -Tail 4
+          $ok = ($rc -eq 0) -and (Select-String -LiteralPath (Join-Path $env:USERPROFILE '.claude\settings.json') -Pattern 'wkharness-run.sh' -Quiet)
+          Write-Host ("CASE pwsh-install-cmd {0} (rc=$rc)" -f $(if ($ok) { 'PASS' } else { 'FAIL' }))
+          if (-not $ok) { exit 1 }
+
       - name: 6. Bash self-tests
         shell: bash
         working-directory: kih
