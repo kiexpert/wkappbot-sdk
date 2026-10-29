@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>webseat v2</title>
+<title>webseat v3</title>
 <style>
 :root {
   color-scheme: dark;
@@ -18,6 +18,7 @@
   }
 }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 body {
   margin: 0; background: var(--bg); color: var(--fg); overflow-x: hidden;
   font: 14px/1.45 ui-monospace, Menlo, Consolas, "Liberation Mono", monospace;
@@ -34,6 +35,9 @@ h1 { font-size: 16px; margin: 0 0 6px; }
 .settings label.check { flex-direction: row; align-items: center; gap: 6px; flex: none; color: var(--fg); }
 .role { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: flex-end; flex-basis: 100%; }
 .role .tag { flex-basis: 100%; font-size: 12px; color: var(--accent); }
+.login { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; flex-basis: 100%; font-size: 12px; }
+.login .ok { color: var(--ok); }
+.login .bad { color: var(--err); }
 main { display: flex; flex-direction: column; }
 aside {
   padding: 12px 16px; border-bottom: 1px solid var(--border); max-height: 40vh; overflow: auto;
@@ -76,7 +80,7 @@ a { color: var(--accent); }
 </head>
 <body>
 <header>
-  <h1>webseat v2</h1>
+  <h1>webseat v3</h1>
   <div class="banner">Command-only mode: the spokesman model sees only file names and sector reports. Sectors run on the endpoint you set below. Never load customer source unless your sector endpoint is approved for it.</div>
 </header>
 
@@ -88,13 +92,20 @@ a { color: var(--accent); }
         <option value="anthropic">anthropic</option>
         <option value="openai-compatible">openai-compatible</option>
         <option value="openrouter">openrouter</option>
+        <option value="gemini">gemini</option>
         <option value="mock">mock</option>
       </select>
     </label>
     <label class="wide">base URL <input id="sp-baseUrl" type="text" spellcheck="false"></label>
     <label>model <input id="sp-model" type="text" spellcheck="false"></label>
     <label>API key <input id="sp-apiKey" type="password" autocomplete="off"></label>
-    <button type="button" id="signin">Sign in with OpenRouter</button>
+    <div class="login" id="sp-login">
+      <span id="sp-login-how" class="dim"></span>
+      <button type="button" id="signin">Sign in with OpenRouter</button>
+      <a id="sp-getkey" target="_blank" rel="noopener noreferrer">Get key</a>
+      <button type="button" id="sp-check">check key</button>
+      <span id="sp-check-status"></span>
+    </div>
   </div>
   <div class="role">
     <span class="tag">SECTOR: the cheap internal model that runs each agent_cmd brief</span>
@@ -121,6 +132,13 @@ a { color: var(--accent); }
     <div id="files"></div>
   </aside>
   <section id="term">
+    <div class="row">
+      <strong>session</strong>
+      <button type="button" id="newSession">new</button>
+      <button type="button" id="exportSession">export</button>
+      <button type="button" id="importBtn">import</button>
+      <input id="importFile" type="file" accept=".jsonl,application/jsonl,text/plain" hidden>
+    </div>
     <div id="log" aria-live="polite"></div>
     <form id="form" class="prompt-row" autocomplete="off">
       <span>&gt;</span>
@@ -146,8 +164,18 @@ a { color: var(--accent); }
     'anthropic': { base: 'https://api.anthropic.com', model: 'claude-sonnet-5-5' },
     'openai-compatible': { base: 'https://api.openai.com/v1', model: 'gpt-5' },
     'openrouter': { base: 'https://openrouter.ai/api/v1', model: 'anthropic/claude-sonnet-4.5' },
+    'gemini': { base: 'https://generativelanguage.googleapis.com/v1beta/openai', model: 'gemini-2.5-pro' },
     'mock': { base: '', model: 'mock' }
   };
+  // login matrix: how each spokesman provider gets a credential in a browser.
+  // Only OpenRouter offers a public browser OAuth flow (PKCE); the others take a pasted key.
+  var LOGIN = {
+    'anthropic': { how: 'login: paste an Anthropic API key', keyPage: 'https://console.anthropic.com/settings/keys' },
+    'openai-compatible': { how: 'login: paste an API key for this host', keyPage: 'https://platform.openai.com/api-keys' },
+    'openrouter': { how: 'login: Sign in with OpenRouter (OAuth PKCE), or paste a key', keyPage: 'https://openrouter.ai/settings/keys', oauth: true },
+    'gemini': { how: 'login: paste a Gemini API key', keyPage: 'https://aistudio.google.com/apikey' }
+  };
+  var SESSION_KEY = 'webseat2.session';
   var SC_PRESETS = {
     'openai-compatible': { base: '', model: '' },
     'mock-sector': { base: '', model: 'mock-sector' }
@@ -236,6 +264,134 @@ a { color: var(--accent); }
     log.appendChild(d);
     log.scrollTop = log.scrollHeight;
     return d;
+  };
+
+  // ---- session file: one Claude Code shaped JSONL line per message, autosaved every turn ----
+  var uuid = function () {
+    if (crypto.randomUUID) return crypto.randomUUID();
+    var b = crypto.getRandomValues(new Uint8Array(16));
+    b[6] = (b[6] & 15) | 64;
+    b[8] = (b[8] & 63) | 128;
+    var h = Array.prototype.map.call(b, function (x) { return (x + 256).toString(16).slice(1); }).join('');
+    return h.slice(0, 8) + '-' + h.slice(8, 12) + '-' + h.slice(12, 16) + '-' + h.slice(16, 20) + '-' + h.slice(20);
+  };
+  var history = [];
+  var session = { id: uuid(), lines: [] };
+  var lastUuid = function (side) {
+    for (var i = session.lines.length - 1; i >= 0; i--) {
+      if (!!session.lines[i].isSidechain === side) return session.lines[i].uuid;
+    }
+    return null;
+  };
+  // internal message -> {type, message} in Claude Code shape
+  var toEntry = function (m) {
+    if (m.role === 'user') return { type: 'user', message: { role: 'user', content: m.content } };
+    if (m.role === 'assistant') {
+      var blocks = [];
+      if (m.text) blocks.push({ type: 'text', text: m.text });
+      m.calls.forEach(function (c) { blocks.push({ type: 'tool_use', id: c.id, name: c.name, input: c.args }); });
+      return { type: 'assistant', message: { role: 'assistant', content: blocks } };
+    }
+    return { type: 'user', message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: m.id, content: m.result }] } };
+  };
+  // Claude Code shaped lines -> internal messages, in order
+  var fromLines = function (lines) {
+    var out = [], names = {};
+    lines.forEach(function (l) {
+      var msg = l.message, content = msg.content;
+      if (l.type === 'assistant') {
+        var text = '', calls = [];
+        (Array.isArray(content) ? content : [{ type: 'text', text: String(content == null ? '' : content) }]).forEach(function (b) {
+          if (b && b.type === 'text') text += b.text;
+          else if (b && b.type === 'tool_use') { names[b.id] = b.name; calls.push({ id: b.id, name: b.name, args: b.input || {} }); }
+        });
+        out.push({ role: 'assistant', text: text, calls: calls, side: !!l.isSidechain });
+      } else if (Array.isArray(content) && content.some(function (b) { return b && b.type === 'tool_result'; })) {
+        content.forEach(function (b) {
+          if (!b || b.type !== 'tool_result') return;
+          var r = typeof b.content === 'string' ? b.content : JSON.stringify(b.content);
+          out.push({ role: 'tool', id: b.tool_use_id, name: names[b.tool_use_id] || '', result: r, side: !!l.isSidechain });
+        });
+      } else {
+        var t = Array.isArray(content)
+          ? content.map(function (b) { return b && b.type === 'text' ? b.text : ''; }).join('')
+          : String(content == null ? '' : content);
+        out.push({ role: 'user', content: t, side: !!l.isSidechain });
+      }
+    });
+    return out;
+  };
+  var renderMsg = function (m, side) {
+    var pre = side ? '[sector] ' : '';
+    if (m.role === 'user') { line(side ? 'sys' : 'user', side ? pre + 'brief: ' + short(m.content, 200) : '> ' + m.content); return; }
+    if (m.role === 'tool') { line('res', pre + short(m.result, 400)); return; }
+    if (m.text) line('text', pre + m.text);
+    m.calls.forEach(function (c) { line('tool', pre + '$ ' + c.name + ' ' + short(JSON.stringify(c.args), 200)); });
+  };
+  var saveSession = function () { store.set(SESSION_KEY, { id: session.id, lines: session.lines }); };
+  // every message goes through here: render, keep the line, autosave
+  var record = function (m, side) {
+    var e = toEntry(m);
+    var l = { parentUuid: lastUuid(!!side), isSidechain: !!side, type: e.type, message: e.message,
+      uuid: uuid(), timestamp: new Date().toISOString(), sessionId: session.id };
+    session.lines.push(l);
+    renderMsg(m, side);
+    saveSession();
+  };
+  var pushMain = function (m) { history.push(m); record(m, false); };
+  var isLine = function (l) {
+    return l && typeof l === 'object' && (l.type === 'user' || l.type === 'assistant') &&
+      l.message && typeof l.message === 'object' && l.message.role === l.type;
+  };
+  // restore history and log from lines; files stay as given by the caller
+  var loadLines = function (id, lines) {
+    session.id = id || uuid();
+    session.lines = lines.filter(isLine);
+    history.length = 0;
+    log.textContent = '';
+    fromLines(session.lines).forEach(function (m) {
+      renderMsg(m, m.side);
+      if (!m.side) { delete m.side; history.push(m); }
+    });
+    saveSession();
+  };
+  var secretsNow = function () {
+    return ['sp-apiKey', 'sc-apiKey'].map(function (id) { return $(id).value.trim(); })
+      .filter(function (k) { return k.length >= 4; });
+  };
+  var exportSession = function () {
+    var rows = session.lines.slice();
+    rows.push({ type: 'webseat-files', files: fs, timestamp: new Date().toISOString(), sessionId: session.id });
+    var text = rows.map(function (r) { return JSON.stringify(r); }).join('\n') + '\n';
+    // keys never live in the transcript; scrub anyway in case a model echoed one
+    secretsNow().forEach(function (k) { text = text.split(k).join('[redacted]'); });
+    return text;
+  };
+  var importSession = function (text) {
+    if (busy) throw new Error('busy: wait for the running prompt');
+    var rows = String(text == null ? '' : text).split(/\r?\n/).filter(function (s) { return s.trim(); });
+    var parsed = rows.map(function (s, i) {
+      try { return JSON.parse(s); } catch (e) { throw new Error('line ' + (i + 1) + ' is not JSON'); }
+    });
+    var id = null, files = null;
+    parsed.forEach(function (r) {
+      if (r && typeof r.sessionId === 'string' && !id) id = r.sessionId;
+      if (r && r.type === 'webseat-files' && r.files && typeof r.files === 'object') files = r.files;
+    });
+    if (!parsed.some(isLine) && !files) throw new Error('no session lines found');
+    if (files) {
+      Object.keys(fs).forEach(function (p) { delete fs[p]; });
+      Object.keys(files).forEach(function (p) { if (typeof files[p] === 'string') fs[p] = files[p]; });
+      saveFiles();
+      renderFiles();
+    }
+    loadLines(id, parsed);
+    line('sys', 'imported session ' + session.id + ': ' + history.length + ' messages, ' + Object.keys(fs).length + ' file(s)');
+  };
+  var newSession = function () {
+    if (busy) return;
+    loadLines(null, []);
+    line('sys', 'new session ' + session.id);
   };
 
   // ---- file panel ----
@@ -517,7 +673,9 @@ a { color: var(--accent); }
   var argPath = function (c) { return String(c.args && c.args.path != null ? c.args.path : ''); };
 
   var runSector = async function (brief, cfg) {
-    var sc = cfg.sector, hist = [{ role: 'user', content: brief }];
+    var sc = cfg.sector, hist = [];
+    var push = function (m) { hist.push(m); record(m, true); };
+    push({ role: 'user', content: brief });
     var changed = [], rounds = 0, ended = false, report = '';
     for (var r = 0; r < SECTOR_ROUNDS && !ended; r++) {
       var resp;
@@ -528,19 +686,17 @@ a { color: var(--accent); }
         report = 'REPORT: sector model call failed';
         break;
       }
-      hist.push({ role: 'assistant', text: resp.text, calls: resp.calls });
-      if (resp.text) { report = resp.text; line('text', '[sector] ' + resp.text); }
+      push({ role: 'assistant', text: resp.text, calls: resp.calls });
+      if (resp.text) report = resp.text;
       if (!resp.calls.length) { ended = true; break; }
       for (var k = 0; k < resp.calls.length; k++) {
         var c = resp.calls[k];
-        line('tool', '[sector] $ ' + c.name + ' ' + short(JSON.stringify(c.args), 200));
         var res = await execTool(c);
         if ((c.name === 'write_file' || c.name === 'edit_file') && res.indexOf('error') !== 0) {
           var p = argPath(c);
           if (changed.indexOf(p) < 0) changed.push(p);
         }
-        hist.push({ role: 'tool', id: c.id, name: c.name, result: res });
-        line('res', '[sector] ' + short(res, 400));
+        push({ role: 'tool', id: c.id, name: c.name, result: res });
       }
     }
     if (!ended && rounds >= SECTOR_ROUNDS) line('err', '[sector] stopped: ' + SECTOR_ROUNDS + ' rounds reached');
@@ -572,7 +728,6 @@ a { color: var(--accent); }
   };
 
   // ---- spokesman agent loop ----
-  var history = [];
   var busy = false;
   var setBusy = function (b) { $('prompt').disabled = b; $('send').disabled = b; };
 
@@ -585,23 +740,19 @@ a { color: var(--accent); }
     var finalText = '';
     try {
       var cfg = readSettings();
-      history.push({ role: 'user', content: text });
-      line('user', '> ' + text);
+      pushMain({ role: 'user', content: text });
       var ended = false, round;
       for (round = 0; round < MAX_ROUNDS && !ended; round++) {
         var resp;
         try { resp = await callModel(cfg.spokesman, history, spokesmanSystem(cfg), spokesmanTools(cfg)); }
         catch (e) { line('err', 'spokesman call failed: ' + errText(e)); break; }
-        history.push({ role: 'assistant', text: resp.text, calls: resp.calls });
+        pushMain({ role: 'assistant', text: resp.text, calls: resp.calls });
         finalText = resp.text;
-        if (resp.text) line('text', resp.text);
         if (!resp.calls.length) { ended = true; break; }
         for (var k = 0; k < resp.calls.length; k++) {
           var c = resp.calls[k];
-          line('tool', '$ ' + c.name + ' ' + short(JSON.stringify(c.args), 200));
           var result = await spokesmanTool(c, cfg);
-          history.push({ role: 'tool', id: c.id, name: c.name, result: result });
-          line('res', short(result, 400));
+          pushMain({ role: 'tool', id: c.id, name: c.name, result: result });
         }
       }
       if (!ended && round >= MAX_ROUNDS) line('err', 'stopped: 25 rounds reached');
@@ -657,6 +808,7 @@ a { color: var(--accent); }
       if (!data || typeof data.key !== 'string' || !data.key) throw new Error('no key in the response');
       $('sp-provider').value = 'openrouter';
       applyPreset('sp', SP_PRESETS);
+      renderLogin();
       $('sp-apiKey').value = data.key;
       saveSettings();
       line('sys', 'signed in with OpenRouter');
@@ -668,8 +820,68 @@ a { color: var(--accent); }
     }
   };
 
+  // ---- login matrix: per-provider sign-in, key page link and key check ----
+  var renderLogin = function () {
+    var lg = LOGIN[$('sp-provider').value];
+    $('sp-login').hidden = !lg;
+    $('sp-check-status').textContent = '';
+    if (!lg) return;
+    $('sp-login-how').textContent = lg.how;
+    $('signin').hidden = !lg.oauth;
+    $('sp-getkey').href = lg.keyPage;
+  };
+  // a cheap authenticated GET that proves the key works without spending tokens
+  var checkKey = async function (s) {
+    if (!s.apiKey) throw new Error('API key is empty');
+    var base = baseOf(s);
+    if (!base) throw new Error('base URL is empty');
+    var url, headers;
+    if (s.provider === 'anthropic') {
+      url = base + '/v1/models';
+      headers = { 'x-api-key': s.apiKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' };
+    } else {
+      url = base + (s.provider === 'openrouter' ? '/key' : '/models');
+      headers = { 'authorization': 'Bearer ' + s.apiKey };
+    }
+    await readJson(await fetch(url, { method: 'GET', headers: headers }));
+  };
+  $('sp-check').onclick = async function () {
+    var st = $('sp-check-status');
+    st.className = '';
+    st.textContent = 'checking...';
+    try {
+      await checkKey(readRole('sp'));
+      st.className = 'ok';
+      st.textContent = 'key ok';
+    } catch (e) {
+      st.className = 'bad';
+      st.textContent = 'key check failed: ' + short(errText(e), 160);
+    }
+  };
+
+  // ---- session buttons ----
+  $('newSession').onclick = newSession;
+  $('exportSession').onclick = function () {
+    var url = URL.createObjectURL(new Blob([exportSession()], { type: 'application/jsonl' }));
+    var a = el('a');
+    a.href = url;
+    a.download = 'webseat-' + session.id + '.jsonl';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 10000);
+  };
+  $('importBtn').onclick = function () { $('importFile').click(); };
+  $('importFile').onchange = async function (ev) {
+    var f = ev.target.files && ev.target.files[0];
+    ev.target.value = '';
+    if (!f) return;
+    try { importSession(await f.text()); }
+    catch (e) { line('err', 'import failed: ' + errText(e)); }
+  };
+
   // ---- wiring ----
-  $('sp-provider').onchange = function () { applyPreset('sp', SP_PRESETS); saveSettings(); };
+  $('sp-provider').onchange = function () { applyPreset('sp', SP_PRESETS); renderLogin(); saveSettings(); };
   $('sc-provider').onchange = function () { applyPreset('sc', SC_PRESETS); saveSettings(); };
   ['sp-baseUrl', 'sp-model', 'sp-apiKey', 'sc-baseUrl', 'sc-model', 'sc-apiKey'].forEach(function (id) {
     $(id).addEventListener('input', saveSettings);
@@ -691,12 +903,23 @@ a { color: var(--accent); }
   fillRole('sp', sp);
   fillRole('sc', sc);
   $('commandOnly').checked = typeof stored.commandOnly === 'boolean' ? stored.commandOnly : true;
+  renderLogin();
   renderFiles();
-  line('sys', 'webseat v2 ready. spokesman: ' + sp.provider + ', sector: ' + sc.provider +
-    ', command-only: ' + ($('commandOnly').checked ? 'on' : 'off') + '.');
+  var saved = store.get(SESSION_KEY, null);
+  if (saved && typeof saved === 'object' && Array.isArray(saved.lines)) {
+    try { loadLines(typeof saved.id === 'string' ? saved.id : null, saved.lines); }
+    catch (e) { line('err', 'autosaved session could not load: ' + errText(e)); loadLines(null, []); }
+  }
+  line('sys', 'webseat v3 ready. spokesman: ' + sp.provider + ', sector: ' + sc.provider +
+    ', command-only: ' + ($('commandOnly').checked ? 'on' : 'off') + ', session: ' + session.id +
+    ' (' + history.length + ' messages).');
   handleCallback();
 
-  window.webseat = { fs: fs, runPrompt: runPrompt, lastSpokesmanToolResults: lastSpokesmanToolResults };
+  window.webseat = {
+    fs: fs, history: history, runPrompt: runPrompt, lastSpokesmanToolResults: lastSpokesmanToolResults,
+    exportSession: exportSession, importSession: importSession, newSession: newSession,
+    sessionId: function () { return session.id; }
+  };
 })();
 </script>
 </body>
