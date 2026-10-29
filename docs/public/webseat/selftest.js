@@ -3,7 +3,7 @@
 const path = require('path');
 const { chromium } = require('playwright');
 
-const PAGE = 'file://' + path.join(__dirname, 'index.html');
+const PAGE = require('url').pathToFileURL(path.join(__dirname, 'index.html')).href;
 const KEYS = 'https://openrouter.ai/api/v1/auth/keys';
 const KEY_HEADERS = {
   'access-control-allow-origin': '*',
