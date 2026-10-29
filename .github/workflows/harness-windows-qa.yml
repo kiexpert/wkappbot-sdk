@@ -239,6 +239,7 @@ jobs:
           if python3 -c "import muse_cli" 2>/dev/null; then n=$((n + 1)); echo "INSTALL muse PASS (muse-cli $(python3 -m pip show muse-cli 2>/dev/null | sed -n "s/^Version: //p"))"; else echo "INSTALL muse FAIL"; fi
           echo "RESULT $n/5"
 
+      # On Windows agy answers a no-login run by opening Edge for its login; the NATIVE scan skips files Edge still holds open.
       - name: 5e. Live -- each CLI run with no login lands its login error in the agent-run ledger (NATIVE lines measure the CLI's own session file)
         shell: pwsh
         working-directory: kih
