@@ -239,7 +239,7 @@ jobs:
           if python3 -c "import muse_cli" 2>/dev/null; then n=$((n + 1)); echo "INSTALL muse PASS (muse-cli $(python3 -m pip show muse-cli 2>/dev/null | sed -n "s/^Version: //p"))"; else echo "INSTALL muse FAIL"; fi
           echo "RESULT $n/5"
 
-      - name: 5e. Live -- each CLI run with no login lands its login error in the agent-run ledger
+      - name: 5e. Live -- each CLI run with no login lands its login error in the agent-run ledger (NATIVE lines measure the CLI's own session file)
         shell: pwsh
         working-directory: kih
         run: ./tools/wkharness-common-agentrun/Test-WkAgentLoginLive.ps1 -Families claude,codex,grok,muse,agy -TimeoutSec 90 -Python python3
