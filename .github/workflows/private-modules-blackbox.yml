@@ -12,7 +12,8 @@ on:
     paths:
       - .github/workflows/private-modules-blackbox.yml
   schedule:
-    - cron: '41 3 * * *'
+    # every 6 hours, so a module or runner change in the private repo is re-tested the same day
+    - cron: '41 */6 * * *'
 
 permissions:
   contents: read
