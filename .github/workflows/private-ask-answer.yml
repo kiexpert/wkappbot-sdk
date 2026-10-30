@@ -1,0 +1,86 @@
+name: private-ask-answer
+
+# Answers the open "[ask]" issues of one private repo of this account with the owner's own
+# Claude subscription (secret CLAUDE_CODE_OAUTH_TOKEN, made with claude setup-token), then closes
+# each issue. Questions and answers live only in that private repo's issues; this public log
+# prints counts, never their text. The target repo is found by a sha256 prefix, never named.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/private-ask-answer.yml
+  schedule:
+    # every 5 minutes, the shortest schedule GitHub runs
+    - cron: '*/5 * * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: private-ask-answer
+  cancel-in-progress: false
+
+jobs:
+  answer:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      TARGET_HASH: ce712644e054789d
+      T1: ${{ secrets.GH_LICENSE_TOKEN }}
+      T2: ${{ secrets.WKAPPBOT_PAT }}
+      T3: ${{ secrets.WKAPPBOT_CORE_PAT }}
+    steps:
+      - name: Find the target repo and a token that can reach it
+        run: |
+          set -u
+          for t in "$T1" "$T2" "$T3"; do
+            [ -n "$t" ] || continue
+            names=$(GH_TOKEN="$t" gh repo list kiexpert --visibility private --limit 300 --json nameWithOwner -q '.[].nameWithOwner' 2>/dev/null || true)
+            for n in $names; do
+              if [ "$(printf %s "$n" | sha256sum | cut -c1-16)" = "$TARGET_HASH" ]; then
+                echo "::add-mask::$n"
+                echo "::add-mask::${n#*/}"
+                echo "::add-mask::$t"
+                { echo "REPO=$n"; echo "TOK=$t"; } >> "$GITHUB_ENV"
+                echo "target found"
+                exit 0
+              fi
+            done
+          done
+          echo "no token reaches the target repo"; exit 1
+      - name: Count open questions
+        id: q
+        run: |
+          set -eu
+          n=$(GH_TOKEN="$TOK" gh issue list --repo "$REPO" --state open --limit 50 --json number,title \
+            -q '[.[] | select(.title | startswith("[ask]"))] | length')
+          echo "open questions: $n"
+          echo "count=$n" >> "$GITHUB_OUTPUT"
+      - name: Install Claude Code
+        if: steps.q.outputs.count != '0'
+        run: npm install -g --silent @anthropic-ai/claude-code
+      - name: Answer and close each question
+        if: steps.q.outputs.count != '0'
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        run: |
+          set -eu
+          test -n "$CLAUDE_CODE_OAUTH_TOKEN" || { echo "secret CLAUDE_CODE_OAUTH_TOKEN is not set"; exit 1; }
+          export GH_TOKEN="$TOK"
+          for num in $(gh issue list --repo "$REPO" --state open --limit 50 --json number,title \
+              -q '.[] | select(.title | startswith("[ask]")) | .number'); do
+            gh issue view "$num" --repo "$REPO" --json title,body -q '.title + "\n\n" + .body' > q.txt
+            { echo "You are the spokesman of a vibe-coding portal for semiconductor engineers."
+              echo "Answer the question below in Korean, polite haeyo form, concise."
+              echo "Never print secrets, tokens, passwords or phone numbers."
+              echo "If it needs a simulation, describe the steps and name the portal tools estimate_resources, call_module and run_python."
+              echo "---"
+              cat q.txt; } > p.txt
+            claude -p --max-turns 3 < p.txt > a.txt 2> /dev/null
+            printf '\n\n---\n_Answered by Claude Code on the owner subscription_\n' >> a.txt
+            gh issue comment "$num" --repo "$REPO" --body-file a.txt > /dev/null
+            gh issue close "$num" --repo "$REPO" --reason completed > /dev/null
+            rm -f q.txt p.txt a.txt
+            echo "answered one question"
+          done
