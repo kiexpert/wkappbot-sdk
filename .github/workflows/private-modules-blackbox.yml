@@ -5,6 +5,7 @@ name: private-modules-blackbox
 # test inputs, and hands the results (names, schemas, outputs, verdicts; never code) to the
 # private-pages-relay through an orphan relay/blackbox branch in that repo.
 # The target repo is never named in this public file or its logs: it is found by a sha256 prefix.
+# OpenRAM runs with use_nix off, so a stock runner needs no Nix (private repo PR 22).
 on:
   workflow_dispatch:
   push:
