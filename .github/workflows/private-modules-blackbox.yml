@@ -60,7 +60,7 @@ jobs:
         with:
           python-version: '3.11'
       - name: Install the module dependencies
-        run: python -m pip install -q numpy scipy
+        run: python -m pip install -q numpy scipy packaging
       - name: Run the black-box tests
         run: python src/modules/run_blackbox.py --root src --out results.json
       - name: Hand the results to the pages relay on relay/blackbox
