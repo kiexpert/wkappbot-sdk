@@ -31,10 +31,6 @@ jobs:
       T2: ${{ secrets.WKAPPBOT_PAT }}
       T3: ${{ secrets.WKAPPBOT_CORE_PAT }}
     steps:
-      - name: Write the .env beside the workspace
-        uses: kiexpert/wkappbot-sdk/.github/actions/write-env@main
-        with:
-          secrets-json: ${{ toJSON(secrets) }}
       - name: Find the target repo and a token that can reach it
         run: |
           set -u
@@ -85,5 +81,6 @@ jobs:
             printf '\n\n---\n_Answered by Claude Code on the owner subscription_\n' >> a.txt
             gh issue comment "$num" --repo "$REPO" --body-file a.txt > /dev/null
             gh issue close "$num" --repo "$REPO" --reason completed > /dev/null
+            rm -f q.txt p.txt a.txt
             echo "answered one question"
           done
