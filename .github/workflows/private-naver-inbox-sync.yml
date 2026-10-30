@@ -1,0 +1,86 @@
+name: private-naver-inbox-sync
+
+# Daily read-only scan of the owner's Naver inbox headers into one private repo of this account
+# (its resume/scripts/naver_inbox_scan.py writes the dated scan file and its own state), then commits
+# the result back to that repo. Secrets NAVER_ID and NAVER_APP_PASSWORD (a Naver application
+# password, IMAP on) are added by the owner. The script prints counts only, never mail text, and
+# the target repo is found by a sha256 prefix, never named.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/private-naver-inbox-sync.yml
+  schedule:
+    - cron: '17 22 * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: private-naver-inbox-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      TARGET_HASH: c48fcce9e0c13229
+      T1: ${{ secrets.GH_LICENSE_TOKEN }}
+      T2: ${{ secrets.WKAPPBOT_PAT }}
+      T3: ${{ secrets.WKAPPBOT_CORE_PAT }}
+    steps:
+      - name: Skip until the Naver secrets exist
+        id: gate
+        env:
+          NAVER_ID: ${{ secrets.NAVER_ID }}
+          NAVER_APP_PASSWORD: ${{ secrets.NAVER_APP_PASSWORD }}
+        run: |
+          if [ -n "$NAVER_ID" ] && [ -n "$NAVER_APP_PASSWORD" ]; then echo "ready=true" >> "$GITHUB_OUTPUT"
+          else echo "secrets NAVER_ID and NAVER_APP_PASSWORD are not set yet: nothing to do"; echo "ready=false" >> "$GITHUB_OUTPUT"; fi
+      - name: Find the target repo and a token that can reach it
+        if: steps.gate.outputs.ready == 'true'
+        run: |
+          set -u
+          for t in "$T1" "$T2" "$T3"; do
+            [ -n "$t" ] || continue
+            names=$(GH_TOKEN="$t" gh repo list kiexpert --visibility private --limit 300 --json nameWithOwner -q '.[].nameWithOwner' 2>/dev/null || true)
+            for n in $names; do
+              if [ "$(printf %s "$n" | sha256sum | cut -c1-16)" = "$TARGET_HASH" ]; then
+                echo "::add-mask::$n"
+                echo "::add-mask::${n#*/}"
+                echo "::add-mask::$t"
+                { echo "REPO=$n"; echo "TOK=$t"; } >> "$GITHUB_ENV"
+                echo "target found"
+                exit 0
+              fi
+            done
+          done
+          echo "no token reaches the target repo"; exit 1
+      - name: Clone the target repo
+        if: steps.gate.outputs.ready == 'true'
+        run: git clone -q --depth 1 "https://x-access-token:${TOK}@github.com/${REPO}.git" src
+      - uses: actions/setup-python@v5
+        if: steps.gate.outputs.ready == 'true'
+        with:
+          python-version: '3.11'
+      - name: Scan the inbox headers
+        if: steps.gate.outputs.ready == 'true'
+        env:
+          NAVER_ID: ${{ secrets.NAVER_ID }}
+          NAVER_APP_PASSWORD: ${{ secrets.NAVER_APP_PASSWORD }}
+        working-directory: src
+        run: python resume/scripts/naver_inbox_scan.py > ../scan.log 2>&1 || { tail -n 5 ../scan.log | sed -E 's/[^ ]+@[^ ]+/<addr>/g'; exit 1; }
+      - name: Commit the scan back
+        if: steps.gate.outputs.ready == 'true'
+        working-directory: src
+        run: |
+          set -eu
+          git config user.name "naver-inbox-sync"
+          git config user.email "naver-inbox-sync@users.noreply.github.com"
+          git add -A resume
+          if git diff --cached --quiet; then echo "no new mail headers"; exit 0; fi
+          git commit -q -m "naver inbox scan $(date -u +%F)"
+          git push -q origin HEAD:main
+          echo "scan committed: $(git diff --stat HEAD~1 | tail -n 1)"
