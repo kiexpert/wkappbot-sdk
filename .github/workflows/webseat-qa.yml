@@ -34,3 +34,5 @@ jobs:
         run: npx playwright install chromium
       - name: Run webseat selftest
         run: node docs/public/webseat/selftest.js
+      - name: Run webseat-bridge selftest
+        run: node docs/public/webseat/bridge-selftest.mjs
