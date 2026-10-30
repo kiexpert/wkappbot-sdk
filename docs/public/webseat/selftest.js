@@ -193,6 +193,33 @@ const check = (name, ok, why) => results.push({ name, ok: !!ok, why: ok ? '' : (
     }
     await pi.selectOption('#sp-provider', 'mock');
     check('L mock: login row hidden', await pi.evaluate(() => document.getElementById('sp-login').hidden));
+
+    // ---- Case S: skill tools against the real SDK catalog file ----
+    const CATALOG = require('url').pathToFileURL(path.join(__dirname, '..', '..', 'skills', 'skills-data-full.js')).href;
+    const ps = await ctx.newPage();
+    track(ps);
+    await ps.addInitScript((u) => { window.WEBSEAT_SKILLS_URL = u; }, CATALOG);
+    await ps.goto(PAGE);
+    const sk = await ps.evaluate(async () => {
+      const ex = (name, args) => window.webseat.execTool({ id: 't', name: name, args: args });
+      return {
+        search: await ex('skill_search', { query: 'cdp timeout' }),
+        read: await ex('skill_read', { id: 'a11y-find' }),
+        miss: await ex('skill_read', { id: 'no-such-skill-xyz' }),
+        tools: window.webseat.spokesmanToolNames()
+      };
+    });
+    check('S1 skill_search returns id :: first-step lines', sk.search.includes(' :: ') && !sk.search.startsWith('error'), sk.search.slice(0, 200));
+    check('S2 skill_read returns the id then numbered steps', sk.read.startsWith('a11y-find\n1. '), sk.read.slice(0, 200));
+    check('S3 skill_read of a missing id is an error', sk.miss === 'error: no such skill: no-such-skill-xyz', sk.miss);
+    check('S4 command-only spokesman keeps the skill tools but not read_file',
+      sk.tools.includes('skill_search') && sk.tools.includes('skill_read') && !sk.tools.includes('read_file'), sk.tools.join(','));
+    const pn = await ctx.newPage();
+    track(pn);
+    await pn.addInitScript((u) => { window.WEBSEAT_SKILLS_URL = u; }, CATALOG.replace('skills-data-full.js', 'missing-catalog.js'));
+    await pn.goto(PAGE);
+    const unreachable = await pn.evaluate(() => window.webseat.execTool({ id: 't', name: 'skill_search', args: { query: 'cdp' } }));
+    check('S5 an unreachable catalog is a tool error, not a crash', unreachable.startsWith('error: skill catalog not reachable'), unreachable);
   } catch (e) {
     check('setup', false, String((e && e.stack) || e));
   } finally {
