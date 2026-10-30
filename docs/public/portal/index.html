@@ -1,0 +1,1067 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>바이브코딩 포털</title>
+<style>
+.lead { margin: 4px 0 8px; font-size: 14px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
+.chip { font: inherit; font-size: 13px; padding: 4px 10px; border-radius: 14px; cursor: pointer; }
+body:not(.settings-page) section.settings, body.settings-page main, .banner { display: none; }
+body.settings-page .to-settings, body:not(.settings-page) .to-portal { display: none; }
+.nav-link { display: inline-block; margin: 4px 12px 4px 0; font-size: 15px; font-weight: 600; }
+:root {
+  color-scheme: dark;
+  --bg: #0d1117; --fg: #c9d1d9; --dim: #8b949e; --panel: #161b22; --border: #30363d;
+  --input: #0d1117; --accent: #58a6ff; --err: #ff7b72; --ok: #7ee787; --warn: #e3b341;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    color-scheme: light;
+    --bg: #fbfbfa; --fg: #1f2328; --dim: #656d76; --panel: #f0f0ee; --border: #d0d7de;
+    --input: #ffffff; --accent: #0969da; --err: #cf222e; --ok: #1a7f37; --warn: #9a6700;
+  }
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body {
+  margin: 0; background: var(--bg); color: var(--fg); overflow-x: hidden;
+  font: 14px/1.45 ui-monospace, Menlo, Consolas, "Liberation Mono", monospace;
+}
+header { padding: 12px 16px; border-bottom: 1px solid var(--border); }
+h1 { font-size: 16px; margin: 0 0 6px; }
+.banner { color: var(--warn); font-size: 12px; }
+.settings {
+  display: flex; flex-wrap: wrap; gap: 8px 12px; padding: 10px 16px;
+  border-bottom: 1px solid var(--border); background: var(--panel);
+}
+.settings label { display: flex; flex-direction: column; gap: 2px; font-size: 11px; color: var(--dim); flex: 1 1 150px; min-width: 0; }
+.settings label.wide { flex-basis: 240px; }
+.settings label.check { flex-direction: row; align-items: center; gap: 6px; flex: none; color: var(--fg); }
+.role { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: flex-end; flex-basis: 100%; }
+.role .tag { flex-basis: 100%; font-size: 12px; color: var(--accent); }
+.login { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; flex-basis: 100%; font-size: 12px; }
+.login .ok { color: var(--ok); }
+.login .bad { color: var(--err); }
+main { display: flex; flex-direction: column; }
+aside {
+  padding: 12px 16px; border-bottom: 1px solid var(--border); max-height: 40vh; overflow: auto;
+}
+.row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.row strong { flex: 1; }
+.file { display: flex; align-items: center; gap: 6px; padding: 4px 0; border-bottom: 1px dotted var(--border); }
+.file .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dim { color: var(--dim); }
+#term { display: flex; flex-direction: column; padding: 12px 16px; flex: 1; min-width: 0; }
+#log {
+  flex: 1; min-height: 50vh; overflow: auto; white-space: pre-wrap; word-break: break-word;
+  padding-bottom: 8px;
+}
+.line { margin: 0 0 4px; }
+.line.user { color: var(--ok); }
+.line.tool { color: var(--accent); }
+.line.res { color: var(--dim); padding-left: 12px; }
+.line.err { color: var(--err); }
+.line.sys { color: var(--dim); }
+.line.text { color: var(--fg); }
+.prompt-row { display: flex; gap: 8px; margin-top: 8px; }
+.prompt-row span { padding-top: 6px; color: var(--ok); }
+input, select, button {
+  font: inherit; color: var(--fg); background: var(--input);
+  border: 1px solid var(--border); border-radius: 4px; padding: 6px 8px; min-width: 0;
+}
+input[type="text"], input[type="password"], select { width: 100%; }
+input[type="checkbox"] { width: auto; padding: 0; }
+button { cursor: pointer; flex: none; }
+button:disabled, input:disabled { opacity: 0.5; cursor: default; }
+.prompt-row input { flex: 1; }
+a { color: var(--accent); }
+@media (min-width: 720px) {
+  main { flex-direction: row; height: calc(100vh - 250px); min-height: 460px; }
+  aside { width: 280px; flex: none; max-height: none; border-bottom: 0; border-right: 1px solid var(--border); }
+  #log { min-height: 0; }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>바이브코딩 포털</h1>
+  <p class="lead">코딩을 몰라도 됩니다. 만들고 싶은 것을 말로 적으면, 대변인 AI가 일을 나누고 작업 AI가 코드를 써서 이 브라우저 안에서 실행합니다. 파일은 왼쪽 목록에 쌓이고 Python 계산도 바로 돌아갑니다.</p>
+  <a class="nav-link to-settings" href="settings.html">지능(AI 모델) 설정 열기 &rarr;</a>
+  <a class="nav-link to-portal" href="index.html">&larr; 포털로 돌아가기</a>
+  <div class="banner">Command-only mode: the spokesman model sees only file names and sector reports. Sectors run on the endpoint you set below. Never load customer source unless your sector endpoint is approved for it.</div>
+</header>
+
+<section class="settings">
+  <div class="role">
+    <span class="tag">SPOKESMAN: the expensive external model that commands the sectors</span>
+    <label>provider
+      <select id="sp-provider">
+        <option value="anthropic">anthropic</option>
+        <option value="openai-compatible">openai-compatible</option>
+        <option value="openrouter">openrouter</option>
+        <option value="gemini">gemini</option>
+        <option value="local-cli">local-cli</option>
+        <option value="mock">mock</option>
+      </select>
+    </label>
+    <label class="wide">base URL <input id="sp-baseUrl" type="text" spellcheck="false"></label>
+    <label>model <input id="sp-model" type="text" spellcheck="false"></label>
+    <label>API key <input id="sp-apiKey" type="password" autocomplete="off"></label>
+    <div class="login" id="sp-login">
+      <span id="sp-login-how" class="dim"></span>
+      <button type="button" id="signin">Sign in with OpenRouter</button>
+      <a id="sp-getkey" target="_blank" rel="noopener noreferrer">Get key</a>
+      <button type="button" id="sp-check">check key</button>
+      <span id="sp-check-status"></span>
+    </div>
+  </div>
+  <div class="role">
+    <span class="tag">SECTOR: the cheap internal model that runs each agent_cmd brief</span>
+    <label>provider
+      <select id="sc-provider">
+        <option value="openai-compatible">openai-compatible</option>
+        <option value="local-cli">local-cli</option>
+        <option value="mock-sector">mock-sector</option>
+      </select>
+    </label>
+    <label class="wide">base URL <input id="sc-baseUrl" type="text" spellcheck="false" placeholder="http://internal-llm.example/v1"></label>
+    <label>model <input id="sc-model" type="text" spellcheck="false"></label>
+    <label>API key <input id="sc-apiKey" type="password" autocomplete="off"></label>
+  </div>
+  <label class="check"><input id="commandOnly" type="checkbox" checked> command-only</label>
+</section>
+
+<main>
+  <aside>
+    <div class="row">
+      <strong>files</strong>
+      <button type="button" id="uploadBtn">upload</button>
+      <input id="upload" type="file" multiple hidden>
+    </div>
+    <div id="files"></div>
+  </aside>
+  <section id="term">
+    <div class="row">
+      <strong>session</strong>
+      <button type="button" id="newSession">new</button>
+      <button type="button" id="exportSession">export</button>
+      <button type="button" id="importBtn">import</button>
+      <input id="importFile" type="file" accept=".jsonl,application/jsonl,text/plain" hidden>
+    </div>
+    <div id="chips" class="chips">
+      <button type="button" class="chip" data-prompt="메모리 셀 1000개가 한 줄로 놓였을 때 가운데 셀이 뜨거워지면 열이 어떻게 퍼지는지 파이썬으로 시뮬레이션하고, 100단계 뒤 평균과 최고 온도를 표로 보여줘">메모리 셀 열 확산 시뮬레이션</button>
+      <button type="button" class="chip" data-prompt="웨이퍼 25장에 결함 좌표를 무작위로 만들고, 웨이퍼를 9개 구역으로 나눠 구역별 결함 수를 세는 파이썬 코드를 짜서 실행하고 결과를 defects.csv로 저장해줘">웨이퍼 결함 구역 집계</button>
+      <button type="button" class="chip" data-prompt="내가 올린 CSV 파일의 열마다 평균, 최솟값, 최댓값을 계산해서 summary.txt로 정리해줘. 파일이 없으면 예시 CSV를 먼저 만들어줘">CSV 파일 요약</button>
+      <button type="button" class="chip" data-prompt="DRAM 리프레시 주기를 16ms부터 256ms까지 바꿔 가며 셀 데이터 유지율을 지수 감쇠 모델로 계산하고, 주기별 유지율을 result.txt에 표로 저장해줘">DRAM 데이터 유지율 곡선</button>
+    </div>
+    <div id="log" aria-live="polite"></div>
+    <form id="form" class="prompt-row" autocomplete="off">
+      <span>&gt;</span>
+      <input id="prompt" type="text" placeholder="만들고 싶은 것을 말로 적어 주세요">
+      <button type="submit" id="send">send</button>
+    </form>
+  </section>
+</main>
+
+<script>window.WEBSEAT_SKILLS_URL = 'https://kiexpert.github.io/wkappbot-sdk/skills/skills-data-full.js';</script>
+<script>
+(function () {
+  'use strict';
+
+  var SPOKESMAN_BASE = 'You are a spokesman, the expensive planner. Give concrete work to sectors with agent_cmd, then answer briefly.';
+  var SECTOR_SYSTEM = 'You are a sector, a cheap worker commanded by a spokesman. Do the brief with the tools. Use run_python for calculations and simulations and save results to files. End your final message with one line starting REPORT: that states the outcome in one sentence.';
+  var MAX_ROUNDS = 25;
+  var SECTOR_ROUNDS = 15;
+  var REPORT_CAP = 1500;
+  var PKCE_KEY = 'webseat2.pkce';
+  var KEYS_URL = 'https://openrouter.ai/api/v1/auth/keys';
+  var MOCK_CODE = 'console.log(6*7)';
+  var SP_PRESETS = {
+    'anthropic': { base: 'https://api.anthropic.com', model: 'claude-sonnet-5-5' },
+    'openai-compatible': { base: 'https://api.openai.com/v1', model: 'gpt-5' },
+    'openrouter': { base: 'https://openrouter.ai/api/v1', model: 'anthropic/claude-sonnet-4.5' },
+    'gemini': { base: 'https://generativelanguage.googleapis.com/v1beta/openai', model: 'gemini-2.5-pro' },
+    // your own logged-in CLI through webseat-bridge.mjs on this machine; the subscription stays in the CLI
+    'local-cli': { base: 'http://127.0.0.1:8787/v1', model: 'claude' },
+    'mock': { base: '', model: 'mock' }
+  };
+  // login matrix: how each spokesman provider gets a credential in a browser.
+  // Only OpenRouter offers a public browser OAuth flow (PKCE); the others take a pasted key.
+  var LOGIN = {
+    'anthropic': { how: 'login: paste an Anthropic API key', keyPage: 'https://console.anthropic.com/settings/keys' },
+    'openai-compatible': { how: 'login: paste an API key for this host', keyPage: 'https://platform.openai.com/api-keys' },
+    'openrouter': { how: 'login: Sign in with OpenRouter (OAuth PKCE), or paste a key', keyPage: 'https://openrouter.ai/settings/keys', oauth: true },
+    'gemini': { how: 'login: paste a Gemini API key', keyPage: 'https://aistudio.google.com/apikey' },
+    'local-cli': { how: 'login: run node webseat-bridge.mjs --cli claude (or codex, gemini) on this machine, then paste the key it prints; your CLI subscription stays in the CLI', keyPage: 'webseat-bridge.mjs' }
+  };
+  var SESSION_KEY = 'webseat2.session';
+  var SC_PRESETS = {
+    'openai-compatible': { base: '', model: '' },
+    'local-cli': { base: 'http://127.0.0.1:8787/v1', model: 'claude' },
+    'mock-sector': { base: '', model: 'mock-sector' }
+  };
+
+  var $ = function (id) { return document.getElementById(id); };
+  var el = function (tag, cls, text) {
+    var d = document.createElement(tag);
+    if (cls) d.className = cls;
+    if (text !== undefined) d.textContent = text;
+    return d;
+  };
+  var short = function (s, n) {
+    n = n || 400;
+    return s.length > n ? s.slice(0, n) + ' ...(+' + (s.length - n) + ' chars)' : s;
+  };
+  var errText = function (e) { return (e && e.message) || String(e); };
+
+  // ---- storage: every access is guarded; the page works without it ----
+  var store = {
+    get: function (k, d) {
+      try { var v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); }
+      catch (e) { return d; }
+    },
+    set: function (k, v) {
+      try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* storage blocked */ }
+    }
+  };
+  var ssGet = function (k) { try { return sessionStorage.getItem(k); } catch (e) { return null; } };
+  var ssSet = function (k, v) { try { sessionStorage.setItem(k, v); } catch (e) { /* blocked */ } };
+  var ssDel = function (k) { try { sessionStorage.removeItem(k); } catch (e) { /* blocked */ } };
+
+  // ---- virtual filesystem: path -> text ----
+  var fs = (function () {
+    var v = store.get('webseat2.files', {});
+    return v && typeof v === 'object' && !Array.isArray(v) ? v : {};
+  })();
+  var has = function (p) { return Object.prototype.hasOwnProperty.call(fs, p); };
+  var saveFiles = function () { store.set('webseat2.files', fs); };
+
+  // ---- settings: two roles plus command-only ----
+  var readRole = function (r) {
+    return {
+      provider: $(r + '-provider').value,
+      baseUrl: $(r + '-baseUrl').value.trim(),
+      model: $(r + '-model').value.trim(),
+      apiKey: $(r + '-apiKey').value.trim()
+    };
+  };
+  var readSettings = function () {
+    return { spokesman: readRole('sp'), sector: readRole('sc'), commandOnly: $('commandOnly').checked };
+  };
+  var saveSettings = function () { store.set('webseat2.settings', readSettings()); };
+  var baseOf = function (s) {
+    var fallback = s.provider === 'anthropic' ? SP_PRESETS.anthropic.base : '';
+    return (s.baseUrl || fallback).replace(/\/+$/, '');
+  };
+  var cleanRole = function (raw, allowed, defProvider, presets) {
+    var o = raw && typeof raw === 'object' ? raw : {};
+    var provider = allowed.indexOf(o.provider) >= 0 ? o.provider : defProvider;
+    var p = presets[provider] || { base: '', model: '' };
+    return {
+      provider: provider,
+      baseUrl: typeof o.baseUrl === 'string' ? o.baseUrl : p.base,
+      model: typeof o.model === 'string' ? o.model : p.model,
+      apiKey: typeof o.apiKey === 'string' ? o.apiKey : ''
+    };
+  };
+  var fillRole = function (r, v) {
+    $(r + '-provider').value = v.provider;
+    $(r + '-baseUrl').value = v.baseUrl;
+    $(r + '-model').value = v.model;
+    $(r + '-apiKey').value = v.apiKey;
+  };
+  var applyPreset = function (r, presets) {
+    var pr = presets[$(r + '-provider').value];
+    if (!pr) return;
+    if (pr.base) $(r + '-baseUrl').value = pr.base;
+    $(r + '-model').value = pr.model;
+  };
+
+  // ---- log ----
+  var log = $('log');
+  var line = function (cls, text) {
+    var d = el('div', 'line ' + cls, text);
+    log.appendChild(d);
+    log.scrollTop = log.scrollHeight;
+    return d;
+  };
+
+  // ---- session file: one Claude Code shaped JSONL line per message, autosaved every turn ----
+  var uuid = function () {
+    if (crypto.randomUUID) return crypto.randomUUID();
+    var b = crypto.getRandomValues(new Uint8Array(16));
+    b[6] = (b[6] & 15) | 64;
+    b[8] = (b[8] & 63) | 128;
+    var h = Array.prototype.map.call(b, function (x) { return (x + 256).toString(16).slice(1); }).join('');
+    return h.slice(0, 8) + '-' + h.slice(8, 12) + '-' + h.slice(12, 16) + '-' + h.slice(16, 20) + '-' + h.slice(20);
+  };
+  var history = [];
+  var session = { id: uuid(), lines: [] };
+  var lastUuid = function (side) {
+    for (var i = session.lines.length - 1; i >= 0; i--) {
+      if (!!session.lines[i].isSidechain === side) return session.lines[i].uuid;
+    }
+    return null;
+  };
+  // internal message -> {type, message} in Claude Code shape
+  var toEntry = function (m) {
+    if (m.role === 'user') return { type: 'user', message: { role: 'user', content: m.content } };
+    if (m.role === 'assistant') {
+      var blocks = [];
+      if (m.text) blocks.push({ type: 'text', text: m.text });
+      m.calls.forEach(function (c) { blocks.push({ type: 'tool_use', id: c.id, name: c.name, input: c.args }); });
+      return { type: 'assistant', message: { role: 'assistant', content: blocks } };
+    }
+    return { type: 'user', message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: m.id, content: m.result }] } };
+  };
+  // Claude Code shaped lines -> internal messages, in order
+  var fromLines = function (lines) {
+    var out = [], names = {};
+    lines.forEach(function (l) {
+      var msg = l.message, content = msg.content;
+      if (l.type === 'assistant') {
+        var text = '', calls = [];
+        (Array.isArray(content) ? content : [{ type: 'text', text: String(content == null ? '' : content) }]).forEach(function (b) {
+          if (b && b.type === 'text') text += b.text;
+          else if (b && b.type === 'tool_use') { names[b.id] = b.name; calls.push({ id: b.id, name: b.name, args: b.input || {} }); }
+        });
+        out.push({ role: 'assistant', text: text, calls: calls, side: !!l.isSidechain });
+      } else if (Array.isArray(content) && content.some(function (b) { return b && b.type === 'tool_result'; })) {
+        content.forEach(function (b) {
+          if (!b || b.type !== 'tool_result') return;
+          var r = typeof b.content === 'string' ? b.content : JSON.stringify(b.content);
+          out.push({ role: 'tool', id: b.tool_use_id, name: names[b.tool_use_id] || '', result: r, side: !!l.isSidechain });
+        });
+      } else {
+        var t = Array.isArray(content)
+          ? content.map(function (b) { return b && b.type === 'text' ? b.text : ''; }).join('')
+          : String(content == null ? '' : content);
+        out.push({ role: 'user', content: t, side: !!l.isSidechain });
+      }
+    });
+    return out;
+  };
+  var renderMsg = function (m, side) {
+    var pre = side ? '[sector] ' : '';
+    if (m.role === 'user') { line(side ? 'sys' : 'user', side ? pre + 'brief: ' + short(m.content, 200) : '> ' + m.content); return; }
+    if (m.role === 'tool') { line('res', pre + short(m.result, 400)); return; }
+    if (m.text) line('text', pre + m.text);
+    m.calls.forEach(function (c) { line('tool', pre + '$ ' + c.name + ' ' + short(JSON.stringify(c.args), 200)); });
+  };
+  var saveSession = function () { store.set(SESSION_KEY, { id: session.id, lines: session.lines }); };
+  // every message goes through here: render, keep the line, autosave
+  var record = function (m, side) {
+    var e = toEntry(m);
+    var l = { parentUuid: lastUuid(!!side), isSidechain: !!side, type: e.type, message: e.message,
+      uuid: uuid(), timestamp: new Date().toISOString(), sessionId: session.id };
+    session.lines.push(l);
+    renderMsg(m, side);
+    saveSession();
+  };
+  var pushMain = function (m) { history.push(m); record(m, false); };
+  var isLine = function (l) {
+    return l && typeof l === 'object' && (l.type === 'user' || l.type === 'assistant') &&
+      l.message && typeof l.message === 'object' && l.message.role === l.type;
+  };
+  // restore history and log from lines; files stay as given by the caller
+  var loadLines = function (id, lines) {
+    session.id = id || uuid();
+    session.lines = lines.filter(isLine);
+    history.length = 0;
+    log.textContent = '';
+    fromLines(session.lines).forEach(function (m) {
+      renderMsg(m, m.side);
+      if (!m.side) { delete m.side; history.push(m); }
+    });
+    saveSession();
+  };
+  var secretsNow = function () {
+    return ['sp-apiKey', 'sc-apiKey'].map(function (id) { return $(id).value.trim(); })
+      .filter(function (k) { return k.length >= 4; });
+  };
+  var exportSession = function () {
+    var rows = session.lines.slice();
+    rows.push({ type: 'webseat-files', files: fs, timestamp: new Date().toISOString(), sessionId: session.id });
+    var text = rows.map(function (r) { return JSON.stringify(r); }).join('\n') + '\n';
+    // keys never live in the transcript; scrub anyway in case a model echoed one
+    secretsNow().forEach(function (k) { text = text.split(k).join('[redacted]'); });
+    return text;
+  };
+  var importSession = function (text) {
+    if (busy) throw new Error('busy: wait for the running prompt');
+    var rows = String(text == null ? '' : text).split(/\r?\n/).filter(function (s) { return s.trim(); });
+    var parsed = rows.map(function (s, i) {
+      try { return JSON.parse(s); } catch (e) { throw new Error('line ' + (i + 1) + ' is not JSON'); }
+    });
+    var id = null, files = null;
+    parsed.forEach(function (r) {
+      if (r && typeof r.sessionId === 'string' && !id) id = r.sessionId;
+      if (r && r.type === 'webseat-files' && r.files && typeof r.files === 'object') files = r.files;
+    });
+    if (!parsed.some(isLine) && !files) throw new Error('no session lines found');
+    if (files) {
+      Object.keys(fs).forEach(function (p) { delete fs[p]; });
+      Object.keys(files).forEach(function (p) { if (typeof files[p] === 'string') fs[p] = files[p]; });
+      saveFiles();
+      renderFiles();
+    }
+    loadLines(id, parsed);
+    line('sys', 'imported session ' + session.id + ': ' + history.length + ' messages, ' + Object.keys(fs).length + ' file(s)');
+  };
+  var newSession = function () {
+    if (busy) return;
+    loadLines(null, []);
+    line('sys', 'new session ' + session.id);
+  };
+
+  // ---- file panel ----
+  var renderFiles = function () {
+    var box = $('files');
+    box.textContent = '';
+    var paths = Object.keys(fs).sort();
+    if (!paths.length) { box.appendChild(el('div', 'dim', '(no files)')); return; }
+    paths.forEach(function (p) {
+      var row = el('div', 'file');
+      var name = el('span', 'name', p);
+      name.title = p;
+      var dl = el('a', '', 'download');
+      dl.href = 'data:text/plain;charset=utf-8,' + encodeURIComponent(fs[p]);
+      dl.download = p;
+      var del = el('button', '', 'delete');
+      del.type = 'button';
+      del.onclick = function () { delete fs[p]; saveFiles(); renderFiles(); };
+      row.appendChild(name);
+      row.appendChild(dl);
+      row.appendChild(del);
+      box.appendChild(row);
+    });
+  };
+
+  $('uploadBtn').onclick = function () { $('upload').click(); };
+  $('upload').onchange = async function (ev) {
+    var files = Array.prototype.slice.call(ev.target.files || []);
+    for (var i = 0; i < files.length; i++) {
+      fs[files[i].name] = await files[i].text();
+    }
+    ev.target.value = '';
+    saveFiles();
+    renderFiles();
+    line('sys', 'uploaded ' + files.length + ' file(s)');
+  };
+
+  // ---- tools ----
+  var TOOLS = [
+    { name: 'list_files', description: 'List all virtual file paths.',
+      params: { type: 'object', properties: {}, required: [] } },
+    { name: 'read_file', description: 'Read a file by path.',
+      params: { type: 'object', properties: { path: { type: 'string' } }, required: ['path'] } },
+    { name: 'write_file', description: 'Create or overwrite a file.',
+      params: { type: 'object', properties: { path: { type: 'string' }, content: { type: 'string' } }, required: ['path', 'content'] } },
+    { name: 'edit_file', description: 'Replace old_string with new_string in a file. old_string must occur exactly once, otherwise an error is returned.',
+      params: { type: 'object', properties: { path: { type: 'string' }, old_string: { type: 'string' }, new_string: { type: 'string' } }, required: ['path', 'old_string', 'new_string'] } },
+    { name: 'run_js', description: 'Run JavaScript in a fresh Web Worker (5 s limit, no access to files). Returns console.log output and the return value. Pass any file text the code needs inside code.',
+      params: { type: 'object', properties: { code: { type: 'string' } }, required: ['code'] } },
+    { name: 'skill_search', description: 'Search the public wkappbot skill catalog by words. Returns up to 8 skill ids, each with its first step.',
+      params: { type: 'object', properties: { query: { type: 'string' } }, required: ['query'] } },
+    { name: 'skill_read', description: 'Read every step of one skill from the public wkappbot skill catalog by its id.',
+      params: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'] } },
+    { name: 'run_python', description: 'Run Python 3 (Pyodide; numpy and other packages load on import) in this page. The virtual files are the working folder: open them by name, and any file the code writes comes back as a virtual file. Returns the printed output.',
+      params: { type: 'object', properties: { code: { type: 'string' } }, required: ['code'] } }
+  ];
+  var AGENT_CMD = { name: 'agent_cmd',
+    description: 'Give one brief to a cheap sector. The sector works with its own tools and returns only its REPORT, the changed file names and its round count.',
+    params: { type: 'object', properties: { brief: { type: 'string' } }, required: ['brief'] } };
+  // command-only: the spokesman gets list_files, the skill tools and agent_cmd (none of them returns file text)
+  var spokesmanTools = function (cfg) {
+    var base = cfg.commandOnly ? TOOLS.filter(function (t) { return t.name === 'list_files' || t.name.indexOf('skill_') === 0; }) : TOOLS;
+    return base.concat([AGENT_CMD]);
+  };
+  var spokesmanSystem = function (cfg) {
+    return SPOKESMAN_BASE + (cfg.commandOnly ? ' You see only file names and sector reports, never file text.' : '');
+  };
+
+  var WORKER_SRC = [
+    "var fmt = function (v) { if (typeof v === 'string') return v; try { var j = JSON.stringify(v); return j === undefined ? String(v) : j; } catch (e) { return String(v); } };",
+    "console.log = function () { postMessage({ t: 'log', s: Array.prototype.map.call(arguments, fmt).join(' ') }); };",
+    "console.error = console.log; console.warn = console.log; console.info = console.log;",
+    "self.onmessage = async function (e) {",
+    "  var code = e.data, ret, err = '';",
+    "  try {",
+    "    var isExpr = true;",
+    "    try { new Function('return (' + code + '\\n)'); } catch (x) { isExpr = false; }",
+    "    var fn = isExpr ? new Function('return (' + code + '\\n)')",
+    "                    : new Function('return (async function () {\\n' + code + '\\n})()');",
+    "    ret = await fn();",
+    "  } catch (x) { err = String((x && x.message) || x); }",
+    "  postMessage({ t: 'done', ret: ret === undefined ? '' : fmt(ret), err: err });",
+    "};"
+  ].join('\n');
+
+  var runJs = function (code) {
+    return new Promise(function (resolve) {
+      if (typeof Worker === 'undefined') return resolve('error: Web Workers unavailable');
+      var logs = [], done = false, w = null, timer = null;
+      var url = URL.createObjectURL(new Blob([WORKER_SRC], { type: 'text/javascript' }));
+      var finish = function (msg) {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        if (w) w.terminate();
+        URL.revokeObjectURL(url);
+        if (msg.err) logs.push('error: ' + msg.err);
+        else if (msg.ret !== '') logs.push('=> ' + msg.ret);
+        resolve(logs.join('\n') || '(no output)');
+      };
+      try { w = new Worker(url); }
+      catch (x) { URL.revokeObjectURL(url); return resolve('error: ' + x.message); }
+      w.onmessage = function (e) {
+        if (e.data.t === 'log') logs.push(e.data.s);
+        else finish(e.data);
+      };
+      w.onerror = function (e) { finish({ ret: '', err: e.message || 'worker error' }); };
+      timer = setTimeout(function () {
+        logs.push('error: timed out after 5 s, worker terminated');
+        finish({ ret: '', err: '' });
+      }, 5000);
+      w.postMessage(String(code == null ? '' : code));
+    });
+  };
+
+  // ---- skills: the public skill catalog this site serves beside the page (docs.yml copies docs/skills) ----
+  var SKILL_HITS = 8;
+  var SKILL_CAP = 8000;
+  var skillsPromise = null;
+  var skillsUrl = function () { return window.WEBSEAT_SKILLS_URL || '../skills/skills-data-full.js'; };
+  // one script tag sets window.SKILLS_FULL; a failed load is retried on the next call
+  var loadSkills = function () {
+    if (!skillsPromise) {
+      skillsPromise = new Promise(function (resolve, reject) {
+        var s = document.createElement('script');
+        s.src = skillsUrl();
+        s.onload = function () {
+          if (Array.isArray(window.SKILLS_FULL)) resolve(window.SKILLS_FULL);
+          else { skillsPromise = null; reject(new Error('skill catalog loaded but holds no skills')); }
+        };
+        s.onerror = function () { skillsPromise = null; reject(new Error('skill catalog not reachable: ' + s.src)); };
+        document.head.appendChild(s);
+      });
+    }
+    return skillsPromise;
+  };
+  var skillWords = function (q) {
+    return String(q == null ? '' : q).toLowerCase().split(/[^a-z0-9가-힣]+/).filter(Boolean);
+  };
+  // a word in the id scores 3, a word in the steps scores 1
+  var searchSkills = function (list, query) {
+    var words = skillWords(query);
+    if (!words.length) return [];
+    return list.map(function (sk) {
+      var id = String(sk.id || '').toLowerCase(), body = (sk.steps || []).join(' ').toLowerCase(), score = 0;
+      words.forEach(function (w) {
+        if (id.indexOf(w) >= 0) score += 3;
+        if (body.indexOf(w) >= 0) score += 1;
+      });
+      return { sk: sk, score: score };
+    }).filter(function (r) { return r.score > 0; })
+      .sort(function (a, b) { return b.score - a.score || (a.sk.id < b.sk.id ? -1 : 1); })
+      .slice(0, SKILL_HITS);
+  };
+
+  // ---- python: Pyodide in this page; the virtual files are its working folder ----
+  var PYODIDE_URL = 'https://cdn.jsdelivr.net/npm/pyodide@0.26.4/';
+  var PY_DIR = '/home/pyodide';
+  var pyPromise = null;
+  var loadPy = function () {
+    if (!pyPromise) {
+      pyPromise = new Promise(function (resolve, reject) {
+        var s = document.createElement('script');
+        s.src = PYODIDE_URL + 'pyodide.js';
+        s.onload = function () { window.loadPyodide({ indexURL: PYODIDE_URL }).then(resolve, function (e) { pyPromise = null; reject(e); }); };
+        s.onerror = function () { pyPromise = null; reject(new Error('python runtime not reachable: ' + s.src)); };
+        document.head.appendChild(s);
+      });
+    }
+    return pyPromise;
+  };
+  var pyMkdirs = function (py, full) {
+    var parts = full.split('/');
+    for (var i = 2; i < parts.length - 1; i++) {
+      try { py.FS.mkdir(parts.slice(0, i + 1).join('/')); } catch (e) { /* already there */ }
+    }
+  };
+  // files the code created or changed come back into the virtual files
+  var pyCollect = function (py, d, rel, before) {
+    py.FS.readdir(d).forEach(function (n) {
+      if (n === '.' || n === '..') return;
+      var full = d + '/' + n, r = rel ? rel + '/' + n : n;
+      if (py.FS.isDir(py.FS.stat(full).mode)) { pyCollect(py, full, r, before); return; }
+      var t;
+      try { t = py.FS.readFile(full, { encoding: 'utf8' }); } catch (e) { return; }
+      if (before[r] !== t) fs[r] = t;
+    });
+  };
+  var runPython = async function (code) {
+    var py = await loadPy();
+    var out = [];
+    py.setStdout({ batched: function (s) { out.push(s); } });
+    py.setStderr({ batched: function (s) { out.push(s); } });
+    var before = {};
+    Object.keys(fs).forEach(function (p) {
+      before[p] = fs[p];
+      pyMkdirs(py, PY_DIR + '/' + p);
+      py.FS.writeFile(PY_DIR + '/' + p, fs[p]);
+    });
+    var err = '';
+    try {
+      await py.loadPackagesFromImports(code);
+      await py.runPythonAsync(code);
+    } catch (e) { err = String((e && e.message) || e); }
+    pyCollect(py, PY_DIR, '', before);
+    saveFiles();
+    renderFiles();
+    return short((out.join('\n') || '(no output)') + (err ? '\nerror: ' + err : ''), 4000);
+  };
+
+  var IMPL = {
+    list_files: function () {
+      return Object.keys(fs).sort().join('\n') || '(no files)';
+    },
+    read_file: function (a) {
+      var p = String(a.path == null ? '' : a.path);
+      return has(p) ? fs[p] : 'error: no such file: ' + p;
+    },
+    write_file: function (a) {
+      var p = String(a.path == null ? '' : a.path);
+      if (typeof a.content !== 'string') return 'error: content must be a string';
+      fs[p] = a.content;
+      saveFiles();
+      renderFiles();
+      return 'wrote ' + a.content.length + ' chars to ' + p;
+    },
+    edit_file: function (a) {
+      var p = String(a.path == null ? '' : a.path);
+      if (!has(p)) return 'error: no such file: ' + p;
+      var oldS = String(a.old_string == null ? '' : a.old_string);
+      if (!oldS) return 'error: old_string is empty';
+      var text = fs[p];
+      var n = text.split(oldS).length - 1;
+      if (n !== 1) return 'error: old_string occurs ' + n + ' times, need exactly 1';
+      fs[p] = text.replace(oldS, function () { return String(a.new_string == null ? '' : a.new_string); });
+      saveFiles();
+      renderFiles();
+      return 'edited ' + p;
+    },
+    run_js: function (a) { return runJs(a.code); },
+    skill_search: async function (a) {
+      var hits = searchSkills(await loadSkills(), a.query);
+      if (!hits.length) return 'no skill matches: ' + String(a.query == null ? '' : a.query);
+      return hits.map(function (r) { return r.sk.id + ' :: ' + short(String((r.sk.steps || [])[0] || ''), 160); }).join('\n');
+    },
+    skill_read: async function (a) {
+      var id = String(a.id == null ? '' : a.id);
+      var sk = (await loadSkills()).filter(function (s) { return s.id === id; })[0];
+      if (!sk) return 'error: no such skill: ' + id;
+      return short(sk.id + '\n' + (sk.steps || []).map(function (s, i) { return (i + 1) + '. ' + s; }).join('\n'), SKILL_CAP);
+    },
+    run_python: function (a) { return runPython(String(a.code == null ? '' : a.code)); }
+  };
+
+  var execTool = async function (c) {
+    var fn = IMPL[c.name];
+    if (!fn) return 'error: unknown tool ' + c.name;
+    if (c.args && c.args.__bad) return 'error: arguments are not valid JSON';
+    try { return String(await fn(c.args || {})); }
+    catch (e) { return 'error: ' + errText(e); }
+  };
+
+  // ---- adapters: internal history -> provider format ----
+  var readJson = async function (res) {
+    var raw = await res.text();
+    if (!res.ok) throw new Error('HTTP ' + res.status + ': ' + short(raw, 300));
+    try { return JSON.parse(raw); }
+    catch (e) { throw new Error('bad JSON from endpoint: ' + short(raw, 200)); }
+  };
+  var parseArgs = function (s) {
+    if (s && typeof s === 'object') return s;
+    try { return JSON.parse(s || '{}'); } catch (e) { return { __bad: true }; }
+  };
+
+  var toAnthropic = function (hist) {
+    var msgs = [];
+    hist.forEach(function (m) {
+      if (m.role === 'user') {
+        msgs.push({ role: 'user', content: m.content });
+      } else if (m.role === 'assistant') {
+        var blocks = [];
+        if (m.text) blocks.push({ type: 'text', text: m.text });
+        m.calls.forEach(function (c) { blocks.push({ type: 'tool_use', id: c.id, name: c.name, input: c.args }); });
+        msgs.push({ role: 'assistant', content: blocks.length ? blocks : [{ type: 'text', text: '(empty)' }] });
+      } else {
+        var block = { type: 'tool_result', tool_use_id: m.id, content: m.result };
+        var prev = msgs[msgs.length - 1];
+        if (prev && prev.role === 'user' && Array.isArray(prev.content)) prev.content.push(block);
+        else msgs.push({ role: 'user', content: [block] });
+      }
+    });
+    return msgs;
+  };
+
+  var callAnthropic = async function (s, hist, system, tools) {
+    var res = await fetch(baseOf(s) + '/v1/messages', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': s.apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: s.model, max_tokens: 4096, system: system, messages: toAnthropic(hist),
+        tools: tools.map(function (t) { return { name: t.name, description: t.description, input_schema: t.params }; })
+      })
+    });
+    var data = await readJson(res);
+    var text = '', calls = [];
+    (data.content || []).forEach(function (b) {
+      if (b.type === 'text') text += b.text;
+      else if (b.type === 'tool_use') calls.push({ id: b.id, name: b.name, args: b.input || {} });
+    });
+    return { text: text, calls: calls };
+  };
+
+  var toOpenAI = function (hist, system) {
+    var msgs = [{ role: 'system', content: system }];
+    hist.forEach(function (m) {
+      if (m.role === 'user') {
+        msgs.push({ role: 'user', content: m.content });
+      } else if (m.role === 'assistant') {
+        var o = { role: 'assistant', content: m.text || null };
+        if (m.calls.length) {
+          o.tool_calls = m.calls.map(function (c) {
+            return { id: c.id, type: 'function', function: { name: c.name, arguments: JSON.stringify(c.args) } };
+          });
+        }
+        msgs.push(o);
+      } else {
+        msgs.push({ role: 'tool', tool_call_id: m.id, content: m.result });
+      }
+    });
+    return msgs;
+  };
+
+  var callOpenAI = async function (s, hist, system, tools) {
+    if (!baseOf(s)) throw new Error('base URL is empty');
+    var res = await fetch(baseOf(s) + '/chat/completions', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'authorization': 'Bearer ' + s.apiKey },
+      body: JSON.stringify({
+        model: s.model, messages: toOpenAI(hist, system),
+        tools: tools.map(function (t) { return { type: 'function', function: { name: t.name, description: t.description, parameters: t.params } }; })
+      })
+    });
+    var data = await readJson(res);
+    var msg = (data.choices && data.choices[0] && data.choices[0].message) || {};
+    var calls = (msg.tool_calls || []).map(function (c) {
+      return { id: c.id, name: c.function.name, args: parseArgs(c.function.arguments) };
+    });
+    return { text: msg.content || '', calls: calls };
+  };
+
+  // ---- mocks: fixed scripts, no network. Step = assistant turns since the last user message ----
+  var stepOf = function (hist) {
+    var n = 0;
+    for (var i = hist.length - 1; i >= 0 && hist[i].role !== 'user'; i--) {
+      if (hist[i].role === 'assistant') n++;
+    }
+    return n;
+  };
+  var mockId = function (step) { return 'mock' + step + '_' + Math.random().toString(36).slice(2, 8); };
+  var mockSpokesman = async function (hist) {
+    var step = stepOf(hist);
+    if (step === 0) return { text: '', calls: [
+      { id: mockId(step), name: 'agent_cmd', args: { brief: 'write hello.js that prints 6*7 and run it' } }
+    ] };
+    return { text: 'spokesman done', calls: [] };
+  };
+  var mockSector = async function (hist) {
+    var step = stepOf(hist);
+    if (step === 0) return { text: '', calls: [
+      { id: mockId(step), name: 'write_file', args: { path: 'hello.js', content: MOCK_CODE } }
+    ] };
+    if (step === 1) return { text: '', calls: [
+      { id: mockId(step), name: 'run_js', args: { code: MOCK_CODE } }
+    ] };
+    return { text: 'built it.\nREPORT: hello.js written and run printed 42', calls: [] };
+  };
+
+  var callModel = function (s, hist, system, tools) {
+    if (s.provider === 'mock') return mockSpokesman(hist);
+    if (s.provider === 'mock-sector') return mockSector(hist);
+    if (s.provider === 'anthropic') return callAnthropic(s, hist, system, tools);
+    return callOpenAI(s, hist, system, tools);
+  };
+
+  // ---- sector sub-loop, run by agent_cmd ----
+  var lastSpokesmanToolResults = [];
+  var argPath = function (c) { return String(c.args && c.args.path != null ? c.args.path : ''); };
+
+  var runSector = async function (brief, cfg) {
+    var sc = cfg.sector, hist = [];
+    var push = function (m) { hist.push(m); record(m, true); };
+    push({ role: 'user', content: brief });
+    var changed = [], rounds = 0, ended = false, report = '';
+    for (var r = 0; r < SECTOR_ROUNDS && !ended; r++) {
+      var resp;
+      rounds++;
+      try { resp = await callModel(sc, hist, SECTOR_SYSTEM, TOOLS); }
+      catch (e) {
+        line('err', '[sector] model call failed: ' + errText(e));
+        report = 'REPORT: sector model call failed';
+        break;
+      }
+      push({ role: 'assistant', text: resp.text, calls: resp.calls });
+      if (resp.text) report = resp.text;
+      if (!resp.calls.length) { ended = true; break; }
+      for (var k = 0; k < resp.calls.length; k++) {
+        var c = resp.calls[k];
+        var res = await execTool(c);
+        if ((c.name === 'write_file' || c.name === 'edit_file') && res.indexOf('error') !== 0) {
+          var p = argPath(c);
+          if (changed.indexOf(p) < 0) changed.push(p);
+        }
+        push({ role: 'tool', id: c.id, name: c.name, result: res });
+      }
+    }
+    if (!ended && rounds >= SECTOR_ROUNDS) line('err', '[sector] stopped: ' + SECTOR_ROUNDS + ' rounds reached');
+
+    var out = (report || 'REPORT: sector produced no report').slice(0, REPORT_CAP);
+    if (cfg.commandOnly) {
+      // belt and braces: no changed file's full text may reach the spokesman
+      changed.forEach(function (p) {
+        var body = has(p) ? fs[p] : '';
+        if (body && out.indexOf(body) >= 0) out = out.split(body).join('[file content removed]');
+      });
+    }
+    return out + '\nchanged files: ' + (changed.length ? changed.join(', ') : 'none') +
+      '\nsector rounds: ' + rounds;
+  };
+
+  var spokesmanTool = async function (c, cfg) {
+    if (c.args && c.args.__bad) return 'error: arguments are not valid JSON';
+    if (c.name === 'agent_cmd') {
+      var brief = c.args && typeof c.args.brief === 'string' ? c.args.brief.trim() : '';
+      if (!brief) return 'error: agent_cmd needs a brief string';
+      var report = await runSector(brief, cfg);
+      lastSpokesmanToolResults.push(report);
+      return report;
+    }
+    var allowed = spokesmanTools(cfg).some(function (t) { return t.name === c.name; });
+    if (!allowed) return 'error: tool not available in this mode: ' + c.name;
+    return execTool(c);
+  };
+
+  // ---- spokesman agent loop ----
+  var busy = false;
+  var setBusy = function (b) { $('prompt').disabled = b; $('send').disabled = b; };
+
+  var runPrompt = async function (text) {
+    text = String(text == null ? '' : text);
+    if (busy) throw new Error('busy: a prompt is already running');
+    busy = true;
+    setBusy(true);
+    lastSpokesmanToolResults.length = 0;
+    var finalText = '';
+    try {
+      var cfg = readSettings();
+      pushMain({ role: 'user', content: text });
+      var ended = false, round;
+      for (round = 0; round < MAX_ROUNDS && !ended; round++) {
+        var resp;
+        try { resp = await callModel(cfg.spokesman, history, spokesmanSystem(cfg), spokesmanTools(cfg)); }
+        catch (e) { line('err', 'spokesman call failed: ' + errText(e)); break; }
+        pushMain({ role: 'assistant', text: resp.text, calls: resp.calls });
+        finalText = resp.text;
+        if (!resp.calls.length) { ended = true; break; }
+        for (var k = 0; k < resp.calls.length; k++) {
+          var c = resp.calls[k];
+          var result = await spokesmanTool(c, cfg);
+          pushMain({ role: 'tool', id: c.id, name: c.name, result: result });
+        }
+      }
+      if (!ended && round >= MAX_ROUNDS) line('err', 'stopped: 25 rounds reached');
+    } finally {
+      busy = false;
+      setBusy(false);
+    }
+    return finalText;
+  };
+
+  // ---- OpenRouter sign-in (PKCE, S256) ----
+  var randomVerifier = function () {
+    var chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
+    var bytes = new Uint8Array(64);
+    crypto.getRandomValues(bytes);
+    var out = '';
+    for (var i = 0; i < 64; i++) out += chars[bytes[i] % chars.length];
+    return out;
+  };
+  var b64url = function (buf) {
+    var bytes = new Uint8Array(buf), bin = '';
+    for (var i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+    return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  };
+  var challengeOf = async function (verifier) {
+    var digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
+    return b64url(digest);
+  };
+
+  $('signin').onclick = async function () {
+    try {
+      var verifier = randomVerifier();
+      ssSet(PKCE_KEY, verifier);
+      var challenge = await challengeOf(verifier);
+      location.href = 'https://openrouter.ai/auth?callback_url=' + encodeURIComponent(location.origin + location.pathname) +
+        '&code_challenge=' + encodeURIComponent(challenge) + '&code_challenge_method=S256';
+    } catch (e) {
+      line('err', 'sign-in could not start: ' + errText(e));
+    }
+  };
+
+  var handleCallback = async function () {
+    var code = new URLSearchParams(location.search).get('code');
+    var verifier = ssGet(PKCE_KEY);
+    if (!code || !verifier) return;
+    try {
+      var res = await fetch(KEYS_URL, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ code: code, code_verifier: verifier, code_challenge_method: 'S256' })
+      });
+      var data = await readJson(res);
+      if (!data || typeof data.key !== 'string' || !data.key) throw new Error('no key in the response');
+      $('sp-provider').value = 'openrouter';
+      applyPreset('sp', SP_PRESETS);
+      renderLogin();
+      $('sp-apiKey').value = data.key;
+      saveSettings();
+      line('sys', 'signed in with OpenRouter');
+    } catch (e) {
+      line('err', 'OpenRouter sign-in failed: ' + errText(e));
+    } finally {
+      ssDel(PKCE_KEY);
+      try { window.history.replaceState(null, '', location.href.split('?')[0].split('#')[0]); } catch (e) { /* keep the URL */ }
+    }
+  };
+
+  // ---- login matrix: per-provider sign-in, key page link and key check ----
+  var renderLogin = function () {
+    var lg = LOGIN[$('sp-provider').value];
+    $('sp-login').hidden = !lg;
+    $('sp-check-status').textContent = '';
+    if (!lg) return;
+    $('sp-login-how').textContent = lg.how;
+    $('signin').hidden = !lg.oauth;
+    $('sp-getkey').href = lg.keyPage;
+  };
+  // a cheap authenticated GET that proves the key works without spending tokens
+  var checkKey = async function (s) {
+    if (!s.apiKey) throw new Error('API key is empty');
+    var base = baseOf(s);
+    if (!base) throw new Error('base URL is empty');
+    var url, headers;
+    if (s.provider === 'anthropic') {
+      url = base + '/v1/models';
+      headers = { 'x-api-key': s.apiKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' };
+    } else {
+      url = base + (s.provider === 'openrouter' ? '/key' : '/models');
+      headers = { 'authorization': 'Bearer ' + s.apiKey };
+    }
+    await readJson(await fetch(url, { method: 'GET', headers: headers }));
+  };
+  $('sp-check').onclick = async function () {
+    var st = $('sp-check-status');
+    st.className = '';
+    st.textContent = 'checking...';
+    try {
+      await checkKey(readRole('sp'));
+      st.className = 'ok';
+      st.textContent = 'key ok';
+    } catch (e) {
+      st.className = 'bad';
+      st.textContent = 'key check failed: ' + short(errText(e), 160);
+    }
+  };
+
+  // ---- session buttons ----
+  $('newSession').onclick = newSession;
+  $('exportSession').onclick = function () {
+    var url = URL.createObjectURL(new Blob([exportSession()], { type: 'application/jsonl' }));
+    var a = el('a');
+    a.href = url;
+    a.download = 'webseat-' + session.id + '.jsonl';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 10000);
+  };
+  $('importBtn').onclick = function () { $('importFile').click(); };
+  $('importFile').onchange = async function (ev) {
+    var f = ev.target.files && ev.target.files[0];
+    ev.target.value = '';
+    if (!f) return;
+    try { importSession(await f.text()); }
+    catch (e) { line('err', 'import failed: ' + errText(e)); }
+  };
+
+  // ---- wiring ----
+  $('sp-provider').onchange = function () { applyPreset('sp', SP_PRESETS); renderLogin(); saveSettings(); };
+  $('sc-provider').onchange = function () { applyPreset('sc', SC_PRESETS); saveSettings(); };
+  ['sp-baseUrl', 'sp-model', 'sp-apiKey', 'sc-baseUrl', 'sc-model', 'sc-apiKey'].forEach(function (id) {
+    $(id).addEventListener('input', saveSettings);
+  });
+  $('commandOnly').onchange = saveSettings;
+  $('form').onsubmit = function (ev) {
+    ev.preventDefault();
+    var t = $('prompt').value.trim();
+    if (!t || busy) return;
+    $('prompt').value = '';
+    runPrompt(t).catch(function (e) { line('err', errText(e)); });
+  };
+
+  // ---- initial state ----
+  var stored = store.get('webseat2.settings', {});
+  if (!stored || typeof stored !== 'object') stored = {};
+  var sp = cleanRole(stored.spokesman, Object.keys(SP_PRESETS), 'anthropic', SP_PRESETS);
+  var sc = cleanRole(stored.sector, Object.keys(SC_PRESETS), 'openai-compatible', SC_PRESETS);
+  fillRole('sp', sp);
+  fillRole('sc', sc);
+  $('commandOnly').checked = typeof stored.commandOnly === 'boolean' ? stored.commandOnly : true;
+  renderLogin();
+  renderFiles();
+  var saved = store.get(SESSION_KEY, null);
+  if (saved && typeof saved === 'object' && Array.isArray(saved.lines)) {
+    try { loadLines(typeof saved.id === 'string' ? saved.id : null, saved.lines); }
+    catch (e) { line('err', 'autosaved session could not load: ' + errText(e)); loadLines(null, []); }
+  }
+  line('sys', 'webseat v3 ready. spokesman: ' + sp.provider + ', sector: ' + sc.provider +
+    ', command-only: ' + ($('commandOnly').checked ? 'on' : 'off') + ', session: ' + session.id +
+    ' (' + history.length + ' messages).');
+  handleCallback();
+  // sample chips fill the prompt so a non-developer starts from a working sentence
+  Array.prototype.forEach.call(document.querySelectorAll('#chips .chip'), function (b) {
+    b.onclick = function () { $('prompt').value = b.getAttribute('data-prompt'); $('prompt').focus(); };
+  });
+
+  window.webseat = {
+    fs: fs, history: history, runPrompt: runPrompt, lastSpokesmanToolResults: lastSpokesmanToolResults,
+    exportSession: exportSession, importSession: importSession, newSession: newSession,
+    sessionId: function () { return session.id; },
+    execTool: execTool,
+    spokesmanToolNames: function () { return spokesmanTools(readSettings()).map(function (t) { return t.name; }); }
+  };
+})();
+</script>
+</body>
+</html>
