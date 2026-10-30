@@ -1,0 +1,44 @@
+name: write-env
+description: >-
+  Writes every secret the calling workflow can see into one .env in the parent folder of the
+  checkout (the GitHub base folder layout of the owner's PCs: D:/GitHub/.env beside the repos),
+  so scripts that load the central .env find it on a runner too. Prints the key count and a hash
+  prefix only. Call it with: secrets-json: ${{ toJSON(secrets) }}
+inputs:
+  secrets-json:
+    description: toJSON(secrets) of the calling workflow
+    required: true
+outputs:
+  path:
+    description: absolute path of the written .env
+    value: ${{ steps.w.outputs.path }}
+  hash:
+    description: sha256 of the whole .env
+    value: ${{ steps.w.outputs.hash }}
+runs:
+  using: composite
+  steps:
+    - id: w
+      shell: bash
+      env:
+        ALL_SECRETS: ${{ inputs.secrets-json }}
+      run: |
+        set -eu
+        umask 077
+        python3 - <<'PY'
+        import json, os, hashlib
+        s = json.loads(os.environ['ALL_SECRETS'] or '{}')
+        s.pop('github_token', None)
+        lines = []
+        for k in sorted(s):
+            v = s[k].replace('\\', '\\\\').replace('"', '\\"').replace('\n', '\\n')
+            lines.append(f'{k}="{v}"')
+        body = '# GitHub secrets of ' + os.environ['GITHUB_REPOSITORY'] + '\n' + '\n'.join(lines) + '\n'
+        path = os.path.abspath(os.path.join(os.environ['GITHUB_WORKSPACE'], '..', '.env'))
+        with open(path, 'w') as f:
+            f.write(body)
+        h = hashlib.sha256(body.encode()).hexdigest()
+        with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+            f.write(f'path={path}\nhash={h}\n')
+        print(f'.env written beside the checkout: {len(lines)} keys, hash {h[:12]}')
+        PY
