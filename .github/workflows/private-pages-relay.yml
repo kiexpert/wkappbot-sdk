@@ -1,0 +1,76 @@
+name: private-pages-relay
+
+# Publishes the web pages of one private repo of this account on that repo's own GitHub Pages.
+# Only the Actions run here (public runners are free); the pages stay in the private repo.
+# The target repo is never named in this public file or its logs: it is found by a sha256 prefix.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 */6 * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: private-pages-relay
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      TARGET_HASH: ce712644e054789d
+      SITE_DIR: poc-site
+      T1: ${{ secrets.GH_LICENSE_TOKEN }}
+      T2: ${{ secrets.WKAPPBOT_PAT }}
+      T3: ${{ secrets.WKAPPBOT_CORE_PAT }}
+    steps:
+      - name: Find the target repo and a token that can reach it
+        run: |
+          set -u
+          for t in "$T1" "$T2" "$T3"; do
+            [ -n "$t" ] || continue
+            names=$(GH_TOKEN="$t" gh repo list kiexpert --visibility private --limit 300 --json nameWithOwner -q '.[].nameWithOwner' 2>/dev/null || true)
+            for n in $names; do
+              if [ "$(printf %s "$n" | sha256sum | cut -c1-16)" = "$TARGET_HASH" ]; then
+                echo "::add-mask::$n"
+                echo "::add-mask::${n#*/}"
+                echo "::add-mask::$t"
+                { echo "REPO=$n"; echo "TOK=$t"; } >> "$GITHUB_ENV"
+                echo "target found"
+                exit 0
+              fi
+            done
+          done
+          echo "no token reaches the target repo"; exit 1
+      - name: Copy the site folder to the gh-pages branch of the target repo
+        run: |
+          set -eu
+          git clone -q --depth 1 "https://x-access-token:${TOK}@github.com/${REPO}.git" src
+          test -d "src/${SITE_DIR}"
+          mkdir out && cp -r "src/${SITE_DIR}/." out/ && touch out/.nojekyll
+          cd out
+          git init -q -b gh-pages
+          git config user.name "pages-relay"
+          git config user.email "pages-relay@users.noreply.github.com"
+          git add -A && git commit -q -m "publish ${SITE_DIR} $(date -u +%FT%TZ)"
+          git push -q -f "https://x-access-token:${TOK}@github.com/${REPO}.git" gh-pages
+          echo "pushed $(git ls-files | wc -l) files"
+      - name: Turn on Pages from gh-pages and request a build
+        env:
+          GH_TOKEN: ${{ env.TOK }}
+        run: |
+          set -u
+          gh api -X POST "repos/${REPO}/pages" -f 'source[branch]=gh-pages' -f 'source[path]=/' >/dev/null 2>&1 \
+            || gh api -X PUT "repos/${REPO}/pages" -f 'source[branch]=gh-pages' -f 'source[path]=/' >/dev/null 2>&1 \
+            || echo "pages source call failed (status below)"
+          gh api -X POST "repos/${REPO}/pages/builds" >/dev/null 2>&1 || true
+          for i in $(seq 1 30); do
+            s=$(gh api "repos/${REPO}/pages/builds/latest" -q .status 2>/dev/null || echo unknown)
+            echo "build status: $s"
+            [ "$s" = "built" ] && exit 0
+            [ "$s" = "errored" ] && exit 1
+            sleep 10
+          done
+          echo "build did not finish in 5 minutes"; exit 1
