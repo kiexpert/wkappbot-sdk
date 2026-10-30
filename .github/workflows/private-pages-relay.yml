@@ -10,7 +10,8 @@ on:
     paths:
       - .github/workflows/private-pages-relay.yml
   schedule:
-    - cron: '17 */6 * * *'
+    # hourly, so a merged page change in the private repo is live within an hour
+    - cron: '17 * * * *'
 
 permissions:
   contents: read
