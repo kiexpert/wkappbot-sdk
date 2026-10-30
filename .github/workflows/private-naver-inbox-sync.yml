@@ -37,7 +37,7 @@ jobs:
           NAVER_ID: ${{ secrets.NAVER_ID }}
           NAVER_APP_PASSWORD: ${{ secrets.NAVER_APP_PASSWORD }}
         run: |
-          if [ -n "$NAVER_ID" ] && [ -n "$NAVER_APP_PASSWORD" ]; then echo "ready=true" >> "$GITHUB_OUTPUT"
+          if [ -n "$NAVER_ID" ] && [ -n "$NAVER_APP_PASSWORD" ] && [ "$NAVER_APP_PASSWORD" != "SET-ME" ]; then echo "ready=true" >> "$GITHUB_OUTPUT"
           else echo "secrets NAVER_ID and NAVER_APP_PASSWORD are not set yet: nothing to do"; echo "ready=false" >> "$GITHUB_OUTPUT"; fi
       - name: Find the target repo and a token that can reach it
         if: steps.gate.outputs.ready == 'true'
