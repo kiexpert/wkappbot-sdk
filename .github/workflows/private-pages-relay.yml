@@ -55,6 +55,10 @@ jobs:
           git clone -q --depth 1 "https://x-access-token:${TOK}@github.com/${REPO}.git" src
           test -d "src/${SITE_DIR}"
           mkdir out && cp -r "src/${SITE_DIR}/." out/ && touch out/.nojekyll
+          # the black-box runner hands its results over on relay/blackbox; the portal reads them beside its pages
+          if git -C src fetch -q --depth 1 origin relay/blackbox 2>/dev/null; then
+            git -C src show FETCH_HEAD:results.json > out/portal/modules-results.json || rm -f out/portal/modules-results.json
+          fi
           cd out
           git init -q -b gh-pages
           git config user.name "pages-relay"
