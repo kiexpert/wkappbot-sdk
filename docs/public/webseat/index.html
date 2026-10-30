@@ -93,6 +93,7 @@ a { color: var(--accent); }
         <option value="openai-compatible">openai-compatible</option>
         <option value="openrouter">openrouter</option>
         <option value="gemini">gemini</option>
+        <option value="local-cli">local-cli</option>
         <option value="mock">mock</option>
       </select>
     </label>
@@ -112,6 +113,7 @@ a { color: var(--accent); }
     <label>provider
       <select id="sc-provider">
         <option value="openai-compatible">openai-compatible</option>
+        <option value="local-cli">local-cli</option>
         <option value="mock-sector">mock-sector</option>
       </select>
     </label>
@@ -165,6 +167,8 @@ a { color: var(--accent); }
     'openai-compatible': { base: 'https://api.openai.com/v1', model: 'gpt-5' },
     'openrouter': { base: 'https://openrouter.ai/api/v1', model: 'anthropic/claude-sonnet-4.5' },
     'gemini': { base: 'https://generativelanguage.googleapis.com/v1beta/openai', model: 'gemini-2.5-pro' },
+    // your own logged-in CLI through webseat-bridge.mjs on this machine; the subscription stays in the CLI
+    'local-cli': { base: 'http://127.0.0.1:8787/v1', model: 'claude' },
     'mock': { base: '', model: 'mock' }
   };
   // login matrix: how each spokesman provider gets a credential in a browser.
@@ -173,11 +177,13 @@ a { color: var(--accent); }
     'anthropic': { how: 'login: paste an Anthropic API key', keyPage: 'https://console.anthropic.com/settings/keys' },
     'openai-compatible': { how: 'login: paste an API key for this host', keyPage: 'https://platform.openai.com/api-keys' },
     'openrouter': { how: 'login: Sign in with OpenRouter (OAuth PKCE), or paste a key', keyPage: 'https://openrouter.ai/settings/keys', oauth: true },
-    'gemini': { how: 'login: paste a Gemini API key', keyPage: 'https://aistudio.google.com/apikey' }
+    'gemini': { how: 'login: paste a Gemini API key', keyPage: 'https://aistudio.google.com/apikey' },
+    'local-cli': { how: 'login: run node webseat-bridge.mjs --cli claude (or codex, gemini) on this machine, then paste the key it prints; your CLI subscription stays in the CLI', keyPage: 'webseat-bridge.mjs' }
   };
   var SESSION_KEY = 'webseat2.session';
   var SC_PRESETS = {
     'openai-compatible': { base: '', model: '' },
+    'local-cli': { base: 'http://127.0.0.1:8787/v1', model: 'claude' },
     'mock-sector': { base: '', model: 'mock-sector' }
   };
 
