@@ -5,6 +5,10 @@ name: private-pages-relay
 # The target repo is never named in this public file or its logs: it is found by a sha256 prefix.
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/private-pages-relay.yml
   schedule:
     - cron: '17 */6 * * *'
 
