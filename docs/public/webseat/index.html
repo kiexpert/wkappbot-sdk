@@ -446,14 +446,18 @@ a { color: var(--accent); }
     { name: 'edit_file', description: 'Replace old_string with new_string in a file. old_string must occur exactly once, otherwise an error is returned.',
       params: { type: 'object', properties: { path: { type: 'string' }, old_string: { type: 'string' }, new_string: { type: 'string' } }, required: ['path', 'old_string', 'new_string'] } },
     { name: 'run_js', description: 'Run JavaScript in a fresh Web Worker (5 s limit, no access to files). Returns console.log output and the return value. Pass any file text the code needs inside code.',
-      params: { type: 'object', properties: { code: { type: 'string' } }, required: ['code'] } }
+      params: { type: 'object', properties: { code: { type: 'string' } }, required: ['code'] } },
+    { name: 'skill_search', description: 'Search the public wkappbot skill catalog by words. Returns up to 8 skill ids, each with its first step.',
+      params: { type: 'object', properties: { query: { type: 'string' } }, required: ['query'] } },
+    { name: 'skill_read', description: 'Read every step of one skill from the public wkappbot skill catalog by its id.',
+      params: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'] } }
   ];
   var AGENT_CMD = { name: 'agent_cmd',
     description: 'Give one brief to a cheap sector. The sector works with its own tools and returns only its REPORT, the changed file names and its round count.',
     params: { type: 'object', properties: { brief: { type: 'string' } }, required: ['brief'] } };
-  // command-only: the spokesman gets list_files and agent_cmd only
+  // command-only: the spokesman gets list_files, the skill tools and agent_cmd (none of them returns file text)
   var spokesmanTools = function (cfg) {
-    var base = cfg.commandOnly ? TOOLS.filter(function (t) { return t.name === 'list_files'; }) : TOOLS;
+    var base = cfg.commandOnly ? TOOLS.filter(function (t) { return t.name === 'list_files' || t.name.indexOf('skill_') === 0; }) : TOOLS;
     return base.concat([AGENT_CMD]);
   };
   var spokesmanSystem = function (cfg) {
@@ -507,6 +511,46 @@ a { color: var(--accent); }
     });
   };
 
+  // ---- skills: the public skill catalog this site serves beside the page (docs.yml copies docs/skills) ----
+  var SKILL_HITS = 8;
+  var SKILL_CAP = 8000;
+  var skillsPromise = null;
+  var skillsUrl = function () { return window.WEBSEAT_SKILLS_URL || '../skills/skills-data-full.js'; };
+  // one script tag sets window.SKILLS_FULL; a failed load is retried on the next call
+  var loadSkills = function () {
+    if (!skillsPromise) {
+      skillsPromise = new Promise(function (resolve, reject) {
+        var s = document.createElement('script');
+        s.src = skillsUrl();
+        s.onload = function () {
+          if (Array.isArray(window.SKILLS_FULL)) resolve(window.SKILLS_FULL);
+          else { skillsPromise = null; reject(new Error('skill catalog loaded but holds no skills')); }
+        };
+        s.onerror = function () { skillsPromise = null; reject(new Error('skill catalog not reachable: ' + s.src)); };
+        document.head.appendChild(s);
+      });
+    }
+    return skillsPromise;
+  };
+  var skillWords = function (q) {
+    return String(q == null ? '' : q).toLowerCase().split(/[^a-z0-9가-힣]+/).filter(Boolean);
+  };
+  // a word in the id scores 3, a word in the steps scores 1
+  var searchSkills = function (list, query) {
+    var words = skillWords(query);
+    if (!words.length) return [];
+    return list.map(function (sk) {
+      var id = String(sk.id || '').toLowerCase(), body = (sk.steps || []).join(' ').toLowerCase(), score = 0;
+      words.forEach(function (w) {
+        if (id.indexOf(w) >= 0) score += 3;
+        if (body.indexOf(w) >= 0) score += 1;
+      });
+      return { sk: sk, score: score };
+    }).filter(function (r) { return r.score > 0; })
+      .sort(function (a, b) { return b.score - a.score || (a.sk.id < b.sk.id ? -1 : 1); })
+      .slice(0, SKILL_HITS);
+  };
+
   var IMPL = {
     list_files: function () {
       return Object.keys(fs).sort().join('\n') || '(no files)';
@@ -536,7 +580,18 @@ a { color: var(--accent); }
       renderFiles();
       return 'edited ' + p;
     },
-    run_js: function (a) { return runJs(a.code); }
+    run_js: function (a) { return runJs(a.code); },
+    skill_search: async function (a) {
+      var hits = searchSkills(await loadSkills(), a.query);
+      if (!hits.length) return 'no skill matches: ' + String(a.query == null ? '' : a.query);
+      return hits.map(function (r) { return r.sk.id + ' :: ' + short(String((r.sk.steps || [])[0] || ''), 160); }).join('\n');
+    },
+    skill_read: async function (a) {
+      var id = String(a.id == null ? '' : a.id);
+      var sk = (await loadSkills()).filter(function (s) { return s.id === id; })[0];
+      if (!sk) return 'error: no such skill: ' + id;
+      return short(sk.id + '\n' + (sk.steps || []).map(function (s, i) { return (i + 1) + '. ' + s; }).join('\n'), SKILL_CAP);
+    }
   };
 
   var execTool = async function (c) {
@@ -924,7 +979,9 @@ a { color: var(--accent); }
   window.webseat = {
     fs: fs, history: history, runPrompt: runPrompt, lastSpokesmanToolResults: lastSpokesmanToolResults,
     exportSession: exportSession, importSession: importSession, newSession: newSession,
-    sessionId: function () { return session.id; }
+    sessionId: function () { return session.id; },
+    execTool: execTool,
+    spokesmanToolNames: function () { return spokesmanTools(readSettings()).map(function (t) { return t.name; }); }
   };
 })();
 </script>
