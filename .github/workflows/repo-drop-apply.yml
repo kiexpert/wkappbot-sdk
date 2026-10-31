@@ -1,0 +1,91 @@
+name: repo-drop-apply
+
+# Creates private repositories of this account from a relay/repo-drop branch of one private repo
+# (one file per new repo: file name = new repo name; first line "seed=<folder>" optionally copies
+# that folder of the private repo's main into the new repo as its first commit), then deletes the
+# branch. Mirrors secret-drop-apply: the private repo is found by a sha256 prefix and never named,
+# every repo name is masked, and an existing repo is never touched.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/repo-drop-apply.yml
+  schedule:
+    - cron: '17,47 * * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: repo-drop-apply
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      TARGET_HASH: ce712644e054789d
+      T1: ${{ secrets.WKAPPBOT_PAT }}
+      T2: ${{ secrets.GH_LICENSE_TOKEN }}
+      T3: ${{ secrets.WKAPPBOT_CORE_PAT }}
+    steps:
+      - name: Find the source repo and a token that can reach it
+        run: |
+          set -u
+          for t in "$T1" "$T2" "$T3"; do
+            [ -n "$t" ] || continue
+            names=$(GH_TOKEN="$t" gh repo list kiexpert --visibility private --limit 300 --json nameWithOwner -q '.[].nameWithOwner' 2>/dev/null || true)
+            for n in $names; do
+              if [ "$(printf %s "$n" | sha256sum | cut -c1-16)" = "$TARGET_HASH" ]; then
+                echo "::add-mask::$n"; echo "::add-mask::${n#*/}"; echo "::add-mask::$t"
+                { echo "REPO=$n"; echo "TOK=$t"; } >> "$GITHUB_ENV"
+                echo "source found"; exit 0
+              fi
+            done
+          done
+          echo "no token reaches the source repo"; exit 1
+      - name: Fetch the drop branch
+        id: drop
+        run: |
+          set -u
+          if git clone -q --depth 1 -b relay/repo-drop "https://x-access-token:${TOK}@github.com/${REPO}.git" drop 2>/dev/null; then
+            echo "has=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "no drop waiting"; echo "has=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Create each dropped repo
+        if: steps.drop.outputs.has == 'true'
+        run: |
+          set -eu
+          git config --global user.name "repo-drop-apply"
+          git config --global user.email "repo-drop-apply@users.noreply.github.com"
+          made=0; kept=0
+          for f in drop/*; do
+            [ -f "$f" ] || continue
+            name=$(basename "$f")
+            printf %s "$name" | grep -Eq '^[A-Za-z0-9._-]{1,100}$' || { echo "skipped a file with a bad repo name"; continue; }
+            echo "::add-mask::$name"
+            if GH_TOKEN="$TOK" gh repo view "kiexpert/$name" > /dev/null 2>&1; then echo "kept one repo (already exists)"; kept=$((kept+1)); continue; fi
+            GH_TOKEN="$TOK" gh repo create "kiexpert/$name" --private > /dev/null
+            seed=$(sed -n 's/^seed=//p' "$f" | head -n1 | tr -d '\r')
+            if [ -n "$seed" ]; then
+              printf %s "$seed" | grep -Eq '^[A-Za-z0-9._/-]+$' || { echo "bad seed path"; exit 1; }
+              rm -rf src new
+              git clone -q --depth 1 "https://x-access-token:${TOK}@github.com/${REPO}.git" src
+              [ -d "src/$seed" ] || { echo "seed folder missing"; exit 1; }
+              mkdir new; cp -R "src/$seed/." new/
+              git -C new init -q -b main
+              git -C new add -A
+              git -C new commit -q -m "Initial import from the portal template folder"
+              git -C new push -q "https://x-access-token:${TOK}@github.com/kiexpert/$name.git" main
+            fi
+            echo "created one repo"; made=$((made+1))
+          done
+          echo "repos created: $made, already present: $kept"
+      - name: Delete the drop branch
+        if: steps.drop.outputs.has == 'true'
+        run: |
+          git -C drop push -q origin --delete relay/repo-drop
+          echo "drop branch deleted"
