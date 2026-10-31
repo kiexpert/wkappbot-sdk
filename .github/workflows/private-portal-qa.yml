@@ -3,6 +3,7 @@ name: private-portal-qa
 # Runs the private portal's own selftests and takes demo screenshots, so a release or a demo
 # rehearsal can be judged by eye instead of by a green tick. It opens no port and runs no tunnel.
 # The target repo is found by a sha256 prefix, never named; its name and every token are masked.
+# The portal selftest drives Playwright itself, so chromium is installed BEFORE it runs.
 # SECRETS READ: WKAPPBOT_PAT, GH_LICENSE_TOKEN, WKAPPBOT_CORE_PAT (tried in that order).
 # A value that is empty or SET-ME counts as unset.
 on:
@@ -54,14 +55,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Portal selftest
-        run: node site/poc-site/portal/selftest.js
-      - name: Site selftest
-        run: node site/poc-site/selftest.js
       - name: Install Chromium
         run: |
           npm i -s playwright@1.49.1
           npx playwright install --with-deps chromium
+      - name: Portal selftest
+        run: node site/poc-site/portal/selftest.js
+      - name: Site selftest
+        run: node site/poc-site/selftest.js
       - name: Screenshots, light and dark
         run: |
           mkdir -p shots
