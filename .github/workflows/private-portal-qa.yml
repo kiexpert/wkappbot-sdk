@@ -1,7 +1,8 @@
 name: private-portal-qa
 
-# Runs the private portal's own selftests and takes demo screenshots, so a release or a demo
-# rehearsal can be judged by eye instead of by a green tick. It opens no port and runs no tunnel.
+# Runs the private portal's own selftests, probes how far its in-browser Linux really runs, and
+# takes demo screenshots, so a release or a demo rehearsal can be judged by eye and by numbers
+# instead of by a green tick. It opens no port and runs no tunnel.
 # The target repo is found by a sha256 prefix, never named; its name and every token are masked.
 # The portal selftest drives Playwright itself, so chromium is installed BEFORE it runs.
 # SECRETS READ: WKAPPBOT_PAT, GH_LICENSE_TOKEN, WKAPPBOT_CORE_PAT (tried in that order).
@@ -63,6 +64,63 @@ jobs:
         run: node site/poc-site/portal/selftest.js
       - name: Site selftest
         run: node site/poc-site/selftest.js
+      - name: In-browser Linux probe
+        run: |
+          cat > weblinux.mjs <<'EOF'
+          // How far the page's "Linux" runs: it is CPython on WASM (Pyodide), so the questions are
+          // does it load, how fast, which packages arrive, what the virtual filesystem does, and
+          // what a browser can never give it. Measured on a clean network, never guessed.
+          import pw from 'playwright';
+          const { chromium } = pw;
+          const b = await chromium.launch({ args: ['--no-sandbox'] });
+          const p = await (await b.newContext()).newPage();
+          await p.goto('https://example.com', { waitUntil: 'domcontentloaded' });
+          const rows = [];
+          const t0 = Date.now();
+          const ver = await p.evaluate(async () => {
+            const url = 'https://cdn.jsdelivr.net/npm/pyodide@0.26.4/';
+            await new Promise((res, rej) => {
+              const s = document.createElement('script');
+              s.src = url + 'pyodide.js'; s.onload = res; s.onerror = () => rej(new Error('pyodide.js'));
+              document.head.appendChild(s);
+            });
+            window.py = await window.loadPyodide({ indexURL: url });
+            return window.py.runPython('import sys; sys.version.split()[0]');
+          });
+          rows.push(['runtime loads', 'OK python ' + ver, Date.now() - t0]);
+          async function probe(label, code, pkgs) {
+            const a = Date.now();
+            const r = await p.evaluate(async ([c, k]) => {
+              try {
+                if (k) await window.py.loadPackagesFromImports(c);
+                return 'OK ' + String(window.py.runPython(c)).slice(0, 60);
+              } catch (e) { return 'FAIL ' + String(e.message || e).split('\n').pop().slice(0, 60); }
+            }, [code, !!pkgs]);
+            rows.push([label, r, Date.now() - a]);
+          }
+          await probe('pure python', 'sum(i*i for i in range(1000000))');
+          await probe('virtual files', "open('/home/pyodide/a.txt','w').write('hi'); open('/home/pyodide/a.txt').read()");
+          await probe('numpy', 'import numpy as np; float(np.fft.fft(np.random.rand(1<<18))[1].real)', true);
+          await probe('scipy', 'import scipy; scipy.__version__', true);
+          await probe('pandas', 'import pandas; pandas.__version__', true);
+          await probe('matplotlib', 'import matplotlib; matplotlib.__version__', true);
+          await probe('micropip wheel', "import micropip; await micropip.install('attrs'); import attrs; attrs.__version__", true);
+          await probe('subprocess (expected FAIL)', "import subprocess; subprocess.run(['ls'])");
+          await probe('raw socket (expected FAIL)', "import socket; socket.create_connection(('example.com',80),2)");
+          await probe('threads (expected FAIL)', 'import threading; threading.Thread(target=lambda: None).start() or "started"');
+          await b.close();
+          const line = r => '| ' + r[0] + ' | ' + r[1] + ' | ' + r[2] + ' |';
+          const md = ['| probe | result | ms |', '| --- | --- | --- |'].concat(rows.map(line)).join('\n');
+          console.log(md);
+          if (process.env.GITHUB_STEP_SUMMARY) {
+            const fs = await import('fs');
+            fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, '## in-browser Linux\n' + md + '\n');
+          }
+          const musts = ['runtime loads', 'pure python', 'virtual files', 'numpy'];
+          const bad = rows.filter(r => musts.includes(r[0]) && !r[1].startsWith('OK'));
+          if (bad.length) { console.log('MUST-RUN BROKEN: ' + bad.map(r => r[0]).join(', ')); process.exit(1); }
+          EOF
+          node weblinux.mjs
       - name: Screenshots, light and dark
         run: |
           mkdir -p shots
