@@ -1,0 +1,101 @@
+name: private-portal-qa
+
+# Runs the private portal's own selftests and takes demo screenshots, so a release or a demo
+# rehearsal can be judged by eye instead of by a green tick. It opens no port and runs no tunnel.
+# The target repo is found by a sha256 prefix, never named; its name and every token are masked.
+# SECRETS READ: WKAPPBOT_PAT, GH_LICENSE_TOKEN, WKAPPBOT_CORE_PAT (tried in that order).
+# A value that is empty or SET-ME counts as unset.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/private-portal-qa.yml
+  schedule:
+    - cron: '41 21 * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: private-portal-qa
+  cancel-in-progress: false
+
+jobs:
+  qa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      TARGET_HASH: ce712644e054789d
+      T1: ${{ secrets.WKAPPBOT_PAT }}
+      T2: ${{ secrets.GH_LICENSE_TOKEN }}
+      T3: ${{ secrets.WKAPPBOT_CORE_PAT }}
+    steps:
+      - name: Find the target repo and a token that can reach it
+        run: |
+          set -u
+          for t in "$T1" "$T2" "$T3"; do
+            [ -n "$t" ] && [ "$t" != "SET-ME" ] || continue
+            echo "::add-mask::$t"
+            names=$(GH_TOKEN="$t" gh repo list kiexpert --visibility private --limit 300 --json nameWithOwner -q '.[].nameWithOwner' 2>/dev/null || true)
+            for n in $names; do
+              if [ "$(printf %s "$n" | sha256sum | cut -c1-16)" = "$TARGET_HASH" ]; then
+                echo "::add-mask::$n"
+                echo "::add-mask::${n#*/}"
+                { echo "REPO=$n"; echo "TOK=$t"; } >> "$GITHUB_ENV"
+                echo "target found"
+                exit 0
+              fi
+            done
+          done
+          echo "no token reaches the target repo"; exit 1
+      - name: Check out the target
+        run: git clone -q --depth 1 "https://x-access-token:${TOK}@github.com/${REPO}.git" site
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Portal selftest
+        run: node site/poc-site/portal/selftest.js
+      - name: Site selftest
+        run: node site/poc-site/selftest.js
+      - name: Install Chromium
+        run: |
+          npm i -s playwright@1.49.1
+          npx playwright install --with-deps chromium
+      - name: Screenshots, light and dark
+        run: |
+          mkdir -p shots
+          cat > shot.mjs <<'EOF'
+          import pw from 'playwright';
+          const { chromium } = pw;
+          const ROOT = process.cwd() + '/site/poc-site/portal';
+          const errs = [];
+          const b = await chromium.launch({ args: ['--no-sandbox'] });
+          async function shot(file, name, w, h, scheme, prep) {
+            const ctx = await b.newContext({ viewport: { width: w, height: h }, colorScheme: scheme });
+            const p = await ctx.newPage();
+            p.on('pageerror', e => errs.push(name + ': ' + e.message));
+            await p.goto('file://' + ROOT + '/' + file);
+            await p.waitForTimeout(600);
+            if (prep) { try { await prep(p); } catch (e) { errs.push(name + ' prep: ' + e.message); } }
+            await p.screenshot({ path: 'shots/' + name + '.png' });
+            await ctx.close();
+          }
+          const chip = async p => { await p.locator('.chip').first().click({ timeout: 3000 }); await p.waitForTimeout(900); };
+          await shot('index.html', 'portal-dark-1440', 1440, 900, 'dark');
+          await shot('index.html', 'portal-light-1440', 1440, 900, 'light');
+          await shot('index.html', 'portal-dark-chip', 1440, 900, 'dark', chip);
+          await shot('index.html', 'portal-1366', 1366, 768, 'dark');
+          await shot('index.html', 'portal-phone', 390, 844, 'dark');
+          await shot('settings.html', 'settings-dark', 1440, 900, 'dark');
+          await shot('members.html', 'members-dark', 1440, 900, 'dark');
+          await b.close();
+          console.log('PAGE ERRORS ' + errs.length + (errs.length ? ' :: ' + errs.join(' || ') : ''));
+          if (errs.length) process.exit(1);
+          EOF
+          node shot.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: portal-screens
+          path: shots
+          retention-days: 14
