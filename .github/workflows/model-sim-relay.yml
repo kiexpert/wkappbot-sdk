@@ -1,0 +1,102 @@
+name: model-sim-relay
+
+# Answers the simulated SK internal models (wkopus, wksonnet, wkhaiku) for the portal's sk-relay provider.
+# The portal commits request files to the private repo; this job answers them with the claude CLI and
+# commits the answers back. It opens no inbound port and runs no tunnel: every 5 minutes it pulls, answers, pushes.
+#   relay/model-req : req/<id>.json  (OpenAI chat/completions request, written by the page)
+#   relay/model-ans : ans/<id>.json  ("answering" marker, then the chat.completion answer)
+# The target repo is found by a sha256 prefix, never named; its name and every token are masked.
+# SECRETS READ: WKAPPBOT_PAT, GH_LICENSE_TOKEN, WKAPPBOT_CORE_PAT (repo tokens, tried in that order)
+# and CLAUDE_CODE_OAUTH_TOKEN (claude CLI credential). A value that is empty or SET-ME counts as unset.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/model-sim-relay.yml
+  schedule:
+    - cron: '*/5 * * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: model-sim-relay
+  cancel-in-progress: false
+
+jobs:
+  relay:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      TARGET_HASH: ce712644e054789d
+      T1: ${{ secrets.WKAPPBOT_PAT }}
+      T2: ${{ secrets.GH_LICENSE_TOKEN }}
+      T3: ${{ secrets.WKAPPBOT_CORE_PAT }}
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+    steps:
+      - name: Skip until the claude credential exists
+        id: gate
+        env:
+          CLAUDE_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        run: |
+          if [ -n "$CLAUDE_TOKEN" ] && [ "$CLAUDE_TOKEN" != "SET-ME" ]; then echo "ready=true" >> "$GITHUB_OUTPUT"
+          else echo "secret CLAUDE_CODE_OAUTH_TOKEN is not set yet: nothing to do"; echo "ready=false" >> "$GITHUB_OUTPUT"; fi
+      - name: Find the target repo and a token that can reach it
+        if: steps.gate.outputs.ready == 'true'
+        run: |
+          set -u
+          for t in "$T1" "$T2" "$T3"; do
+            [ -n "$t" ] && [ "$t" != "SET-ME" ] || continue
+            echo "::add-mask::$t"
+            names=$(GH_TOKEN="$t" gh repo list kiexpert --visibility private --limit 300 --json nameWithOwner -q '.[].nameWithOwner' 2>/dev/null || true)
+            for n in $names; do
+              if [ "$(printf %s "$n" | sha256sum | cut -c1-16)" = "$TARGET_HASH" ]; then
+                echo "::add-mask::$n"
+                echo "::add-mask::${n#*/}"
+                { echo "REPO=$n"; echo "TOK=$t"; } >> "$GITHUB_ENV"
+                echo "target found"
+                exit 0
+              fi
+            done
+          done
+          echo "no token reaches the target repo"; exit 1
+      - name: Check out main and the two relay branches
+        if: steps.gate.outputs.ready == 'true'
+        run: |
+          url="https://x-access-token:${TOK}@github.com/${REPO}.git"
+          git clone -q --depth 1 "$url" main
+          if git ls-remote --exit-code --heads "$url" relay/model-req >/dev/null; then
+            git clone -q --depth 1 --branch relay/model-req "$url" req
+          else
+            echo "STATE no requests branch yet"; echo "NOREQ=1" >> "$GITHUB_ENV"
+          fi
+          if git ls-remote --exit-code --heads "$url" relay/model-ans >/dev/null; then
+            git clone -q --depth 1 --branch relay/model-ans "$url" ans
+          else
+            git clone -q --depth 1 "$url" ans && git -C ans checkout -q -b relay/model-ans
+          fi
+      - uses: actions/setup-node@v4
+        if: steps.gate.outputs.ready == 'true' && env.NOREQ != '1'
+        with:
+          node-version: 22
+      - name: Install Claude Code
+        if: steps.gate.outputs.ready == 'true' && env.NOREQ != '1'
+        shell: bash
+        run: npm install -g @anthropic-ai/claude-code >/dev/null 2>&1
+      - name: Answer pending requests
+        if: steps.gate.outputs.ready == 'true' && env.NOREQ != '1'
+        shell: bash
+        run: node main/relay/model-sim/run.mjs --req req --ans ans --max 5
+      - name: Commit answers, then remove answered requests
+        if: steps.gate.outputs.ready == 'true' && env.NOREQ != '1'
+        shell: bash
+        run: |
+          for d in ans req; do
+            git -C "$d" config user.name relay-bot
+            git -C "$d" config user.email relay-bot@users.noreply.github.com
+          done
+          git -C ans add -A ans
+          git -C ans diff --cached --quiet || { git -C ans commit -qm "relay: answers" && git -C ans push -q origin HEAD:relay/model-ans; }
+          git -C req add -A req
+          git -C req diff --cached --quiet || { git -C req commit -qm "relay: answered" && git -C req push -q origin HEAD:relay/model-req; }
