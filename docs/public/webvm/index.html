@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- i.copy.sh refuses a hotlinked Referer with 403 and serves the same ISO with ACAO * when no Referer is sent (measured 2026-11-01). -->
+<meta name="referrer" content="no-referrer">
+<title>WebVM QA</title>
+<meta name="description" content="Harness QA: a Linux PC in the browser, the web spokesman and every AI family, checked live.">
+<style>
+:root{--bg:#0d1117;--panel:#161b22;--panel2:#1f2630;--line:#30363d;--fg:#e6edf3;--dim:#8b949e;--acc:#58a6ff;--ok:#3fb950;--bad:#f85149;--skip:#d29922;--term:#0a0e14;--termfg:#b3f5b3;}
+:root[data-theme="light"]{--bg:#e9eef5;--panel:#ffffff;--panel2:#f3f6fa;--line:#cfd7e2;--fg:#1b2430;--dim:#5b6675;--acc:#0b63ce;--ok:#1a7f37;--bad:#cf222e;--skip:#9a6700;}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font:14px/1.45 system-ui,-apple-system,"Segoe UI","Noto Sans KR",sans-serif;overflow:hidden}
+#desktop{position:fixed;inset:32px 0 56px 0;background:radial-gradient(1200px 600px at 20% 10%,#1f6feb33,transparent),radial-gradient(900px 500px at 90% 90%,#8957e533,transparent),var(--bg)}
+#topbar{position:fixed;top:0;left:0;right:0;height:32px;display:flex;align-items:center;gap:12px;padding:0 12px;background:var(--panel);border-bottom:1px solid var(--line);font-size:13px;z-index:50}
+#topbar b{color:var(--acc)} #topbar .sp{flex:1}
+.pill{padding:2px 8px;border-radius:10px;background:var(--panel2);border:1px solid var(--line);color:var(--dim);font-size:12px}
+.pill.on{color:var(--ok);border-color:var(--ok)}
+#dock{position:fixed;bottom:8px;left:50%;transform:translateX(-50%);display:flex;gap:8px;padding:6px 10px;background:var(--panel);border:1px solid var(--line);border-radius:14px;z-index:50}
+#dock button{background:var(--panel2);color:var(--fg);border:1px solid var(--line);border-radius:10px;padding:6px 12px;cursor:pointer;font:inherit}
+#dock button:hover{border-color:var(--acc)}
+.win{position:absolute;display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:0 12px 40px #0008;min-width:280px;overflow:hidden}
+.win .bar{display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--panel2);border-bottom:1px solid var(--line);cursor:move;user-select:none;font-weight:600;font-size:13px}
+.win .bar i{width:11px;height:11px;border-radius:50%;display:inline-block;background:#ff5f57}.win .bar i+i{background:#febc2e}.win .bar i+i+i{background:#28c840}
+.win .body{flex:1;overflow:auto;padding:10px}
+#w-term{left:2%;top:3%;width:56%;height:62%}
+#w-qa{left:60%;top:3%;width:38%;height:62%}
+#w-keys{left:2%;top:67%;width:56%;height:31%}
+#w-intent{left:60%;top:67%;width:38%;height:31%}
+#screen{background:var(--term);color:var(--termfg);height:100%;border-radius:6px;overflow:hidden;position:relative;font:13px/1.25 ui-monospace,Menlo,Consolas,monospace}
+#screen > div{white-space:pre;padding:4px} #screen canvas{display:none}
+#vmstatus{position:absolute;right:8px;top:6px;color:var(--dim);font-size:12px}
+table{border-collapse:collapse;width:100%;font-size:13px} td,th{border-bottom:1px solid var(--line);padding:4px 6px;text-align:left;vertical-align:top}
+.st{font-weight:700} .PASS{color:var(--ok)} .FAIL{color:var(--bad)} .SKIP{color:var(--skip)} .RUN{color:var(--acc)}
+.mono{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;color:var(--dim);word-break:break-all}
+label{display:block;margin:4px 0 2px;color:var(--dim);font-size:12px}
+input{width:100%;background:var(--panel2);color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:5px 7px;font:inherit}
+.row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.btn{background:var(--acc);color:#fff;border:0;border-radius:8px;padding:7px 12px;cursor:pointer;font:inherit;margin-right:6px}
+.btn.ghost{background:transparent;color:var(--acc);border:1px solid var(--acc)}
+#summary{margin:6px 0 8px;font-weight:700}
+@media (max-width:820px){html,body{overflow:auto}#desktop{position:static;padding:40px 0 70px}.win{position:relative;left:auto!important;top:auto!important;width:auto!important;height:auto!important;margin:12px 16px}#screen{height:320px}.row{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div id="topbar"><b>WebVM QA</b><span>wkappbot 하네스 · 웹 안의 리눅스 PC</span><span class="sp"></span><span id="pill-claude" class="pill">claude 토큰 없음</span><span id="clock" class="mono"></span><button class="btn ghost" id="theme" style="padding:2px 8px">테마</button></div>
+<div id="desktop">
+  <section class="win" id="w-term"><div class="bar"><i></i><i></i><i></i> 터미널 — Linux (v86, 브라우저 안 가상머신)</div><div class="body" style="padding:6px"><div id="screen"><div></div><canvas></canvas><span id="vmstatus">대기</span></div></div></section>
+  <section class="win" id="w-qa"><div class="bar"><i></i><i></i><i></i> QA 보고</div><div class="body">
+    <div><button class="btn" id="run">전체 실행</button><button class="btn ghost" id="copy">보고 복사</button></div>
+    <div id="summary">아직 실행 전</div>
+    <table><thead><tr><th>검사</th><th>결과</th><th>근거</th></tr></thead><tbody id="rows"></tbody></table>
+  </div></section>
+  <section class="win" id="w-keys"><div class="bar"><i></i><i></i><i></i> 지능 가족 키 (이 브라우저에만 저장)</div><div class="body">
+    <div class="row">
+      <div><label>Claude 구독 토큰 / API 키</label><input id="k-claude" type="password" autocomplete="off"></div>
+      <div><label>Codex · OpenAI 키</label><input id="k-openai" type="password" autocomplete="off"></div>
+      <div><label>Agy · Gemini 키</label><input id="k-gemini" type="password" autocomplete="off"></div>
+      <div><label>Grok · xAI 키</label><input id="k-xai" type="password" autocomplete="off"></div>
+      <div><label>Muse (브라우저 API 없음)</label><input id="k-muse" type="password" autocomplete="off" disabled placeholder="쿠키 로그인 CLI라 브라우저에서 못 불러요"></div>
+      <div><label>GitHub 토큰 (선택, 속도 제한 완화)</label><input id="k-gh" type="password" autocomplete="off"></div>
+    </div>
+    <p class="mono">링크로 넣기: …/webvm/#claude=TOKEN&amp;openai=KEY&amp;xai=KEY — 해시(#)는 서버로 가지 않고, 읽자마자 주소창에서 지워져 이 브라우저의 localStorage에만 남아요. 소스에는 어떤 키도 없어요.</p>
+  </div></section>
+  <section class="win" id="w-intent"><div class="bar"><i></i><i></i><i></i> 의도락 · 지식화 (웹대변인)</div><div class="body">
+    <label>사장님 문장 (의도락 시험용)</label><input id="owner" value="선배 대변인의 반사를 역사폴더에서 공부하시오">
+    <div id="intent-out" class="mono" style="margin-top:8px">대변인 검색 사슬이 여기 표시돼요</div>
+  </div></section>
+</div>
+<nav id="dock"><button data-w="w-term">터미널</button><button data-w="w-qa">QA</button><button data-w="w-keys">키</button><button data-w="w-intent">의도락</button></nav>
+<script>
+"use strict";
+// ---- constants pinned by the 2026-11-01 survey (edit only here) ----
+// v86 0.5.473 build files are CORS-open on jsDelivr but the package ships no bios/, so the BIOS comes from the v86 source repo.
+const V86 = { base: "https://cdn.jsdelivr.net/npm/v86@0.5.473/build/", bios: "https://raw.githubusercontent.com/copy/v86/master/bios/", image: "https://i.copy.sh/linux4.iso" };
+const MODELS = { claude: "claude-haiku-5-5", openai: "gpt-5-mini", gemini: "gemini-2.5-flash", xai: "grok-4-fast" };
+const SKILL_REPO = "kiexpert/wkappbot-sdk";
+const KEYS = ["claude", "openai", "gemini", "xai", "gh"];
+
+// ---- key store: fragment or query -> localStorage, then scrub the URL ----
+const store = {
+  get(k) { try { return localStorage.getItem("webvm.key." + k) || ""; } catch (e) { return ""; } },
+  set(k, v) { try { v ? localStorage.setItem("webvm.key." + k, v) : localStorage.removeItem("webvm.key." + k); } catch (e) {} }
+};
+function absorbUrlKeys() {
+  const got = [];
+  const src = [new URLSearchParams(location.hash.replace(/^#/, "")), new URLSearchParams(location.search)];
+  for (const p of src) for (const k of KEYS) { const alias = k === "claude" ? ["claude", "token"] : [k]; for (const a of alias) { const v = p.get(a); if (v) { store.set(k, v.trim()); got.push(k); } } }
+  if (got.length && history.replaceState) history.replaceState(null, "", location.pathname);
+  return got;
+}
+function mask(v) { return v ? v.slice(0, 7) + "…" + v.slice(-4) : ""; }
+
+// ---- intent lock rules, the same shape the harness enforces ----
+const KO = /[가-힣]/;
+const PARTICLES = ["에서", "으로", "에게", "까지", "부터", "처럼", "이랑", "랑", "의", "를", "을", "가", "이", "은", "는", "에", "로", "도", "만", "과", "와"];
+function stripParticle(w) { for (const p of PARTICLES) if (w.length > p.length + 1 && w.endsWith(p)) return w.slice(0, -p.length); return w; }
+function corrected(phrase) { return phrase.split("-").map(x => KO.test(x) ? stripParticle(x) : x).join("-"); }
+function ownerWords(text) { return (text.match(/[가-힣A-Za-z0-9]+/g) || []).filter(w => w.length > 1); }
+function checkChain(tok) {
+  const s = tok.split("=").filter(Boolean);
+  if (s.length < 3) return "3칸 이상이어야 해요 (원문=보정=영어)";
+  const left = s[0].toLowerCase();
+  if (s[s.length - 1].toLowerCase() === left) return "마지막 칸이 원문과 같아요";
+  if (KO.test(left) && corrected(left) !== left && s[1].toLowerCase() === left) return "보정 칸에 조사가 남았어요: " + corrected(left);
+  return "";
+}
+function checkSearch(owner, query) {
+  const toks = query.trim().split(/\s+/).filter(t => t.includes("="));
+  const bad = toks.map(t => [t, checkChain(t)]).filter(x => x[1]);
+  const words = ownerWords(owner).map(stripParticle);
+  const lefts = toks.flatMap(t => t.split("=")[0].split("-")).map(stripParticle);
+  const hit = words.filter(w => lefts.some(l => l === w || l.startsWith(w) || w.startsWith(l)));
+  const cov = words.length ? hit.length / words.length : 0;
+  return { pass: bad.length === 0 && cov >= 0.77 && toks.length > 0, cov, bad, toks };
+}
+
+// ---- QA rows ----
+const rows = [];
+function row(id, title) { const r = { id, title, st: "SKIP", note: "" }; rows.push(r); return r; }
+function esc(s) { return String(s).replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c])); }
+function render() {
+  document.getElementById("rows").innerHTML = rows.map(r => `<tr><td>${esc(r.title)}<div class="mono">${r.id}</div></td><td class="st ${r.st}">${r.st}</td><td class="mono">${esc(r.note)}</td></tr>`).join("");
+  const p = rows.filter(r => r.st === "PASS").length, f = rows.filter(r => r.st === "FAIL").length, k = rows.filter(r => r.st === "SKIP").length;
+  document.getElementById("summary").textContent = `RESULT ${p}/${p + f} (skip ${k})`;
+}
+async function timed(r, fn) { r.st = "RUN"; render(); const t = performance.now(); try { const res = await fn(); r.st = res.st; r.note = `${res.note} (${Math.round(performance.now() - t)} ms)`; } catch (e) { r.st = "FAIL"; r.note = String(e && e.message || e); } render(); }
+
+// ---- model calls, straight from the browser ----
+async function claudeAsk(prompt, maxTokens) {
+  const key = store.get("claude"); if (!key) throw new Error("no key");
+  const h = { "content-type": "application/json", "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" };
+  if (key.startsWith("sk-ant-oat")) { h["authorization"] = "Bearer " + key; h["anthropic-beta"] = "oauth-2025-04-20"; } else { h["x-api-key"] = key; }
+  const res = await fetch("https://api.anthropic.com/v1/messages", { method: "POST", headers: h, body: JSON.stringify({ model: MODELS.claude, max_tokens: maxTokens || 64, messages: [{ role: "user", content: prompt }] }) });
+  const j = await res.json(); if (!res.ok) throw new Error(res.status + " " + (j.error && j.error.message || ""));
+  return (j.content || []).map(c => c.text || "").join("");
+}
+async function openaiLike(base, key, model, prompt) {
+  const res = await fetch(base + "/chat/completions", { method: "POST", headers: { "content-type": "application/json", authorization: "Bearer " + key }, body: JSON.stringify({ model, messages: [{ role: "user", content: prompt }], max_tokens: 16 }) });
+  const j = await res.json(); if (!res.ok) throw new Error(res.status + " " + (j.error && (j.error.message || j.error) || ""));
+  return j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content || "";
+}
+async function geminiAsk(key, prompt) {
+  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODELS.gemini}:generateContent?key=${encodeURIComponent(key)}`, { method: "POST", headers: { "content-type": "text/plain" }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }) });
+  const j = await res.json(); if (!res.ok) throw new Error(res.status + " " + (j.error && j.error.message || ""));
+  const c = (j.candidates || [])[0]; return c && c.content ? c.content.parts.map(p => p.text || "").join("") : "";
+}
+const PING = "Reply with the single word PONG.";
+const pong = t => /PONG/i.test(t) ? { st: "PASS", note: "PONG" } : { st: "FAIL", note: "answer: " + String(t).slice(0, 60) };
+
+// ---- knowledge: skill search and read against the public skill store ----
+let skillIndex = null;
+async function loadSkillIndex() {
+  if (skillIndex) return skillIndex;
+  const gh = store.get("gh"); const h = gh ? { authorization: "Bearer " + gh } : {};
+  const res = await fetch(`https://api.github.com/repos/${SKILL_REPO}/git/trees/main?recursive=1`, { headers: h });
+  const j = await res.json(); if (!res.ok) throw new Error(res.status + " " + (j.message || ""));
+  skillIndex = (j.tree || []).filter(e => /\.skill\.json$/.test(e.path)).map(e => ({ path: e.path, id: e.path.split("/").pop().replace(/\.skill\.json$/, "") }));
+  return skillIndex;
+}
+// Same idea as wkappbot skill search over ids: every query word that appears in the id scores one; best first.
+const SEARCH_Q = "agent cmd delegation front door";
+let topHit = null;
+function searchSkills(idx, q) {
+  const words = q.toLowerCase().split(/\s+/).filter(Boolean);
+  return idx.map(s => ({ ...s, score: words.filter(w => s.id.includes(w)).length })).filter(s => s.score > 0).sort((a, b) => b.score - a.score || a.id.length - b.id.length);
+}
+async function readSkill(path) { const res = await fetch(`https://raw.githubusercontent.com/${SKILL_REPO}/main/${path}`); if (!res.ok) throw new Error(res.status); return res.json(); }
+
+// ---- the Linux PC: v86 boots a real kernel inside this tab ----
+let vmStarted = false;
+function bootVm() {
+  return new Promise((resolve) => {
+    const st = document.getElementById("vmstatus");
+    const s = document.createElement("script"); s.src = V86.base + "libv86.js";
+    s.onerror = () => resolve({ st: "FAIL", note: "libv86.js load failed" });
+    s.onload = () => {
+      try {
+        st.textContent = "부팅 중…";
+        const emu = new window.V86({ wasm_path: V86.base + "v86.wasm", memory_size: 64 * 1024 * 1024, vga_memory_size: 2 * 1024 * 1024, screen_container: document.getElementById("screen"), bios: { url: V86.bios + "seabios.bin" }, vga_bios: { url: V86.bios + "vgabios.bin" }, cdrom: { url: V86.image }, autostart: true });
+        window.__vm = emu; let done = false;
+        emu.add_listener("emulator-started", () => { vmStarted = true; st.textContent = "실행 중"; });
+        // PASS only when the kernel ANSWERS a typed command: wait for the shell prompt, type uname -sr, read "Linux x.y" back.
+        const t0 = Date.now(); let typed = false;
+        const screenRows = () => [...document.querySelectorAll("#screen > div > div")].map(d => d.textContent.replace(/\s+$/, ""));
+        const poll = setInterval(() => {
+          const rows = screenRows();
+          if (!typed && rows.some(r => /(^|\s)~?[%#$] ?/.test(r) && /~[%#$]/.test(r))) { typed = true; emu.keyboard_send_text("uname -sr\n"); }
+          const ans = typed ? rows.find(r => /^Linux \d+\.\d+/.test(r.trim())) : null;
+          if (!done && ans) { done = true; clearInterval(poll); resolve({ st: "PASS", note: "shell answered: " + ans.trim().slice(0, 40) }); }
+          else if (Date.now() - t0 > 120000) { clearInterval(poll); if (!done) resolve(!vmStarted ? { st: "FAIL", note: "emulator did not start" } : typed ? { st: "FAIL", note: "typed uname, no answer in 120 s" } : { st: "FAIL", note: "started, no shell prompt in 120 s" }); }
+        }, 1000);
+      } catch (e) { resolve({ st: "FAIL", note: String(e.message || e) }); }
+    };
+    document.head.appendChild(s);
+  });
+}
+
+// ---- the check list ----
+const R = {
+  urlkeys: row("keys.url-scrub", "키가 URL에서 지워짐"),
+  vm: row("vm.boot", "웹 안 리눅스 PC 부팅 (v86)"),
+  intentLocal: row("intent.rules", "의도락 규칙 (조사 보정·3칸)"),
+  ksearch: row("knowledge.search", "지식: 스킬 서치"),
+  kread: row("knowledge.read", "지식: 스킬 리드"),
+  claude: row("family.claude", "웹대변인 Claude 응답"),
+  intentSpk: row("intent.spokesman", "웹대변인이 의도락 검색 작성"),
+  jisikhwa: row("knowledge.like", "웹대변인이 지식화 라이크 작성"),
+  codex: row("family.codex", "Codex (OpenAI)"),
+  agy: row("family.agy", "Agy (Gemini)"),
+  grok: row("family.grok", "Grok (xAI)"),
+  muse: row("family.muse", "Muse")
+};
+R.muse.note = "브라우저 API 없음: muse는 쿠키 로그인 CLI라 VM 하네스에서만 시험돼요";
+async function runAll(opts) {
+  opts = opts || {};
+  await timed(R.intentLocal, async () => {
+    const good = checkSearch("선배 대변인의 반사를", "선배-대변인의=선배-대변인=전임-스포크스맨=predecessor-spokesman 대변인의-반사를=대변인-반사=전임자-리플렉스=reflex");
+    const bad = checkChain("대변인의-선배=대변인의-선배=앞선-전임자=predecessor");
+    return good.pass && bad.startsWith("보정 칸에 조사") ? { st: "PASS", note: `cov ${Math.round(good.cov * 100)}%, particle case refused` } : { st: "FAIL", note: JSON.stringify({ good, bad }) };
+  });
+  if (!opts.noNet) {
+    await timed(R.ksearch, async () => { const idx = await loadSkillIndex(); const hits = searchSkills(idx, SEARCH_Q); topHit = hits[0] || null; return topHit ? { st: "PASS", note: `${idx.length} skills, "${SEARCH_Q}" -> ${hits.slice(0, 3).map(h => h.id).join(", ")}` } : { st: "FAIL", note: `${idx.length} skills, no hit for "${SEARCH_Q}"` }; });
+    await timed(R.kread, async () => { const idx = await loadSkillIndex(); const s = topHit || searchSkills(idx, SEARCH_Q)[0]; if (!s) return { st: "FAIL", note: "no search hit to read" }; const j = await readSkill(s.path); const step = (j.steps || [])[0]; const text = typeof step === "string" ? step : (step && (step.text || step.content)) || ""; return text ? { st: "PASS", note: `${s.id} step 1: ${text.slice(0, 50)}` } : { st: "FAIL", note: "no step text" }; });
+  } else { for (const r of [R.ksearch, R.kread]) { r.st = "SKIP"; r.note = "network off"; } render(); }
+  if (store.get("claude") && !opts.noNet) {
+    await timed(R.claude, async () => pong(await claudeAsk(PING, 16)));
+    await timed(R.intentSpk, async () => {
+      const owner = document.getElementById("owner").value;
+      const q = (await claudeAsk(`Write ONE wkappbot skill search line for this owner sentence. Each token is ORIGINAL-PAIR=CORRECTED-PAIR=SYNONYM-PAIR=english-pair, where ORIGINAL-PAIR is two adjacent words of the sentence joined by a hyphen, CORRECTED-PAIR strips Korean particles (의, 를, 을, 에서, 은, 는), SYNONYM-PAIR is a different phrase with the same meaning, english-pair is lowercase with dashes. Cover every word. Output only the tokens separated by spaces.\nSentence: ${owner}`, 300)).replace(/^.*search\s+/i, "");
+      const v = checkSearch(owner, q);
+      document.getElementById("intent-out").textContent = q;
+      return v.pass ? { st: "PASS", note: `cov ${Math.round(v.cov * 100)}%, ${v.toks.length} chains` } : { st: "FAIL", note: `cov ${Math.round(v.cov * 100)}%; ${v.bad.map(b => b[1]).join("; ")}` };
+    });
+    await timed(R.jisikhwa, async () => {
+      const step = "DECISION: clear an [intent-lock] refusal with ONE search built from the refusal itself.";
+      const out = await claudeAsk(`Write one command: wkappbot skill edit intent-lock --like "<a verbatim fragment of 5 or more words copied from this step>" --why "<six or more words on what you learned>". Step: ${step}. Output only the command.`, 120);
+      const m = out.match(/--like\s+"([^"]+)"\s+--why\s+"([^"]+)"/);
+      if (!m) return { st: "FAIL", note: "shape: " + out.slice(0, 60) };
+      const verbatim = step.includes(m[1]) && m[1].split(/\s+/).length >= 5, why = m[2].split(/\s+/).length >= 6;
+      return verbatim && why ? { st: "PASS", note: "like: " + m[1].slice(0, 40) } : { st: "FAIL", note: `verbatim ${verbatim}, why ${why}` };
+    });
+  } else { for (const r of [R.claude, R.intentSpk, R.jisikhwa]) { r.st = "SKIP"; r.note = opts.noNet ? "network off" : "Claude 토큰 없음"; } render(); }
+  const fam = [[R.codex, "openai", k => openaiLike("https://api.openai.com/v1", k, MODELS.openai, PING)], [R.agy, "gemini", k => geminiAsk(k, PING)], [R.grok, "xai", k => openaiLike("https://api.x.ai/v1", k, MODELS.xai, PING)]];
+  for (const [r, k, fn] of fam) { const key = store.get(k); if (!key || opts.noNet) { r.st = "SKIP"; r.note = key ? "network off" : "키 없음"; render(); continue; } await timed(r, async () => pong(await fn(key))); }
+  if (!opts.noNet && !opts.noVm) await timed(R.vm, bootVm); else { R.vm.st = "SKIP"; R.vm.note = "VM off"; render(); }
+  return reportText();
+}
+function reportText() { return [document.getElementById("summary").textContent].concat(rows.map(r => `${r.st} ${r.id} -- ${r.note}`)).join("\n"); }
+
+// ---- desktop wiring ----
+function refreshPill() { const p = document.getElementById("pill-claude"), v = store.get("claude"); p.textContent = v ? "claude " + mask(v) : "claude 토큰 없음"; p.className = "pill" + (v ? " on" : ""); }
+function initKeys() {
+  for (const k of KEYS) { const el = document.getElementById("k-" + k); el.value = store.get(k); el.addEventListener("change", () => { store.set(k, el.value.trim()); refreshPill(); }); }
+  refreshPill();
+}
+function initWindows() {
+  let z = 10;
+  document.querySelectorAll(".win").forEach(w => {
+    w.addEventListener("mousedown", () => { w.style.zIndex = ++z; });
+    const bar = w.querySelector(".bar"); let dx = 0, dy = 0, drag = false;
+    bar.addEventListener("mousedown", e => { drag = true; dx = e.clientX - w.offsetLeft; dy = e.clientY - w.offsetTop; e.preventDefault(); });
+    addEventListener("mousemove", e => { if (drag) { w.style.left = (e.clientX - dx) + "px"; w.style.top = (e.clientY - dy) + "px"; } });
+    addEventListener("mouseup", () => { drag = false; });
+  });
+  document.querySelectorAll("#dock button").forEach(b => b.addEventListener("click", () => { const w = document.getElementById(b.dataset.w); w.style.zIndex = ++z; w.scrollIntoView({ block: "nearest" }); }));
+}
+function initTheme() { const t = document.getElementById("theme"); let cur = ""; try { cur = localStorage.getItem("webvm.theme") || ""; } catch (e) {} if (cur) document.documentElement.dataset.theme = cur; t.addEventListener("click", () => { cur = document.documentElement.dataset.theme === "light" ? "dark" : "light"; document.documentElement.dataset.theme = cur; try { localStorage.setItem("webvm.theme", cur); } catch (e) {} }); }
+setInterval(() => { document.getElementById("clock").textContent = new Date().toLocaleTimeString(); }, 1000);
+const absorbed = absorbUrlKeys();
+R.urlkeys.st = absorbed.length ? ((location.hash || location.search) ? "FAIL" : "PASS") : "SKIP";
+R.urlkeys.note = absorbed.length ? `absorbed ${absorbed.join(",")}; url now ${location.pathname}` : "no key in URL";
+initKeys(); initWindows(); initTheme(); render();
+document.getElementById("run").addEventListener("click", () => runAll());
+document.getElementById("copy").addEventListener("click", async () => { try { await navigator.clipboard.writeText(reportText()); } catch (e) {} });
+window.WebVMQA = { runAll, reportText, checkSearch, checkChain, store, absorbUrlKeys };
+if (/autorun=1/.test(location.search + location.hash)) runAll();
+</script>
+</body>
+</html>
