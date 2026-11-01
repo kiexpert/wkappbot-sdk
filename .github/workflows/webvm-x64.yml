@@ -101,7 +101,17 @@ jobs:
           npm pack -s coi-serviceworker@0.1.7 >/dev/null
           tar -xzf coi-serviceworker-0.1.7.tgz
           cp package/coi-serviceworker.js out/
-          printf '{"c2w":"%s","image":"alpine:3.21 + python3 git","built":"%s"}\n' "$C2W_TAG" "$(date -u +%FT%TZ)" > out/manifest.json
+          # GitHub refuses files over 100 MB and the QEMU .data is ~130 MB (run 41359318459): split it; the page joins the parts.
+          parts=""
+          for f in out/*.data; do
+            [ "$(stat -c %s "$f")" -gt 95000000 ] || continue
+            split -b 45M -d -a 2 "$f" "$f.part"
+            rm "$f"
+          done
+          parts=$(cd out && ls -1 *.data.part* 2>/dev/null | sed 's/.*/"&"/' | paste -sd, -)
+          printf '{"c2w":"%s","image":"alpine:3.21 + python3 git","parts":[%s],"built":"%s"}\n' "$C2W_TAG" "$parts" "$(date -u +%FT%TZ)" > out/manifest.json
+          cat out/manifest.json
+          ls -la out
           find out -type f -size +95M -print -exec false {} + || { echo "a file is over the 100 MB push limit"; exit 1; }
 
       - name: Publish as webvm/x64 beside the page
