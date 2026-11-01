@@ -7,6 +7,8 @@ name: private-gitlab-setup
 # It reads ONE secret, GITLAB_TOKEN. Empty or SET-ME means "not set yet" and the job says so and stops
 # green, because a missing credential is the owner's step, never a failure of this pipeline.
 # The token is masked, never printed, and never written into a file that is committed.
+# The push trigger exists because workflow_dispatch is refused for the agent session that maintains
+# this file, so touching the file is the only way to run it on demand (2026-11-01).
 on:
   workflow_dispatch:
     inputs:
@@ -14,6 +16,10 @@ on:
         description: 'GitLab project full path (namespace/name)'
         required: false
         default: 'kiexpert-group/clush-poc'
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/private-gitlab-setup.yml
   schedule:
     - cron: '23 22 * * *'
 
