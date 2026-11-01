@@ -53,13 +53,25 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -eu
-          # The project marks no release as "latest" (gh release view without a tag says release not found), so take the newest listed.
-          gh release list -R ktock/container2wasm --limit 5
-          tag=$(gh release list -R ktock/container2wasm --limit 1 --json tagName -q '.[0].tagName')
-          asset=$(gh release view "$tag" -R ktock/container2wasm --json assets -q '.assets[].name' | grep -E '^container2wasm-.*linux-amd64\.tar\.gz$' | head -1)
-          gh release download "$tag" -R ktock/container2wasm -p "$asset" -O c2w.tgz
-          mkdir c2wbin && tar -xzf c2w.tgz -C c2wbin
-          sudo install "$(find c2wbin -name c2w -type f | head -1)" /usr/local/bin/c2w
+          # ktock/container2wasm lists no releases to the API any more (runs 41357907275, 41358171310: release not found),
+          # so try the project's org repo first, then build c2w from the Go module proxy.
+          tag=""
+          for r in container2wasm/container2wasm ktock/container2wasm; do
+            tag=$(gh release list -R "$r" --limit 1 --json tagName -q '.[0].tagName' 2>/dev/null || true)
+            [ -n "$tag" ] || continue
+            asset=$(gh release view "$tag" -R "$r" --json assets -q '.assets[].name' | grep -E '^container2wasm-.*linux-amd64\.tar\.gz$' | head -1)
+            [ -n "$asset" ] || { tag=""; continue; }
+            gh release download "$tag" -R "$r" -p "$asset" -O c2w.tgz
+            mkdir -p c2wbin && tar -xzf c2w.tgz -C c2wbin
+            sudo install "$(find c2wbin -name c2w -type f | head -1)" /usr/local/bin/c2w
+            echo "c2w from release $r $tag"; break
+          done
+          if [ -z "$tag" ]; then
+            GOBIN=/tmp/gobin go install github.com/ktock/container2wasm/cmd/c2w@latest
+            sudo install /tmp/gobin/c2w /usr/local/bin/c2w
+            tag="go-$(go version -m /tmp/gobin/c2w | awk '$1=="mod"{print $3; exit}')"
+            echo "c2w from the Go module proxy $tag"
+          fi
           c2w --version
           echo "C2W_TAG=$tag" >> "$GITHUB_ENV"
 
