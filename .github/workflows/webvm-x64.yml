@@ -1,0 +1,115 @@
+name: webvm-x64
+
+# Measurement build (owner 2026-11-01: "run a 64-bit WebVM test, I want to see how slow it is"). Converts an
+# x86_64 Alpine container (python3, git) to a browser bundle with container2wasm (c2w --to-js: QEMU compiled to wasm)
+# and publishes it as webvm/x64/ beside the target repo's 32-bit v86 WebVM page. The page file comes from the target
+# repo (webvm/x64/index.html). The target repo is found by sha256 prefix and never named, as in harness-pages-relay.yml.
+on:
+  workflow_dispatch:
+  push:
+    branches: ['**']
+    paths:
+      - .github/workflows/webvm-x64.yml
+
+permissions:
+  contents: read
+
+# Shares the relay's lock: every one of these jobs pushes the same gh-pages branch.
+concurrency:
+  group: harness-pages-relay
+  cancel-in-progress: false
+
+jobs:
+  x64:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    env:
+      TARGET_HASH: 23ade98d428c8527
+      T1: ${{ secrets.GH_LICENSE_TOKEN }}
+      T2: ${{ secrets.WKAPPBOT_PAT }}
+      T3: ${{ secrets.WKAPPBOT_CORE_PAT }}
+    steps:
+      - name: Find the target repo and a token that can reach it
+        run: |
+          set -u
+          for t in "$T1" "$T2" "$T3"; do
+            [ -n "$t" ] || continue
+            names=$(GH_TOKEN="$t" gh repo list kiexpert --visibility private --limit 300 --json nameWithOwner -q '.[].nameWithOwner' 2>/dev/null || true)
+            for n in $names; do
+              if [ "$(printf %s "$n" | sha256sum | cut -c1-16)" = "$TARGET_HASH" ]; then
+                echo "::add-mask::$n"
+                echo "::add-mask::${n#*/}"
+                echo "::add-mask::$t"
+                { echo "REPO=$n"; echo "TOK=$t"; } >> "$GITHUB_ENV"
+                echo "target found"
+                exit 0
+              fi
+            done
+          done
+          echo "no token reaches the target repo"; exit 1
+
+      - name: Install container2wasm (latest release)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          tag=$(gh release view -R ktock/container2wasm --json tagName -q .tagName)
+          asset=$(gh release view "$tag" -R ktock/container2wasm --json assets -q '.assets[].name' | grep -E '^container2wasm-.*linux-amd64\.tar\.gz$' | head -1)
+          gh release download "$tag" -R ktock/container2wasm -p "$asset" -O c2w.tgz
+          mkdir c2wbin && tar -xzf c2w.tgz -C c2wbin
+          sudo install "$(find c2wbin -name c2w -type f | head -1)" /usr/local/bin/c2w
+          c2w --version
+          echo "C2W_TAG=$tag" >> "$GITHUB_ENV"
+
+      - name: Build the x86_64 image and convert it to a browser bundle
+        run: |
+          set -eu
+          printf 'FROM alpine:3.21\nRUN apk add --no-cache python3 git\n' | docker build --platform linux/amd64 -t wk-x64 -
+          docker run --rm --platform linux/amd64 wk-x64 sh -c 'uname -m; python3 -V; git --version'
+          mkdir -p out
+          start=$(date +%s)
+          c2w --to-js wk-x64 out/
+          echo "c2w --to-js took $(( $(date +%s) - start )) s"
+          ls -la out
+          du -sh out
+
+      - name: Add the page and the COOP/COEP service worker
+        run: |
+          set -eu
+          git clone -q --depth 1 "https://x-access-token:${TOK}@github.com/${REPO}.git" src
+          cp src/webvm/x64/index.html out/index.html
+          npm pack -s coi-serviceworker@0.1.7 >/dev/null
+          tar -xzf coi-serviceworker-0.1.7.tgz
+          cp package/coi-serviceworker.js out/
+          printf '{"c2w":"%s","image":"alpine:3.21 + python3 git","built":"%s"}\n' "$C2W_TAG" "$(date -u +%FT%TZ)" > out/manifest.json
+          find out -type f -size +95M -print -exec false {} + || { echo "a file is over the 100 MB push limit"; exit 1; }
+
+      - name: Publish as webvm/x64 beside the page
+        run: |
+          set -eu
+          git clone -q --depth 1 --branch gh-pages "https://x-access-token:${TOK}@github.com/${REPO}.git" pages
+          rm -rf pages/webvm/x64
+          mkdir -p pages/webvm
+          cp -r out pages/webvm/x64
+          cd pages
+          git config user.name "pages-relay"
+          git config user.email "pages-relay@users.noreply.github.com"
+          git add -A
+          git commit -q -m "webvm x64 $(date -u +%FT%TZ) c2w $C2W_TAG" || { echo "x64 unchanged"; exit 0; }
+          git push -q "https://x-access-token:${TOK}@github.com/${REPO}.git" gh-pages
+          echo "x64 published"
+
+      - name: Request a Pages build
+        env:
+          GH_TOKEN: ${{ env.TOK }}
+        run: |
+          set -u
+          gh api -X POST "repos/${REPO}/pages/builds" >/dev/null 2>&1 || true
+          for i in $(seq 1 40); do
+            s=$(gh api "repos/${REPO}/pages/builds/latest" -q .status 2>/dev/null || echo unknown)
+            echo "build status: $s"
+            [ "$s" = "built" ] && exit 0
+            [ "$s" = "errored" ] && exit 1
+            sleep 15
+          done
+          echo "build did not finish in 10 minutes"; exit 1
