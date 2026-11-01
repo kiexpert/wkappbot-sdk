@@ -5,6 +5,8 @@ name: private-portal-qa
 # instead of by a green tick. It opens no port and runs no tunnel.
 # The target repo is found by a sha256 prefix, never named; its name and every token are masked.
 # The portal selftest drives Playwright itself, so chromium is installed BEFORE it runs.
+# The probe reads the runtime base URL OUT OF the portal source: a hardcoded copy measured the old
+# address for a whole day after the page had already been fixed (2026-11-01).
 # SECRETS READ: WKAPPBOT_PAT, GH_LICENSE_TOKEN, WKAPPBOT_CORE_PAT (tried in that order).
 # A value that is empty or SET-ME counts as unset.
 on:
@@ -66,19 +68,24 @@ jobs:
         run: node site/poc-site/selftest.js
       - name: In-browser Linux probe
         run: |
+          PY_BASE=$(grep -ho "PYODIDE_URL *= *'[^']*'" site/poc-site/portal/modules/sim/sim.js | head -1 | sed "s/.*'\(.*\)'/\1/")
+          if [ -z "$PY_BASE" ]; then echo "could not read PYODIDE_URL from the portal source"; exit 1; fi
+          echo "runtime base under test: $PY_BASE"
+          export PY_BASE
           cat > weblinux.mjs <<'EOF'
           // How far the page's "Linux" runs: it is CPython on WASM (Pyodide), so the questions are
           // does it load, how fast, which packages arrive, what the virtual filesystem does, and
-          // what a browser can never give it. Measured on a clean network, never guessed.
+          // what a browser can never give it. Measured on a clean network, never guessed, and
+          // always against the base URL the PORTAL itself uses.
           import pw from 'playwright';
           const { chromium } = pw;
+          const base = process.env.PY_BASE;
           const b = await chromium.launch({ args: ['--no-sandbox'] });
           const p = await (await b.newContext()).newPage();
           await p.goto('https://example.com', { waitUntil: 'domcontentloaded' });
           const rows = [];
           const t0 = Date.now();
-          const ver = await p.evaluate(async () => {
-            const url = 'https://cdn.jsdelivr.net/npm/pyodide@0.26.4/';
+          const ver = await p.evaluate(async (url) => {
             await new Promise((res, rej) => {
               const s = document.createElement('script');
               s.src = url + 'pyodide.js'; s.onload = res; s.onerror = () => rej(new Error('pyodide.js'));
@@ -86,7 +93,7 @@ jobs:
             });
             window.py = await window.loadPyodide({ indexURL: url });
             return window.py.runPython('import sys; sys.version.split()[0]');
-          });
+          }, base);
           rows.push(['runtime loads', 'OK python ' + ver, Date.now() - t0]);
           async function probe(label, code, pkgs) {
             const a = Date.now();
@@ -110,7 +117,7 @@ jobs:
           await probe('threads (expected FAIL)', 'import threading; threading.Thread(target=lambda: None).start() or "started"');
           await b.close();
           const line = r => '| ' + r[0] + ' | ' + r[1] + ' | ' + r[2] + ' |';
-          const md = ['| probe | result | ms |', '| --- | --- | --- |'].concat(rows.map(line)).join('\n');
+          const md = ['runtime base: `' + base + '`', '', '| probe | result | ms |', '| --- | --- | --- |'].concat(rows.map(line)).join('\n');
           console.log(md);
           if (process.env.GITHUB_STEP_SUMMARY) {
             const fs = await import('fs');
