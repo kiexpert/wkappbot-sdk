@@ -53,7 +53,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -eu
-          tag=$(gh release view -R ktock/container2wasm --json tagName -q .tagName)
+          # The project marks no release as "latest" (gh release view without a tag says release not found), so take the newest listed.
+          gh release list -R ktock/container2wasm --limit 5
+          tag=$(gh release list -R ktock/container2wasm --limit 1 --json tagName -q '.[0].tagName')
           asset=$(gh release view "$tag" -R ktock/container2wasm --json assets -q '.assets[].name' | grep -E '^container2wasm-.*linux-amd64\.tar\.gz$' | head -1)
           gh release download "$tag" -R ktock/container2wasm -p "$asset" -O c2w.tgz
           mkdir c2wbin && tar -xzf c2w.tgz -C c2wbin
