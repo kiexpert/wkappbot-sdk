@@ -69,7 +69,11 @@ jobs:
           if [ -z "$tag" ]; then
             GOBIN=/tmp/gobin go install github.com/ktock/container2wasm/cmd/c2w@latest
             sudo install /tmp/gobin/c2w /usr/local/bin/c2w
-            tag="go-$(go version -m /tmp/gobin/c2w | awk '$1=="mod"{print $3; exit}')"
+            ver=$(go version -m /tmp/gobin/c2w | awk '$1=="mod"{print $3; exit}')
+            tag="go-$ver"
+            # c2w clones its build assets at its own tag from ktock/container2wasm, where that tag is gone (run 41358359646:
+            # "Remote branch v0.8.4 not found"); the module cache holds the same source, so hand it over with --assets.
+            echo "C2W_ASSETS=$(go env GOMODCACHE)/github.com/ktock/container2wasm@$ver" >> "$GITHUB_ENV"
             echo "c2w from the Go module proxy $tag"
           fi
           c2w --version
@@ -82,7 +86,7 @@ jobs:
           docker run --rm --platform linux/amd64 wk-x64 sh -c 'uname -m; python3 -V; git --version'
           mkdir -p out
           start=$(date +%s)
-          c2w --to-js wk-x64 out/
+          c2w ${C2W_ASSETS:+--assets "$C2W_ASSETS"} --to-js wk-x64 out/
           echo "c2w --to-js took $(( $(date +%s) - start )) s"
           ls -la out
           du -sh out
