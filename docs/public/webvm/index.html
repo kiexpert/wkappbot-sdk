@@ -86,9 +86,27 @@ const store = {
 function absorbUrlKeys() {
   const got = [];
   const src = [new URLSearchParams(location.hash.replace(/^#/, "")), new URLSearchParams(location.search)];
-  for (const p of src) for (const k of KEYS) { const alias = k === "claude" ? ["claude", "token"] : [k]; for (const a of alias) { const v = p.get(a); if (v) { store.set(k, v.trim()); got.push(k); } } }
+  for (const p of src) for (const k of KEYS.concat(["unlock"])) { const alias = k === "claude" ? ["claude", "token"] : k === "unlock" ? ["k", "unlock"] : [k]; for (const a of alias) { const v = p.get(a); if (v) { store.set(k, v.trim()); got.push(k); } } }
   if (got.length && history.replaceState) history.replaceState(null, "", location.pathname);
   return got;
+}
+// Sealed keys: the published build (webvm/seal.js) may carry the owner's model keys as AES-256-GCM ciphertext.
+// The unlock key comes only from this browser (#k= once, then localStorage); without it the blob stays closed.
+const b64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+async function unseal() {
+  const el = document.getElementById("webvm-sealed");
+  if (!el) return { st: "SKIP", note: "this build carries no sealed keys" };
+  const pass = store.get("unlock");
+  if (!pass) return { st: "SKIP", note: "sealed keys present; open the owner's link once (#k=...) to unlock" };
+  const s = JSON.parse(el.textContent);
+  const base = await crypto.subtle.importKey("raw", new TextEncoder().encode(pass), "PBKDF2", false, ["deriveKey"]);
+  const key = await crypto.subtle.deriveKey({ name: "PBKDF2", salt: b64(s.salt), iterations: s.iter, hash: "SHA-256" }, base, { name: "AES-GCM", length: 256 }, false, ["decrypt"]);
+  let plain;
+  try { plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: b64(s.iv) }, key, b64(s.ct)); }
+  catch (e) { return { st: "FAIL", note: "unlock key does not open this build" }; }
+  const keys = JSON.parse(new TextDecoder().decode(plain));
+  for (const [k, v] of Object.entries(keys)) if (KEYS.includes(k)) store.set(k, v);
+  return { st: "PASS", note: "unsealed " + Object.keys(keys).join(",") };
 }
 function mask(v) { return v ? v.slice(0, 7) + "…" + v.slice(-4) : ""; }
 
@@ -200,6 +218,7 @@ function bootVm() {
 // ---- the check list ----
 const R = {
   urlkeys: row("keys.url-scrub", "키가 URL에서 지워짐"),
+  unseal: row("keys.unseal", "봉인된 구독키 열기"),
   vm: row("vm.boot", "웹 안 리눅스 PC 부팅 (v86)"),
   intentLocal: row("intent.rules", "의도락 규칙 (조사 보정·3칸)"),
   ksearch: row("knowledge.search", "지식: 스킬 서치"),
@@ -271,11 +290,12 @@ setInterval(() => { document.getElementById("clock").textContent = new Date().to
 const absorbed = absorbUrlKeys();
 R.urlkeys.st = absorbed.length ? ((location.hash || location.search) ? "FAIL" : "PASS") : "SKIP";
 R.urlkeys.note = absorbed.length ? `absorbed ${absorbed.join(",")}; url now ${location.pathname}` : "no key in URL";
-initKeys(); initWindows(); initTheme(); render();
-document.getElementById("run").addEventListener("click", () => runAll());
+initWindows(); initTheme(); render();
+const unsealed = timed(R.unseal, unseal).then(() => initKeys());
+document.getElementById("run").addEventListener("click", () => unsealed.then(() => runAll()));
 document.getElementById("copy").addEventListener("click", async () => { try { await navigator.clipboard.writeText(reportText()); } catch (e) {} });
-window.WebVMQA = { runAll, reportText, checkSearch, checkChain, store, absorbUrlKeys };
-if (/autorun=1/.test(location.search + location.hash)) runAll();
+window.WebVMQA = { runAll: o => unsealed.then(() => runAll(o)), reportText, checkSearch, checkChain, store, absorbUrlKeys, unsealed };
+if (/autorun=1/.test(location.search + location.hash)) unsealed.then(() => runAll());
 </script>
 </body>
 </html>

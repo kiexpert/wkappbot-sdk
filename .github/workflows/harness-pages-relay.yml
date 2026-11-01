@@ -1,0 +1,125 @@
+name: harness-pages-relay
+
+# Publishes the harness web pages (the WebVM QA page) of one private repo of this account on that
+# repo's own GitHub Pages, with the owner's model keys SEALED into the page (AES-256-GCM; the unlock
+# key travels only in the owner's link hash). Only the Actions run here (public runners are free).
+# The target repo is never named in this public file or its logs: it is found by a sha256 prefix.
+# GitHub has no "secret changed" event, so an hourly run compares a fingerprint of page + secrets with
+# the one already published and rebuilds only when it differs; a manual dispatch always rebuilds.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/harness-pages-relay.yml
+  schedule:
+    - cron: '41 * * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: harness-pages-relay
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      TARGET_HASH: 23ade98d428c8527
+      T1: ${{ secrets.GH_LICENSE_TOKEN }}
+      T2: ${{ secrets.WKAPPBOT_PAT }}
+      T3: ${{ secrets.WKAPPBOT_CORE_PAT }}
+    steps:
+      - name: Find the target repo and a token that can reach it
+        run: |
+          set -u
+          for t in "$T1" "$T2" "$T3"; do
+            [ -n "$t" ] || continue
+            names=$(GH_TOKEN="$t" gh repo list kiexpert --visibility private --limit 300 --json nameWithOwner -q '.[].nameWithOwner' 2>/dev/null || true)
+            for n in $names; do
+              if [ "$(printf %s "$n" | sha256sum | cut -c1-16)" = "$TARGET_HASH" ]; then
+                echo "::add-mask::$n"
+                echo "::add-mask::${n#*/}"
+                echo "::add-mask::$t"
+                { echo "REPO=$n"; echo "TOK=$t"; } >> "$GITHUB_ENV"
+                echo "target found"
+                exit 0
+              fi
+            done
+          done
+          echo "no token reaches the target repo"; exit 1
+
+      - name: Ensure the unlock key (made once, kept as a secret here, link handed over privately)
+        env:
+          K: ${{ secrets.WEBVM_KEY }}
+        run: |
+          set -u
+          if [ -n "$K" ]; then
+            echo "::add-mask::$K"; echo "WEBVM_KEY=$K" >> "$GITHUB_ENV"; echo "unlock key present"; exit 0
+          fi
+          K=$(openssl rand -base64 33 | tr '+/' '-_' | tr -d '=\n')
+          echo "::add-mask::$K"
+          stored=""
+          for t in "$T1" "$T2" "$T3"; do
+            [ -n "$t" ] || continue
+            if printf %s "$K" | GH_TOKEN="$t" gh secret set WEBVM_KEY --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then stored=yes; break; fi
+          done
+          if [ -z "$stored" ]; then echo "no token can store the unlock key; this build stays unsealed"; exit 0; fi
+          echo "WEBVM_KEY=$K" >> "$GITHUB_ENV"
+          name="${REPO#*/}"
+          printf 'The harness WebVM QA page opens with your model keys after one visit to this link (the part after # never reaches a server and is wiped from the address bar at once):\n\nhttps://kiexpert.github.io/%s/webvm/#k=%s\n\nKeep this issue private; close it after the first visit if you like.\n' "$name" "$K" > body.md
+          GH_TOKEN="$TOK" gh issue create --repo "$REPO" --title "[webvm] unlock link" --body-file body.md >/dev/null && echo "unlock link handed over" || echo "unlock link issue failed"
+          rm -f body.md
+
+      - name: Build the sealed page and compare its fingerprint
+        env:
+          WEBVM_CLAUDE: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          WEBVM_GEMINI: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          set -eu
+          git clone -q --depth 1 "https://x-access-token:${TOK}@github.com/${REPO}.git" src
+          test -f src/webvm/index.html && test -f src/webvm/seal.js
+          mkdir -p built
+          node src/webvm/seal.js src/webvm/index.html built/index.html | tee seal.log
+          fp=$(sed -n 's/^FINGERPRINT //p' seal.log)
+          if git clone -q --depth 1 --branch gh-pages "https://x-access-token:${TOK}@github.com/${REPO}.git" pages 2>/dev/null; then
+            old=$(cat pages/webvm/FINGERPRINT 2>/dev/null || true)
+          else
+            mkdir pages && git -C pages init -q -b gh-pages; old=""
+          fi
+          if [ "$fp" = "$old" ] && [ "$GITHUB_EVENT_NAME" != "workflow_dispatch" ]; then
+            echo "unchanged ($fp); nothing to publish"; echo "SKIP=1" >> "$GITHUB_ENV"; exit 0
+          fi
+          mkdir -p pages/webvm
+          cp built/index.html pages/webvm/index.html
+          printf %s "$fp" > pages/webvm/FINGERPRINT
+          touch pages/.nojekyll
+          [ -f pages/index.html ] || printf '<!doctype html><meta charset="utf-8"><meta http-equiv="refresh" content="0; url=webvm/"><title>Harness</title><a href="webvm/">WebVM QA</a>\n' > pages/index.html
+          cd pages
+          git config user.name "pages-relay"
+          git config user.email "pages-relay@users.noreply.github.com"
+          git add -A
+          git commit -q -m "publish webvm $(date -u +%FT%TZ) fp $fp" || { echo "nothing new to commit"; exit 0; }
+          git push -q "https://x-access-token:${TOK}@github.com/${REPO}.git" gh-pages
+          echo "published fp $fp"
+
+      - name: Turn on Pages from gh-pages and request a build
+        if: env.SKIP != '1'
+        env:
+          GH_TOKEN: ${{ env.TOK }}
+        run: |
+          set -u
+          gh api -X POST "repos/${REPO}/pages" -f 'source[branch]=gh-pages' -f 'source[path]=/' >/dev/null 2>&1 \
+            || gh api -X PUT "repos/${REPO}/pages" -f 'source[branch]=gh-pages' -f 'source[path]=/' >/dev/null 2>&1 \
+            || echo "pages source call failed (status below)"
+          gh api -X POST "repos/${REPO}/pages/builds" >/dev/null 2>&1 || true
+          for i in $(seq 1 30); do
+            s=$(gh api "repos/${REPO}/pages/builds/latest" -q .status 2>/dev/null || echo unknown)
+            echo "build status: $s"
+            [ "$s" = "built" ] && exit 0
+            [ "$s" = "errored" ] && exit 1
+            sleep 10
+          done
+          echo "build did not finish in 5 minutes"; exit 1
