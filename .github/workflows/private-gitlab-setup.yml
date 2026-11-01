@@ -1,0 +1,203 @@
+name: private-gitlab-setup
+
+# Sets up the owner's own GitLab project and gives it a working CI/CD pipeline, including a job that
+# screenshots the running app from inside the runner (a container, so the same job text runs on a
+# Kubernetes-executor runner) and publishes the images as artifacts the portal can show.
+# Idempotent: it creates what is missing and updates what exists, so it is safe to re-run.
+# It reads ONE secret, GITLAB_TOKEN. Empty or SET-ME means "not set yet" and the job says so and stops
+# green, because a missing credential is the owner's step, never a failure of this pipeline.
+# The token is masked, never printed, and never written into a file that is committed.
+on:
+  workflow_dispatch:
+    inputs:
+      project_path:
+        description: 'GitLab project full path (namespace/name)'
+        required: false
+        default: 'kiexpert-group/clush-poc'
+  schedule:
+    - cron: '23 22 * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: private-gitlab-setup
+  cancel-in-progress: false
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      GL: https://gitlab.com
+      GLTOK: ${{ secrets.GITLAB_TOKEN }}
+      PROJECT_PATH: ${{ github.event.inputs.project_path || 'kiexpert-group/clush-poc' }}
+    steps:
+      - name: Is the GitLab token set
+        id: gate
+        run: |
+          if [ -z "$GLTOK" ] || [ "$GLTOK" = "SET-ME" ]; then
+            echo "GITLAB_TOKEN is not set yet -- nothing to do. The owner (or the docs root) stores the"
+            echo "glpat value in this repo's secret GITLAB_TOKEN, then re-runs this workflow."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "::add-mask::$GLTOK"
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Who the token belongs to, and what it may do
+        if: steps.gate.outputs.ready == 'true'
+        run: |
+          set -e
+          code=$(curl -s -o /tmp/me.json -w '%{http_code}' -H "PRIVATE-TOKEN: $GLTOK" "$GL/api/v4/user")
+          if [ "$code" != "200" ]; then echo "GET /user returned $code -- the token is wrong, expired or lacks api scope"; exit 1; fi
+          python3 - <<'EOF'
+          import json
+          me = json.load(open('/tmp/me.json'))
+          print('user:', me.get('username'), '| id:', me.get('id'), '| bot:', me.get('bot'))
+          EOF
+          scopes=$(curl -s -H "PRIVATE-TOKEN: $GLTOK" "$GL/api/v4/personal_access_tokens/self" | python3 -c "import sys,json; d=json.load(sys.stdin); print(','.join(d.get('scopes',[])), '| expires:', d.get('expires_at'))" 2>/dev/null || echo "scope read not permitted")
+          echo "scopes: $scopes"
+      - name: Ensure the project exists
+        if: steps.gate.outputs.ready == 'true'
+        run: |
+          set -e
+          ns="${PROJECT_PATH%/*}"; name="${PROJECT_PATH##*/}"
+          enc=$(python3 -c "import urllib.parse,os;print(urllib.parse.quote(os.environ['PROJECT_PATH'],safe=''))")
+          code=$(curl -s -o /tmp/p.json -w '%{http_code}' -H "PRIVATE-TOKEN: $GLTOK" "$GL/api/v4/projects/$enc")
+          if [ "$code" = "200" ]; then
+            echo "project exists"
+          else
+            nsid=$(curl -s -H "PRIVATE-TOKEN: $GLTOK" "$GL/api/v4/namespaces?search=$ns" | python3 -c "import sys,json;d=json.load(sys.stdin);print(d[0]['id'] if d else '')")
+            if [ -z "$nsid" ]; then echo "namespace $ns not found for this token"; exit 1; fi
+            curl -s -o /tmp/p.json -w 'create: %{http_code}\n' -X POST -H "PRIVATE-TOKEN: $GLTOK" \
+              --data-urlencode "name=$name" --data-urlencode "path=$name" --data "namespace_id=$nsid&visibility=private&initialize_with_readme=true" \
+              "$GL/api/v4/projects"
+          fi
+          python3 - <<'EOF'
+          import json
+          p = json.load(open('/tmp/p.json'))
+          print('project id:', p.get('id'), '| web:', p.get('web_url'), '| default branch:', p.get('default_branch'))
+          open('/tmp/pid','w').write(str(p.get('id')))
+          EOF
+          echo "PID=$(cat /tmp/pid)" >> "$GITHUB_ENV"
+      - name: Fetch the CI/CD template set
+        if: steps.gate.outputs.ready == 'true'
+        run: git clone -q --depth 1 https://github.com/kiexpert/clush-cicd-templates.git templates
+      - name: Push the templates and a pipeline that screenshots the app
+        if: steps.gate.outputs.ready == 'true'
+        run: |
+          set -e
+          enc=$(python3 -c "import urllib.parse,os;print(urllib.parse.quote(os.environ['PROJECT_PATH'],safe=''))")
+          branch=$(curl -s -H "PRIVATE-TOKEN: $GLTOK" "$GL/api/v4/projects/$enc" | python3 -c "import sys,json;print(json.load(sys.stdin).get('default_branch') or 'main')")
+          git clone -q "https://oauth2:${GLTOK}@gitlab.com/${PROJECT_PATH}.git" work
+          rm -rf work/cicd-templates
+          mkdir -p work/cicd-templates
+          cp -r templates/. work/cicd-templates/
+          rm -rf work/cicd-templates/.git
+          cat > work/.gitlab-ci.yml <<'EOF'
+          # Demo pipeline for the Clush PoC. Every job runs in a container, so the same file works on a
+          # shared runner and on a Kubernetes-executor runner (one pod per job) with no change.
+          stages: [build, test, shot, deploy]
+
+          variables:
+            GIT_DEPTH: "20"
+
+          build:
+            stage: build
+            image: node:22-alpine
+            script:
+              - echo "building the demo app"
+              - mkdir -p public
+              - |
+                cat > public/index.html <<'HTML'
+                <!doctype html><html lang="ko"><head><meta charset="utf-8">
+                <title>Clush PoC</title><style>
+                body{margin:0;font:16px/1.5 system-ui,sans-serif;background:#0d1117;color:#c9d1d9;
+                display:flex;align-items:center;justify-content:center;height:100vh}
+                .card{padding:40px 56px;border:1px solid #30363d;border-radius:14px;background:#161b22}
+                h1{margin:0 0 8px;font-size:28px}.ok{color:#7ee787}
+                </style></head><body><div class="card">
+                <h1>Clush PoC</h1><p>GitLab CI/CD pipeline <span class="ok">green</span></p>
+                <p id="t"></p></div>
+                <script>document.getElementById('t').textContent=new Date().toISOString()</script>
+                </body></html>
+                HTML
+            artifacts:
+              paths: [public]
+              expire_in: 1 week
+
+          test:
+            stage: test
+            image: node:22-alpine
+            script:
+              - test -s public/index.html
+              - echo "smoke ok"
+
+          screenshot:
+            stage: shot
+            # The screenshot of what the runner is running: a headless browser inside the job pod.
+            image: mcr.microsoft.com/playwright:v1.49.1-jammy
+            script:
+              - npx --yes http-server public -p 8080 &
+              - sleep 3
+              - |
+                cat > shot.mjs <<'MJS'
+                import { chromium } from 'playwright';
+                const b = await chromium.launch({ args: ['--no-sandbox'] });
+                for (const [name, w, h] of [['desktop',1440,900],['phone',390,844]]) {
+                  const p = await (await b.newContext({ viewport:{width:w,height:h} })).newPage();
+                  await p.goto('http://127.0.0.1:8080/', { waitUntil:'networkidle' });
+                  await p.screenshot({ path: `shots/${name}.png` });
+                }
+                await b.close();
+                console.log('screenshots written');
+                MJS
+              - mkdir -p shots && node shot.mjs
+            artifacts:
+              paths: [shots]
+              expire_in: 1 week
+
+          deploy:
+            stage: deploy
+            image: alpine:3.20
+            script:
+              - echo "deploying $CI_COMMIT_SHORT_SHA from runner $CI_RUNNER_DESCRIPTION"
+            environment:
+              name: demo
+          EOF
+          cd work
+          git config user.email "relay-bot@users.noreply.github.com"
+          git config user.name "relay-bot"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "nothing to push: the project already carries this exact setup"
+          else
+            git commit -qm "ci: Clush PoC pipeline (build, smoke, runner screenshots, deploy) + CI/CD template set"
+            git push -q origin "HEAD:$branch"
+            echo "pushed to $branch"
+          fi
+      - name: Wait for the pipeline and report it
+        if: steps.gate.outputs.ready == 'true'
+        run: |
+          set -e
+          enc=$(python3 -c "import urllib.parse,os;print(urllib.parse.quote(os.environ['PROJECT_PATH'],safe=''))")
+          for i in $(seq 1 30); do
+            pl=$(curl -s -H "PRIVATE-TOKEN: $GLTOK" "$GL/api/v4/projects/$enc/pipelines?per_page=1")
+            st=$(printf '%s' "$pl" | python3 -c "import sys,json;d=json.load(sys.stdin);print(d[0]['status'] if d else 'none')")
+            id=$(printf '%s' "$pl" | python3 -c "import sys,json;d=json.load(sys.stdin);print(d[0]['id'] if d else '')")
+            url=$(printf '%s' "$pl" | python3 -c "import sys,json;d=json.load(sys.stdin);print(d[0]['web_url'] if d else '')")
+            echo "pipeline $id: $st"
+            case "$st" in success|failed|canceled|skipped|none) break;; esac
+            sleep 20
+          done
+          {
+            echo "## GitLab setup"
+            echo ""
+            echo "- project: \`$PROJECT_PATH\`"
+            echo "- pipeline: $id ($st) $url"
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ -n "$id" ]; then
+            curl -s -H "PRIVATE-TOKEN: $GLTOK" "$GL/api/v4/projects/$enc/pipelines/$id/jobs" \
+              | python3 -c "import sys,json;[print('job:', j['name'], j['status'], '| runner:', (j.get('runner') or {}).get('description'), '| artifacts:', bool(j.get('artifacts')))  for j in json.load(sys.stdin)]"
+          fi
+          if [ "$st" = "failed" ]; then echo "the pipeline failed -- read the job log above"; exit 1; fi
