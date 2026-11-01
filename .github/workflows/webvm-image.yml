@@ -1,0 +1,89 @@
+name: webvm-image
+
+# Builds the WebVM Docker-like image -- an Alpine i386 root with python3, git, curl, nodejs and github-cli as a v86
+# 9p filesystem plus a saved machine state that restores a root shell instantly -- for one private repo of this
+# account, and publishes it beside that repo's WebVM page (gh-pages webvm/image/). The builder lives in the target repo
+# (webvm/image-build/); this public file only runs it on a free public runner. The target repo is never named here or
+# in the logs: it is found by a sha256 prefix, exactly as in harness-pages-relay.yml.
+on:
+  workflow_dispatch:
+  push:
+    branches: ['**']
+    paths:
+      - .github/workflows/webvm-image.yml
+
+permissions:
+  contents: read
+
+# Shares the relay's lock: both jobs push the same gh-pages branch.
+concurrency:
+  group: harness-pages-relay
+  cancel-in-progress: false
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      TARGET_HASH: 23ade98d428c8527
+      T1: ${{ secrets.GH_LICENSE_TOKEN }}
+      T2: ${{ secrets.WKAPPBOT_PAT }}
+      T3: ${{ secrets.WKAPPBOT_CORE_PAT }}
+    steps:
+      - name: Find the target repo and a token that can reach it
+        run: |
+          set -u
+          for t in "$T1" "$T2" "$T3"; do
+            [ -n "$t" ] || continue
+            names=$(GH_TOKEN="$t" gh repo list kiexpert --visibility private --limit 300 --json nameWithOwner -q '.[].nameWithOwner' 2>/dev/null || true)
+            for n in $names; do
+              if [ "$(printf %s "$n" | sha256sum | cut -c1-16)" = "$TARGET_HASH" ]; then
+                echo "::add-mask::$n"
+                echo "::add-mask::${n#*/}"
+                echo "::add-mask::$t"
+                { echo "REPO=$n"; echo "TOK=$t"; } >> "$GITHUB_ENV"
+                echo "target found"
+                exit 0
+              fi
+            done
+          done
+          echo "no token reaches the target repo"; exit 1
+
+      - name: Build the image (boot once, prove the tools, save the state, restore it and prove again)
+        run: |
+          set -eu
+          git clone -q --depth 1 "https://x-access-token:${TOK}@github.com/${REPO}.git" src
+          sudo apt-get install -y -qq python3-zstandard >/dev/null
+          sudo -E env "PATH=$PATH" bash src/webvm/image-build/build-image.sh "$PWD/image"
+          sudo chown -R "$(id -u):$(id -g)" image
+          cat image/manifest.json
+
+      - name: Publish beside the page
+        run: |
+          set -eu
+          git clone -q --depth 1 --branch gh-pages "https://x-access-token:${TOK}@github.com/${REPO}.git" pages
+          rm -rf pages/webvm/image
+          mkdir -p pages/webvm
+          cp -r image pages/webvm/image
+          cd pages
+          git config user.name "pages-relay"
+          git config user.email "pages-relay@users.noreply.github.com"
+          git add -A
+          git commit -q -m "webvm image $(date -u +%FT%TZ)" || { echo "image unchanged"; exit 0; }
+          git push -q "https://x-access-token:${TOK}@github.com/${REPO}.git" gh-pages
+          echo "image published"
+
+      - name: Request a Pages build
+        env:
+          GH_TOKEN: ${{ env.TOK }}
+        run: |
+          set -u
+          gh api -X POST "repos/${REPO}/pages/builds" >/dev/null 2>&1 || true
+          for i in $(seq 1 40); do
+            s=$(gh api "repos/${REPO}/pages/builds/latest" -q .status 2>/dev/null || echo unknown)
+            echo "build status: $s"
+            [ "$s" = "built" ] && exit 0
+            [ "$s" = "errored" ] && exit 1
+            sleep 15
+          done
+          echo "build did not finish in 10 minutes"; exit 1
