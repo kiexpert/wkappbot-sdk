@@ -86,7 +86,9 @@ jobs:
           docker run --rm --platform linux/amd64 wk-x64 sh -c 'uname -m; python3 -V; git --version'
           mkdir -p out
           start=$(date +%s)
-          c2w ${C2W_ASSETS:+--assets "$C2W_ASSETS"} --to-js wk-x64 out/
+          # The Dockerfile clones its assets with git clone -b $SOURCE_REPO_VERSION; the release tag is gone upstream
+          # (runs 41358359646, 41358891316), the repo itself still clones, so build from its main branch.
+          c2w --build-arg SOURCE_REPO_VERSION=main --to-js wk-x64 out/
           echo "c2w --to-js took $(( $(date +%s) - start )) s"
           ls -la out
           du -sh out
