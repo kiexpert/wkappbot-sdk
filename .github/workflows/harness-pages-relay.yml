@@ -81,10 +81,10 @@ jobs:
         run: |
           set -eu
           git clone -q --depth 1 "https://x-access-token:${TOK}@github.com/${REPO}.git" src
-          test -f src/webvm/index.html && test -f src/webvm/seal.js
+          test -f src/webvm/index.html && test -f src/webvm/qa.html && test -f src/webvm/seal.js
           mkdir -p built
-          node src/webvm/seal.js src/webvm/index.html built/index.html | tee seal.log
-          fp=$(sed -n 's/^FINGERPRINT //p' seal.log)
+          node src/webvm/seal.js src/webvm/qa.html built/qa.html | tee seal.log
+          fp=$( { sed -n 's/^FINGERPRINT //p' seal.log; sha256sum < src/webvm/index.html; } | sha256sum | cut -c1-12)
           if git clone -q --depth 1 --branch gh-pages "https://x-access-token:${TOK}@github.com/${REPO}.git" pages 2>/dev/null; then
             old=$(cat pages/webvm/FINGERPRINT 2>/dev/null || true)
           else
@@ -94,7 +94,8 @@ jobs:
             echo "unchanged ($fp); nothing to publish"; echo "SKIP=1" >> "$GITHUB_ENV"; exit 0
           fi
           mkdir -p pages/webvm
-          cp built/index.html pages/webvm/index.html
+          cp src/webvm/index.html pages/webvm/index.html
+          cp built/qa.html pages/webvm/qa.html
           printf %s "$fp" > pages/webvm/FINGERPRINT
           touch pages/.nojekyll
           [ -f pages/index.html ] || printf '<!doctype html><meta charset="utf-8"><meta http-equiv="refresh" content="0; url=webvm/"><title>Harness</title><a href="webvm/">WebVM QA</a>\n' > pages/index.html
