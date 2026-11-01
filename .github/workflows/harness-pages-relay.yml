@@ -4,8 +4,9 @@ name: harness-pages-relay
 # repo's own GitHub Pages, with the owner's model keys SEALED into the page (AES-256-GCM; the unlock
 # key travels only in the owner's link hash). Only the Actions run here (public runners are free).
 # The target repo is never named in this public file or its logs: it is found by a sha256 prefix.
-# GitHub has no "secret changed" event, so an hourly run compares a fingerprint of page + secrets with
-# the one already published and rebuilds only when it differs; a manual dispatch always rebuilds.
+# GitHub has no "secret changed" event and a private repo's push cannot wake a public repo's workflow, so
+# a run every 15 minutes compares a fingerprint of page + secrets with the one already published and
+# rebuilds only when either changed (a harness page change or a renewed key); a manual dispatch always rebuilds.
 on:
   workflow_dispatch:
   push:
@@ -13,7 +14,7 @@ on:
     paths:
       - .github/workflows/harness-pages-relay.yml
   schedule:
-    - cron: '41 * * * *'
+    - cron: '*/15 * * * *'
 
 permissions:
   contents: read

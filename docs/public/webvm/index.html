@@ -32,7 +32,8 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font:14px/1.
 #screen > div{white-space:pre;padding:4px} #screen canvas{display:none}
 #vmstatus{position:absolute;right:8px;top:6px;color:var(--dim);font-size:12px}
 table{border-collapse:collapse;width:100%;font-size:13px} td,th{border-bottom:1px solid var(--line);padding:4px 6px;text-align:left;vertical-align:top}
-.st{font-weight:700} .PASS{color:var(--ok)} .FAIL{color:var(--bad)} .SKIP{color:var(--skip)} .RUN{color:var(--acc)}
+.st{font-weight:700} .PASS{color:var(--ok)} .FAIL{color:var(--bad)} .SKIP{color:var(--skip)} .RUN{color:var(--acc)} .LOGIN{color:var(--acc)}
+#login-links div{margin:6px 0} #login-links a{color:var(--acc);word-break:break-all}
 .mono{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;color:var(--dim);word-break:break-all}
 label{display:block;margin:4px 0 2px;color:var(--dim);font-size:12px}
 input{width:100%;background:var(--panel2);color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:5px 7px;font:inherit}
@@ -61,6 +62,8 @@ input{width:100%;background:var(--panel2);color:var(--fg);border:1px solid var(-
       <div><label>Muse (브라우저 API 없음)</label><input id="k-muse" type="password" autocomplete="off" disabled placeholder="쿠키 로그인 CLI라 브라우저에서 못 불러요"></div>
       <div><label>GitHub 토큰 (선택, 속도 제한 완화)</label><input id="k-gh" type="password" autocomplete="off"></div>
     </div>
+    <div id="login-links"></div>
+    <p class="mono">GitHub 토큰이 kiexpert 계정이면 봉인된 구독키가 저절로 채워져요. 다른 계정이면 열리지 않아요.</p>
     <p class="mono">링크로 넣기: …/webvm/#claude=TOKEN&amp;openai=KEY&amp;xai=KEY — 해시(#)는 서버로 가지 않고, 읽자마자 주소창에서 지워져 이 브라우저의 localStorage에만 남아요. 소스에는 어떤 키도 없어요.</p>
   </div></section>
   <section class="win" id="w-intent"><div class="bar"><i></i><i></i><i></i> 의도락 · 지식화 (웹대변인)</div><div class="body">
@@ -93,11 +96,38 @@ function absorbUrlKeys() {
 // Sealed keys: the published build (webvm/seal.js) may carry the owner's model keys as AES-256-GCM ciphertext.
 // The unlock key comes only from this browser (#k= once, then localStorage); without it the blob stays closed.
 const b64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+// GitHub identity: a GitHub token in this browser is checked with GET /user. Only the OWNER account may
+// fetch the unlock key, which lives in a PRIVATE issue of the repo serving this page, so GitHub itself
+// decides who can read it; any other login is refused and nothing is unsealed.
+const OWNER = "kiexpert";
+let ghLogin = "";
+async function githubIdentity() {
+  const gh = store.get("gh"); if (!gh) return "";
+  const res = await fetch("https://api.github.com/user", { headers: { authorization: "Bearer " + gh } });
+  if (!res.ok) return "";
+  ghLogin = String((await res.json()).login || "");
+  return ghLogin;
+}
+function pagesRepo() {
+  const m = location.hostname.match(/^([\w-]+)\.github\.io$/); const seg = location.pathname.split("/").filter(Boolean)[0];
+  return m && seg ? `${m[1]}/${seg}` : "";
+}
+async function fetchUnlockFromIssue() {
+  const repo = pagesRepo(); const gh = store.get("gh"); if (!repo || !gh) return "";
+  const res = await fetch(`https://api.github.com/repos/${repo}/issues?state=all&per_page=50`, { headers: { authorization: "Bearer " + gh } });
+  if (!res.ok) return "";
+  const hit = (await res.json()).find(i => i.title === "[webvm] unlock link");
+  const m = hit && String(hit.body || "").match(/#k=([\w-]+)/);
+  return m ? m[1] : "";
+}
 async function unseal() {
   const el = document.getElementById("webvm-sealed");
   if (!el) return { st: "SKIP", note: "this build carries no sealed keys" };
+  let who = ""; try { who = await githubIdentity(); } catch (e) { who = ""; }
+  if (who && who !== OWNER) return { st: "FAIL", note: `GitHub login ${who} is not ${OWNER}; sealed keys stay closed` };
+  if (who === OWNER && !store.get("unlock")) { try { const k = await fetchUnlockFromIssue(); if (k) store.set("unlock", k); } catch (e) {} }
   const pass = store.get("unlock");
-  if (!pass) return { st: "SKIP", note: "sealed keys present; open the owner's link once (#k=...) to unlock" };
+  if (!pass) return { st: "SKIP", note: `sealed keys present; sign in as ${OWNER} (GitHub token) or open the owner's link once` };
   const s = JSON.parse(el.textContent);
   const base = await crypto.subtle.importKey("raw", new TextEncoder().encode(pass), "PBKDF2", false, ["deriveKey"]);
   const key = await crypto.subtle.deriveKey({ name: "PBKDF2", salt: b64(s.salt), iterations: s.iter, hash: "SHA-256" }, base, { name: "AES-GCM", length: 256 }, false, ["decrypt"]);
@@ -106,7 +136,7 @@ async function unseal() {
   catch (e) { return { st: "FAIL", note: "unlock key does not open this build" }; }
   const keys = JSON.parse(new TextDecoder().decode(plain));
   for (const [k, v] of Object.entries(keys)) if (KEYS.includes(k)) store.set(k, v);
-  return { st: "PASS", note: "unsealed " + Object.keys(keys).join(",") };
+  return { st: "PASS", note: "unsealed " + Object.keys(keys).join(",") + (who ? ` for GitHub ${who}` : "") };
 }
 function mask(v) { return v ? v.slice(0, 7) + "…" + v.slice(-4) : ""; }
 
@@ -141,7 +171,8 @@ function esc(s) { return String(s).replace(/[&<>]/g, c => ({ "&": "&amp;", "<": 
 function render() {
   document.getElementById("rows").innerHTML = rows.map(r => `<tr><td>${esc(r.title)}<div class="mono">${r.id}</div></td><td class="st ${r.st}">${r.st}</td><td class="mono">${esc(r.note)}</td></tr>`).join("");
   const p = rows.filter(r => r.st === "PASS").length, f = rows.filter(r => r.st === "FAIL").length, k = rows.filter(r => r.st === "SKIP").length;
-  document.getElementById("summary").textContent = `RESULT ${p}/${p + f} (skip ${k})`;
+  const lg = rows.filter(r => r.st === "LOGIN").length;
+  document.getElementById("summary").textContent = `RESULT ${p}/${p + f} (skip ${k})` + (lg ? ` login ${lg}` : "") + (ghLogin ? ` github ${ghLogin}` : "");
 }
 async function timed(r, fn) { r.st = "RUN"; render(); const t = performance.now(); try { const res = await fn(); r.st = res.st; r.note = `${res.note} (${Math.round(performance.now() - t)} ms)`; } catch (e) { r.st = "FAIL"; r.note = String(e && e.message || e); } render(); }
 
@@ -163,6 +194,27 @@ async function geminiAsk(key, prompt) {
   const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODELS.gemini}:generateContent?key=${encodeURIComponent(key)}`, { method: "POST", headers: { "content-type": "text/plain" }, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }) });
   const j = await res.json(); if (!res.ok) throw new Error(res.status + " " + (j.error && j.error.message || ""));
   const c = (j.candidates || [])[0]; return c && c.content ? c.content.parts.map(p => p.text || "").join("") : "";
+}
+// A family with no key is still RUN: the call goes out without a key, the refusal status is shown, and the
+// page prints where that family's login or key comes from, so the owner can finish the login from his phone.
+const LOGIN = {
+  claude: { name: "Claude", url: "https://claude.ai/login", how: "구독 토큰: 클라우드 VM에서 claude setup-token 실행 후 나온 링크로 로그인 (API 키는 https://console.anthropic.com/settings/keys)" },
+  openai: { name: "Codex/OpenAI", url: "https://auth.openai.com/codex/device", how: "codex login --device-auth 가 보여주는 코드를 이 주소에 입력 (API 키는 https://platform.openai.com/api-keys)" },
+  gemini: { name: "Agy/Gemini", url: "https://aistudio.google.com/apikey", how: "Google 계정으로 로그인 후 API 키 만들기" },
+  xai: { name: "Grok/xAI", url: "https://console.x.ai", how: "xAI 콘솔에서 API 키 만들기" }
+};
+const loginShown = new Set();
+function showLogin(k, status) {
+  loginShown.add(k);
+  const box = document.getElementById("login-links"); if (!box) return;
+  box.innerHTML = [...loginShown].map(x => `<div><b>${esc(LOGIN[x].name)}</b> — 키 없이 실행: ${esc(String(status))} → <a href="${LOGIN[x].url}" target="_blank" rel="noopener">${LOGIN[x].url}</a><div class="mono">${esc(LOGIN[x].how)}</div></div>`).join("");
+}
+async function probeWithoutKey(k) {
+  const urls = { claude: ["https://api.anthropic.com/v1/messages", { method: "POST", headers: { "content-type": "application/json", "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" }, body: "{}" }], openai: ["https://api.openai.com/v1/models", {}], gemini: ["https://generativelanguage.googleapis.com/v1beta/models", {}], xai: ["https://api.x.ai/v1/models", {}] };
+  let status = "no answer";
+  try { const r = await fetch(urls[k][0], urls[k][1]); status = "HTTP " + r.status; } catch (e) { status = "blocked (" + String(e.message || e).slice(0, 30) + ")"; }
+  showLogin(k, status);
+  return { st: "LOGIN", note: `${status} without a key; login: ${LOGIN[k].url}` };
 }
 const PING = "Reply with the single word PONG.";
 const pong = t => /PONG/i.test(t) ? { st: "PASS", note: "PONG" } : { st: "FAIL", note: "answer: " + String(t).slice(0, 60) };
@@ -260,9 +312,18 @@ async function runAll(opts) {
       const verbatim = step.includes(m[1]) && m[1].split(/\s+/).length >= 5, why = m[2].split(/\s+/).length >= 6;
       return verbatim && why ? { st: "PASS", note: "like: " + m[1].slice(0, 40) } : { st: "FAIL", note: `verbatim ${verbatim}, why ${why}` };
     });
-  } else { for (const r of [R.claude, R.intentSpk, R.jisikhwa]) { r.st = "SKIP"; r.note = opts.noNet ? "network off" : "Claude 토큰 없음"; } render(); }
+  } else {
+    for (const r of [R.claude, R.intentSpk, R.jisikhwa]) { r.st = "SKIP"; r.note = opts.noNet ? "network off" : "Claude 토큰 없음"; }
+    render();
+    if (!opts.noNet) await timed(R.claude, () => probeWithoutKey("claude"));
+  }
   const fam = [[R.codex, "openai", k => openaiLike("https://api.openai.com/v1", k, MODELS.openai, PING)], [R.agy, "gemini", k => geminiAsk(k, PING)], [R.grok, "xai", k => openaiLike("https://api.x.ai/v1", k, MODELS.xai, PING)]];
-  for (const [r, k, fn] of fam) { const key = store.get(k); if (!key || opts.noNet) { r.st = "SKIP"; r.note = key ? "network off" : "키 없음"; render(); continue; } await timed(r, async () => pong(await fn(key))); }
+  for (const [r, k, fn] of fam) {
+    const key = store.get(k);
+    if (opts.noNet) { r.st = "SKIP"; r.note = key ? "network off" : "키 없음"; render(); continue; }
+    if (!key) { await timed(r, () => probeWithoutKey(k)); continue; }
+    await timed(r, async () => pong(await fn(key)));
+  }
   if (!opts.noNet && !opts.noVm) await timed(R.vm, bootVm); else { R.vm.st = "SKIP"; R.vm.note = "VM off"; render(); }
   return reportText();
 }
