@@ -124,7 +124,7 @@ jobs:
             'RUN apk add --no-cache icu-libs libintl krb5-libs libstdc++ gcompat' \
             "RUN curl -fsSL -o /tmp/pwsh.tgz $PWSH_URL && echo '$PWSH_SHA256  /tmp/pwsh.tgz' | sha256sum -c - && mkdir -p /opt/microsoft/powershell/7 && tar -xzf /tmp/pwsh.tgz -C /opt/microsoft/powershell/7 && chmod +x /opt/microsoft/powershell/7/pwsh && ln -s /opt/microsoft/powershell/7/pwsh /usr/bin/pwsh && rm /tmp/pwsh.tgz" \
             'COPY harness /opt/wk-harness' \
-            'RUN cd /opt/wk-harness && (bash install-linux.sh > /opt/wk-harness-install.log 2>&1; echo install-linux rc=$?; tail -8 /opt/wk-harness-install.log)' \
+            'RUN cd /opt/wk-harness && { bash install-linux.sh > /opt/wk-harness-install.log 2>&1; rc=$?; echo install-linux rc=$rc; tail -8 /opt/wk-harness-install.log; exit $rc; }' \
             'RUN rm -rf /usr/local/lib/node_modules/@openai/codex-linux-x64/vendor/*/codex-resources/voice; du -sh /usr/local/lib/node_modules/* /usr/local/lib/node_modules/@*/* 2>/dev/null | sort -rh | head -15' \
             | docker build --platform linux/amd64 -t wk-x64 -f - ctx
           docker run --rm --platform linux/amd64 wk-x64 sh -c '
