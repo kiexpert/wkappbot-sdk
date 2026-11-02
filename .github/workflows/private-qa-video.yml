@@ -61,7 +61,7 @@ jobs:
         run: |
           cd src
           if [ "${{ github.event_name }}" != "schedule" ]; then echo "run=1" >> "$GITHUB_OUTPUT"; echo "build: ${{ github.event_name }}"; exit 0; fi
-          road="poc-site/portal/qa/scenes.json poc-site/portal/qa/record.js poc-site/portal/modules/spokesman/mock-scripts.js poc-site/portal/modules/deploy poc-site/portal/modules/repo"
+          road="poc-site/portal/qa/scenes.json poc-site/portal/qa/record.js poc-site/portal/qa/a11y-scene.js poc-site/portal/modules poc-site/portal/index.html poc-site/portal/settings.html poc-site/portal/runners.html"
           last=$(git log -1 --format=%ct -- $road); since=$(git log -1 --format=%ct -- poc-site/portal/qa/qa-video.mp4)
           if [ "${last:-0}" -gt "${since:-0}" ]; then echo "run=1" >> "$GITHUB_OUTPUT"; echo "build: the QA road changed"; else echo "run=0" >> "$GITHUB_OUTPUT"; echo "skip: the video is current"; fi
       - uses: actions/setup-node@v4
