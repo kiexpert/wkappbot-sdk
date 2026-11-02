@@ -6,8 +6,9 @@ name: webvm-x64
 # repo (webvm/x64/index.html). The target repo is found by sha256 prefix and never named, as in harness-pages-relay.yml.
 # Post-boot snapshot (2026-11-02): the c2w assets are patched at build time with the target repo's
 # webvm/x64-build/c2w-webvm.patch, so the VM init unmounts its two 9p shares after reading its info file and
-# QEMU accepts "migrate". The VM CPU is Westmere (SSE4.2, PCLMUL, AES, no AVX): AVX models crash c2w's Go init under
-# wasm TCG, and the agy (Antigravity CLI) static musl binary refuses qemu64 for lacking SSE4.2 and PCLMUL. claude is
+# QEMU accepts "migrate". The VM CPU is qemu64 plus SSSE3, SSE4.1, SSE4.2, POPCNT, CX16 and PCLMUL, with no AES and no
+# AVX: every model with AES (max, Haswell, Westmere) crashed c2w's Go init under wasm TCG (runs 41414477139 and
+# 41438211832), and the agy (Antigravity CLI) static musl binary refuses plain qemu64 for lacking SSE4.2 and PCLMUL. claude is
 # pinned to 2.1.112, the last release that runs as Node cli.js (2.1.113+ is an AVX2 native binary). The bundle is then booted once in headless Chromium, python3 and git are warmed, and the
 # migration file is shipped as the manifest's "snapshot" (gzip parts); the page resumes from it instead of booting.
 # Agent CLIs (2026-11-02): the image carries Node.js, npm, pip, curl, gh, the claude-code, codex and gemini-cli npm
@@ -153,7 +154,7 @@ jobs:
           hash=$(sha256sum "$f.gz" | cut -c1-16)
           split -b 45M -d -a 2 "$f.gz" "$f.gz.part" && rm "$f.gz"
           parts=$(cd out && ls -1 *.data.gz.part* | sed 's/.*/"&"/' | paste -sd, -)
-          printf '{"c2w":"%s","assets":"%s+c2w-webvm.patch","disk":"disk/","image":"alpine:3.21 + python3 pip git curl node npm gh + claude-code codex gemini-cli agy","cpu":"Westmere","memMB":512,"encoding":"gzip","raw":%s,"hash":"%s","parts":[%s],"built":"%s"}\n' "$C2W_TAG" "$C2W_ASSETS_REV" "$raw" "$hash" "$parts" "$(date -u +%FT%TZ)" > out/manifest.json
+          printf '{"c2w":"%s","assets":"%s+c2w-webvm.patch","disk":"disk/","image":"alpine:3.21 + python3 pip git curl node npm gh + claude-code codex gemini-cli agy","cpu":"qemu64+ssse3+sse4.1+sse4.2+popcnt+cx16+pclmulqdq","memMB":512,"encoding":"gzip","raw":%s,"hash":"%s","parts":[%s],"built":"%s"}\n' "$C2W_TAG" "$C2W_ASSETS_REV" "$raw" "$hash" "$parts" "$(date -u +%FT%TZ)" > out/manifest.json
           cat out/manifest.json
 
       - name: Take the post-boot snapshot in headless Chromium
