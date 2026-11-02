@@ -93,7 +93,7 @@ jobs:
             const a=m.a11y||[];console.log('a11y steps:',a.length,'|',a.map(x=>x.cmd.split(' ').slice(0,3).join(' ')).join(' / '));
             if(a.length!==5)process.exit(1);
             const il=m.intentlock||[];console.log('intent-lock lines:',il.length);if(il.length!==2)process.exit(1);
-            const v=m.webvm;console.log('webvm:',v?'inline '+v.inline+(v.why?' ('+v.why+')':'')+', x64 ready '+v.ready+' '+v.seconds+' s, python3 '+v.python:'no scene')"
+            const v=m.webvm;console.log('webvm:',v?'isolated '+v.isolated+', inline '+v.inline+(v.why?' ('+v.why+')':'')+', x64 ready '+v.ready+' '+v.seconds+' s, python3 '+v.python:'no scene')"
       - name: Push the video to qa-video/build
         if: steps.gate.outputs.run == '1'
         run: |
