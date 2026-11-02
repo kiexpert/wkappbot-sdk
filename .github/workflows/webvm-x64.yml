@@ -6,7 +6,7 @@ name: webvm-x64
 # repo (webvm/x64/index.html). The target repo is found by sha256 prefix and never named, as in harness-pages-relay.yml.
 # Post-boot snapshot (2026-11-02): the c2w assets are patched at build time with the target repo's
 # webvm/x64-build/c2w-init-unmount.patch, so the VM init unmounts its two 9p shares after reading its info file and
-# QEMU accepts "migrate". The bundle is then booted once in headless Chromium, python3 and git are warmed, and the
+# QEMU accepts "migrate", and QEMU runs with -cpu max (qemu64 lacks instructions the claude binary uses). The bundle is then booted once in headless Chromium, python3 and git are warmed, and the
 # migration file is shipped as the manifest's "snapshot" (gzip parts); the page resumes from it instead of booting.
 # Agent CLIs (2026-11-02): the image carries Node.js, npm, pip, curl, gh and the claude-code, codex and gemini-cli npm
 # packages with no key or config; their versions are published as cli-versions.json. The VM has 512 MB RAM for them.
@@ -90,7 +90,7 @@ jobs:
           git clone -q --depth 1 "https://x-access-token:${TOK}@github.com/${REPO}.git" src
           git clone -q https://github.com/ktock/container2wasm c2w-assets
           git -C c2w-assets checkout -q "$C2W_ASSETS_REV"
-          git -C c2w-assets apply --verbose ../src/webvm/x64-build/c2w-init-unmount.patch
+          git -C c2w-assets apply --verbose ../src/webvm/x64-build/c2w-webvm.patch
           git -C c2w-assets diff --stat
 
       - name: Build the x86_64 image and convert it to a browser bundle
@@ -101,6 +101,7 @@ jobs:
             'FROM alpine:3.21' \
             'RUN apk add --no-cache python3 py3-pip git curl ca-certificates nodejs npm github-cli bash' \
             'RUN npm install -g --no-fund --no-audit @anthropic-ai/claude-code @openai/codex @google/gemini-cli && npm cache clean --force' \
+            'RUN rm -rf /usr/local/lib/node_modules/@openai/codex-linux-x64/vendor/*/codex-resources/voice; du -sh /usr/local/lib/node_modules/* /usr/local/lib/node_modules/@*/* 2>/dev/null | sort -rh | head -15' \
             | docker build --platform linux/amd64 -t wk-x64 -
           docker run --rm --platform linux/amd64 wk-x64 sh -c '
             v() { out=$("$@" 2>&1 | head -1); printf "\"%s\":\"%s\"," "$1" "$(printf %s "$out" | tr -d "\"\\")"; }
@@ -142,7 +143,7 @@ jobs:
           hash=$(sha256sum "$f.gz" | cut -c1-16)
           split -b 45M -d -a 2 "$f.gz" "$f.gz.part" && rm "$f.gz"
           parts=$(cd out && ls -1 *.data.gz.part* | sed 's/.*/"&"/' | paste -sd, -)
-          printf '{"c2w":"%s","assets":"%s+init-unmount","image":"alpine:3.21 + python3 pip git curl node npm gh + claude-code codex gemini-cli","memMB":512,"encoding":"gzip","raw":%s,"hash":"%s","parts":[%s],"built":"%s"}\n' "$C2W_TAG" "$C2W_ASSETS_REV" "$raw" "$hash" "$parts" "$(date -u +%FT%TZ)" > out/manifest.json
+          printf '{"c2w":"%s","assets":"%s+c2w-webvm.patch","cpu":"max","image":"alpine:3.21 + python3 pip git curl node npm gh + claude-code codex gemini-cli","memMB":512,"encoding":"gzip","raw":%s,"hash":"%s","parts":[%s],"built":"%s"}\n' "$C2W_TAG" "$C2W_ASSETS_REV" "$raw" "$hash" "$parts" "$(date -u +%FT%TZ)" > out/manifest.json
           cat out/manifest.json
 
       - name: Take the post-boot snapshot in headless Chromium
@@ -158,7 +159,7 @@ jobs:
           hash=$(sha256sum out/snap.state.gz | cut -c1-16)
           split -b 45M -d -a 2 out/snap.state.gz out/snap.state.gz.part && rm out/snap.state.gz
           parts=$(cd out && ls -1 snap.state.gz.part* | sed 's/.*/"&"/' | paste -sd, -)
-          python3 -c 'import json,sys; m=json.load(open("out/manifest.json")); m["snapshot"]={"encoding":"gzip","raw":int(sys.argv[1]),"hash":sys.argv[2],"parts":json.loads("["+sys.argv[3]+"]"),"warm":"python3 git"}; json.dump(m,open("out/manifest.json","w"))' "$raw" "$hash" "$parts"
+          python3 -c 'import json,os,sys; m=json.load(open("out/manifest.json")); m["snapshot"]={"encoding":"gzip","raw":int(sys.argv[1]),"hash":sys.argv[2],"parts":json.loads("["+sys.argv[3]+"]"),"warm":"python3 git"}; m["packed"]=sum(os.path.getsize("out/"+p) for p in m["parts"]+m["snapshot"]["parts"]); json.dump(m,open("out/manifest.json","w"))' "$raw" "$hash" "$parts"
           cat out/manifest.json
           ls -la out
           find out -type f -size +95M -print -exec false {} + || { echo "a file is over the 100 MB push limit"; exit 1; }
