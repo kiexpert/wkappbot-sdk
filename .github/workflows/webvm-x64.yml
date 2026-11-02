@@ -11,11 +11,15 @@ name: webvm-x64
 # 41438211832), and the agy (Antigravity CLI) static musl binary refuses plain qemu64 for lacking SSE4.2 and PCLMUL. claude is
 # pinned to 2.1.112, the last release that runs as Node cli.js (2.1.113+ is an AVX2 native binary). The bundle is then booted once in headless Chromium, python3 and git are warmed, and the
 # migration file is shipped as the manifest's "snapshot" (gzip parts); the page resumes from it instead of booting.
-# Popcnt experiment (2026-11-02): a local per-flag cold-boot bisect showed +popcnt kills the guest Go init and
-# +sse4.2 hangs it; the target repo's c2w patch therefore sets ktock/qemu-wasm's TCG_TARGET_HAS_ctpop_i32/i64 to 0
-# (generic popcount helper) and this build shows whether agy can start; on failure the green workflow returns.
+# Popcnt fix (2026-11-02): +popcnt killed the guest Go init and +sse4.2 hung it until the target repo's c2w patch set
+# ktock/qemu-wasm's TCG_TARGET_HAS_ctpop_i32/i64 to 0 (generic popcount helper); run 41469470928 booted with them and
+# agy --version printed 1.4.12 (rc 0) on the published page.
 # Agent CLIs (2026-11-02): the image carries Node.js, npm, pip, curl, gh, the claude-code, codex and gemini-cli npm
 # packages and the official agy release (sha512-checked) with no key or config; their versions are published as cli-versions.json. The VM has 512 MB RAM for them.
+# Minimal harness (owner 2026-11-02, road A: the VM cannot clone the target repo): the target repo's
+# tools/wk-harness-min-copy.sh copies only the files its measured manifest lists, drops personal docs and every file
+# matching the private-term scrub list, and fails the build unless its scrub gate prints hits=0. PowerShell 7.6.9
+# (official linux-musl-x64 tarball, sha256-checked) runs the hooks; .NET 10 still targets the x86-64-v1 CPU baseline.
 on:
   workflow_dispatch:
   push:
@@ -98,6 +102,9 @@ jobs:
           git -C c2w-assets checkout -q "$C2W_ASSETS_REV"
           git -C c2w-assets apply --verbose ../src/webvm/x64-build/c2w-webvm.patch
           git -C c2w-assets diff --stat
+          # Road A: the pruned harness copy; the script exits 1 unless the scrub gate prints hits=0.
+          bash src/tools/wk-harness-min-copy.sh "$PWD/src" "$PWD/ctx/harness" src/tools/wk-harness-min-manifest.txt
+          du -sh ctx/harness
 
       - name: Build the x86_64 image and convert it to a browser bundle
         run: |
@@ -105,6 +112,8 @@ jobs:
           # agy: the official installer's linux_amd64_musl manifest entry, pinned with its sha512.
           AGY_URL=https://storage.googleapis.com/antigravity-public/antigravity-cli/1.4.12-4768735748292608/linux-x64-musl/cli_linux_x64_musl.tar.gz
           AGY_SHA512=60a2705b9d0446a88fe2a685a044e0f9ec65f9742492d96e6fa3a87c9c477d3fddd9c4d7f22bca7bdb2a99d6dd5833de9d6e690eb8fd9e77ebe25794fdb4555a
+          PWSH_URL=https://github.com/PowerShell/PowerShell/releases/download/v7.6.9/powershell-7.6.9-linux-musl-x64.tar.gz
+          PWSH_SHA256=f83df6705edaae07db970dcc6c34ad6583d33a2f6199f1b55cdc5354fbb9001c
           # Coding-agent CLIs baked in (owner 2026-11-02); no key, token or config is written into the image.
           # claude-code@2.1.112: the newest release that is Node cli.js; later ones need AVX2, which this VM cannot offer.
           printf '%s\n' \
@@ -112,13 +121,19 @@ jobs:
             'RUN apk add --no-cache python3 py3-pip git curl ca-certificates nodejs npm github-cli bash' \
             'RUN npm install -g --no-fund --no-audit @anthropic-ai/claude-code@2.1.112 @openai/codex @google/gemini-cli && npm cache clean --force' \
             "RUN curl -fsSL -o /tmp/agy.tgz $AGY_URL && echo '$AGY_SHA512  /tmp/agy.tgz' | sha512sum -c - && tar -xzf /tmp/agy.tgz -C /usr/local/bin antigravity && mv /usr/local/bin/antigravity /usr/local/bin/agy && rm /tmp/agy.tgz" \
+            'RUN apk add --no-cache icu-libs libintl krb5-libs libstdc++ gcompat' \
+            "RUN curl -fsSL -o /tmp/pwsh.tgz $PWSH_URL && echo '$PWSH_SHA256  /tmp/pwsh.tgz' | sha256sum -c - && mkdir -p /opt/microsoft/powershell/7 && tar -xzf /tmp/pwsh.tgz -C /opt/microsoft/powershell/7 && chmod +x /opt/microsoft/powershell/7/pwsh && ln -s /opt/microsoft/powershell/7/pwsh /usr/bin/pwsh && rm /tmp/pwsh.tgz" \
+            'COPY harness /opt/wk-harness' \
+            'RUN cd /opt/wk-harness && (bash install-linux.sh > /opt/wk-harness-install.log 2>&1; echo install-linux rc=$?; tail -8 /opt/wk-harness-install.log)' \
             'RUN rm -rf /usr/local/lib/node_modules/@openai/codex-linux-x64/vendor/*/codex-resources/voice; du -sh /usr/local/lib/node_modules/* /usr/local/lib/node_modules/@*/* 2>/dev/null | sort -rh | head -15' \
-            | docker build --platform linux/amd64 -t wk-x64 -
+            | docker build --platform linux/amd64 -t wk-x64 -f - ctx
           docker run --rm --platform linux/amd64 wk-x64 sh -c '
             v() { out=$("$@" 2>&1 | head -1); printf "\"%s\":\"%s\"," "$1" "$(printf %s "$out" | tr -d "\"\\")"; }
             printf "{"; v uname -m; v node --version; v npm --version; v python3 --version; v pip3 --version; v git --version;
-            v curl --version; v gh --version; v claude --version; v codex --version; v gemini --version; v agy --version; printf "\"ok\":true}"' > cli-versions.json
+            v curl --version; v gh --version; v claude --version; v codex --version; v gemini --version; v pwsh --version; v agy --version; printf "\"ok\":true}"' > cli-versions.json
           cat cli-versions.json
+          # The harness QA inside the image (native run on the runner; the in-guest run is measured on the published page).
+          docker run --rm --platform linux/amd64 wk-x64 sh -c 'cd /opt/wk-harness && time pwsh -NoProfile -c "\$PSVersionTable.PSVersion.ToString()"; bash tools/wk-harness-qa.sh' || true
           python3 -c 'import json; print(json.dumps(json.load(open("cli-versions.json")), indent=1))'
           docker image ls wk-x64
           mkdir -p out
@@ -157,7 +172,7 @@ jobs:
           hash=$(sha256sum "$f.gz" | cut -c1-16)
           split -b 45M -d -a 2 "$f.gz" "$f.gz.part" && rm "$f.gz"
           parts=$(cd out && ls -1 *.data.gz.part* | sed 's/.*/"&"/' | paste -sd, -)
-          printf '{"c2w":"%s","assets":"%s+c2w-webvm.patch","disk":"disk/","image":"alpine:3.21 + python3 pip git curl node npm gh + claude-code codex gemini-cli agy","cpu":"qemu64+ssse3+sse4.1+sse4.2+popcnt+cx16+pclmulqdq","memMB":512,"encoding":"gzip","raw":%s,"hash":"%s","parts":[%s],"built":"%s"}\n' "$C2W_TAG" "$C2W_ASSETS_REV" "$raw" "$hash" "$parts" "$(date -u +%FT%TZ)" > out/manifest.json
+          printf '{"c2w":"%s","assets":"%s+c2w-webvm.patch","disk":"disk/","image":"alpine:3.21 + python3 pip git curl node npm gh + claude-code codex gemini-cli agy + pwsh 7.6.9 + harness (min)","cpu":"qemu64+ssse3+sse4.1+sse4.2+popcnt+cx16+pclmulqdq","memMB":512,"encoding":"gzip","raw":%s,"hash":"%s","parts":[%s],"built":"%s"}\n' "$C2W_TAG" "$C2W_ASSETS_REV" "$raw" "$hash" "$parts" "$(date -u +%FT%TZ)" > out/manifest.json
           cat out/manifest.json
 
       - name: Take the post-boot snapshot in headless Chromium
