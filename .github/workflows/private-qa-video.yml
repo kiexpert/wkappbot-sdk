@@ -83,7 +83,7 @@ jobs:
           if [ -n "${GLTOK:-}" ] && [ "$GLTOK" != "SET-ME" ]; then echo "::add-mask::$GLTOK"; export LIVE_GL_TOKEN="$GLTOK"; else echo "GITLAB_TOKEN not set: the scene signs in to GitHub only"; fi
           cd src
           NODE_PATH="$GITHUB_WORKSPACE/node_modules" bash poc-site/portal/qa/build.sh dark
-      - name: Masking, accessibility and intent-lock scene results
+      - name: Masking, accessibility, intent-lock and Linux VM scene results
         if: steps.gate.outputs.run == '1'
         run: |
           node -e "const m=require('./src/poc-site/portal/qa/qa-video.json');const l=m.live;
@@ -92,7 +92,8 @@ jobs:
             if(l.mask.leaks||!l.mask.password_fields)process.exit(1);
             const a=m.a11y||[];console.log('a11y steps:',a.length,'|',a.map(x=>x.cmd.split(' ').slice(0,3).join(' ')).join(' / '));
             if(a.length!==5)process.exit(1);
-            const il=m.intentlock||[];console.log('intent-lock lines:',il.length);if(il.length!==2)process.exit(1)"
+            const il=m.intentlock||[];console.log('intent-lock lines:',il.length);if(il.length!==2)process.exit(1);
+            const v=m.webvm;console.log('webvm:',v?v.page+' '+v.state+' '+v.seconds+' s, python3 '+v.python+(v.fallback?' (32-bit fallback)':''):'no scene')"
       - name: Push the video to qa-video/build
         if: steps.gate.outputs.run == '1'
         run: |
