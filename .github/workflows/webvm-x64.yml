@@ -11,6 +11,9 @@ name: webvm-x64
 # 41438211832), and the agy (Antigravity CLI) static musl binary refuses plain qemu64 for lacking SSE4.2 and PCLMUL. claude is
 # pinned to 2.1.112, the last release that runs as Node cli.js (2.1.113+ is an AVX2 native binary). The bundle is then booted once in headless Chromium, python3 and git are warmed, and the
 # migration file is shipped as the manifest's "snapshot" (gzip parts); the page resumes from it instead of booting.
+# Popcnt experiment (2026-11-02): a local per-flag cold-boot bisect showed +popcnt kills the guest Go init and
+# +sse4.2 hangs it; the target repo's c2w patch therefore sets ktock/qemu-wasm's TCG_TARGET_HAS_ctpop_i32/i64 to 0
+# (generic popcount helper) and this build shows whether agy can start; on failure the green workflow returns.
 # Agent CLIs (2026-11-02): the image carries Node.js, npm, pip, curl, gh, the claude-code, codex and gemini-cli npm
 # packages and the official agy release (sha512-checked) with no key or config; their versions are published as cli-versions.json. The VM has 512 MB RAM for them.
 on:
