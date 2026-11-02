@@ -113,7 +113,14 @@ jobs:
           start=$(date +%s)
           # Dockerfile and assets both come from the patched checkout, so the init that lands in the VM is the patched one.
           # SOURCE_REPO_VERSION=main stays for any stage that still clones upstream itself.
-          c2w --dockerfile c2w-assets/Dockerfile --assets c2w-assets --build-arg SOURCE_REPO_VERSION=main --build-arg VM_MEMORY_SIZE_MB=512 --to-js wk-x64 out/
+          # Upstream clones inside the c2w Dockerfile can drop (run 41399033181: pixman from gitlab, curl 92); buildx keeps
+          # the finished stages cached, so a retry resumes where the clone failed.
+          for try in 1 2 3; do
+            c2w --dockerfile c2w-assets/Dockerfile --assets c2w-assets --build-arg SOURCE_REPO_VERSION=main \
+              --build-arg VM_MEMORY_SIZE_MB=512 --to-js wk-x64 out/ && break
+            [ "$try" = 3 ] && { echo "c2w failed 3 times"; exit 1; }
+            echo "c2w try $try failed; retrying in 30 s"; sleep 30
+          done
           echo "c2w --to-js took $(( $(date +%s) - start )) s"
           ls -la out
           du -sh out
