@@ -108,7 +108,10 @@ jobs:
           rec apply kubectl apply -f proof/demo.yaml
           rec rollout kubectl -n portal-demo rollout status deployment/notice --timeout=180s
           rec pods kubectl -n portal-demo get pods -o wide
-          rec serve kubectl -n portal-demo run probe --rm -i --restart=Never --image=curlimages/curl:8.11.1 --command -- curl -s http://notice.portal-demo.svc.cluster.local/
+          # the page through the Service, from a pod inside the cluster (an attached --rm run can lose its output)
+          kubectl -n portal-demo run probe --restart=Never --image=curlimages/curl:8.11.1 --command -- curl -s http://notice.portal-demo.svc.cluster.local/
+          kubectl -n portal-demo wait --for=jsonpath='{.status.phase}'=Succeeded pod/probe --timeout=120s
+          rec serve kubectl -n portal-demo logs probe
       - name: Install Argo CD and sync an Application from Git
         run: |
           set -eu
