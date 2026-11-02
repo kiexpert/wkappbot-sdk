@@ -90,6 +90,7 @@ jobs:
             if(!l){console.log('no live scene');process.exit(1)}
             console.log('live chips:',l.chips.join(' '),'| badges:',l.badges.join(' '),'| tokens:',l.mask.tokens,'| password fields:',l.mask.password_fields,'| leaks:',l.mask.leaks);
             if(l.mask.leaks||!l.mask.password_fields)process.exit(1);
+            if(process.env.TOK&&!l.chips.includes('github:ok')){console.log('the live GitHub token did not sign in (chip not ok)');process.exit(1)}
             const a=m.a11y||[];console.log('a11y steps:',a.length,'|',a.map(x=>x.cmd.split(' ').slice(0,3).join(' ')).join(' / '));
             if(a.length!==5)process.exit(1);
             const il=m.intentlock||[];console.log('intent-lock lines:',il.length);if(il.length!==2)process.exit(1);
