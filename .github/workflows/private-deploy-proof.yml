@@ -1,0 +1,167 @@
+name: private-deploy-proof
+
+# Proves the portal demo's deploy stage with the real tools, end to end, on a throwaway cluster:
+#   1. kind creates a real Kubernetes cluster on the runner (one node, deleted with the runner);
+#   2. `kubectl apply` deploys the demo service (a Deployment, a Service and the page it serves) and
+#      `kubectl rollout status` waits for it; the page is fetched through the Service to show it serves;
+#   3. Argo CD (pinned v2.13.3) is installed, an Application is created from a public Git repository
+#      (argoproj/argocd-example-apps, guestbook), synced automatically and waited on until Synced and Healthy.
+# The measured result (versions, every command with its output, timings, the sync revision) is written as
+# deploy-proof.json and pushed to one private repo's branch deploy-proof/build, where it lands on main by a
+# pull request and the portal's deploy stage shows it. The target repo is found by a sha256 prefix and never
+# named; its name and the token are masked. No artifact is uploaded here (this repo is public).
+# SECRETS READ: GH_LICENSE_TOKEN, WKAPPBOT_PAT, WKAPPBOT_CORE_PAT (the same order as private-pages-relay).
+# No cloud account is used: the cluster lives and dies on the GitHub runner.
+on:
+  workflow_dispatch:
+  push:
+    branches: ['qa-video/**']
+    paths:
+      - .github/workflows/private-deploy-proof.yml
+  schedule:
+    - cron: '41 3 * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: private-deploy-proof
+  cancel-in-progress: false
+
+jobs:
+  proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      TARGET_HASH: ce712644e054789d
+      T1: ${{ secrets.GH_LICENSE_TOKEN }}
+      T2: ${{ secrets.WKAPPBOT_PAT }}
+      T3: ${{ secrets.WKAPPBOT_CORE_PAT }}
+      ARGOCD_VERSION: v2.13.3
+    steps:
+      - name: Find the target repo and a token that can reach it
+        run: |
+          set -u
+          for t in "$T1" "$T2" "$T3"; do
+            [ -n "$t" ] && [ "$t" != "SET-ME" ] || continue
+            echo "::add-mask::$t"
+            names=$(GH_TOKEN="$t" gh repo list kiexpert --visibility private --limit 300 --json nameWithOwner -q '.[].nameWithOwner' 2>/dev/null || true)
+            for n in $names; do
+              if [ "$(printf %s "$n" | sha256sum | cut -c1-16)" = "$TARGET_HASH" ]; then
+                echo "::add-mask::$n"
+                echo "::add-mask::${n#*/}"
+                { echo "REPO=$n"; echo "TOK=$t"; } >> "$GITHUB_ENV"
+                echo "target found"
+                exit 0
+              fi
+            done
+          done
+          echo "no token reaches the target repo"; exit 1
+      - name: Create a real Kubernetes cluster (kind)
+        uses: helm/kind-action@v1.10.0
+        with:
+          cluster_name: portal-demo
+      - name: kubectl apply the demo service and wait for the rollout
+        run: |
+          set -eu
+          mkdir -p proof
+          rec() { local id="$1"; shift; local t0=$(date +%s.%N); set +e; out=$("$@" 2>&1); rc=$?; set -e
+            local t1=$(date +%s.%N); printf '%s' "$out" > "proof/$id.out"
+            node -e "const fs=require('fs');const f='proof/steps.json';const a=fs.existsSync(f)?JSON.parse(fs.readFileSync(f)):[];a.push({id:process.argv[1],cmd:process.argv[2],rc:+process.argv[3],seconds:+(process.argv[5]-process.argv[4]).toFixed(2),out:fs.readFileSync('proof/'+process.argv[1]+'.out','utf8').split('\n').slice(-40).join('\n')});fs.writeFileSync(f,JSON.stringify(a))" "$id" "$*" "$rc" "$t0" "$t1"
+            echo "\$ $*"; echo "$out" | tail -20; return $rc; }
+          cat > proof/demo.yaml <<'YAML'
+          apiVersion: v1
+          kind: Namespace
+          metadata: { name: portal-demo }
+          ---
+          apiVersion: v1
+          kind: ConfigMap
+          metadata: { name: notice-page, namespace: portal-demo }
+          data:
+            index.html: |
+              <!doctype html><meta charset="utf-8"><title>notice</title><h1>S customer notice portal 1.5.0</h1><p>deployed by kubectl apply</p>
+          ---
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata: { name: notice, namespace: portal-demo, labels: { app: notice } }
+          spec:
+            replicas: 2
+            selector: { matchLabels: { app: notice } }
+            template:
+              metadata: { labels: { app: notice, version: "1.5.0" } }
+              spec:
+                containers:
+                  - name: web
+                    image: nginx:1.27-alpine
+                    ports: [{ containerPort: 80 }]
+                    volumeMounts: [{ name: page, mountPath: /usr/share/nginx/html }]
+                    readinessProbe: { httpGet: { path: /, port: 80 }, periodSeconds: 2 }
+                volumes: [{ name: page, configMap: { name: notice-page } }]
+          ---
+          apiVersion: v1
+          kind: Service
+          metadata: { name: notice, namespace: portal-demo }
+          spec: { selector: { app: notice }, ports: [{ port: 80, targetPort: 80 }] }
+          YAML
+          rec version kubectl version
+          rec nodes kubectl get nodes -o wide
+          rec apply kubectl apply -f proof/demo.yaml
+          rec rollout kubectl -n portal-demo rollout status deployment/notice --timeout=180s
+          rec pods kubectl -n portal-demo get pods -o wide
+          rec serve kubectl -n portal-demo run probe --rm -i --restart=Never --image=curlimages/curl:8.11.1 --command -- curl -s http://notice.portal-demo.svc.cluster.local/
+      - name: Install Argo CD and sync an Application from Git
+        run: |
+          set -eu
+          rec() { local id="$1"; shift; local t0=$(date +%s.%N); set +e; out=$("$@" 2>&1); rc=$?; set -e
+            local t1=$(date +%s.%N); printf '%s' "$out" > "proof/$id.out"
+            node -e "const fs=require('fs');const f='proof/steps.json';const a=fs.existsSync(f)?JSON.parse(fs.readFileSync(f)):[];a.push({id:process.argv[1],cmd:process.argv[2],rc:+process.argv[3],seconds:+(process.argv[5]-process.argv[4]).toFixed(2),out:fs.readFileSync('proof/'+process.argv[1]+'.out','utf8').split('\n').slice(-40).join('\n')});fs.writeFileSync(f,JSON.stringify(a))" "$id" "$*" "$rc" "$t0" "$t1"
+            echo "\$ $*"; echo "$out" | tail -20; return $rc; }
+          rec argocd-ns kubectl create namespace argocd
+          rec argocd-install kubectl apply -n argocd -f "https://raw.githubusercontent.com/argoproj/argo-cd/${ARGOCD_VERSION}/manifests/install.yaml"
+          rec argocd-ready kubectl -n argocd wait --for=condition=Available deployment --all --timeout=300s
+          cat > proof/app.yaml <<'YAML'
+          apiVersion: argoproj.io/v1alpha1
+          kind: Application
+          metadata: { name: guestbook, namespace: argocd }
+          spec:
+            project: default
+            source: { repoURL: https://github.com/argoproj/argocd-example-apps.git, targetRevision: HEAD, path: guestbook }
+            destination: { server: https://kubernetes.default.svc, namespace: guestbook }
+            syncPolicy: { automated: { prune: true, selfHeal: true }, syncOptions: [CreateNamespace=true] }
+          YAML
+          rec app-apply kubectl apply -f proof/app.yaml
+          ok=0
+          for i in $(seq 1 90); do
+            s=$(kubectl -n argocd get application guestbook -o jsonpath='{.status.sync.status}/{.status.health.status}' 2>/dev/null || true)
+            echo "sync/health: $s"
+            if [ "$s" = "Synced/Healthy" ]; then ok=1; break; fi
+            sleep 4
+          done
+          rec app-status kubectl -n argocd get application guestbook -o jsonpath='{.status.sync.status} {.status.health.status} {.status.sync.revision} {.status.operationState.phase} {.status.operationState.finishedAt}'
+          rec app-resources kubectl -n guestbook get deploy,svc,pods -o wide
+          [ "$ok" = 1 ] || { echo "Argo CD did not reach Synced/Healthy"; exit 1; }
+      - name: Write deploy-proof.json and push it to the target's deploy-proof/build
+        run: |
+          set -eu
+          git clone -q --depth 5 "https://x-access-token:${TOK}@github.com/${REPO}.git" src
+          node -e "
+            const fs=require('fs');const steps=JSON.parse(fs.readFileSync('proof/steps.json'));
+            const get=(id)=>(steps.find(s=>s.id===id)||{}).out||'';
+            const st=get('app-status').trim().split(/\s+/);
+            const out={generated_at:new Date().toISOString(),run:process.env.GITHUB_RUN_ID,runner:'github-hosted ubuntu-latest',
+              cluster:{tool:'kind',name:'portal-demo',kubectl:(get('version').match(/Client Version: (\S+)/)||[])[1]||'',server:(get('version').match(/Server Version: (\S+)/)||[])[1]||''},
+              kubectl:{namespace:'portal-demo',image:'nginx:1.27-alpine',replicas:2,served:/S customer notice portal 1\.5\.0/.test(get('serve'))},
+              argocd:{version:process.env.ARGOCD_VERSION,app:'guestbook',repo:'https://github.com/argoproj/argocd-example-apps.git',path:'guestbook',
+                sync:st[0]||'',health:st[1]||'',revision:st[2]||'',phase:st[3]||'',finished_at:st[4]||''},
+              ok:steps.every(s=>s.rc===0)&&st[0]==='Synced'&&st[1]==='Healthy',
+              steps};
+            fs.writeFileSync('src/poc-site/portal/deploy-proof.json',JSON.stringify(out,null,1)+'\n');
+            console.log('ok',out.ok,'| kubectl',out.cluster.kubectl,'server',out.cluster.server,'| served',out.kubectl.served,'| argocd',out.argocd.sync,out.argocd.health,out.argocd.revision.slice(0,12));"
+          cd src
+          git config user.name "deploy-proof-bot"
+          git config user.email "deploy-proof-bot@users.noreply.github.com"
+          git checkout -q -B deploy-proof/build
+          git add poc-site/portal/deploy-proof.json
+          git commit -q -m "deploy: real kind + kubectl apply + Argo CD sync proof (run ${GITHUB_RUN_ID})"
+          git push -q -f origin deploy-proof/build
+          echo "pushed deploy-proof/build $(git rev-parse --short HEAD)"
