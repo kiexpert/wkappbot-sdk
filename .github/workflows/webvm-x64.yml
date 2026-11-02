@@ -5,12 +5,14 @@ name: webvm-x64
 # and publishes it as webvm/x64/ beside the target repo's 32-bit v86 WebVM page. The page file comes from the target
 # repo (webvm/x64/index.html). The target repo is found by sha256 prefix and never named, as in harness-pages-relay.yml.
 # Post-boot snapshot (2026-11-02): the c2w assets are patched at build time with the target repo's
-# webvm/x64-build/c2w-init-unmount.patch, so the VM init unmounts its two 9p shares after reading its info file and
-# QEMU accepts "migrate". The VM keeps QEMU's default CPU: AVX models crash c2w's Go init under wasm TCG, so claude is
+# webvm/x64-build/c2w-webvm.patch, so the VM init unmounts its two 9p shares after reading its info file and
+# QEMU accepts "migrate". The VM CPU is qemu64 plus SSSE3, SSE4.1, SSE4.2, POPCNT, CX16 and PCLMUL, with no AES and no
+# AVX: every model with AES (max, Haswell, Westmere) crashed c2w's Go init under wasm TCG (runs 41414477139 and
+# 41438211832), and the agy (Antigravity CLI) static musl binary refuses plain qemu64 for lacking SSE4.2 and PCLMUL. claude is
 # pinned to 2.1.112, the last release that runs as Node cli.js (2.1.113+ is an AVX2 native binary). The bundle is then booted once in headless Chromium, python3 and git are warmed, and the
 # migration file is shipped as the manifest's "snapshot" (gzip parts); the page resumes from it instead of booting.
-# Agent CLIs (2026-11-02): the image carries Node.js, npm, pip, curl, gh and the claude-code, codex and gemini-cli npm
-# packages with no key or config; their versions are published as cli-versions.json. The VM has 512 MB RAM for them.
+# Agent CLIs (2026-11-02): the image carries Node.js, npm, pip, curl, gh, the claude-code, codex and gemini-cli npm
+# packages and the official agy release (sha512-checked) with no key or config; their versions are published as cli-versions.json. The VM has 512 MB RAM for them.
 on:
   workflow_dispatch:
   push:
@@ -97,18 +99,22 @@ jobs:
       - name: Build the x86_64 image and convert it to a browser bundle
         run: |
           set -eu
+          # agy: the official installer's linux_amd64_musl manifest entry, pinned with its sha512.
+          AGY_URL=https://storage.googleapis.com/antigravity-public/antigravity-cli/1.4.12-4768735748292608/linux-x64-musl/cli_linux_x64_musl.tar.gz
+          AGY_SHA512=60a2705b9d0446a88fe2a685a044e0f9ec65f9742492d96e6fa3a87c9c477d3fddd9c4d7f22bca7bdb2a99d6dd5833de9d6e690eb8fd9e77ebe25794fdb4555a
           # Coding-agent CLIs baked in (owner 2026-11-02); no key, token or config is written into the image.
           # claude-code@2.1.112: the newest release that is Node cli.js; later ones need AVX2, which this VM cannot offer.
           printf '%s\n' \
             'FROM alpine:3.21' \
             'RUN apk add --no-cache python3 py3-pip git curl ca-certificates nodejs npm github-cli bash' \
             'RUN npm install -g --no-fund --no-audit @anthropic-ai/claude-code@2.1.112 @openai/codex @google/gemini-cli && npm cache clean --force' \
+            "RUN curl -fsSL -o /tmp/agy.tgz $AGY_URL && echo '$AGY_SHA512  /tmp/agy.tgz' | sha512sum -c - && tar -xzf /tmp/agy.tgz -C /usr/local/bin antigravity && mv /usr/local/bin/antigravity /usr/local/bin/agy && rm /tmp/agy.tgz" \
             'RUN rm -rf /usr/local/lib/node_modules/@openai/codex-linux-x64/vendor/*/codex-resources/voice; du -sh /usr/local/lib/node_modules/* /usr/local/lib/node_modules/@*/* 2>/dev/null | sort -rh | head -15' \
             | docker build --platform linux/amd64 -t wk-x64 -
           docker run --rm --platform linux/amd64 wk-x64 sh -c '
             v() { out=$("$@" 2>&1 | head -1); printf "\"%s\":\"%s\"," "$1" "$(printf %s "$out" | tr -d "\"\\")"; }
             printf "{"; v uname -m; v node --version; v npm --version; v python3 --version; v pip3 --version; v git --version;
-            v curl --version; v gh --version; v claude --version; v codex --version; v gemini --version; printf "\"ok\":true}"' > cli-versions.json
+            v curl --version; v gh --version; v claude --version; v codex --version; v gemini --version; v agy --version; printf "\"ok\":true}"' > cli-versions.json
           cat cli-versions.json
           python3 -c 'import json; print(json.dumps(json.load(open("cli-versions.json")), indent=1))'
           docker image ls wk-x64
@@ -148,7 +154,7 @@ jobs:
           hash=$(sha256sum "$f.gz" | cut -c1-16)
           split -b 45M -d -a 2 "$f.gz" "$f.gz.part" && rm "$f.gz"
           parts=$(cd out && ls -1 *.data.gz.part* | sed 's/.*/"&"/' | paste -sd, -)
-          printf '{"c2w":"%s","assets":"%s+c2w-webvm.patch","disk":"disk/","image":"alpine:3.21 + python3 pip git curl node npm gh + claude-code codex gemini-cli","memMB":512,"encoding":"gzip","raw":%s,"hash":"%s","parts":[%s],"built":"%s"}\n' "$C2W_TAG" "$C2W_ASSETS_REV" "$raw" "$hash" "$parts" "$(date -u +%FT%TZ)" > out/manifest.json
+          printf '{"c2w":"%s","assets":"%s+c2w-webvm.patch","disk":"disk/","image":"alpine:3.21 + python3 pip git curl node npm gh + claude-code codex gemini-cli agy","cpu":"qemu64+ssse3+sse4.1+sse4.2+popcnt+cx16+pclmulqdq","memMB":512,"encoding":"gzip","raw":%s,"hash":"%s","parts":[%s],"built":"%s"}\n' "$C2W_TAG" "$C2W_ASSETS_REV" "$raw" "$hash" "$parts" "$(date -u +%FT%TZ)" > out/manifest.json
           cat out/manifest.json
 
       - name: Take the post-boot snapshot in headless Chromium
