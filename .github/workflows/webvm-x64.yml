@@ -4,6 +4,12 @@ name: webvm-x64
 # x86_64 Alpine container (python3, git) to a browser bundle with container2wasm (c2w --to-js: QEMU compiled to wasm)
 # and publishes it as webvm/x64/ beside the target repo's 32-bit v86 WebVM page. The page file comes from the target
 # repo (webvm/x64/index.html). The target repo is found by sha256 prefix and never named, as in harness-pages-relay.yml.
+# Post-boot snapshot (2026-11-02): the c2w assets are patched at build time with the target repo's
+# webvm/x64-build/c2w-init-unmount.patch, so the VM init unmounts its two 9p shares after reading its info file and
+# QEMU accepts "migrate". The bundle is then booted once in headless Chromium, python3 and git are warmed, and the
+# migration file is shipped as the manifest's "snapshot" (gzip parts); the page resumes from it instead of booting.
+# Agent CLIs (2026-11-02): the image carries Node.js, npm, pip, curl, gh and the claude-code, codex and gemini-cli npm
+# packages with no key or config; their versions are published as cli-versions.json. The VM has 512 MB RAM for them.
 on:
   workflow_dispatch:
   push:
@@ -28,6 +34,8 @@ jobs:
       T1: ${{ secrets.GH_LICENSE_TOKEN }}
       T2: ${{ secrets.WKAPPBOT_PAT }}
       T3: ${{ secrets.WKAPPBOT_CORE_PAT }}
+      # container2wasm main at the commit the init patch was written against; bump both together.
+      C2W_ASSETS_REV: 3f0f9be4d5ee201ea1a12f9700e6e3ef52c8b345
     steps:
       - name: Find the target repo and a token that can reach it
         run: |
@@ -71,24 +79,41 @@ jobs:
             sudo install /tmp/gobin/c2w /usr/local/bin/c2w
             ver=$(go version -m /tmp/gobin/c2w | awk '$1=="mod"{print $3; exit}')
             tag="go-$ver"
-            # c2w clones its build assets at its own tag from ktock/container2wasm, where that tag is gone (run 41358359646:
-            # "Remote branch v0.8.4 not found"); the module cache holds the same source, so hand it over with --assets.
-            echo "C2W_ASSETS=$(go env GOMODCACHE)/github.com/ktock/container2wasm@$ver" >> "$GITHUB_ENV"
             echo "c2w from the Go module proxy $tag"
           fi
           c2w --version
           echo "C2W_TAG=$tag" >> "$GITHUB_ENV"
 
+      - name: Fetch the page source and patch the c2w build assets
+        run: |
+          set -eu
+          git clone -q --depth 1 "https://x-access-token:${TOK}@github.com/${REPO}.git" src
+          git clone -q https://github.com/ktock/container2wasm c2w-assets
+          git -C c2w-assets checkout -q "$C2W_ASSETS_REV"
+          git -C c2w-assets apply --verbose ../src/webvm/x64-build/c2w-init-unmount.patch
+          git -C c2w-assets diff --stat
+
       - name: Build the x86_64 image and convert it to a browser bundle
         run: |
           set -eu
-          printf 'FROM alpine:3.21\nRUN apk add --no-cache python3 git\n' | docker build --platform linux/amd64 -t wk-x64 -
-          docker run --rm --platform linux/amd64 wk-x64 sh -c 'uname -m; python3 -V; git --version'
+          # Coding-agent CLIs baked in (owner 2026-11-02); no key, token or config is written into the image.
+          printf '%s\n' \
+            'FROM alpine:3.21' \
+            'RUN apk add --no-cache python3 py3-pip git curl ca-certificates nodejs npm github-cli bash' \
+            'RUN npm install -g --no-fund --no-audit @anthropic-ai/claude-code @openai/codex @google/gemini-cli && npm cache clean --force' \
+            | docker build --platform linux/amd64 -t wk-x64 -
+          docker run --rm --platform linux/amd64 wk-x64 sh -c '
+            v() { out=$("$@" 2>&1 | head -1); printf "\"%s\":\"%s\"," "$1" "$(printf %s "$out" | tr -d "\"\\")"; }
+            printf "{"; v uname -m; v node --version; v npm --version; v python3 --version; v pip3 --version; v git --version;
+            v curl --version; v gh --version; v claude --version; v codex --version; v gemini --version; printf "\"ok\":true}"' > cli-versions.json
+          cat cli-versions.json
+          python3 -c 'import json; print(json.dumps(json.load(open("cli-versions.json")), indent=1))'
+          docker image ls wk-x64
           mkdir -p out
           start=$(date +%s)
-          # The Dockerfile clones its assets with git clone -b $SOURCE_REPO_VERSION; the release tag is gone upstream
-          # (runs 41358359646, 41358891316), the repo itself still clones, so build from its main branch.
-          c2w --build-arg SOURCE_REPO_VERSION=main --to-js wk-x64 out/
+          # Dockerfile and assets both come from the patched checkout, so the init that lands in the VM is the patched one.
+          # SOURCE_REPO_VERSION=main stays for any stage that still clones upstream itself.
+          c2w --dockerfile c2w-assets/Dockerfile --assets c2w-assets --build-arg SOURCE_REPO_VERSION=main --build-arg VM_MEMORY_SIZE_MB=512 --to-js wk-x64 out/
           echo "c2w --to-js took $(( $(date +%s) - start )) s"
           ls -la out
           du -sh out
@@ -96,8 +121,8 @@ jobs:
       - name: Add the page and the COOP/COEP service worker
         run: |
           set -eu
-          git clone -q --depth 1 "https://x-access-token:${TOK}@github.com/${REPO}.git" src
           cp src/webvm/x64/index.html out/index.html
+          cp cli-versions.json out/cli-versions.json
           npm pack -s coi-serviceworker@0.1.7 >/dev/null
           tar -xzf coi-serviceworker-0.1.7.tgz
           cp package/coi-serviceworker.js out/
@@ -110,7 +135,23 @@ jobs:
           hash=$(sha256sum "$f.gz" | cut -c1-16)
           split -b 45M -d -a 2 "$f.gz" "$f.gz.part" && rm "$f.gz"
           parts=$(cd out && ls -1 *.data.gz.part* | sed 's/.*/"&"/' | paste -sd, -)
-          printf '{"c2w":"%s","image":"alpine:3.21 + python3 git","encoding":"gzip","raw":%s,"hash":"%s","parts":[%s],"built":"%s"}\n' "$C2W_TAG" "$raw" "$hash" "$parts" "$(date -u +%FT%TZ)" > out/manifest.json
+          printf '{"c2w":"%s","assets":"%s+init-unmount","image":"alpine:3.21 + python3 pip git curl node npm gh + claude-code codex gemini-cli","memMB":512,"encoding":"gzip","raw":%s,"hash":"%s","parts":[%s],"built":"%s"}\n' "$C2W_TAG" "$C2W_ASSETS_REV" "$raw" "$hash" "$parts" "$(date -u +%FT%TZ)" > out/manifest.json
+          cat out/manifest.json
+
+      - name: Take the post-boot snapshot in headless Chromium
+        run: |
+          set -eu
+          npm i -s --no-save --prefix snaptool playwright@1.48.2 >/dev/null
+          npx --prefix snaptool playwright install --with-deps chromium >/dev/null
+          start=$(date +%s)
+          NODE_PATH="$PWD/snaptool/node_modules" node src/webvm/x64-build/snap-ci.js out snap.state
+          echo "snapshot took $(( $(date +%s) - start )) s"
+          raw=$(stat -c %s snap.state)
+          gzip -9 -c snap.state > out/snap.state.gz && rm snap.state
+          hash=$(sha256sum out/snap.state.gz | cut -c1-16)
+          split -b 45M -d -a 2 out/snap.state.gz out/snap.state.gz.part && rm out/snap.state.gz
+          parts=$(cd out && ls -1 snap.state.gz.part* | sed 's/.*/"&"/' | paste -sd, -)
+          python3 -c 'import json,sys; m=json.load(open("out/manifest.json")); m["snapshot"]={"encoding":"gzip","raw":int(sys.argv[1]),"hash":sys.argv[2],"parts":json.loads("["+sys.argv[3]+"]"),"warm":"python3 git"}; json.dump(m,open("out/manifest.json","w"))' "$raw" "$hash" "$parts"
           cat out/manifest.json
           ls -la out
           find out -type f -size +95M -print -exec false {} + || { echo "a file is over the 100 MB push limit"; exit 1; }
@@ -126,7 +167,7 @@ jobs:
           git config user.name "pages-relay"
           git config user.email "pages-relay@users.noreply.github.com"
           git add -A
-          git commit -q -m "webvm x64 $(date -u +%FT%TZ) c2w $C2W_TAG" || { echo "x64 unchanged"; exit 0; }
+          git commit -q -m "webvm x64 $(date -u +%FT%TZ) c2w $C2W_TAG snapshot" || { echo "x64 unchanged"; exit 0; }
           git push -q "https://x-access-token:${TOK}@github.com/${REPO}.git" gh-pages
           echo "x64 published"
 
