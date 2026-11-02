@@ -102,14 +102,15 @@ jobs:
           tar -xzf coi-serviceworker-0.1.7.tgz
           cp package/coi-serviceworker.js out/
           # GitHub refuses files over 100 MB and the QEMU .data is ~130 MB (run 41359318459): split it; the page joins the parts.
-          parts=""
-          for f in out/*.data; do
-            [ "$(stat -c %s "$f")" -gt 95000000 ] || continue
-            split -b 45M -d -a 2 "$f" "$f.part"
-            rm "$f"
-          done
-          parts=$(cd out && ls -1 *.data.part* 2>/dev/null | sed 's/.*/"&"/' | paste -sd, -)
-          printf '{"c2w":"%s","image":"alpine:3.21 + python3 git","parts":[%s],"built":"%s"}\n' "$C2W_TAG" "$parts" "$(date -u +%FT%TZ)" > out/manifest.json
+          # The page gunzips with the browser's DecompressionStream, so ship one gzip -9 stream cut in parts
+          # (owner 2026-11-02: compress it; measured 129.7 MB raw -> 51.8 MB gzip). The hash keys the page's Cache Storage.
+          f=$(ls out/*.data | head -1)
+          raw=$(stat -c %s "$f")
+          gzip -9 -c "$f" > "$f.gz" && rm "$f"
+          hash=$(sha256sum "$f.gz" | cut -c1-16)
+          split -b 45M -d -a 2 "$f.gz" "$f.gz.part" && rm "$f.gz"
+          parts=$(cd out && ls -1 *.data.gz.part* | sed 's/.*/"&"/' | paste -sd, -)
+          printf '{"c2w":"%s","image":"alpine:3.21 + python3 git","encoding":"gzip","raw":%s,"hash":"%s","parts":[%s],"built":"%s"}\n' "$C2W_TAG" "$raw" "$hash" "$parts" "$(date -u +%FT%TZ)" > out/manifest.json
           cat out/manifest.json
           ls -la out
           find out -type f -size +95M -print -exec false {} + || { echo "a file is over the 100 MB push limit"; exit 1; }
