@@ -1,0 +1,105 @@
+name: private-qa-video
+
+# Rebuilds the narrated QA video of one private repo's web portal (Korean speech, subtitles, MP4 and WebM) and
+# pushes it to that repo's branch qa-video/build, where it lands on main through a pull request.
+# It also records the live credential scene: the portal signs in with a real GitHub token and, when set, a real
+# GitLab token, and the recorder's masking check fails the build if any token text reaches the page.
+# The target repo is found by a sha256 prefix and never named; its name and every token are masked in the logs.
+# No video or log file is uploaded as an artifact here (this repo is public); the result goes to the private repo only.
+# SECRETS READ: GH_LICENSE_TOKEN, WKAPPBOT_PAT, WKAPPBOT_CORE_PAT (the same order as private-pages-relay) and
+# GITLAB_TOKEN (optional; empty or SET-ME means no GitLab sign-in in the scene).
+on:
+  workflow_dispatch:
+  push:
+    branches: ['qa-video/**']
+    paths:
+      - .github/workflows/private-qa-video.yml
+  schedule:
+    # every six hours; a scheduled run builds only when the QA road changed after the last video
+    - cron: '23 */6 * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: private-qa-video
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      TARGET_HASH: ce712644e054789d
+      T1: ${{ secrets.GH_LICENSE_TOKEN }}
+      T2: ${{ secrets.WKAPPBOT_PAT }}
+      T3: ${{ secrets.WKAPPBOT_CORE_PAT }}
+      GLTOK: ${{ secrets.GITLAB_TOKEN }}
+    steps:
+      - name: Find the target repo and a token that can reach it
+        run: |
+          set -u
+          for t in "$T1" "$T2" "$T3"; do
+            [ -n "$t" ] && [ "$t" != "SET-ME" ] || continue
+            echo "::add-mask::$t"
+            names=$(GH_TOKEN="$t" gh repo list kiexpert --visibility private --limit 300 --json nameWithOwner -q '.[].nameWithOwner' 2>/dev/null || true)
+            for n in $names; do
+              if [ "$(printf %s "$n" | sha256sum | cut -c1-16)" = "$TARGET_HASH" ]; then
+                echo "::add-mask::$n"
+                echo "::add-mask::${n#*/}"
+                { echo "REPO=$n"; echo "TOK=$t"; } >> "$GITHUB_ENV"
+                echo "target found"
+                exit 0
+              fi
+            done
+          done
+          echo "no token reaches the target repo"; exit 1
+      - name: Check out the target
+        run: git clone -q --depth 50 "https://x-access-token:${TOK}@github.com/${REPO}.git" src
+      - name: Decide whether to build
+        id: gate
+        run: |
+          cd src
+          if [ "${{ github.event_name }}" != "schedule" ]; then echo "run=1" >> "$GITHUB_OUTPUT"; echo "build: ${{ github.event_name }}"; exit 0; fi
+          road="poc-site/portal/qa/scenes.json poc-site/portal/qa/record.js poc-site/portal/modules/spokesman/mock-scripts.js poc-site/portal/modules/deploy poc-site/portal/modules/repo"
+          last=$(git log -1 --format=%ct -- $road); since=$(git log -1 --format=%ct -- poc-site/portal/qa/qa-video.mp4)
+          if [ "${last:-0}" -gt "${since:-0}" ]; then echo "run=1" >> "$GITHUB_OUTPUT"; echo "build: the QA road changed"; else echo "run=0" >> "$GITHUB_OUTPUT"; echo "skip: the video is current"; fi
+      - uses: actions/setup-node@v4
+        if: steps.gate.outputs.run == '1'
+        with:
+          node-version: 22
+      - name: Tools
+        if: steps.gate.outputs.run == '1'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq espeak-ng ffmpeg fonts-wqy-zenhei >/dev/null
+          npm i -s playwright@1.49.1
+          npx playwright install --with-deps chromium >/dev/null
+      - name: Build the video, live credential scene included
+        if: steps.gate.outputs.run == '1'
+        run: |
+          set -eu
+          export LIVE_GH_TOKEN="$TOK" LIVE_GH_REPO="kiexpert/wkappbot-sdk"
+          if [ -n "${GLTOK:-}" ] && [ "$GLTOK" != "SET-ME" ]; then echo "::add-mask::$GLTOK"; export LIVE_GL_TOKEN="$GLTOK"; else echo "GITLAB_TOKEN not set: the scene signs in to GitHub only"; fi
+          cd src
+          NODE_PATH="$GITHUB_WORKSPACE/node_modules" bash poc-site/portal/qa/build.sh dark
+      - name: Masking result
+        if: steps.gate.outputs.run == '1'
+        run: |
+          node -e "const m=require('./src/poc-site/portal/qa/qa-video.json');const l=m.live;
+            if(!l){console.log('no live scene');process.exit(1)}
+            console.log('live chips:',l.chips.join(' '),'| badges:',l.badges.join(' '),'| tokens:',l.mask.tokens,'| password fields:',l.mask.password_fields,'| leaks:',l.mask.leaks);
+            if(l.mask.leaks||!l.mask.password_fields)process.exit(1)"
+      - name: Push the video to qa-video/build
+        if: steps.gate.outputs.run == '1'
+        run: |
+          set -eu
+          cd src
+          git config user.name "qa-video-bot"
+          git config user.email "qa-video-bot@users.noreply.github.com"
+          git checkout -q -B qa-video/build
+          git add poc-site/portal/qa/qa-video.mp4 poc-site/portal/qa/qa-video.webm poc-site/portal/qa/qa-video.vtt poc-site/portal/qa/qa-video.json
+          git diff --cached --quiet && { echo "nothing changed"; exit 0; }
+          git commit -q -m "qa: rebuild the narrated QA video with the live credential scene"
+          git push -q -f origin qa-video/build
+          echo "pushed qa-video/build $(git rev-parse --short HEAD)"
