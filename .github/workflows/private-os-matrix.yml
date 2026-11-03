@@ -117,3 +117,5 @@ jobs:
         shell: bash
         run: |
           [ -f src/ci-os-matrix.json ] && cat src/ci-os-matrix.json || echo "no matrix file"
+
+# re-run 2026-11-03T12:52Z (skhy-clush 96b801f: aggregate gates on health + start-spread, not window overlap)
