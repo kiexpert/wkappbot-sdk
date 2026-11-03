@@ -1,0 +1,181 @@
+name: private-im-live
+
+# Proves item (u): the internal-model road over wkwire, honestly. Unlike private-im-proof (both peers on one runner,
+# canned answer), here the DAEMON runs on its OWN runner and answers from a REAL model on the owner's subscription
+# secret (claude -p --output-format stream-json), streaming command-only 'model' chunks over the encrypted wkwire data
+# channel; the PAGE runs on a SEPARATE runner and times the user-visible numbers end to end on one clock. A setup job
+# creates the throwaway dual issues + AES key and hands them to both runners; a collect job closes the issues.
+# The logic lives in the target repo (ci/relay-im-daemon.mjs, ci/relay-im-live.mjs, ci/relay-wire-peer.html); this is a
+# thin shim (item-o pattern): the target is found by a sha256 prefix and never named, its name and tokens are masked.
+# SECRETS: GH_LICENSE_TOKEN / WKAPPBOT_PAT / WKAPPBOT_CORE_PAT (find+clone target), WKSIG_GITLAB_TOKEN +
+# WKSIG_GITHUB_TOKEN (the dual wkwire signaller), CLAUDE_CODE_OAUTH_TOKEN (the owner's subscription, daemon only).
+on:
+  workflow_dispatch:
+  push:
+    branches: ['qa-video/**']
+    paths:
+      - .github/workflows/private-im-live.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: private-im-live
+  cancel-in-progress: false
+
+env:
+  GL_API: https://gitlab.com/api/v4
+  GL_PROJECT: kiexpert-group/wksig
+  GH_API: https://api.github.com
+  GH_REPO: kiexpert/wksig
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      issue_gl: ${{ steps.mk.outputs.issue_gl }}
+      issue_gh: ${{ steps.mk.outputs.issue_gh }}
+      key: ${{ steps.mk.outputs.key }}
+    steps:
+      - name: Create the throwaway dual issues and the session key
+        id: mk
+        env:
+          WKSIG_GITLAB_TOKEN: ${{ secrets.WKSIG_GITLAB_TOKEN }}
+          WKSIG_GITHUB_TOKEN: ${{ secrets.WKSIG_GITHUB_TOKEN }}
+        run: |
+          set -eu
+          [ -n "$WKSIG_GITLAB_TOKEN" ] && [ -n "$WKSIG_GITHUB_TOKEN" ] || { echo "both WKSIG tokens required"; exit 1; }
+          echo "::add-mask::$WKSIG_GITLAB_TOKEN"; echo "::add-mask::$WKSIG_GITHUB_TOKEN"
+          ts=$(date +%s)
+          gl=$(curl -sf -X POST -H "authorization: Bearer $WKSIG_GITLAB_TOKEN" "$GL_API/projects/$(python3 -c "import urllib.parse;print(urllib.parse.quote('$GL_PROJECT',safe=''))")/issues?title=wkwire-im-live-$ts" | python3 -c "import sys,json;print(json.load(sys.stdin)['iid'])")
+          gh=$(curl -sf -X POST -H "authorization: Bearer $WKSIG_GITHUB_TOKEN" -H "accept: application/vnd.github+json" "$GH_API/repos/$GH_REPO/issues" -d "{\"title\":\"wkwire-im-live-$ts\"}" | python3 -c "import sys,json;print(json.load(sys.stdin)['number'])")
+          key=$(openssl rand 32 | basenc --base64url | tr -d '=' )
+          echo "::add-mask::$key"
+          { echo "issue_gl=$gl"; echo "issue_gh=$gh"; echo "key=$key"; } >> "$GITHUB_OUTPUT"
+          echo "issues created (ids masked below); session key generated"
+
+  daemon:
+    needs: setup
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      TARGET_HASH: ce712644e054789d
+      T1: ${{ secrets.GH_LICENSE_TOKEN }}
+      T2: ${{ secrets.WKAPPBOT_PAT }}
+      T3: ${{ secrets.WKAPPBOT_CORE_PAT }}
+      WKSIG_GITLAB_TOKEN: ${{ secrets.WKSIG_GITLAB_TOKEN }}
+      WKSIG_GITHUB_TOKEN: ${{ secrets.WKSIG_GITHUB_TOKEN }}
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+      WK_ISSUE_GITLAB: ${{ needs.setup.outputs.issue_gl }}
+      WK_ISSUE_GITHUB: ${{ needs.setup.outputs.issue_gh }}
+      WK_KEY: ${{ needs.setup.outputs.key }}
+    steps:
+      - name: Find and clone the target
+        run: |
+          set -u
+          for t in "$T1" "$T2" "$T3"; do
+            [ -n "$t" ] && [ "$t" != "SET-ME" ] || continue
+            echo "::add-mask::$t"
+            names=$(GH_TOKEN="$t" gh repo list kiexpert --visibility private --limit 300 --json nameWithOwner -q '.[].nameWithOwner' 2>/dev/null || true)
+            for n in $names; do
+              if [ "$(printf %s "$n" | sha256sum | cut -c1-16)" = "$TARGET_HASH" ]; then
+                echo "::add-mask::$n"; echo "::add-mask::${n#*/}"; echo "TOK=$t" >> "$GITHUB_ENV"; echo "REPO=$n" >> "$GITHUB_ENV"; exit 0
+              fi
+            done
+          done
+          echo "no token reaches the target"; exit 1
+      - name: Clone + install (playwright + claude)
+        run: |
+          set -eu
+          git clone -q --depth 5 "https://x-access-token:${TOK}@github.com/${REPO}.git" src
+          cd src && npm init -y >/dev/null 2>&1 && npm i --no-save playwright@1.48.0 >/dev/null 2>&1 && npx playwright install --with-deps chromium
+          npm install -g --silent @anthropic-ai/claude-code
+      - name: Guard the subscription secret
+        run: |
+          [ -n "$CLAUDE_CODE_OAUTH_TOKEN" ] && echo "::add-mask::$CLAUDE_CODE_OAUTH_TOKEN" || { echo "CLAUDE_CODE_OAUTH_TOKEN not set — the daemon has no model to call"; exit 1; }
+      - name: Run the daemon (calls the real model, streams over wkwire)
+        working-directory: src
+        env:
+          WK_RESULT: ${{ github.workspace }}/daemon-result.json
+        run: node ci/relay-im-daemon.mjs
+      - name: Upload daemon result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: daemon-result
+          path: daemon-result.json
+          if-no-files-found: ignore
+
+  page:
+    needs: setup
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      TARGET_HASH: ce712644e054789d
+      T1: ${{ secrets.GH_LICENSE_TOKEN }}
+      T2: ${{ secrets.WKAPPBOT_PAT }}
+      T3: ${{ secrets.WKAPPBOT_CORE_PAT }}
+      WKSIG_GITLAB_TOKEN: ${{ secrets.WKSIG_GITLAB_TOKEN }}
+      WKSIG_GITHUB_TOKEN: ${{ secrets.WKSIG_GITHUB_TOKEN }}
+      WK_ISSUE_GITLAB: ${{ needs.setup.outputs.issue_gl }}
+      WK_ISSUE_GITHUB: ${{ needs.setup.outputs.issue_gh }}
+      WK_KEY: ${{ needs.setup.outputs.key }}
+      WK_PROMPT: 확산 온도 시뮬레이션을 200셀로 돌려 줘
+    steps:
+      - name: Find and clone the target
+        run: |
+          set -u
+          for t in "$T1" "$T2" "$T3"; do
+            [ -n "$t" ] && [ "$t" != "SET-ME" ] || continue
+            echo "::add-mask::$t"
+            names=$(GH_TOKEN="$t" gh repo list kiexpert --visibility private --limit 300 --json nameWithOwner -q '.[].nameWithOwner' 2>/dev/null || true)
+            for n in $names; do
+              if [ "$(printf %s "$n" | sha256sum | cut -c1-16)" = "$TARGET_HASH" ]; then
+                echo "::add-mask::$n"; echo "::add-mask::${n#*/}"; echo "TOK=$t" >> "$GITHUB_ENV"; echo "REPO=$n" >> "$GITHUB_ENV"; exit 0
+              fi
+            done
+          done
+          echo "no token reaches the target"; exit 1
+      - name: Clone + install (playwright)
+        run: |
+          set -eu
+          git clone -q --depth 5 "https://x-access-token:${TOK}@github.com/${REPO}.git" src
+          cd src && npm init -y >/dev/null 2>&1 && npm i --no-save playwright@1.48.0 >/dev/null 2>&1 && npx playwright install --with-deps chromium
+      - name: Run the page (times the end-to-end user numbers)
+        working-directory: src
+        env:
+          WK_RESULT: ${{ github.workspace }}/page-result.json
+        run: node ci/relay-im-live.mjs
+      - name: Upload page result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: page-result
+          path: page-result.json
+          if-no-files-found: ignore
+
+  collect:
+    needs: [setup, daemon, page]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { path: results }
+      - name: Show the combined result
+        run: |
+          echo "=== daemon ==="; cat results/daemon-result/daemon-result.json 2>/dev/null || echo "(no daemon result)"
+          echo "=== page ==="; cat results/page-result/page-result.json 2>/dev/null || echo "(no page result)"
+      - name: Close the throwaway issues
+        if: always()
+        env:
+          WKSIG_GITLAB_TOKEN: ${{ secrets.WKSIG_GITLAB_TOKEN }}
+          WKSIG_GITHUB_TOKEN: ${{ secrets.WKSIG_GITHUB_TOKEN }}
+          GL: ${{ needs.setup.outputs.issue_gl }}
+          GHN: ${{ needs.setup.outputs.issue_gh }}
+        run: |
+          echo "::add-mask::$WKSIG_GITLAB_TOKEN"; echo "::add-mask::$WKSIG_GITHUB_TOKEN"
+          [ -n "$GL" ] && curl -sf -X PUT -H "authorization: Bearer $WKSIG_GITLAB_TOKEN" "$GL_API/projects/$(python3 -c "import urllib.parse;print(urllib.parse.quote('$GL_PROJECT',safe=''))")/issues/$GL?state_event=close" >/dev/null || true
+          [ -n "$GHN" ] && curl -sf -X PATCH -H "authorization: Bearer $WKSIG_GITHUB_TOKEN" -H "accept: application/vnd.github+json" "$GH_API/repos/$GH_REPO/issues/$GHN" -d '{"state":"closed"}' >/dev/null || true
+          echo "issues closed"
