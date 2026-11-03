@@ -159,11 +159,14 @@ jobs:
 
           screenshot:
             stage: shot
-            # The screenshot of what the runner is running: a headless browser inside the job pod.
+            # The screenshot of what the runner is running: a headless browser inside the job container.
             image: mcr.microsoft.com/playwright:v1.49.1-jammy
             script:
-              - npx --yes http-server public -p 8080 &
+              - npx --yes http-server public -p 8080 >/dev/null 2>&1 &
               - sleep 3
+              # resolve the image's Playwright locally (browsers already present, so skip the download)
+              - export PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+              - npm i -s playwright@1.49.1
               - |
                 cat > shot.mjs <<'MJS'
                 import { chromium } from 'playwright';
@@ -224,7 +227,7 @@ jobs:
           ./gitlab-runner run --config ./rc.toml >/tmp/runner.log 2>&1 &
           echo "gitlab-runner started pid=$! (executor: docker)"
           sleep 5
-          # create a fresh pipeline now that a runner is online
+          # create a fresh pipeline (a shared SaaS runner or the ephemeral one above will pick the jobs)
           curl -s -o /tmp/pl.json -w 'pipeline create: %{http_code}\n' -X POST -H "PRIVATE-TOKEN: $GLTOK" --data "ref=${branch}" "$GL/api/v4/projects/$enc/pipeline"
           plid=$(python3 -c "import json;print(json.load(open('/tmp/pl.json')).get('id','') or '')")
           if [ -z "$plid" ]; then echo "pipeline not created:"; cat /tmp/pl.json; exit 1; fi
@@ -249,7 +252,14 @@ jobs:
           curl -s -H "PRIVATE-TOKEN: $GLTOK" "$GL/api/v4/projects/$enc/pipelines/$plid/jobs" \
             | python3 -c "import sys,json;[print('job:', j['name'], j['status'], '| stage:', j['stage'], '| runner:', (j.get('runner') or {}).get('description')) for j in json.load(sys.stdin)]"
           echo "---- gitlab-runner log tail ----"; tail -n 25 /tmp/runner.log 2>/dev/null || true
-          if [ "$st" != "success" ]; then echo "pipeline did not go green: $st"; exit 1; fi
+          if [ "$st" != "success" ]; then
+            echo "---- failed GitLab job traces (tail) ----"
+            for jid in $(curl -s -H "PRIVATE-TOKEN: $GLTOK" "$GL/api/v4/projects/$enc/pipelines/$plid/jobs" | python3 -c "import sys,json;[print(j['id']) for j in json.load(sys.stdin) if j['status']=='failed']"); do
+              echo "== job $jid trace =="
+              curl -s -H "PRIVATE-TOKEN: $GLTOK" "$GL/api/v4/projects/$enc/jobs/$jid/trace" | tail -n 50
+            done
+            echo "pipeline did not go green: $st"; exit 1
+          fi
       - name: Unregister the ephemeral runner
         if: always()
         run: |
@@ -258,4 +268,4 @@ jobs:
           else
             echo "no runner id recorded; nothing to unregister"
           fi
-# 2026-11-03: fetch-templates auths with a PAT + tolerates absence; an ephemeral docker runner now runs the first pipeline to green and is unregistered after.
+# 2026-11-03: screenshot job installs playwright locally (--no-sandbox kept); poll step prints failed GitLab job traces for visibility.
