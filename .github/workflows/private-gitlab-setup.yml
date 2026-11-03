@@ -239,6 +239,10 @@ jobs:
           curl -sSL "https://gitlab-runner-downloads.s3.amazonaws.com/latest/binaries/gitlab-runner-linux-amd64" -o ./gitlab-runner
           chmod +x ./gitlab-runner
           ./gitlab-runner register --non-interactive --config ./rc.toml --url "$GL" --token "$rtok" --executor shell --name "ephemeral-kind-${GITHUB_RUN_ID}"
+          # the shell executor sources the login profile; ubuntu's ~/.bash_logout runs clear_console,
+          # which exits non-zero without a tty and fails "prepare environment". Remove the logout scripts.
+          rm -f "$HOME/.bash_logout" || true
+          sudo rm -f /root/.bash_logout /etc/bash.bash_logout 2>/dev/null || true
           ./gitlab-runner run --config ./rc.toml >/tmp/runner.log 2>&1 &
           echo "gitlab-runner started pid=$! (executor: shell, tag clush-kind)"
           # install glab (pinned, best-effort) for a richer post-run report; curl report below is the fallback
@@ -299,4 +303,4 @@ jobs:
           else
             echo "no runner id recorded; nothing to unregister"
           fi
-# 2026-11-03: deploy stage is now a real kind + Argo CD deploy (k8s/deploy.sh) on a tagged shell runner; build/test/screenshot stay on shared runners; glab + failed-trace reporting kept.
+# 2026-11-03: deploy stage is a real kind + Argo CD deploy (k8s/deploy.sh) on a tagged shell runner (login profile .bash_logout removed so prepare-environment passes); build/test/screenshot stay on shared runners; glab + failed-trace reporting kept.
