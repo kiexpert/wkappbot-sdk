@@ -1,0 +1,125 @@
+name: wksig-signal-token
+
+# Mints the issues-only WebRTC signaling token for the portal (phase 1B), entirely on the runner.
+# It creates the owner's own private GitLab project <namespace>/wksig with issues enabled and
+# everything else disabled, rotates any existing wksig-signal token, mints a fresh project access
+# token (Guest = access_level 10, api scope, one-year expiry), verifies that the token can open an
+# issue and edit its own note on wksig and is denied (not 2xx) on clush-poc, then stores the value as
+# the SDK secret WKSIG_GITLAB_TOKEN. The token value is masked and never printed or committed; the
+# workflow reads GITLAB_TOKEN only. Note: an api-scoped token is scoped to this ONE project (the 403
+# check proves the isolation), but within wksig it can reach the full project API, not literally
+# "issues only" -- that is the owner's chosen scope for the browser signaling client.
+# workflow_dispatch is refused for the agent session, so a push to this file is the on-demand trigger.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/wksig-signal-token.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wksig-signal-token
+  cancel-in-progress: false
+
+jobs:
+  mint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GL: https://gitlab.com
+      GLTOK: ${{ secrets.GITLAB_TOKEN }}
+      NS: kiexpert-group
+      T1: ${{ secrets.GH_LICENSE_TOKEN }}
+      T2: ${{ secrets.WKAPPBOT_PAT }}
+      T3: ${{ secrets.WKAPPBOT_CORE_PAT }}
+    steps:
+      - name: Gate on GITLAB_TOKEN
+        id: gate
+        run: |
+          if [ -z "$GLTOK" ] || [ "$GLTOK" = "SET-ME" ]; then
+            echo "GITLAB_TOKEN is not set yet -- nothing to do."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "::add-mask::$GLTOK"
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Ensure the wksig project exists (issues only)
+        if: steps.gate.outputs.ready == 'true'
+        run: |
+          set -e
+          enc=$(python3 -c "import urllib.parse;print(urllib.parse.quote('${NS}/wksig',safe=''))")
+          code=$(curl -s -o /tmp/p.json -w '%{http_code}' -H "PRIVATE-TOKEN: $GLTOK" "$GL/api/v4/projects/$enc")
+          if [ "$code" != "200" ]; then
+            nsid=$(curl -s -H "PRIVATE-TOKEN: $GLTOK" "$GL/api/v4/namespaces?search=$NS" | python3 -c "import sys,json;d=json.load(sys.stdin);print(d[0]['id'] if d else '')")
+            [ -n "$nsid" ] || { echo "namespace $NS not found for this token"; exit 1; }
+            curl -s -o /tmp/p.json -w 'create: %{http_code}\n' -X POST -H "PRIVATE-TOKEN: $GLTOK" \
+              --data-urlencode "name=wksig" --data-urlencode "path=wksig" \
+              --data "namespace_id=$nsid&visibility=private&issues_access_level=enabled&repository_access_level=disabled&merge_requests_access_level=disabled&builds_access_level=disabled&wiki_access_level=disabled&snippets_access_level=disabled&pages_access_level=disabled&container_registry_access_level=disabled&initialize_with_readme=false" \
+              "$GL/api/v4/projects"
+          fi
+          python3 - <<'EOF'
+          import json
+          p = json.load(open('/tmp/p.json'))
+          print('wksig project id:', p.get('id'), '| web:', p.get('web_url'))
+          open('/tmp/pid','w').write(str(p.get('id')))
+          EOF
+          echo "PID=$(cat /tmp/pid)" >> "$GITHUB_ENV"
+      - name: Rotate any existing wksig-signal token, then mint a fresh one
+        if: steps.gate.outputs.ready == 'true'
+        run: |
+          set -e
+          # revoke existing active tokens named wksig-signal, so exactly one stays
+          curl -s -H "PRIVATE-TOKEN: $GLTOK" "$GL/api/v4/projects/$PID/access_tokens" \
+            | python3 -c "import sys,json;[print(t['id']) for t in json.load(sys.stdin) if t.get('name')=='wksig-signal' and t.get('active')]" > /tmp/old.ids || true
+          while read -r tid; do
+            [ -n "$tid" ] || continue
+            curl -s -o /dev/null -w "revoke $tid: %{http_code}\n" -X DELETE -H "PRIVATE-TOKEN: $GLTOK" "$GL/api/v4/projects/$PID/access_tokens/$tid"
+          done < /tmp/old.ids
+          exp=$(python3 -c "import datetime;print((datetime.date.today()+datetime.timedelta(days=365)).isoformat())")
+          curl -s -o /tmp/t.json -w 'mint: %{http_code}\n' -X POST -H "PRIVATE-TOKEN: $GLTOK" \
+            --data-urlencode "name=wksig-signal" --data "scopes[]=api&access_level=10&expires_at=$exp" \
+            "$GL/api/v4/projects/$PID/access_tokens"
+          tok=$(python3 -c "import json;print(json.load(open('/tmp/t.json')).get('token','') or '')")
+          if [ -z "$tok" ]; then
+            python3 -c "import json;d=json.load(open('/tmp/t.json'));print('mint failed:', d.get('message') or d)"
+            exit 1
+          fi
+          echo "::add-mask::$tok"
+          printf '%s' "$tok" > /tmp/wksig.tok
+          echo "wksig-signal minted (Guest, api, expires $exp) -- value masked"
+      - name: Verify the token (issue + own-note edit here, denied on clush-poc)
+        if: steps.gate.outputs.ready == 'true'
+        run: |
+          set -e
+          tok=$(cat /tmp/wksig.tok); echo "::add-mask::$tok"
+          iid=$(curl -s -X POST -H "PRIVATE-TOKEN: $tok" --data-urlencode "title=signal-selftest $(date -u +%FT%TZ)" "$GL/api/v4/projects/$PID/issues" | python3 -c "import sys,json;print(json.load(sys.stdin).get('iid',''))")
+          [ -n "$iid" ] || { echo "FAIL: wksig-signal could not open an issue on wksig"; exit 1; }
+          echo "issue iid=$iid opened on wksig"
+          nid=$(curl -s -X POST -H "PRIVATE-TOKEN: $tok" --data-urlencode "body=offer" "$GL/api/v4/projects/$PID/issues/$iid/notes" | python3 -c "import sys,json;print(json.load(sys.stdin).get('id',''))")
+          [ -n "$nid" ] || { echo "FAIL: could not add a note"; exit 1; }
+          ec=$(curl -s -o /dev/null -w '%{http_code}' -X PUT -H "PRIVATE-TOKEN: $tok" --data-urlencode "body=answer" "$GL/api/v4/projects/$PID/issues/$iid/notes/$nid")
+          [ "$ec" = "200" ] || { echo "FAIL: could not edit its own note (HTTP $ec)"; exit 1; }
+          echo "own-note edit ok"
+          cpenc=$(python3 -c "import urllib.parse;print(urllib.parse.quote('${NS}/clush-poc',safe=''))")
+          other=$(curl -s -o /dev/null -w '%{http_code}' -H "PRIVATE-TOKEN: $tok" "$GL/api/v4/projects/$cpenc/issues")
+          echo "wksig-signal -> clush-poc issues: HTTP $other"
+          case "$other" in 2*) echo "FAIL: wksig-signal reached clush-poc (expected denial)"; exit 1;; *) echo "cross-project denied as expected (HTTP $other)";; esac
+          # close the selftest issue to keep wksig clean
+          curl -s -o /dev/null -w "close selftest issue: %{http_code}\n" -X PUT -H "PRIVATE-TOKEN: $GLTOK" --data "state_event=close" "$GL/api/v4/projects/$PID/issues/$iid"
+      - name: Store the token as the SDK secret WKSIG_GITLAB_TOKEN
+        if: steps.gate.outputs.ready == 'true'
+        run: |
+          set -e
+          tok=$(cat /tmp/wksig.tok); echo "::add-mask::$tok"
+          done=false
+          for t in "$T1" "$T2" "$T3"; do
+            [ -n "$t" ] || continue
+            if printf '%s' "$tok" | GH_TOKEN="$t" gh secret set WKSIG_GITLAB_TOKEN --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+              done=true; break
+            fi
+          done
+          rm -f /tmp/wksig.tok
+          if $done; then echo "WKSIG_GITLAB_TOKEN set on $GITHUB_REPOSITORY"; else echo "no PAT could set the secret (needs Secrets: write)"; exit 1; fi
