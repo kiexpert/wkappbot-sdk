@@ -86,3 +86,5 @@ jobs:
 # re-run 2026-11-03T11:55Z (item r round 3: skhy-clush 628cea4 — browser POST/PATCH/conditional-GET diagnosis)
 
 # re-run 2026-11-03T12:00Z (item r FIX: skhy-clush f7d97ae — provider wired through; expect GitHub browserOk true)
+
+# re-run 2026-11-03T12:30Z (dual channel: skhy-clush a3b6f27 — 3-case proof both/gitlab-blocked/github-blocked)
