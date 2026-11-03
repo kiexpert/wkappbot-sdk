@@ -88,3 +88,5 @@ jobs:
 # re-run 2026-11-03T12:00Z (item r FIX: skhy-clush f7d97ae — provider wired through; expect GitHub browserOk true)
 
 # re-run 2026-11-03T12:30Z (dual channel: skhy-clush a3b6f27 — 3-case proof both/gitlab-blocked/github-blocked)
+
+# re-run 2026-11-03T13:05Z (adaptive: skhy-clush 194afcd — slow GitLab 1.5s route delay, expect primary github + per-provider RTT)
