@@ -6,7 +6,9 @@ Usage: clush-release-status.py <pipeline_id> <pipeline_status> <jobs.json> <clus
 - jobs.json: the GitLab pipeline jobs array (has name, status, duration).
 - cluster-metrics.json: best-effort metrics written by the deploy job (may be missing/empty).
 
-Prints the assembled JSON to stdout. Never raises on missing cluster metrics.
+Prints the assembled JSON to stdout. The primary payload is a "cd" block in the schema the
+portal's release board already reads (poc-site/portal/deploy-proof.json). Never raises on
+missing cluster metrics.
 """
 import sys
 import json
@@ -32,21 +34,36 @@ def main() -> int:
     except Exception:
         cm = {}
 
+    now_iso = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    sync, _, health = (cm.get("argo_sync_health") or "").partition("/")
+
+    # Primary payload: the "cd" block in the schema the portal's release board already reads
+    # (poc-site/portal/deploy-proof.json). Extra fields (pipeline_status, stages) are siblings
+    # the board ignores.
+    onprem = {
+        "version": cm.get("app_image") or None,
+        "argoApp": "guestbook",
+        "sync": sync or None,
+        "health": health or None,
+        "revision": cm.get("app_revision") or None,
+        "deployedAt": cm.get("cluster_timestamp") or None,
+        "podsReady": cm.get("pods_ready") or None,
+        "cpu": cm.get("top_cpu") or None,
+        "mem": cm.get("top_mem") or None,
+        "latencyMs": {"p50": cm.get("latency_ms_p50"), "p95": cm.get("latency_ms_p95")},
+    }
     out = {
-        "pipeline_id": plid,
+        "cd": {
+            "provider": "gitlab",
+            "pipeline": plid,
+            "measured_at": now_iso,
+            "clusters": {"onprem": onprem},
+        },
         "pipeline_status": status,
         "project": "kiexpert-group/clush-poc",
         "stages": stages,
-        "argo_sync_health": cm.get("argo_sync_health"),
-        "app_revision": cm.get("app_revision"),
-        "pods_ready": cm.get("pods_ready"),
-        "kubectl_top": {"cpu": cm.get("top_cpu"), "mem": cm.get("top_mem")},
-        "latency_ms": {
-            "p50": cm.get("latency_ms_p50"),
-            "p95": cm.get("latency_ms_p95"),
-            "samples": cm.get("samples"),
-        },
-        "generated_at": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "latency_samples": cm.get("samples"),
+        "generated_at": now_iso,
     }
     print(json.dumps(out, indent=2))
     return 0
