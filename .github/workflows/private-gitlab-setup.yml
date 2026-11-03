@@ -2,8 +2,8 @@ name: private-gitlab-setup
 
 # Sets up the owner's own GitLab project and gives it a working CI/CD pipeline, including a job that
 # screenshots the running app from inside the runner (a container, so the same job text runs on a
-# Kubernetes-executor runner) and publishes the images as artifacts the portal can show.
-# Idempotent: it creates what is missing and updates what exists, so it is safe to re-run.
+# Kubernetes-executor runner) and a deploy stage that does a REAL kind + Argo CD deploy on a tagged
+# ephemeral shell-executor runner. Idempotent: it creates what is missing and updates what exists.
 # It reads ONE secret, GITLAB_TOKEN. Empty or SET-ME means "not set yet" and the job says so and stops
 # green, because a missing credential is the owner's step, never a failure of this pipeline.
 # The token is masked, never printed, and never written into a file that is committed.
@@ -20,6 +20,7 @@ on:
     branches: [main]
     paths:
       - .github/workflows/private-gitlab-setup.yml
+      - .github/scripts/clush-deploy.sh
   schedule:
     - cron: '23 22 * * *'
 
@@ -33,12 +34,14 @@ concurrency:
 jobs:
   setup:
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 45
     env:
       GL: https://gitlab.com
       GLTOK: ${{ secrets.GITLAB_TOKEN }}
       PROJECT_PATH: ${{ github.event.inputs.project_path || 'kiexpert-group/clush-poc' }}
     steps:
+      - name: Check out this repo (for the deploy script)
+        uses: actions/checkout@v4
       - name: Is the GitLab token set
         id: gate
         run: |
@@ -107,7 +110,7 @@ jobs:
             rm -rf templates; mkdir -p templates
             echo "clush-cicd-templates not reachable (private or missing) -- continuing with an empty template set so the pipeline still ships"
           fi
-      - name: Push the templates and a pipeline that screenshots the app
+      - name: Push the templates, pipeline and deploy script
         if: steps.gate.outputs.ready == 'true'
         run: |
           set -e
@@ -119,8 +122,9 @@ jobs:
           cp -r templates/. work/cicd-templates/ 2>/dev/null || true
           rm -rf work/cicd-templates/.git
           cat > work/.gitlab-ci.yml <<'EOF'
-          # Demo pipeline for the Clush PoC. Every job runs in a container, so the same file works on a
-          # shared runner and on a Kubernetes-executor runner (one pod per job) with no change.
+          # Demo pipeline for the Clush PoC. build/test/screenshot run in containers on GitLab shared
+          # runners; the deploy stage is a REAL kind + Argo CD deploy that runs on a tagged ephemeral
+          # shell-executor runner (kind needs the host docker daemon).
           stages: [build, test, shot, deploy]
 
           variables:
@@ -159,12 +163,10 @@ jobs:
 
           screenshot:
             stage: shot
-            # The screenshot of what the runner is running: a headless browser inside the job container.
             image: mcr.microsoft.com/playwright:v1.49.1-jammy
             script:
               - npx --yes http-server public -p 8080 >/dev/null 2>&1 &
               - sleep 3
-              # resolve the image's Playwright locally (browsers already present, so skip the download)
               - export PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
               - npm i -s playwright@1.49.1
               - |
@@ -186,12 +188,21 @@ jobs:
 
           deploy:
             stage: deploy
-            image: alpine:3.20
+            tags: [clush-kind]
             script:
-              - echo "deploying $CI_COMMIT_SHORT_SHA from runner $CI_RUNNER_DESCRIPTION"
+              - bash k8s/deploy.sh
+            artifacts:
+              when: always
+              paths: [deploy-proof]
+              expire_in: 1 week
             environment:
               name: demo
+            after_script:
+              - kind delete cluster --name portal-demo || true
           EOF
+          mkdir -p work/k8s
+          cp "$GITHUB_WORKSPACE/.github/scripts/clush-deploy.sh" work/k8s/deploy.sh
+          chmod +x work/k8s/deploy.sh
           cd work
           git config user.email "relay-bot@users.noreply.github.com"
           git config user.name "relay-bot"
@@ -199,33 +210,37 @@ jobs:
           if git diff --cached --quiet; then
             echo "nothing to push: the project already carries this exact setup"
           else
-            git commit -qm "ci: Clush PoC pipeline (build, smoke, runner screenshots, deploy) + CI/CD template set"
+            git commit -qm "ci: Clush PoC pipeline (build, smoke, runner screenshots, real kind+Argo deploy)"
             git push -q origin "HEAD:$branch"
             echo "pushed to $branch"
           fi
-      - name: Register an ephemeral docker runner and run the pipeline to green
+      - name: Register a tagged shell runner (for kind) and run the pipeline to green
         if: steps.gate.outputs.ready == 'true'
         run: |
           set -e
           enc=$(python3 -c "import urllib.parse,os;print(urllib.parse.quote(os.environ['PROJECT_PATH'],safe=''))")
           branch=$(curl -s -H "PRIVATE-TOKEN: $GLTOK" "$GL/api/v4/projects/$enc" | python3 -c "import sys,json;print(json.load(sys.stdin).get('default_branch') or 'main')")
-          # register a project runner (untagged allowed so it picks the demo jobs)
+          # tools for the deploy job (shell executor runs on THIS host; kind uses the host docker daemon)
+          curl -sSLo ./kind "https://kind.sigs.k8s.io/dl/v0.24.0/kind-linux-amd64" && sudo install ./kind /usr/local/bin/kind
+          curl -sSLo ./kubectl "https://dl.k8s.io/release/v1.31.2/bin/linux/amd64/kubectl" && sudo install ./kubectl /usr/local/bin/kubectl
+          kind --version || true
+          kubectl version --client 2>/dev/null | head -1 || true
+          # register a PROJECT runner: shell executor, tagged clush-kind, tagged-only so ONLY the deploy job lands on it
           resp=$(curl -s -X POST -H "PRIVATE-TOKEN: $GLTOK" \
-            --data "runner_type=project_type&project_id=${PID}&run_untagged=true&tag_list=clush-poc&description=ephemeral-actions-${GITHUB_RUN_ID}" \
+            --data "runner_type=project_type&project_id=${PID}&run_untagged=false&tag_list=clush-kind&description=ephemeral-kind-${GITHUB_RUN_ID}" \
             "$GL/api/v4/user/runners")
           rid=$(printf '%s' "$resp" | python3 -c "import sys,json;print(json.load(sys.stdin).get('id','') or '')")
           rtok=$(printf '%s' "$resp" | python3 -c "import sys,json;print(json.load(sys.stdin).get('token','') or '')")
           if [ -z "$rtok" ]; then echo "runner token not issued:"; printf '%s' "$resp" | python3 -c "import sys,json;d=json.load(sys.stdin);print(d.get('message') or d)"; exit 1; fi
           echo "::add-mask::$rtok"
           echo "RID=$rid" >> "$GITHUB_ENV"
-          echo "runner registered id=$rid (token masked)"
-          # install gitlab-runner locally (no sudo), docker executor uses the host docker daemon
+          echo "shell runner registered id=$rid tag=clush-kind (token masked)"
+          # install gitlab-runner locally (no sudo); shell executor runs jobs on this host
           curl -sSL "https://gitlab-runner-downloads.s3.amazonaws.com/latest/binaries/gitlab-runner-linux-amd64" -o ./gitlab-runner
           chmod +x ./gitlab-runner
-          ./gitlab-runner register --non-interactive --config ./rc.toml --url "$GL" --token "$rtok" \
-            --executor docker --docker-image "alpine:3.20" --name "ephemeral-actions-${GITHUB_RUN_ID}"
+          ./gitlab-runner register --non-interactive --config ./rc.toml --url "$GL" --token "$rtok" --executor shell --name "ephemeral-kind-${GITHUB_RUN_ID}"
           ./gitlab-runner run --config ./rc.toml >/tmp/runner.log 2>&1 &
-          echo "gitlab-runner started pid=$! (executor: docker)"
+          echo "gitlab-runner started pid=$! (executor: shell, tag clush-kind)"
           # install glab (pinned, best-effort) for a richer post-run report; curl report below is the fallback
           for u in \
             "https://gitlab.com/gitlab-org/cli/-/releases/v1.54.0/downloads/glab_1.54.0_linux_amd64.tar.gz" \
@@ -237,15 +252,15 @@ jobs:
           done
           glab --version 2>/dev/null || echo "glab not installed (best-effort); the curl report still runs"
           sleep 5
-          # create a fresh pipeline (a shared SaaS runner or the ephemeral one above will pick the jobs)
+          # create a fresh pipeline (shared SaaS runners serve build/test/screenshot; the tagged shell runner serves deploy)
           curl -s -o /tmp/pl.json -w 'pipeline create: %{http_code}\n' -X POST -H "PRIVATE-TOKEN: $GLTOK" --data "ref=${branch}" "$GL/api/v4/projects/$enc/pipeline"
           plid=$(python3 -c "import json;print(json.load(open('/tmp/pl.json')).get('id','') or '')")
           if [ -z "$plid" ]; then echo "pipeline not created:"; cat /tmp/pl.json; exit 1; fi
           echo "PIPELINE_ID=$plid" >> "$GITHUB_ENV"
           echo "pipeline id=$plid created"
-          # poll the pipeline id directly until terminal (fixes the old 'none' race)
+          # poll the pipeline id directly until terminal (kind+Argo takes a while)
           st=created
-          for i in $(seq 1 80); do
+          for i in $(seq 1 120); do
             st=$(curl -s -H "PRIVATE-TOKEN: $GLTOK" "$GL/api/v4/projects/$enc/pipelines/$plid" | python3 -c "import sys,json;print(json.load(sys.stdin).get('status','') or '')")
             echo "pipeline $plid: $st"
             case "$st" in success|failed|canceled|skipped) break;; esac
@@ -272,7 +287,7 @@ jobs:
             echo "---- failed GitLab job traces (tail) ----"
             for jid in $(curl -s -H "PRIVATE-TOKEN: $GLTOK" "$GL/api/v4/projects/$enc/pipelines/$plid/jobs" | python3 -c "import sys,json;[print(j['id']) for j in json.load(sys.stdin) if j['status']=='failed']"); do
               echo "== job $jid trace =="
-              curl -s -H "PRIVATE-TOKEN: $GLTOK" "$GL/api/v4/projects/$enc/jobs/$jid/trace" | tail -n 50
+              curl -s -H "PRIVATE-TOKEN: $GLTOK" "$GL/api/v4/projects/$enc/jobs/$jid/trace" | tail -n 80
             done
             echo "pipeline did not go green: $st"; exit 1
           fi
@@ -284,4 +299,4 @@ jobs:
           else
             echo "no runner id recorded; nothing to unregister"
           fi
-# 2026-11-03: screenshot job installs playwright locally (--no-sandbox kept); poll step prints failed GitLab job traces; glab (pinned, best-effort) adds a glab api report alongside curl.
+# 2026-11-03: deploy stage is now a real kind + Argo CD deploy (k8s/deploy.sh) on a tagged shell runner; build/test/screenshot stay on shared runners; glab + failed-trace reporting kept.
