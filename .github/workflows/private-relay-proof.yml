@@ -94,3 +94,5 @@ jobs:
 # re-run 2026-11-03T13:15Z (item t: skhy-clush d001479 — activity-based pace, handshake+requests at 500 vs 1200)
 
 # re-run 2026-11-03T13:22Z (cold-start race: skhy-clush b9e6e64 — adaptive handshake at fast-alone speed + pace 500/1200)
+
+# re-run 2026-11-03T13:58Z (item t adaptive write: skhy-clush f741196 — measured POST vs PATCH latency + live mode flip, writeMode gate)
