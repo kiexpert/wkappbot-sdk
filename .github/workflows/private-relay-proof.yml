@@ -98,3 +98,5 @@ jobs:
 # re-run 2026-11-03T13:58Z (item t adaptive write: skhy-clush f741196 — measured POST vs PATCH latency + live mode flip, writeMode gate)
 
 # re-run 2026-11-03T14:20Z (item t: skhy-clush ea88383 — live write flip via driven stream, opts.diag seam)
+
+# re-run 2026-11-03T14:30Z (item t: skhy-clush 7e8bf59 — keyB64 fix, live write flip green)
