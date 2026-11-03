@@ -74,3 +74,6 @@ jobs:
 # re-run 2026-11-03T10:23Z (picks up skhy-clush cipher-check fix f8d0f52)
 
 # re-run 10:45Z (giveup fix abb9b80 surfaces the GitHub error fast)
+
+# re-run 2026-11-03T10:58Z (picks up skhy-clush a115a32: GitHub CORS recorded as browserBlockedCORS, honest
+# signal-cost benchmark N=8/N=64). Expect GREEN: GitLab full browser proof, GitHub browserBlockedCORS+apiOk.
