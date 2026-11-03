@@ -82,3 +82,5 @@ jobs:
 # http://127.0.0.1 and the Pages origin for both providers, to recheck the GitHub browser-CORS verdict).
 
 # re-run 2026-11-03T11:45Z (item r round 2: skhy-clush 00fa043 — actual-response CORS + direct browser fetch with/without Accept)
+
+# re-run 2026-11-03T11:55Z (item r round 3: skhy-clush 628cea4 — browser POST/PATCH/conditional-GET diagnosis)
