@@ -3,9 +3,10 @@ name: private-gitlab-setup
 # Sets up the owner's own GitLab project and gives it a working CI/CD pipeline, including a job that
 # screenshots the running app from inside the runner (a container, so the same job text runs on a
 # Kubernetes-executor runner) and a deploy stage that does a REAL kind + Argo CD deploy on a tagged
-# ephemeral shell-executor runner. Idempotent: it creates what is missing and updates what exists.
-# It reads ONE secret, GITLAB_TOKEN. Empty or SET-ME means "not set yet" and the job says so and stops
-# green, because a missing credential is the owner's step, never a failure of this pipeline.
+# ephemeral shell-executor runner, then publishes a release-status.json to a public release the portal
+# reads. Idempotent: it creates what is missing and updates what exists.
+# It reads ONE GitLab secret, GITLAB_TOKEN. Empty or SET-ME means "not set yet" and the job says so and
+# stops green, because a missing credential is the owner's step, never a failure of this pipeline.
 # The token is masked, never printed, and never written into a file that is committed.
 # The push trigger exists because workflow_dispatch is refused for the agent session that maintains
 # this file, so touching the file is the only way to run it on demand (2026-11-01).
@@ -21,6 +22,7 @@ on:
     paths:
       - .github/workflows/private-gitlab-setup.yml
       - .github/scripts/clush-deploy.sh
+      - .github/scripts/clush-release-status.py
   schedule:
     - cron: '23 22 * * *'
 
@@ -35,6 +37,8 @@ jobs:
   setup:
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    permissions:
+      contents: write
     env:
       GL: https://gitlab.com
       GLTOK: ${{ secrets.GITLAB_TOKEN }}
@@ -216,6 +220,8 @@ jobs:
           fi
       - name: Register a tagged shell runner (for kind) and run the pipeline to green
         if: steps.gate.outputs.ready == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -e
           enc=$(python3 -c "import urllib.parse,os;print(urllib.parse.quote(os.environ['PROJECT_PATH'],safe=''))")
@@ -295,6 +301,17 @@ jobs:
             done
             echo "pipeline did not go green: $st"; exit 1
           fi
+          # success path: assemble release-status.json (pipeline + cluster metrics) and publish it publicly
+          echo "== assemble + publish release-status.json =="
+          curl -s -H "PRIVATE-TOKEN: $GLTOK" "$GL/api/v4/projects/$enc/pipelines/$plid/jobs" > /tmp/jobs.json
+          deploy_jid="$(python3 -c "import json;print(next((j['id'] for j in json.load(open('/tmp/jobs.json')) if j['name']=='deploy'),''))")"
+          curl -s -H "PRIVATE-TOKEN: $GLTOK" "$GL/api/v4/projects/$enc/jobs/${deploy_jid}/artifacts/deploy-proof/cluster-metrics.json" -o /tmp/cluster-metrics.json 2>/dev/null || true
+          python3 "$GITHUB_WORKSPACE/.github/scripts/clush-release-status.py" "$plid" "$st" /tmp/jobs.json /tmp/cluster-metrics.json > release-status.json
+          echo "---- release-status.json ----"; cat release-status.json
+          gh release view clush-release-board --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 \
+            || gh release create clush-release-board --repo "$GITHUB_REPOSITORY" --title "Clush release board" --notes "Live release-status.json for the portal release board (updated each clush-poc deploy)." --latest=false
+          gh release upload clush-release-board release-status.json --repo "$GITHUB_REPOSITORY" --clobber
+          echo "release-status.json URL: https://github.com/$GITHUB_REPOSITORY/releases/download/clush-release-board/release-status.json"
       - name: Unregister the ephemeral runner
         if: always()
         run: |
@@ -303,4 +320,4 @@ jobs:
           else
             echo "no runner id recorded; nothing to unregister"
           fi
-# 2026-11-03: deploy stage is a real kind + Argo CD deploy (k8s/deploy.sh) on a tagged shell runner (login profile .bash_logout removed so prepare-environment passes); build/test/screenshot stay on shared runners; glab + failed-trace reporting kept.
+# 2026-11-03: deploy stage runs real kind + Argo CD (k8s/deploy.sh) on a tagged shell runner; metrics-server + cluster metrics gathered; a public release-status.json (release clush-release-board) feeds the portal board; glab + failed-trace reporting kept.
