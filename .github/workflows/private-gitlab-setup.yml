@@ -226,6 +226,16 @@ jobs:
             --executor docker --docker-image "alpine:3.20" --name "ephemeral-actions-${GITHUB_RUN_ID}"
           ./gitlab-runner run --config ./rc.toml >/tmp/runner.log 2>&1 &
           echo "gitlab-runner started pid=$! (executor: docker)"
+          # install glab (pinned, best-effort) for a richer post-run report; curl report below is the fallback
+          for u in \
+            "https://gitlab.com/gitlab-org/cli/-/releases/v1.54.0/downloads/glab_1.54.0_linux_amd64.tar.gz" \
+            "https://gitlab.com/gitlab-org/cli/-/releases/v1.54.0/downloads/glab_1.54.0_Linux_x86_64.tar.gz"; do
+            if curl -sSLf "$u" -o /tmp/glab.tgz 2>/dev/null; then
+              mkdir -p /tmp/glabx && tar -xzf /tmp/glab.tgz -C /tmp/glabx 2>/dev/null && \
+              gbin="$(find /tmp/glabx -type f -name glab | head -1)" && [ -n "$gbin" ] && sudo install "$gbin" /usr/local/bin/glab 2>/dev/null && break
+            fi
+          done
+          glab --version 2>/dev/null || echo "glab not installed (best-effort); the curl report still runs"
           sleep 5
           # create a fresh pipeline (a shared SaaS runner or the ephemeral one above will pick the jobs)
           curl -s -o /tmp/pl.json -w 'pipeline create: %{http_code}\n' -X POST -H "PRIVATE-TOKEN: $GLTOK" --data "ref=${branch}" "$GL/api/v4/projects/$enc/pipeline"
@@ -251,6 +261,12 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
           curl -s -H "PRIVATE-TOKEN: $GLTOK" "$GL/api/v4/projects/$enc/pipelines/$plid/jobs" \
             | python3 -c "import sys,json;[print('job:', j['name'], j['status'], '| stage:', j['stage'], '| runner:', (j.get('runner') or {}).get('description')) for j in json.load(sys.stdin)]"
+          # glab-based report (best-effort), alongside the curl report above
+          if command -v glab >/dev/null 2>&1; then
+            echo "---- glab api report ----"
+            GITLAB_HOST="$GL" GITLAB_TOKEN="$GLTOK" glab api "projects/$PID/pipelines/$plid" 2>/dev/null | python3 -c "import sys,json;d=json.load(sys.stdin);print('glab pipeline', d.get('id'), d.get('status'), d.get('web_url'))" 2>/dev/null || echo "glab pipeline read skipped"
+            GITLAB_HOST="$GL" GITLAB_TOKEN="$GLTOK" glab api "projects/$PID/pipelines/$plid/jobs" 2>/dev/null | python3 -c "import sys,json;[print('glab job:', j['name'], j['status']) for j in json.load(sys.stdin)]" 2>/dev/null || echo "glab jobs read skipped"
+          fi
           echo "---- gitlab-runner log tail ----"; tail -n 25 /tmp/runner.log 2>/dev/null || true
           if [ "$st" != "success" ]; then
             echo "---- failed GitLab job traces (tail) ----"
@@ -268,4 +284,4 @@ jobs:
           else
             echo "no runner id recorded; nothing to unregister"
           fi
-# 2026-11-03: screenshot job installs playwright locally (--no-sandbox kept); poll step prints failed GitLab job traces for visibility.
+# 2026-11-03: screenshot job installs playwright locally (--no-sandbox kept); poll step prints failed GitLab job traces; glab (pinned, best-effort) adds a glab api report alongside curl.
