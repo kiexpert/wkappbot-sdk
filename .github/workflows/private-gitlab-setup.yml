@@ -207,3 +207,4 @@ jobs:
               | python3 -c "import sys,json;[print('job:', j['name'], j['status'], '| runner:', (j.get('runner') or {}).get('description'), '| artifacts:', bool(j.get('artifacts')))  for j in json.load(sys.stdin)]"
           fi
           if [ "$st" = "failed" ]; then echo "the pipeline failed -- read the job log above"; exit 1; fi
+# on-demand re-run 2026-11-03: re-check the GITLAB_TOKEN gate after the owner's drop (no behavior change).
