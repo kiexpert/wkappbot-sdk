@@ -33,6 +33,7 @@ jobs:
       T2: ${{ secrets.WKAPPBOT_PAT }}
       T3: ${{ secrets.WKAPPBOT_CORE_PAT }}
       WKSIG_GITLAB_TOKEN: ${{ secrets.WKSIG_GITLAB_TOKEN }}
+      WKSIG_GITHUB_TOKEN: ${{ secrets.WKSIG_GITHUB_TOKEN }}
     steps:
       - name: Find the target repo and a token that can reach it
         run: |
@@ -50,13 +51,12 @@ jobs:
             done
           done
           echo "no token reaches the target repo"; exit 1
-      - name: Guard the signal token
+      - name: Guard the signal tokens
         run: |
-          if [ -z "$WKSIG_GITLAB_TOKEN" ] || [ "$WKSIG_GITLAB_TOKEN" = "SET-ME" ]; then
-            echo "WKSIG_GITLAB_TOKEN is not set — the live relay proof is skipped until the owner provides it"; exit 1
-          fi
-          echo "::add-mask::$WKSIG_GITLAB_TOKEN"
-          echo "signal token present"
+          ok=0
+          [ -n "$WKSIG_GITLAB_TOKEN" ] && [ "$WKSIG_GITLAB_TOKEN" != "SET-ME" ] && { echo "::add-mask::$WKSIG_GITLAB_TOKEN"; echo "GitLab signal token present"; ok=1; }
+          [ -n "$WKSIG_GITHUB_TOKEN" ] && [ "$WKSIG_GITHUB_TOKEN" != "SET-ME" ] && { echo "::add-mask::$WKSIG_GITHUB_TOKEN"; echo "GitHub signal token present"; ok=1; }
+          [ "$ok" = 1 ] || { echo "no signal token set (WKSIG_GITLAB_TOKEN / WKSIG_GITHUB_TOKEN) — nothing to prove"; exit 1; }
       - name: Clone the target and run the live relay proof
         run: |
           set -eu
