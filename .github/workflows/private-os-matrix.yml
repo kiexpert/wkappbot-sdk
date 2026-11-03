@@ -1,0 +1,119 @@
+name: private-os-matrix
+
+# Proves the portal's deploy status is correct regardless of the service VM's OS (item s). ONE run fans out a matrix
+# of ubuntu/windows/macos with fail-fast off and max-parallel 3, so all three deploy at the same moment; each runs the
+# target's ci/os-deploy.mjs (a tiny service in cross-OS node, emitting the same deploy-proof schema) and uploads its
+# status entry. A final aggregate job merges the three into one osMatrix (and measures how simultaneous they were) with
+# the target's ci/os-aggregate.mjs. The logic lives in the target repo; this is a thin shim (item-o pattern): the
+# target is found by a sha256 prefix and never named, its name and tokens are masked. This repo is public.
+# SECRETS READ: GH_LICENSE_TOKEN / WKAPPBOT_PAT / WKAPPBOT_CORE_PAT (to find+clone the target). No cleartext secret printed.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, 'qa-video/**']
+    paths:
+      - .github/workflows/private-os-matrix.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: private-os-matrix
+  cancel-in-progress: false
+
+env:
+  TARGET_HASH: ce712644e054789d
+
+jobs:
+  deploy:
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Find the target repo and a token that can reach it
+        shell: bash
+        env:
+          T1: ${{ secrets.GH_LICENSE_TOKEN }}
+          T2: ${{ secrets.WKAPPBOT_PAT }}
+          T3: ${{ secrets.WKAPPBOT_CORE_PAT }}
+        run: |
+          set -u
+          for t in "$T1" "$T2" "$T3"; do
+            [ -n "$t" ] && [ "$t" != "SET-ME" ] || continue
+            echo "::add-mask::$t"
+            names=$(GH_TOKEN="$t" gh repo list kiexpert --visibility private --limit 300 --json nameWithOwner -q '.[].nameWithOwner' 2>/dev/null || true)
+            for n in $names; do
+              h=$(node -e "console.log(require('crypto').createHash('sha256').update(process.argv[1]).digest('hex').slice(0,16))" "$n")
+              if [ "$h" = "$TARGET_HASH" ]; then
+                echo "::add-mask::$n"; echo "::add-mask::${n#*/}"
+                { echo "REPO=$n"; echo "TOK=$t"; } >> "$GITHUB_ENV"
+                echo "target found"; exit 0
+              fi
+            done
+          done
+          echo "no token reaches the target repo"; exit 1
+      - name: Clone the target and deploy on this OS
+        shell: bash
+        run: |
+          set -eu
+          git clone -q --depth 1 "https://x-access-token:${TOK}@github.com/${REPO}.git" src
+          cd src
+          node ci/os-deploy.mjs "${{ matrix.os }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: os-status-${{ matrix.os }}
+          path: src/ci-os-status.json
+          retention-days: 7
+  aggregate:
+    needs: deploy
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Find the target repo and a token that can reach it
+        shell: bash
+        env:
+          T1: ${{ secrets.GH_LICENSE_TOKEN }}
+          T2: ${{ secrets.WKAPPBOT_PAT }}
+          T3: ${{ secrets.WKAPPBOT_CORE_PAT }}
+        run: |
+          set -u
+          for t in "$T1" "$T2" "$T3"; do
+            [ -n "$t" ] && [ "$t" != "SET-ME" ] || continue
+            echo "::add-mask::$t"
+            names=$(GH_TOKEN="$t" gh repo list kiexpert --visibility private --limit 300 --json nameWithOwner -q '.[].nameWithOwner' 2>/dev/null || true)
+            for n in $names; do
+              h=$(node -e "console.log(require('crypto').createHash('sha256').update(process.argv[1]).digest('hex').slice(0,16))" "$n")
+              if [ "$h" = "$TARGET_HASH" ]; then
+                echo "::add-mask::$n"; echo "::add-mask::${n#*/}"
+                { echo "REPO=$n"; echo "TOK=$t"; } >> "$GITHUB_ENV"
+                echo "target found"; exit 0
+              fi
+            done
+          done
+          echo "no token reaches the target repo"; exit 1
+      - name: Clone the target
+        shell: bash
+        run: git clone -q --depth 1 "https://x-access-token:${TOK}@github.com/${REPO}.git" src
+      - name: Download all per-OS status entries
+        uses: actions/download-artifact@v4
+        with:
+          path: entries
+      - name: Aggregate the OS matrix
+        shell: bash
+        run: node src/ci/os-aggregate.mjs entries src/ci-os-matrix.json
+      - name: Show the aggregated matrix
+        if: always()
+        shell: bash
+        run: |
+          [ -f src/ci-os-matrix.json ] && cat src/ci-os-matrix.json || echo "no matrix file"
