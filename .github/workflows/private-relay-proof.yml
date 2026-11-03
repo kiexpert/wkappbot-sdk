@@ -84,3 +84,5 @@ jobs:
 # re-run 2026-11-03T11:45Z (item r round 2: skhy-clush 00fa043 — actual-response CORS + direct browser fetch with/without Accept)
 
 # re-run 2026-11-03T11:55Z (item r round 3: skhy-clush 628cea4 — browser POST/PATCH/conditional-GET diagnosis)
+
+# re-run 2026-11-03T12:00Z (item r FIX: skhy-clush f7d97ae — provider wired through; expect GitHub browserOk true)
