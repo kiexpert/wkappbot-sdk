@@ -143,6 +143,25 @@ jobs:
           rec app-status kubectl -n argocd get application guestbook -o jsonpath='{.status.sync.status} {.status.health.status} {.status.sync.revision} {.status.operationState.phase} {.status.operationState.finishedAt}'
           rec app-resources kubectl -n guestbook get deploy,svc,pods -o wide
           [ "$ok" = 1 ] || { echo "Argo CD did not reach Synced/Healthy"; exit 1; }
+      - name: Deploy the runner pods and measure them for real (metrics-server)
+        run: |
+          set -eu
+          rec() { local id="$1"; shift; local t0=$(date +%s.%N); set +e; out=$("$@" 2>&1); rc=$?; set -e
+            local t1=$(date +%s.%N); printf '%s' "$out" > "proof/$id.out"
+            node -e "const fs=require('fs');const f='proof/steps.json';const a=fs.existsSync(f)?JSON.parse(fs.readFileSync(f)):[];a.push({id:process.argv[1],cmd:process.argv[2],rc:+process.argv[3],seconds:+(process.argv[5]-process.argv[4]).toFixed(2),out:fs.readFileSync('proof/'+process.argv[1]+'.out','utf8').split('\n').slice(-40).join('\n')});fs.writeFileSync(f,JSON.stringify(a))" "$id" "$*" "$rc" "$t0" "$t1"
+            echo "\$ $*"; echo "$out" | tail -20; return $rc; }
+          # metrics-server so `kubectl top` returns real CPU/memory; kind's kubelet serving cert needs --kubelet-insecure-tls
+          kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+          kubectl -n kube-system patch deployment metrics-server --type=json -p='[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--kubelet-insecure-tls"}]'
+          kubectl -n kube-system rollout status deployment/metrics-server --timeout=180s
+          kubectl create namespace portal-runners
+          kubectl -n portal-runners create deployment daemon-runner --image=nginx:1.27-alpine --replicas=2
+          kubectl -n portal-runners rollout status deployment/daemon-runner --timeout=120s
+          # metrics take ~15-30 s to populate after the pods are Ready
+          for i in $(seq 1 30); do kubectl top pods -n portal-runners --no-headers 2>/dev/null | grep -q . && break; sleep 5; done
+          rec runner-pods kubectl -n portal-runners get pods -o wide
+          rec runner-top kubectl top pods -n portal-runners --no-headers || true
+          rec node-top kubectl top nodes --no-headers || true
       - name: Write deploy-proof.json and push it to the target's deploy-proof/build
         run: |
           set -eu
@@ -156,10 +175,15 @@ jobs:
               kubectl:{namespace:'portal-demo',image:'nginx:1.27-alpine',replicas:2,served:/S customer notice portal 1\.5\.0/.test(get('serve'))},
               argocd:{version:process.env.ARGOCD_VERSION,app:'guestbook',repo:'https://github.com/argoproj/argocd-example-apps.git',path:'guestbook',
                 sync:st[0]||'',health:st[1]||'',revision:st[2]||'',phase:st[3]||'',finished_at:st[4]||''},
-              ok:steps.every(s=>s.rc===0)&&st[0]==='Synced'&&st[1]==='Healthy',
+              ok:steps.filter(s=>!['runner-top','node-top'].includes(s.id)).every(s=>s.rc===0)&&st[0]==='Synced'&&st[1]==='Healthy',
               steps};
+            // real runner pods measured on the kind cluster (names, node, phase, and CPU/memory from metrics-server)
+            const topPods={}; get('runner-top').split('\n').filter(l=>l.trim()).forEach(l=>{const c=l.trim().split(/\s+/);topPods[c[0]]={cpu:c[1],mem:c[2]};});
+            const pods=get('runner-pods').split('\n').slice(1).filter(l=>l.trim()).map(l=>{const c=l.trim().split(/\s+/);return Object.assign({pod:c[0],ready:c[1],phase:c[2],restarts:c[3],ip:c[5],node:c[6]},topPods[c[0]]||{});});
+            const nodes=get('node-top').split('\n').filter(l=>l.trim()).map(l=>{const c=l.trim().split(/\s+/);return {node:c[0],cpu:c[1],cpu_pct:c[2],mem:c[3],mem_pct:c[4]};});
+            out.runners={namespace:'portal-runners',deployment:'daemon-runner',measured_at:new Date().toISOString(),metrics:topPods&&Object.keys(topPods).length?'metrics-server':'none',pods,nodes};
             fs.writeFileSync('src/poc-site/portal/deploy-proof.json',JSON.stringify(out,null,1)+'\n');
-            console.log('ok',out.ok,'| kubectl',out.cluster.kubectl,'server',out.cluster.server,'| served',out.kubectl.served,'| argocd',out.argocd.sync,out.argocd.health,out.argocd.revision.slice(0,12));"
+            console.log('ok',out.ok,'| kubectl',out.cluster.kubectl,'| argocd',out.argocd.sync,out.argocd.health,'| runners',out.runners.pods.length,'metrics',out.runners.metrics,'| top',out.runners.pods.map(p=>p.pod+':'+(p.cpu||'-')+'/'+(p.mem||'-')).join(' '));"
           cd src
           git config user.name "deploy-proof-bot"
           git config user.email "deploy-proof-bot@users.noreply.github.com"
