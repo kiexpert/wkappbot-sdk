@@ -80,3 +80,5 @@ jobs:
 
 # re-run 2026-11-03T11:36Z (item r: picks up skhy-clush 0dbdfc8 — captures the OPTIONS preflight evidence from
 # http://127.0.0.1 and the Pages origin for both providers, to recheck the GitHub browser-CORS verdict).
+
+# re-run 2026-11-03T11:45Z (item r round 2: skhy-clush 00fa043 — actual-response CORS + direct browser fetch with/without Accept)
