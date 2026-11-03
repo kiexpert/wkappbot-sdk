@@ -90,3 +90,5 @@ jobs:
 # re-run 2026-11-03T12:30Z (dual channel: skhy-clush a3b6f27 — 3-case proof both/gitlab-blocked/github-blocked)
 
 # re-run 2026-11-03T13:05Z (adaptive: skhy-clush 194afcd — slow GitLab 1.5s route delay, expect primary github + per-provider RTT)
+
+# re-run 2026-11-03T13:15Z (item t: skhy-clush d001479 — activity-based pace, handshake+requests at 500 vs 1200)
