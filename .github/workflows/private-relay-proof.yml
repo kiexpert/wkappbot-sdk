@@ -92,3 +92,5 @@ jobs:
 # re-run 2026-11-03T13:05Z (adaptive: skhy-clush 194afcd — slow GitLab 1.5s route delay, expect primary github + per-provider RTT)
 
 # re-run 2026-11-03T13:15Z (item t: skhy-clush d001479 — activity-based pace, handshake+requests at 500 vs 1200)
+
+# re-run 2026-11-03T13:22Z (cold-start race: skhy-clush b9e6e64 — adaptive handshake at fast-alone speed + pace 500/1200)
