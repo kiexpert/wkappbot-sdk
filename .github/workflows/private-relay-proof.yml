@@ -96,3 +96,5 @@ jobs:
 # re-run 2026-11-03T13:22Z (cold-start race: skhy-clush b9e6e64 — adaptive handshake at fast-alone speed + pace 500/1200)
 
 # re-run 2026-11-03T13:58Z (item t adaptive write: skhy-clush f741196 — measured POST vs PATCH latency + live mode flip, writeMode gate)
+
+# re-run 2026-11-03T14:20Z (item t: skhy-clush ea88383 — live write flip via driven stream, opts.diag seam)
