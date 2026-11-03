@@ -70,3 +70,5 @@ jobs:
         if: always()
         run: |
           [ -f src/ci-relay-proof-result.json ] && cat src/ci-relay-proof-result.json || echo "no result file"
+
+# re-run 2026-11-03T10:23Z (picks up skhy-clush cipher-check fix f8d0f52)
