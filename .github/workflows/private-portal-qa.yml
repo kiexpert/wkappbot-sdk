@@ -12,7 +12,7 @@ name: private-portal-qa
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: [main, 'qa-video/**']
     paths:
       - .github/workflows/private-portal-qa.yml
   schedule:
