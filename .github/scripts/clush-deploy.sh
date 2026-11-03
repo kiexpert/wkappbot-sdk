@@ -89,6 +89,8 @@ echo "== gather release metrics (best-effort) =="
 rev="$(kubectl -n argocd get application guestbook -o jsonpath='{.status.sync.revision}' 2>/dev/null)"
 pods_ready="$(kubectl -n clush-demo get deploy notice -o jsonpath='{.status.readyReplicas}/{.status.replicas}' 2>/dev/null)"
 app_image="$(kubectl -n clush-demo get deploy notice -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null)"
+kube_ctx="$(kubectl config current-context 2>/dev/null)"
+kubectl_ver="$(kubectl version --client -o json 2>/dev/null | python3 -c "import sys,json;print(json.load(sys.stdin).get('clientVersion',{}).get('gitVersion',''))" 2>/dev/null)"
 top_cpu=""; top_mem=""
 for i in $(seq 1 25); do
   line="$(kubectl -n clush-demo top pod -l app=notice --no-headers 2>/dev/null | head -1)"
@@ -111,7 +113,7 @@ kill "$pf" 2>/dev/null
 p50="$(python3 -c "import math;v=sorted(float(x) for x in open('/tmp/lat.txt') if x.strip());print(round(v[max(0,math.ceil(0.50*len(v))-1)]*1000,1)) if v else print('')" 2>/dev/null)"
 p95="$(python3 -c "import math;v=sorted(float(x) for x in open('/tmp/lat.txt') if x.strip());print(round(v[max(0,math.ceil(0.95*len(v))-1)]*1000,1)) if v else print('')" 2>/dev/null)"
 samples="$(grep -c . /tmp/lat.txt 2>/dev/null)"
-export CM_S="$s" CM_REV="$rev" CM_PR="$pods_ready" CM_IMG="$app_image" CM_CPU="$top_cpu" CM_MEM="$top_mem" CM_P50="$p50" CM_P95="$p95" CM_N="$samples"
+export CM_S="$s" CM_REV="$rev" CM_PR="$pods_ready" CM_IMG="$app_image" CM_CTX="$kube_ctx" CM_KV="$kubectl_ver" CM_CPU="$top_cpu" CM_MEM="$top_mem" CM_P50="$p50" CM_P95="$p95" CM_N="$samples"
 python3 - <<'PY'
 import json, os, datetime
 d = {
@@ -119,6 +121,8 @@ d = {
   "app_revision": os.environ.get("CM_REV", ""),
   "pods_ready": os.environ.get("CM_PR", ""),
   "app_image": os.environ.get("CM_IMG", ""),
+  "cluster_name": os.environ.get("CM_CTX", ""),
+  "kubectl_version": os.environ.get("CM_KV", ""),
   "top_cpu": os.environ.get("CM_CPU", ""),
   "top_mem": os.environ.get("CM_MEM", ""),
   "latency_ms_p50": os.environ.get("CM_P50", ""),
