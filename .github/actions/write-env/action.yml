@@ -3,7 +3,7 @@ description: >-
   Writes every secret the calling workflow can see into one .env in the parent folder of the
   checkout (the GitHub base folder layout of the owner's PCs: D:/GitHub/.env beside the repos),
   so scripts that load the central .env find it on a runner too. Prints the key count and a hash
-  prefix only. Call it with: secrets-json: ${{ toJSON(secrets) }}
+  prefix only. The caller passes secrets-json set to toJSON of its own secrets context.
 inputs:
   secrets-json:
     description: toJSON(secrets) of the calling workflow
