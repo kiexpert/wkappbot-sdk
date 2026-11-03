@@ -77,3 +77,6 @@ jobs:
 
 # re-run 2026-11-03T10:58Z (picks up skhy-clush a115a32: GitHub CORS recorded as browserBlockedCORS, honest
 # signal-cost benchmark N=8/N=64). Expect GREEN: GitLab full browser proof, GitHub browserBlockedCORS+apiOk.
+
+# re-run 2026-11-03T11:36Z (item r: picks up skhy-clush 0dbdfc8 — captures the OPTIONS preflight evidence from
+# http://127.0.0.1 and the Pages origin for both providers, to recheck the GitHub browser-CORS verdict).
