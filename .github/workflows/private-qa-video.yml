@@ -1,0 +1,80 @@
+name: private-qa-video
+
+# Item (w): rebuilds the portal's QA video as the presentation, with a NATURAL neural Korean voice (edge-tts
+# ko-KR-SunHiNeural, slightly slow, loudness-normalised) that the owner's container cannot synthesise (the TTS endpoint
+# is off-network there). This runs on a GitHub runner (open network), installs a Korean font, records the live portal
+# road with Playwright, burns in large Korean captions, and uploads the built video + vtt + json as artifacts to land
+# in the target repo. Thin shim (item-o pattern): the target is found by a sha256 prefix and never named, masked.
+# SECRETS: GH_LICENSE_TOKEN / WKAPPBOT_PAT / WKAPPBOT_CORE_PAT (to find + clone the target). No other secret is used.
+on:
+  workflow_dispatch:
+  push:
+    branches: ['qa-video/**']
+    paths:
+      - .github/workflows/private-qa-video.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: private-qa-video
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      TARGET_HASH: ce712644e054789d
+      T1: ${{ secrets.GH_LICENSE_TOKEN }}
+      T2: ${{ secrets.WKAPPBOT_PAT }}
+      T3: ${{ secrets.WKAPPBOT_CORE_PAT }}
+      SCHEME: dark
+      SRC_REF: main
+    steps:
+      - name: Find the target repo and a token that can reach it
+        run: |
+          set -u
+          for t in "$T1" "$T2" "$T3"; do
+            [ -n "$t" ] && [ "$t" != "SET-ME" ] || continue
+            echo "::add-mask::$t"
+            names=$(GH_TOKEN="$t" gh repo list kiexpert --visibility private --limit 300 --json nameWithOwner -q '.[].nameWithOwner' 2>/dev/null || true)
+            for n in $names; do
+              if [ "$(printf %s "$n" | sha256sum | cut -c1-16)" = "$TARGET_HASH" ]; then
+                echo "::add-mask::$n"; echo "::add-mask::${n#*/}"; echo "TOK=$t" >> "$GITHUB_ENV"; echo "REPO=$n" >> "$GITHUB_ENV"; exit 0
+              fi
+            done
+          done
+          echo "no token reaches the target"; exit 1
+      - name: Install the media + voice toolchain
+        run: |
+          set -eu
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg espeak-ng fonts-noto-cjk >/dev/null
+          python3 -m pip install --quiet edge-tts
+          fc-cache -f >/dev/null 2>&1 || true
+      - name: Clone the target and install Playwright
+        run: |
+          set -eu
+          git clone -q --depth 5 --branch "$SRC_REF" "https://x-access-token:${TOK}@github.com/${REPO}.git" src
+          cd src && npm init -y >/dev/null 2>&1 && npm i --no-save playwright@1.48.0 >/dev/null 2>&1 && npx playwright install --with-deps chromium
+      - name: Build the QA video (neural voice)
+        working-directory: src
+        env:
+          TTS_ENGINE: edge
+        run: |
+          set -eu
+          bash poc-site/portal/qa/build.sh "$SCHEME"
+          echo "=== qa-video.json ==="; cat poc-site/portal/qa/qa-video.json
+          ls -la poc-site/portal/qa/qa-video.mp4 poc-site/portal/qa/qa-video.webm poc-site/portal/qa/qa-video.vtt poc-site/portal/qa/qa-video.json
+      - name: Upload the built video
+        uses: actions/upload-artifact@v4
+        with:
+          name: qa-video
+          path: |
+            src/poc-site/portal/qa/qa-video.mp4
+            src/poc-site/portal/qa/qa-video.webm
+            src/poc-site/portal/qa/qa-video.vtt
+            src/poc-site/portal/qa/qa-video.json
+          retention-days: 3
+          if-no-files-found: error
