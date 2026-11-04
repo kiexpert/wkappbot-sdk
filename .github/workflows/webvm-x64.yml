@@ -193,6 +193,13 @@ jobs:
           set -eu
           cp src/webvm/x64/index.html out/index.html
           mkdir -p out/harness && cp harnesspkg/wk-harness-min.tar.gz out/harness/ && cp src/webvm/x64-build/harness-install.sh out/harness/install.sh
+          # Harness dist v2: sha256 + version.json beside the tarball (install.sh refuses a mismatch), the Windows
+          # install.ps1 and the daily wk-harness-update.sh. version = the image hash, so it changes only with the harness.
+          SHA=$(sha256sum out/harness/wk-harness-min.tar.gz | cut -d' ' -f1)
+          printf '%s  wk-harness-min.tar.gz\n' "$SHA" > out/harness/wk-harness-min.tar.gz.sha256
+          printf '{"version":"%s","sha256":"%s","built":"%s","files":%s}\n' "$IMG_HASH" "$SHA" "$(date -u +%FT%TZ)" "$(tar -tzf out/harness/wk-harness-min.tar.gz | grep -vc '/$')" > out/harness/version.json
+          for f in install.ps1 wk-harness-update.sh; do [ ! -f "src/webvm/x64-build/$f" ] || cp "src/webvm/x64-build/$f" "out/harness/$f"; done
+          (cd out/harness && sha256sum -c wk-harness-min.tar.gz.sha256 && cat version.json)
           cp cli-versions.json out/cli-versions.json
           npm pack -s coi-serviceworker@0.1.7 >/dev/null
           tar -xzf coi-serviceworker-0.1.7.tgz
@@ -239,7 +246,21 @@ jobs:
           git clone -q --depth 1 --branch gh-pages "https://x-access-token:${TOK}@github.com/${REPO}.git" pages
           rm -rf pages/webvm/x64
           mkdir -p pages/webvm
+          # Signal client dist (owner 2026-11-04): the target repo's webvm/signal/*.js served at webvm/signal/ with SHA256SUMS
+          # and a version.json whose version is the hash of SHA256SUMS (no timestamp, so an unchanged client is no commit).
+          # The target repo's own scrub gate (the SCRUB pattern of tools/wk-harness-min-copy.sh) must print hits=0.
+          sync_signal() {
+            [ -d src/webvm/signal ] || return 0
+            rm -rf sig && mkdir sig && cp src/webvm/signal/*.js sig/
+            SCRUB=$(sed -n "s/^SCRUB='\\(.*\\)'$/\\1/p" src/tools/wk-harness-min-copy.sh)
+            hits=$(grep -i -E -l -- "$SCRUB" sig/* | wc -l); echo "signal scrub hits=$hits"; [ "$hits" = 0 ] || { echo "signal scrub gate failed"; return 1; }
+            (cd sig && sha256sum *.js > SHA256SUMS && v=$(sha256sum SHA256SUMS | cut -c1-16) && printf '{"version":"%s","files":%s}\n' "$v" "$(ls *.js | wc -l)" > version.json && cat version.json)
+            if diff -rq sig pages/webvm/signal >/dev/null 2>&1; then echo "signal unchanged"; return 0; fi
+            rm -rf pages/webvm/signal && mkdir -p pages/webvm && cp -r sig pages/webvm/signal && SIG_CH=1
+          }
+          SIG_CH=0
           cp -r out pages/webvm/x64
+          sync_signal
           cd pages
           git config user.name "pages-relay"
           git config user.email "pages-relay@users.noreply.github.com"
@@ -256,12 +277,27 @@ jobs:
           set -eu
           start=$(date +%s)
           git clone -q --depth 1 --branch gh-pages "https://x-access-token:${TOK}@github.com/${REPO}.git" pages
-          if cmp -s src/webvm/x64/index.html pages/webvm/x64/index.html; then echo "page unchanged"; exit 0; fi
-          cp src/webvm/x64/index.html pages/webvm/x64/index.html
+          # Signal client dist (owner 2026-11-04): the target repo's webvm/signal/*.js served at webvm/signal/ with SHA256SUMS
+          # and a version.json whose version is the hash of SHA256SUMS (no timestamp, so an unchanged client is no commit).
+          # The target repo's own scrub gate (the SCRUB pattern of tools/wk-harness-min-copy.sh) must print hits=0.
+          sync_signal() {
+            [ -d src/webvm/signal ] || return 0
+            rm -rf sig && mkdir sig && cp src/webvm/signal/*.js sig/
+            SCRUB=$(sed -n "s/^SCRUB='\\(.*\\)'$/\\1/p" src/tools/wk-harness-min-copy.sh)
+            hits=$(grep -i -E -l -- "$SCRUB" sig/* | wc -l); echo "signal scrub hits=$hits"; [ "$hits" = 0 ] || { echo "signal scrub gate failed"; return 1; }
+            (cd sig && sha256sum *.js > SHA256SUMS && v=$(sha256sum SHA256SUMS | cut -c1-16) && printf '{"version":"%s","files":%s}\n' "$v" "$(ls *.js | wc -l)" > version.json && cat version.json)
+            if diff -rq sig pages/webvm/signal >/dev/null 2>&1; then echo "signal unchanged"; return 0; fi
+            rm -rf pages/webvm/signal && mkdir -p pages/webvm && cp -r sig pages/webvm/signal && SIG_CH=1
+          }
+          SIG_CH=0
+          sync_signal
+          PG_CH=0; cmp -s src/webvm/x64/index.html pages/webvm/x64/index.html || { cp src/webvm/x64/index.html pages/webvm/x64/index.html; PG_CH=1; }
+          if [ "$PG_CH$SIG_CH" = 00 ]; then echo "page and signal unchanged"; exit 0; fi
           cd pages
           git config user.name "pages-relay"
           git config user.email "pages-relay@users.noreply.github.com"
           git add webvm/x64/index.html
+          [ ! -d webvm/signal ] || git add webvm/signal
           git commit -q -m "webvm x64 page $(date -u +%FT%TZ) image $IMG_HASH"
           for i in 1 2 3; do git push -q "https://x-access-token:${TOK}@github.com/${REPO}.git" gh-pages && break; [ "$i" = 3 ] && exit 1; sleep 20; done
           echo "page published in $(( $(date +%s) - start )) s"
