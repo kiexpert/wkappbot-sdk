@@ -129,6 +129,13 @@ jobs:
           print("field guard ok")
           PY
 
+      - name: Leak-grep the proof artifacts (fail on any token prefix)
+        run: |
+          if grep -rEI 'ghp_[A-Za-z0-9]|github_pat_[A-Za-z0-9]|glpat-[A-Za-z0-9]|sk-ant-[A-Za-z0-9]' svc-health.json ; then
+            echo "TOKEN-PREFIX LEAK detected"; exit 1
+          fi
+          echo "leak-grep: 0 (no token prefix in the proof artifacts)"
+
       - name: Publish svc-health.json + screenshot to the tokenless board release
         env:
           GH_TOKEN: ${{ github.token }}
