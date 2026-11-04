@@ -1,0 +1,94 @@
+{
+  "id": "wkroot",
+  "app": "wkappbot-workflow",
+  "title": "wkroot",
+  "title_ko": null,
+  "desc": "T1 usage core for wkroot.cmd: launch a root-mode agent of any family on a working folder with HANDOFF processing. Spec and acceptance tests live in wkroot-launcher.",
+  "steps": [
+    "ORDER IN THE PROMPT, NOT ONLY IN A FILE (measured 2026-10-11; and a tell or launch prompt never carries a pipe, ampersand or angle bracket, because the cmd shim splits there and exits 255, measured 2026-10-25 when a tell holding coverage-pipe-intent died and the same text with the word or was queued): write 'Your FIRST tool call reads .tmp/ORDER.md' into the launch prompt and check the root's first reply names that file; three resumed agy roots answered only with skill reads for 90 minutes and landed none of their orders. DETACHED LAUNCH (kih 369fad5b5, 2026-10-11; an Opus spokesman runs wkroot.cmd from the Bash tool with run_in_background true, since a foreground launch is refused by Opus:parallel-delegation, example 2026-10-22 skhy-clush root ec242c52): wkroot starts the -run child through Start-WkRootDetached (WMI Win32_Process.Create, parent WmiPrvSE), so the launch prints [wkroot] detached run pid N log PATH, then WAITS on that pid and streams its log (kih 4b2fc81ca; -nowait returns at once), so each live root shows one shell to the owner and the root survives a reaped or closed spokesman shell (proved 2026-10-12: Claude Code reaped all four waiting shells for low memory and roots 21148, 20624, 10168, 21020 kept running). Reaping is Claude Code's own; the owner turns it off only by starting Claude Code with CLAUDE_CODE_DISABLE_BG_SHELL_PRESSURE_REAP=1 in its environment (setting it from a shell has no effect). A root launched before the wait landed gets a watcher shell: . tools/Start-WkRootDetached.ps1; Wait-WkRootDetached -ProcessId N -LogPath LOG (run in background). Example: WKAppBot root 530914c1 kept running as pid 34876 after its launcher shell exited 0; check it with Get-Process -Id N and the log tail. //why:two kih roots exited rc1 before reading order-unknown //why:both launch prompts named the ORDER file first call-opus //why:launcher shells reaped by low memory, detached roots survived-haiku //why:fresh sdk root got blocked send_message, signal queue road named instead",
+    "MODEL UPGRADE CONTINUES THE SAME SESSION ONLY UNDER 7 MB (owner 2026-10-25: a root past 7 MB is never resumed directly; summon it by forced inheritance, wkroot.cmd REPO PROMPT -inherit OLDSID -model sonnet, which stops the old root and gives a fresh session only its reflex trajectory, and an heir grows too, so read transcriptBytes in roots -json at every report and inherit again past 7 MB, and inherit an IDLE root the same way because a queued tell never wakes it (2026-10-25: docs root idle 194 min with 445 inbox bytes unread, the heir started WORKING at once), overnight too: three sonnet roots left past 7 MB while the owner slept spent 45 percent of 6.2e7 weighted tokens in six hours (2026-10-25, .tmp/tokscan.py), and 66 to 78 percent of their tool calls were harness refusals that each re-read 130K to 165K of context, so also count blocked=1 in the tokens rows of wkhippo reflex SID --rows and send the gate that refuses most to the kih root (2026-10-25: heir e8c50ab5 reached 21 MB looping on stop gates, re-inherited as 9d7ea468); measured 2026-10-25 a 19 MB docs root and a 40 MB quant root were replaced this way by e8c50ab5 at 0.9 MB and 7dfead2a at 1.0 MB) (owner 2026-09-28, after a spokesman launched a fresh sonnet beside a 1.7MB haiku root): when a root crosses a ladder line or the work outgrows its model, run wkroot.cmd REPO PROMPT -resume SID -model sonnet on THAT root's session id, never a fresh launch -- a fresh session loses everything the root already learned (and a fresh -model sonnet launch can still land on another family by the lottery: 2026-10-23 a personal-docs launch came up agy-flash-lite) and puts two sessions in one repo. Only a retired root past omega is replaced by a rookie. //why:docs heir 7ac72dda started working right after inherit //why:patrol found kih heir at 6.9 MB with 70 percent refusals-opus //why:patrol found kih heir at 6.9 MB with 70 percent refusals-opus //why:docs heir 7ac72dda started working right after inherit-opus",
+    "USAGE: wkroot.cmd <working-folder> <prompt> -model <sonnet|codex-luna|agy-flash|...>. ROSTER: wkroot.cmd roots -json -alive prints only alive roots with a model column; read that column after a launch, since -model sonnet came back as codex-luna on 2026-10-25 and that codex root died after every command was rejected blocked by policy; for a Claude root resume an existing Claude session with -resume SID -model sonnet (spokesman 99e78c05, 2026-10-06: plain roots -json printed 113 KB of 467 records, 2 alive); use it as the spokesman first call. SPEC (owner 2026-10-10, a personal-docs root died unnoticed while roots -alive still listed others by lease): -alive must mean the session record ChildPid process exists (Get-Process on .tmp/wkroot-sessions/SID.json ChildPid), not that a lease file is present; print a pid column and drop rows whose loop is gone. LIVE STATE, NOT A PID GUESS (owner 2026-10-10: the root tool misjudges whether a root is alive; use hippo records, open parallel and serial work, completion and time): one module Get-WkRootLiveState gives each root a State from five signals: (1) ChildPid exists and its name is a family host; (2) PID reuse refused when the process started over 2 min after the record Started; (3) last activity = newest write of the transcript, its subagents folder or the inbox, and for codex, agy and grok the transcript path comes from the wkhippo indexer; (4) open work = tool calls without a result plus background launches without a completion notice in the transcript tail; (5) WORKING if active within 2 min, WAITING if open work and silent at most 30 min, IDLE if no open work (the loop waits for its inbox, so a tell only queues), STALE if open work but silent past 30 min, DEAD if the pid is gone or reused. An agy root's conversation is invisible to the indexer, so prove it is working by a model call in its CLI log: Select-String ~/.gemini/antigravity-cli/log/cli-*.log -Pattern 'generateContent|streamGenerate' (2026-10-24: three agy roots listed as RUNNING? had zero model calls in 2.5 to 4 h, and -inherit -model sonnet revived them). -alive prints State, IdleMin and Pending. SPOKESMEN ALWAYS LISTED (owner 2026-10-10): roots -json carries a spokesmen array of every spokesman session, ended or not, with State (WORKING, IDLE, ENDED), IdleMin and the count of roots it commands; -alive never filters it. Until it lands, the spokesman checks each ChildPid with Get-Process at every turn open. Quote a backslash folder path when calling from bash. Run from bash as ./wkroot.cmd or by absolute path; the child prompt gets agent-on-load plus family skill reads and a HANDOFF.md pointer. //why:roster state field confirmed four roots kept running //why:alive roster showed docs root despite exit notice-opus //why:four ChildPids still ran after their waiting shells died-opus //why:roster state field confirmed four roots kept running-opus //why:alive roster confirmed replacement quant root",
+    "ROUTING (owner 2026-09-25): -model AUTO-ASSIGNS BY SIZE when omitted (owner 2026-09-28, supersedes the mandatory rule): with no -model, wkroot picks the ladder model by transcript MB -- a fresh launch (~0MB, no -resume) defaults to haiku, and -resume reads that session transcript MB and applies <2MB haiku / 2-4MB sonnet / >=4MB opus; an explicit NON-CLAUDE -model always wins. MODEL LOTTERY IS SPEC (owner 2026-10-02, restated 2026-10-05): on a FRESH launch, no -model OR a CLAUDE model named (haiku, sonnet, opus) is replaced by a weighted lottery over the youngest model of every family (haiku 10, codex-luna 45, agy-flash 45; an exhausted family is skipped since kih ab64a6311, but it only reads .tmp/wkroot-family-limits.txt and nothing wrote a 429 into it, so 2026-10-12 it drew agy-flash at 429 with 99h left; first aid: append FAMILY TAB RESET_UTC TAB note to that file (proved: Get-WkRootExhaustedFamilies printed agy-flash), the auto-writer is the TODO step; DO re-inherit on another family WHEN a root log shows AGY_ERROR RESOURCE_EXHAUSTED 429 Individual quota reached: wkroot.cmd REPO PROMPT -inherit SID -model sonnet. Example: 2026-10-11 agy quota reset was 105h away, WKAppBot root 530914c1 resumed as sonnet 2c71018e), and wkroot prints [wkroot] model lottery picked NAME; this is not a bug, so never report it as one. Only a non-Claude -model (codex-luna, agy-flash) on a fresh launch, or any -model on -resume, is obeyed exactly. To get a Claude model for sure, resume an existing Claude session with -resume SID -model sonnet. Code: wkappbot-kih tools/wkroot-codex.ps1 line 139. Build a pure Get-WkRootAutoModel(sizeMB,isResume) in the wkroot-codex.ps1 arg parse replacing the -model-missing exit 2. TODO: land this via a sector proto + selftest (0MB->haiku, 1.9->haiku, 2.5->sonnet, 4.1->opus, explicit-overrides). ORIGINAL: -model named the exact model (sonnet, codex-luna, agy-flash). -family and -tier were REMOVED and are refused with exit 2, because Agent.ps1 let -Family silently override -Model. Child skill refs are chosen from the model name; every named ref must score >=60 or the child's tier-gate refuses its first dispatch (agy-harness-integration-guide at 20 did exactly that 2026-09-25, swapped for cross-family-harness-integration). A failed child is NOT re-run; the direct fallback fires only when wkappbot exec never started the child (the .started marker is absent). //why:short sid suffix guess failed, full uuid resumed-opus //why:two resumed roots came up sonnet, roster confirmed-opus //why:two resumed roots came up sonnet, roster confirmed-opus",
+    "SEE ALSO: wkappbot skill read wkroot-launcher (spec, acceptance tests, known bugs); wkappbot skill read codex-tool-wrappers (codex backend).",
+    "NAVIGATION: wkappbot skill read wkroot (T1 usage core, this skill); wkappbot skill read wkroot-howto (T2 spec: family adapter spec, milestone gate, HANDOFF forwarding). INCIDENT 2026-09-27: a spokesman authorized only for one repo used wkroot to launch and command roots in two sibling repos already patrolled by other spokesmen -- roots -json prints a spokesman id per record but nothing in wkroot/send/tell checks it before acting. RULE: before launching or telling/sending a root, read the existing record's spokesman field (use -json, the plain table truncates it) and refuse if it is set and differs from your own session id. TODO: code this as Test-WkRootCommandAllowed in wkroot-send.ps1 (empty target allowed, matching allowed, mismatch blocked unless -Force, -Force still logs both ids) -- sector builds proto+selftest, ROOT wires. //why:usage lock should require spokesman skills //why:usage lock should require spokesman skills-sonnet",
+    "DECISION: a root replacement goes to an OTHER-FAMILY model, not sonnet by habit (owner 2026-10-25: send replacements to other families too; a spokesman who keeps ignoring this is downgraded to sonnet). WHEN: every -inherit or fresh launch that replaces a root. HOW: run wkappbot skill read cross-family-harness-integration, then launch wkroot.cmd REPO PROMPT -inherit OLDSID -model codex-luna or agy-flash, read the model column of roots -json -alive, and run wkhippo reflex SID --summary a few minutes later to catch that family's harness bugs; an order that must reach origin is written as a .tmp proto that the spokesman lands. WHY: a sonnet-only fleet never exercises the other families, so their connection bugs stay hidden (2026-10-25: a codex sector exited 0 with every command rejected blocked by policy). //why:other families were dead so sonnet inherited kih root-sonnet //why:like decision step wkroot bin migration-sonnet //why:like decision step wkroot bin migration-sonnet",
+    "SPEC, FORCED STUDY FROM THE ROOT TOOL (owner 2026-10-05, his words: trace the reflex trajectory inside the root tool and call the forced-like harness function when something needed is unread, and the on-load lock enforces it; no patchwork hook blocks, the nudge skill carries the list). WHEN: every wkroot.cmd launch, send and tell. HOW: read the required ids from this skill's own Require lines of the form wkappbot skill read ID (one source, no second list), ask wkhippo studied --ids LIST --session CALLER_SID --since SESSION_START --json which are unread, and for each unread id call Add-WkForcedStudy (tools/wkharness-common-forcedstudy/Add-WkForcedStudy.ps1, Msg containing wkappbot skill read ID, SessionId the caller session) so the existing on-load lock refuses everything except knowledge ops until the skills are read; print one line naming the unread skills and still exit normally. FAIL OPEN on an unknown caller session, a missing helper or any error, never add a hook rule. VERIFY by a live round trip: an unread caller session gets the forced-study ledger line and the next non-knowledge call is refused by the on-load lock, a session that read them gets no ledger line.",
+    "CODEX ROOTS CANNOT LAND (measured 2026-10-10, root 1499a6ef): a codex child runs as the sandbox user CodexSandboxOffline, so git worktree add fails with Permission denied on .git/worktrees and a clone it makes is owned by that user (dubious ownership for everyone else). For an order that must reach origin, launch a claude-family root (haiku, sonnet) or have the codex root write the fix as a .tmp proto plus its exit output, and the spokesman lands it from a clean worktree: git worktree add --detach .tmp/wt-NAME origin/main, apply, commit by pathspec, git push origin HEAD:main. Example: QA roster fix 4cca1d04f landed this way. //why:explains zero codex commits across sdk and wkappbot today //why:explains zero codex commits across sdk and wkappbot today-opus",
+    "RESULT kih 4e9210899, selftest 5/5, not yet proven by a live 429 or a live codex fallback: (2026-10-12) the lottery must skip a family whose quota is known exhausted and the codex-budget fallback must launch fresh, never reuse the codex -resume id. Measured: -model sonnet drew agy-flash then 429 Resets in 99h; -resume bf6218d6 -model codex-luna fell back to sonnet with the codex id, claude printed No conversation found. Proof wanted: selftest where a cached agy 429 makes the lottery pick only haiku or codex, and a codex-blocked resume falls back to a fresh claude session id."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkroot.cmd help",
+      "expect": "prints Usage line and exits 0",
+      "prompt": null
+    },
+    {
+      "cmd": "wkroot.cmd",
+      "expect": "prints Usage line and exits 2",
+      "prompt": null
+    },
+    {
+      "cmd": "wkroot.cmd D:\\no\\such\\dir x",
+      "expect": "working folder not found, exit 2",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read spokesman-root-command-constitution",
+      "expect": "VERIFY EVERY ESCALATION",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read spokesman-root-command-constitution-howto",
+      "expect": "THE COMMAND GEARWORK",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wkroot-howto",
+      "expect": "family routing, HANDOFF forwarding, milestone gate",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read commanded-root-reflexes",
+      "expect": "every family ROOT launched by wkroot",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read proto-to-live-wiring",
+      "expect": "THE SEQUENCE",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read agent-brief-standard-template",
+      "expect": "the ten-part brief shape",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read invoke-wk-emergency-edit-door",
+      "expect": "the door that repairs the guard refusing you",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read hippo-indexer-master",
+      "expect": "STORES AND WHO USES THEM",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wk-intelligence-constitution",
+      "expect": "ARTICLE 1 -- PURPOSE",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read spokesman-hippo-advanced",
+      "expect": "ROOT STATUS",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-09-24T18:17:21.5130571Z",
+  "updated": "2026-11-04T22:18:39.9332374Z",
+  "version": "1.170"
+}
