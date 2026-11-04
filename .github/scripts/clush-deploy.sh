@@ -137,34 +137,43 @@ wait_version "$PODINFO_V2" || { echo "podinfo v2 never reached Synced/Healthy at
 kubectl -n podinfo rollout status deployment/podinfo --timeout=180s
 record_step "upgrade_v2" "$PODINFO_V2" "patch targetRevision + Argo CD auto-sync" || exit 1
 
-echo "-- rollback: argocd app rollback to the v1 deployment --"
+echo "-- rollback: argocd app rollback to the recorded v1 deployment (history-based undo) --"
 # turn OFF automated sync first so the rollback is not immediately re-synced forward to v2
 kubectl -n argocd patch application podinfo --type json -p '[{"op":"remove","path":"/spec/syncPolicy/automated"}]' || true
-argocd app history podinfo || true
-# pick the earliest history id whose revision is the v1 chart version (fallback to id 0)
-v1_id="$(argocd app history podinfo 2>/dev/null | awk -v v="$PODINFO_V1" 'NR>1 && $NF==v {print $1; exit}' || true)"
-[ -n "${v1_id:-}" ] || v1_id=0
-echo "   rolling back to history id $v1_id"
-rb_method="argocd app rollback"
-argocd app rollback podinfo "$v1_id" || { echo "argocd app rollback errored; the targetRevision realign below still completes the rollback"; rb_method="argocd app rollback (kubectl fallback)"; }
-# `argocd app rollback` reverts the workload to the v1 manifests but leaves spec.source.targetRevision
-# at v2, so Argo reports OutOfSync; realign the declared target to v1 and re-enable auto-sync so the
-# app reconciles to Synced/Healthy at v1 (and if the CLI errored, the controller converges here too).
+# capture the deployment history (the record we undo to) as a durable proof artifact
+argocd app history podinfo | tee deploy-proof/argocd-history.txt
+# pick the earliest history id whose RECORDED revision is the v1 chart version (the recorded v1 deployment)
+v1_id="$(awk -v v="$PODINFO_V1" 'NR>1 && $NF==v {print $1; exit}' deploy-proof/argocd-history.txt || true)"
+[ -n "${v1_id:-}" ] || { echo "no deployment-history entry for $PODINFO_V1 -- cannot perform a history-based rollback"; exit 1; }
+echo "   rolling back to recorded history id $v1_id (revision $PODINFO_V1)"
+# STRICT: the undo must be the history-based 'argocd app rollback <id>'; there is NO forward-re-point
+# fallback. Under set -e a non-zero exit here fails the job, so a non-history rollback can never pass.
+argocd app rollback podinfo "$v1_id"
+# `argocd app rollback` reverts the workload to the recorded v1 manifests but leaves spec.source.targetRevision
+# at v2, so Argo reports OutOfSync; realign the declared target to v1 so the app reconciles to Synced/Healthy
+# at the rolled-back revision (cosmetic only -- the undo itself was the history rollback above).
 kubectl -n argocd patch application podinfo --type merge -p "{\"spec\":{\"source\":{\"targetRevision\":\"$PODINFO_V1\"},\"syncPolicy\":{\"automated\":{}}}}"
 wait_version "$PODINFO_V1" || { echo "podinfo rollback never reached Synced/Healthy at $PODINFO_V1"; exit 1; }
 kubectl -n podinfo rollout status deployment/podinfo --timeout=180s
-record_step "rollback_v1" "$PODINFO_V1" "$rb_method" || exit 1
+record_step "rollback_v1" "$PODINFO_V1" "argocd app rollback (history id $v1_id)" || exit 1
 
 echo "-- assemble rollback-timeline.json --"
-python3 - "$PODINFO_REPO" "$PODINFO_V1" "$PODINFO_V2" > deploy-proof/rollback-timeline.json <<'PY'
+python3 - "$PODINFO_REPO" "$PODINFO_V1" "$PODINFO_V2" "$v1_id" > deploy-proof/rollback-timeline.json <<'PY'
 import json, sys
-repo, v1, v2 = sys.argv[1:4]
+repo, v1, v2, hid = sys.argv[1:5]
 steps = [json.loads(l) for l in open("/tmp/rollback_steps.jsonl") if l.strip()]
+try:
+    history = [l.rstrip("\n") for l in open("deploy-proof/argocd-history.txt") if l.strip()]
+except Exception:
+    history = []
 out = {
     "app": "podinfo",
     "tool": "Argo CD",
     "chart": "podinfo (%s)" % repo,
     "fromVersion": v1, "upgradedTo": v2, "rolledBackTo": v1,
+    "rollbackMechanism": "argocd app rollback <history-id> (undo to a recorded deployment)",
+    "rollbackHistoryId": hid,
+    "history": history,
     "steps": steps,
     "ok": all(s.get("ok") for s in steps) and len(steps) == 3,
 }
