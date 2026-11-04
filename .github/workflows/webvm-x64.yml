@@ -20,6 +20,9 @@ name: webvm-x64
 # tools/wk-harness-min-copy.sh copies only the files its measured manifest lists, drops personal docs and every file
 # matching the private-term scrub list, and fails the build unless its scrub gate prints hits=0. PowerShell 7.6.9
 # (official linux-musl-x64 tarball, sha256-checked) runs the hooks; .NET 10 still targets the x86-64-v1 CPU baseline.
+# AI bridge (owner 2026-11-04: intelligence tools answer at once): the real claude CLI needed 411 s under wasm TCG
+# before its first row, so claude/codex/gemini/grok/agy resolve first to /usr/local/sbin/wk-ai (the target repo's
+# webvm/x64-build/wk-ai.sh), which the page answers with the browser's own fetch; the real CLIs stay as <name>-vm.
 on:
   workflow_dispatch:
   push:
@@ -105,6 +108,7 @@ jobs:
           # Road A: the pruned harness copy; the script exits 1 unless the scrub gate prints hits=0.
           bash src/tools/wk-harness-min-copy.sh "$PWD/src" "$PWD/ctx/harness" src/tools/wk-harness-min-manifest.txt
           du -sh ctx/harness
+          cp src/webvm/x64-build/wk-ai.sh ctx/wk-ai
 
       - name: Build the x86_64 image and convert it to a browser bundle
         run: |
@@ -124,6 +128,8 @@ jobs:
             'RUN apk add --no-cache icu-libs libintl krb5-libs libstdc++ gcompat' \
             "RUN curl -fsSL -o /tmp/pwsh.tgz $PWSH_URL && echo '$PWSH_SHA256  /tmp/pwsh.tgz' | sha256sum -c - && mkdir -p /opt/microsoft/powershell/7 && tar -xzf /tmp/pwsh.tgz -C /opt/microsoft/powershell/7 && chmod +x /opt/microsoft/powershell/7/pwsh && ln -s /opt/microsoft/powershell/7/pwsh /usr/bin/pwsh && rm /tmp/pwsh.tgz" \
             'COPY harness /opt/wk-harness' \
+            'COPY wk-ai /usr/local/sbin/wk-ai' \
+            'RUN chmod 755 /usr/local/sbin/wk-ai && for c in claude codex gemini grok agy; do ln -sf wk-ai /usr/local/sbin/$c; if [ -e /usr/local/bin/$c ]; then ln -sf /usr/local/bin/$c /usr/local/bin/$c-vm; fi; done; ls -l /usr/local/sbin' \
             'RUN cd /opt/wk-harness && { bash install-linux.sh > /opt/wk-harness-install.log 2>&1; rc=$?; echo install-linux rc=$rc; tail -8 /opt/wk-harness-install.log; exit $rc; }' \
             'RUN rm -rf /usr/local/lib/node_modules/@openai/codex-linux-x64/vendor/*/codex-resources/voice; du -sh /usr/local/lib/node_modules/* /usr/local/lib/node_modules/@*/* 2>/dev/null | sort -rh | head -15' \
             | docker build --platform linux/amd64 -t wk-x64 -f - ctx
@@ -172,7 +178,7 @@ jobs:
           hash=$(sha256sum "$f.gz" | cut -c1-16)
           split -b 45M -d -a 2 "$f.gz" "$f.gz.part" && rm "$f.gz"
           parts=$(cd out && ls -1 *.data.gz.part* | sed 's/.*/"&"/' | paste -sd, -)
-          printf '{"c2w":"%s","assets":"%s+c2w-webvm.patch","disk":"disk/","image":"alpine:3.21 + python3 pip git curl node npm gh + claude-code codex gemini-cli agy + pwsh 7.6.9 + harness (min)","cpu":"qemu64+ssse3+sse4.1+sse4.2+popcnt+cx16+pclmulqdq","memMB":512,"encoding":"gzip","raw":%s,"hash":"%s","parts":[%s],"built":"%s"}\n' "$C2W_TAG" "$C2W_ASSETS_REV" "$raw" "$hash" "$parts" "$(date -u +%FT%TZ)" > out/manifest.json
+          printf '{"c2w":"%s","assets":"%s+c2w-webvm.patch","disk":"disk/","image":"alpine:3.21 + python3 pip git curl node npm gh + claude-code codex gemini-cli agy + pwsh 7.6.9 + harness (min) + wk-ai bridge","cpu":"qemu64+ssse3+sse4.1+sse4.2+popcnt+cx16+pclmulqdq","memMB":512,"encoding":"gzip","raw":%s,"hash":"%s","parts":[%s],"built":"%s"}\n' "$C2W_TAG" "$C2W_ASSETS_REV" "$raw" "$hash" "$parts" "$(date -u +%FT%TZ)" > out/manifest.json
           cat out/manifest.json
 
       - name: Take the post-boot snapshot in headless Chromium
