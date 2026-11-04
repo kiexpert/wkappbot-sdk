@@ -11,8 +11,16 @@ name: private-portal-qa
 # Live-twin selftests additionally read WK_QA_GH_TOKEN (=WKAPPBOT_PAT) and WK_QA_GL_TOKEN
 # (=GITLAB_TOKEN), masked; they are opt-in per selftest case and do no live writes unless that
 # case is enabled. A value that is empty or SET-ME counts as unset.
+# WK_QA_LIVE_WRITE=1 (dispatch input live_write, default off) arms the P29 live-write twin, only on the
+# throwaway GitLab project in WK_QA_LIVE_WRITE_PROJECT; the selftest owns its try/finally cleanup.
 on:
   workflow_dispatch:
+    inputs:
+      live_write:
+        description: 'Run the P29 live-WRITE twin against the throwaway GitLab project (owner-supervised runs only)'
+        type: boolean
+        required: false
+        default: false
   push:
     branches: [main, 'qa-video/**']
     paths:
@@ -38,7 +46,13 @@ jobs:
       T3: ${{ secrets.WKAPPBOT_CORE_PAT }}
       WK_QA_GH_TOKEN: ${{ secrets.WKAPPBOT_PAT }}
       WK_QA_GL_TOKEN: ${{ secrets.GITLAB_TOKEN }}
+      # '1' only on a manual dispatch with live_write ticked; push and schedule runs never write.
+      WK_QA_LIVE_WRITE: ${{ (github.event_name == 'workflow_dispatch' && inputs.live_write) && '1' || '' }}
+      WK_QA_LIVE_WRITE_PROJECT: kiexpert-group/wksig
     steps:
+      - name: Live-write gate
+        run: |
+          echo "live-write twin: $([ "$WK_QA_LIVE_WRITE" = 1 ] && echo "ON (project $WK_QA_LIVE_WRITE_PROJECT)" || echo off)"
       - name: Mask the live-twin tokens (explicit, on top of Actions auto-masking)
         run: |
           [ -n "${WK_QA_GH_TOKEN:-}" ] && echo "::add-mask::$WK_QA_GH_TOKEN" || true
