@@ -228,16 +228,24 @@ jobs:
           start=$(date +%s)
           NODE_PATH="$PWD/snaptool/node_modules" node src/webvm/x64-build/snap-ci.js out snap.state
           echo "snapshot took $(( $(date +%s) - start )) s"
+          if [ -f src/webvm/x64-build/snapshot-chunks.py ]; then
+            # Incremental download (owner 2026-11-04): 1 MiB pieces named by content hash under snap/, cached by name in
+            # the page, so a returning browser fetches only the pieces a new bake changed (the disk chunks do the same).
+            python3 -I src/webvm/x64-build/snapshot-chunks.py snap.state out && rm snap.state
+            python3 -c 'import json,os; m=json.load(open("out/manifest.json")); m["snapshot"]["warm"]="python3 git"; m["packed"]=sum(os.path.getsize("out/"+p) for p in m["parts"])+m["snapshot"]["packed"]; m["imageHash"]=os.environ["IMG_HASH"]; json.dump(m,open("out/manifest.json","w"))'
+          else
           raw=$(stat -c %s snap.state)
           gzip -9 -c snap.state > out/snap.state.gz && rm snap.state
           hash=$(sha256sum out/snap.state.gz | cut -c1-16)
           split -b 45M -d -a 2 out/snap.state.gz out/snap.state.gz.part && rm out/snap.state.gz
           parts=$(cd out && ls -1 snap.state.gz.part* | sed 's/.*/"&"/' | paste -sd, -)
           python3 -c 'import json,os,sys; m=json.load(open("out/manifest.json")); m["snapshot"]={"encoding":"gzip","raw":int(sys.argv[1]),"hash":sys.argv[2],"parts":json.loads("["+sys.argv[3]+"]"),"warm":"python3 git"}; m["packed"]=sum(os.path.getsize("out/"+p) for p in m["parts"]+m["snapshot"]["parts"]); m["imageHash"]=os.environ["IMG_HASH"]; json.dump(m,open("out/manifest.json","w"))' "$raw" "$hash" "$parts"
+          fi
           cat out/manifest.json
           ls -la out
           find out -type f -size +95M -print -exec false {} + || { echo "a file is over the 100 MB push limit"; exit 1; }
           echo "disk: $(ls out/disk | wc -l) files, $(du -sh out/disk | cut -f1)"; cat out/disk/index.json | head -c 300; echo
+          [ ! -d out/snap ] || echo "snapshot: $(ls out/snap | wc -l) files, $(du -sh out/snap | cut -f1)"
 
       - name: Publish as webvm/x64 beside the page
         if: env.BAKE == '1'
