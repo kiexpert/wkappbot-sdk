@@ -59,6 +59,11 @@ jobs:
           if git -C src fetch -q --depth 1 origin relay/blackbox 2>/dev/null; then
             git -C src show FETCH_HEAD:results.json > out/portal/modules-results.json || rm -f out/portal/modules-results.json
           fi
+          # the im-live daemon hands its live intelligence e2e proof over on relay/intelligence-e2e
+          if git -C src fetch -q --depth 1 origin relay/intelligence-e2e 2>/dev/null; then
+            mkdir -p out/portal
+            git -C src show FETCH_HEAD:intelligence-e2e-proof.json > out/portal/intelligence-e2e-proof.json || rm -f out/portal/intelligence-e2e-proof.json
+          fi
           # the live service-health board is published as a public release asset (svc-health-board, refreshed ~10 min);
           # copy the latest onto the Pages site so the portal fetches it same-origin (tokenless public download)
           mkdir -p out/portal
@@ -67,7 +72,7 @@ jobs:
           # token-safety: scan only the DYNAMICALLY-FETCHED data files for token prefixes.
           # (The static site source is reviewed in the private repo and its selftest fixtures legitimately
           #  contain fake token-shaped strings, so scanning all of out/ false-positives and blocks the publish.)
-          for f in out/portal/modules-results.json out/portal/svc-health.json; do
+          for f in out/portal/modules-results.json out/portal/svc-health.json out/portal/intelligence-e2e-proof.json; do
             [ -f "$f" ] || continue
             if grep -EI 'ghp_[A-Za-z0-9]|github_pat_[A-Za-z0-9]|glpat-[A-Za-z0-9]|sk-ant-[A-Za-z0-9]' "$f" ; then
               echo "TOKEN-PREFIX LEAK detected in $f"; exit 1
