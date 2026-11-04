@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+# Tokenless, pwsh-free `wkappbot` for cloud ROOT sessions.
+#
+# If the full harness brain is installed (pwsh + bin/wkwrap.ps1, from the private kih source),
+# this defers to it unchanged. Otherwise it serves the read-only skill commands directly from the
+# PUBLIC skills/*.skill.json files, so a fresh root can ALWAYS `wkappbot skill read/list/search`
+# with no secret, no pwsh and no private brain. Full harness commands (eye/cdp/ask/...) still need
+# the brain; this shim says so instead of failing silently.
+set -euo pipefail
+SELF_DIR="$(cd "$(dirname "$(realpath "$0")")" && pwd)"
+ROOT="${WKAPPBOT_SDK_ROOT:-$(cd "$SELF_DIR/.." && pwd)}"
+
+# 1) Real harness present? route to the PowerShell brain exactly as the .sh shims do.
+if command -v powershell >/dev/null 2>&1 && [ -f "$ROOT/bin/wkwrap.ps1" ]; then
+  exec powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$ROOT/bin/wkwrap.ps1" wkappbot "$@"
+fi
+
+# 2) Tokenless fallback: read-only skill access from the public files.
+SKILLS="$ROOT/skills"
+sub="${1:-}"; act="${2:-}"; arg="${3:-}"
+case "$sub $act" in
+  "skill read")
+    [ -n "$arg" ] || { echo "usage: wkappbot skill read <id>"; exit 2; }
+    f="$(find "$SKILLS" -type f -name "${arg}.skill.json" 2>/dev/null | head -1)"
+    [ -n "$f" ] || { echo "skill not found: $arg (fallback reader; full harness not installed)"; exit 1; }
+    python3 - "$f" <<'PY'
+import json,sys
+d=json.load(open(sys.argv[1],encoding="utf-8-sig"))
+print("# %s  (%s)"%(d.get("id"),d.get("app")))
+if d.get("title"): print(d["title"])
+if d.get("desc"): print("\n"+d["desc"])
+steps=d.get("steps") or d.get("body") or ""
+if isinstance(steps,str) and steps.strip():
+    print("\n--- steps ---")
+    for i,s in enumerate(steps.split("|"),1):
+        s=s.strip()
+        if s: print("%d. %s"%(i,s))
+PY
+    ;;
+  "skill list")
+    find "$SKILLS" -type f -name '*.skill.json' 2>/dev/null | sed -E 's#.*/([^/]+)\.skill\.json#\1#' | sort ;;
+  "skill search")
+    [ -n "$arg" ] || { echo "usage: wkappbot skill search <query>"; exit 2; }
+    find "$SKILLS" -type f -name '*.skill.json' 2>/dev/null | while read -r f; do
+      python3 - "$f" "$arg" <<'PY' 2>/dev/null
+import json,sys
+d=json.load(open(sys.argv[1],encoding="utf-8-sig")); q=sys.argv[2].lower()
+blob=(str(d.get("id",""))+" "+str(d.get("title",""))+" "+str(d.get("desc",""))).lower()
+if q in blob: print(d.get("id"),"-",d.get("title",""))
+PY
+    done ;;
+  *)
+    echo "wkappbot: tokenless skill-reader fallback (full harness CLI needs pwsh + the private wkwrap.ps1 brain)."
+    echo "supported here: wkappbot skill read <id> | skill list | skill search <query>"
+    echo "command requested: '$*' is not available without the full harness." ;;
+esac

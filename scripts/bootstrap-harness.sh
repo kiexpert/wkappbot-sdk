@@ -1,64 +1,86 @@
 #!/usr/bin/env bash
-# Linux, tokenless harness bootstrap for cloud ROOT sessions.
+# Single-entry, Linux, (mostly) tokenless harness setup for cloud ROOT sessions.
 #
-# WHY: setup.ps1 is Windows-only (it exits on a non-Windows OS), so new cloud (Linux) ROOT sessions
-# were coming up WITHOUT the harness on PATH -- "roots running wild": no wkappbot CLI, no wkdoctor,
-# no guards. This script installs the harness from the ALREADY-PRESENT public wkappbot-sdk checkout
-# with NO secret, NO token, NO `git pull`, and NO PowerShell, then lets the repo's own wkdoctor
-# self-repair the CLI/symlinks. The environment Setup script should call it once, e.g.:
-#     bash scripts/bootstrap-harness.sh "$GITHUB_WORKSPACE"   # or the repo root path
+# WHY: setup.ps1 is Windows-only, so new cloud (Linux) ROOT sessions came up without the harness --
+# no wkappbot CLI, no guards ("roots running wild"). This one script finishes EVERYTHING a root needs
+# that can be done from the PUBLIC checkout with no secret: npm deps, PATH, the tokenless wkappbot
+# skill-reader, and (when the PowerShell brain is present) pwsh + wkdoctor self-heal.
 #
-# Idempotent: re-running is a no-op except the wkdoctor heal probe.
+# Wire it from the environment Setup script (runs once at root creation), e.g.:
+#     bash scripts/bootstrap-harness.sh "$PWD"
+# or add an npm hook so `npm install` runs it (see package.json proposal in the PR).
+#
+# Idempotent. Optional steps are best-effort and never fatal; only a missing bin/ is fatal.
+#
+# NOTE: the FULL harness (eye/cdp/wkdoctor) needs the PowerShell brain bin/wkwrap.ps1, which lives in
+# the PRIVATE kih source and is NOT in the public SDK. Until a root's setup installs that brain (with a
+# token, team-owned), this script still gives every root a working `wkappbot skill read/list/search`
+# via the tokenless fallback, so no root is ever "wild" for skills.
 set -euo pipefail
 
-# Resolve the repo root: explicit arg, else the parent of this script's dir.
 REPO_ROOT="${1:-}"
-if [ -z "$REPO_ROOT" ]; then
-  REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-fi
+[ -n "$REPO_ROOT" ] || REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BIN="$REPO_ROOT/bin"
+echo "[..] harness setup: repo root = $REPO_ROOT"
+[ -d "$BIN" ] || { echo "[FAIL] bin/ not found at $BIN -- not a wkappbot-sdk checkout?" >&2; exit 1; }
 
-echo "[..] harness bootstrap: repo root = $REPO_ROOT"
-if [ ! -d "$BIN" ]; then
-  echo "[FAIL] bin/ not found at $BIN -- is this the wkappbot-sdk checkout?" >&2
-  exit 1
+# 1) npm deps (the root runs npm install anyway; do it here so setup is one place). Best-effort.
+if [ -f "$REPO_ROOT/package.json" ] && command -v npm >/dev/null 2>&1; then
+  echo "[..] npm install"
+  ( cd "$REPO_ROOT" && npm install --no-audit --no-fund --silent ) && echo "[ok] npm deps installed" \
+    || echo "[warn] npm install reported issues (non-fatal)"
+else
+  echo "[skip] npm install (no package.json or npm) "
 fi
 
-# 1) Put the harness bin on PATH for this shell and for future shells (idempotent, no duplicates).
-case ":${PATH}:" in
-  *":${BIN}:"*) echo "[skip] bin already on PATH" ;;
-  *) export PATH="${BIN}:${PATH}"; echo "[ok] bin added to PATH (this shell)" ;;
-esac
+# 2) PATH + executables (idempotent).
+case ":${PATH}:" in *":${BIN}:"*) echo "[skip] bin already on PATH" ;; *) export PATH="${BIN}:${PATH}"; echo "[ok] bin on PATH (this shell)";; esac
 for rc in "$HOME/.bashrc" "$HOME/.profile"; do
   [ -e "$rc" ] || : > "$rc"
-  if ! grep -qsF "wkappbot-sdk/bin" "$rc" && ! grep -qsF "$BIN" "$rc"; then
-    printf '\n# wkappbot harness\nexport PATH="%s:$PATH"\n' "$BIN" >> "$rc"
-    echo "[ok] PATH line appended to $rc"
-  fi
+  grep -qsF "$BIN" "$rc" || { printf '\n# wkappbot harness\nexport PATH="%s:$PATH"\n' "$BIN" >> "$rc"; echo "[ok] PATH appended to $rc"; }
 done
-
-# 2) Make the shell harness tools executable (git may not preserve +x in every clone path).
 chmod +x "$BIN"/*.sh 2>/dev/null || true
+chmod +x "$BIN/wkappbot" 2>/dev/null || true
 [ -d "$BIN/wkappbot.hq" ] && find "$BIN/wkappbot.hq" -type f -name '*.sh' -exec chmod +x {} + 2>/dev/null || true
 
-# 3) Let the repo's own doctor self-repair the harness (wkappbot/claude/codex busybox symlinks,
-#    guards, pace). wkdoctor is the SDK-distributed heal tool; a non-zero here is a WARN, not fatal,
-#    so a single failing check never bricks session creation.
-if [ -x "$BIN/wkdoctor.sh" ]; then
-  echo "[..] running wkdoctor self-heal"
-  if bash "$BIN/wkdoctor.sh"; then
-    echo "[ok] wkdoctor heal complete"
+# 3) PowerShell brain prerequisite -- install pwsh ONLY when the brain is present (or forced), since
+#    pwsh is useless without bin/wkwrap.ps1. Best-effort, idempotent, tokenless (public release).
+if [ -f "$BIN/wkwrap.ps1" ] || [ "${WKAPPBOT_INSTALL_PWSH:-}" = "1" ]; then
+  if ! command -v powershell >/dev/null 2>&1; then
+    echo "[..] installing PowerShell (pwsh) -- brain present or forced"
+    PV="7.4.6"; arch="$(uname -m)"; case "$arch" in x86_64) a=x64;; aarch64|arm64) a=arm64;; *) a="";; esac
+    if [ -n "$a" ] && curl -fsSL "https://github.com/PowerShell/PowerShell/releases/download/v${PV}/powershell-${PV}-linux-${a}.tar.gz" -o /tmp/pwsh.tgz 2>/dev/null; then
+      mkdir -p "$HOME/.local/pwsh" "$HOME/.local/bin"
+      tar -xzf /tmp/pwsh.tgz -C "$HOME/.local/pwsh" && chmod +x "$HOME/.local/pwsh/pwsh"
+      ln -sf "$HOME/.local/pwsh/pwsh" "$HOME/.local/bin/pwsh"
+      ln -sf "$HOME/.local/pwsh/pwsh" "$HOME/.local/bin/powershell"
+      case ":${PATH}:" in *":$HOME/.local/bin:"*) : ;; *) export PATH="$HOME/.local/bin:$PATH";; esac
+      grep -qsF '.local/bin' "$HOME/.bashrc" || printf '\nexport PATH="$HOME/.local/bin:$PATH"\n' >> "$HOME/.bashrc"
+      echo "[ok] pwsh installed: $("$HOME/.local/bin/pwsh" --version 2>/dev/null)"
+    else
+      echo "[warn] pwsh download skipped/failed (arch=$arch) -- full harness will stay unavailable (non-fatal)"
+    fi
   else
-    echo "[warn] wkdoctor reported issues (exit $?) -- harness installed but review the output above"
+    echo "[skip] pwsh already present"
   fi
 else
-  echo "[warn] $BIN/wkdoctor.sh not found -- harness bin is on PATH but self-heal was skipped"
+  echo "[note] bin/wkwrap.ps1 (private kih brain) absent -- skipping pwsh; skill CLI works via the tokenless fallback"
 fi
 
-# 4) Quick visibility: show what the new root can now reach (best-effort, never fatal).
-echo "[..] harness entrypoints now resolvable:"
-for t in wkdoctor.sh wkharness.sh wkask.sh wkclaude.sh wkcodex.sh; do
-  if [ -e "$BIN/$t" ]; then echo "    - $t"; fi
-done
+# 4) Self-heal via the real doctor only when the brain can actually run.
+if [ -f "$BIN/wkwrap.ps1" ] && command -v powershell >/dev/null 2>&1 && [ -x "$BIN/wkdoctor.sh" ]; then
+  echo "[..] wkdoctor self-heal"
+  bash "$BIN/wkdoctor.sh" && echo "[ok] wkdoctor done" || echo "[warn] wkdoctor reported issues (non-fatal)"
+else
+  echo "[note] skipping wkdoctor (needs pwsh + private bin/wkwrap.ps1)"
+fi
 
-echo "[OK] harness bootstrap complete (tokenless, Linux-native). New shells get the harness on PATH."
+# 5) Sanity: the skill CLI must work on every root, brain or not.
+if [ -x "$BIN/wkappbot" ]; then
+  n="$("$BIN/wkappbot" skill list 2>/dev/null | wc -l | tr -d ' ')"
+  echo "[ok] wkappbot skill CLI ready (tokenless): $n skills readable"
+else
+  echo "[warn] bin/wkappbot not found -- skill CLI fallback missing"
+fi
+
+echo "[OK] harness setup complete. Skills always work; full harness (eye/cdp/wkdoctor) activates once the private wkwrap.ps1 brain + pwsh are installed by the root's setup (team-owned)."
