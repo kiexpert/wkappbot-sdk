@@ -1,0 +1,50 @@
+{
+  "id": "wk-guardtest",
+  "app": "wkappbot-kih",
+  "title": "wk-guardtest: run every guard self-test this repo owns",
+  "title_ko": null,
+  "desc": "Repo-official runner for the guard self-tests. Runs each suite from its CANONICAL path, both directions asserted, and treats a MISSING suite as a loud FAIL rather than a silent skip. Exists because a self-test sitting loose beside its module is a test nobody has a reason to run -- and an unreferenced one under .tmp gets purged by the collector.",
+  "steps": [
+    "WHAT: ./wk-guardtest.cmd runs every guard self-test listed in wk-guardtest.ps1 from its CANONICAL path, printing OK or FAIL per suite. Exit 0 all green, 1 any suite failing OR MISSING, 2 the runner could not evaluate. A missing suite file is a loud FAIL and never a silent skip, because a vanished test and a green test must not look alike. WHEN: after touching any guard, and before claiming a guard fix is done. HOW: run wkappbot skill read verify-tool-or-guard-synthetic-live-static-howto first, then ./wk-guardtest.cmd, or -Quiet for one tally line per suite. WHY: three verified suites written 2026-08-29 were about to be purged with the .tmp sweep because nothing referenced them -- being CORRECT is not being CONNECTED, and the collector spares only what is wired or tracked. //why:schedule portal qa failure was only visible via run list",
+    "ADDING A SUITE IS THE WIRING: append one row to the suites array in wk-guardtest.ps1 with a name and a repo-relative path. That row is what keeps the file alive and what gives the next session a reason to run it. WHEN: you finish a guard self-test and are about to leave it beside its module. HOW: run wkappbot skill read proto-to-live-wiring for the three-artifact contract, then add the row in the same commit as the suite -- a suite landed without its row is the same half-promotion as a module landed without its test. ENTRY BAR: the suite must assert BOTH directions. A suite that only proves the happy path proves nothing about a guard, whose entire job is to REFUSE. WHY: measured 2026-08-29 -- of five probes written that day, three printed FAIL over working code because the PROBE was wrong, so a suite that never exercises the refusing direction would have shipped a broken guard as green."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read verify-tool-or-guard-synthetic-live-static-howto",
+      "expect": "the run-it-never-read-it discipline each listed suite must satisfy",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read proto-to-live-wiring",
+      "expect": "why a module without its self-test is half-promoted",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wkgc-tmp",
+      "expect": "the collector that purges an unreferenced suite, which is why they are tracked and listed here",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "test",
+    "runner",
+    "guard",
+    "selftest",
+    "wk-tool",
+    "verification",
+    "harness",
+    "regression",
+    "테스트",
+    "러너",
+    "가드",
+    "자기테스트",
+    "검증"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-08-29T07:45:32.2868949Z",
+  "updated": "2026-11-04T23:28:20.3126739Z",
+  "version": "1.1"
+}
