@@ -150,7 +150,7 @@ jobs:
           # claude-code@2.1.112: the newest release that is Node cli.js; later ones need AVX2, which this VM cannot offer.
           printf '%s\n' \
             'FROM alpine:3.21' \
-            'RUN apk add --no-cache python3 py3-pip git curl ca-certificates nodejs npm github-cli bash' \
+            'RUN apk add --no-cache python3 py3-pip git curl ca-certificates nodejs npm github-cli bash tree' \
             'RUN npm install -g --no-fund --no-audit @anthropic-ai/claude-code@2.1.112 @openai/codex @google/gemini-cli && npm cache clean --force' \
             "RUN curl -fsSL -o /tmp/agy.tgz $AGY_URL && echo '$AGY_SHA512  /tmp/agy.tgz' | sha512sum -c - && tar -xzf /tmp/agy.tgz -C /usr/local/bin antigravity && mv /usr/local/bin/antigravity /usr/local/bin/agy && rm /tmp/agy.tgz" \
             'RUN apk add --no-cache icu-libs libintl krb5-libs libstdc++ gcompat' \
