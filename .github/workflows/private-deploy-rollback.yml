@@ -1,0 +1,93 @@
+name: private-deploy-rollback
+
+# Item (x) part 3: proves a REAL deploy -> upgrade -> rollback. On a GitHub ubuntu runner (Docker available), it stands
+# up a kind Kubernetes cluster and a real Argo CD (core mode), then runs the target repo's ci/deploy-rollback.mjs, which
+# takes a tiny versioned service through v1 -> v2 -> `argocd app rollback` back to v1, reading the SERVED version and the
+# sync/health back from the cluster at each stage and recording the Argo CD history. Writes deploy-rollback-proof.json,
+# uploaded as an artifact to land in the target by a pull request. Thin shim (item-o pattern): the target is found by a
+# sha256 prefix and never named; its name and the token are masked. This repo is public.
+# SECRETS READ: GH_LICENSE_TOKEN / WKAPPBOT_PAT / WKAPPBOT_CORE_PAT (to find + clone + push the scratch branch to the
+# target). No cleartext secret is printed; the target script redacts the token and the target name from the proof.
+on:
+  workflow_dispatch:
+  push:
+    branches: ['qa-video/**']
+    paths:
+      - .github/workflows/private-deploy-rollback.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: private-deploy-rollback
+  cancel-in-progress: false
+
+env:
+  TARGET_HASH: ce712644e054789d
+  KIND_VERSION: v0.24.0
+
+jobs:
+  deploy-rollback:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Find the target repo and a token that can reach it
+        shell: bash
+        env:
+          T1: ${{ secrets.GH_LICENSE_TOKEN }}
+          T2: ${{ secrets.WKAPPBOT_PAT }}
+          T3: ${{ secrets.WKAPPBOT_CORE_PAT }}
+        run: |
+          set -u
+          for t in "$T1" "$T2" "$T3"; do
+            [ -n "$t" ] && [ "$t" != "SET-ME" ] || continue
+            echo "::add-mask::$t"
+            names=$(GH_TOKEN="$t" gh repo list kiexpert --visibility private --limit 300 --json nameWithOwner -q '.[].nameWithOwner' 2>/dev/null || true)
+            for n in $names; do
+              h=$(node -e "console.log(require('crypto').createHash('sha256').update(process.argv[1]).digest('hex').slice(0,16))" "$n")
+              if [ "$h" = "$TARGET_HASH" ]; then
+                echo "::add-mask::$n"; echo "::add-mask::${n#*/}"
+                { echo "REPO=$n"; echo "TOK=$t"; } >> "$GITHUB_ENV"
+                echo "target found"; exit 0
+              fi
+            done
+          done
+          echo "no token reaches the target repo"; exit 1
+      - name: Install kind, kubectl and the Argo CD CLI
+        shell: bash
+        run: |
+          set -eu
+          curl -fsSL "https://kind.sigs.k8s.io/dl/${KIND_VERSION}/kind-linux-amd64" -o /tmp/kind
+          sudo install -m 0755 /tmp/kind /usr/local/bin/kind
+          KV=$(curl -fsSL https://dl.k8s.io/release/stable.txt)
+          curl -fsSL "https://dl.k8s.io/release/${KV}/bin/linux/amd64/kubectl" -o /tmp/kubectl
+          sudo install -m 0755 /tmp/kubectl /usr/local/bin/kubectl
+          curl -fsSL "https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64" -o /tmp/argocd
+          sudo install -m 0755 /tmp/argocd /usr/local/bin/argocd
+          kind --version; kubectl version --client --output=yaml | head -3; argocd version --client --short || true
+      - name: Clone the target
+        shell: bash
+        run: git clone -q --depth 1 "https://x-access-token:${TOK}@github.com/${REPO}.git" src
+      - name: Run the real deploy -> upgrade -> rollback
+        working-directory: src
+        shell: bash
+        env:
+          REPO: ${{ env.REPO }}
+          TOK: ${{ env.TOK }}
+        run: node ci/deploy-rollback.mjs
+      - name: Show the proof
+        if: always()
+        shell: bash
+        run: |
+          [ -f src/deploy-rollback-proof.json ] && node -e "const d=require('./src/deploy-rollback-proof.json'); console.log(JSON.stringify({ok:d.ok,timeline:d.timeline,rollback:d.rollback,history:d.history,steps:(d.steps||[]).length},null,2))" || echo "no proof file"
+      - name: Upload the proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deploy-rollback-proof
+          path: src/deploy-rollback-proof.json
+          retention-days: 7
+          if-no-files-found: error
