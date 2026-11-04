@@ -1,0 +1,60 @@
+{
+  "id": "pace-95-circuit-breaker",
+  "app": "wkappbot-workflow",
+  "title": "Pace 95%-of-target circuit breaker -- pause for a human decision before an intelligence faints",
+  "title_ko": null,
+  "desc": "When the current model's WEEKLY or MONTHLY usage crosses 95% of its OWN target, PAUSE: block all tools (including reads and delegation) EXCEPT knowledge-ification, until the user replies -- so an intelligence stops for a human decision instead of running to the hard limit and fainting (no answer). Per-family, one-time-per-crossing, fail-open.",
+  "steps": [
+    "TRIGGER: the MOMENT the current model transitions from comfortable into the 95%-of-target zone -- weekly OR monthly usage >= 95% of its OWN target. WHY: intelligences otherwise run to the hard limit and faint (stop answering); this pauses them at 95% for the user's decision.",
+    "MONTHLY-SKIP: a model with NO monthly limit skips the monthly check entirely (gate on monthlyAvailable / the family having a monthly target). Only the cycles that exist for that family are evaluated.",
+    "WHAT IS BLOCKED: ALL tools -- reads, Bash/Write/Edit, AND delegation (Agent) -- are blocked. ONLY knowledge-ification stays possible (Skill tool, wkappbot skill read/edit/contribute, .md edits). Knowledge is the escape valve plus the user's reply. Delegation is explicitly NOT an escape (the model must stop, not hand off).",
+    "ONE-TIME PER CROSSING (stateful): marker {crossedAt, acked}. First cross -> wkappbot speak alert + arm. Block every non-knowledge tool until a USER turn arrives with timestamp > crossedAt -> set acked (no more block for THIS crossing). When pace drops below 95% (e.g. weekly reset) -> clear marker so the next genuine crossing re-arms. So it fires once per transition, not every call forever.",
+    "PLACEMENT (critical): the breaker MUST run in wkharness-guards.ps1 RIGHT AFTER the TIER0 knowledge-op early-exit and BEFORE the read-only early-exit -- so knowledge-ops have already exited (free) but reads + Agent + TIER2 all hit it. A pace-guard-level placement is WRONG because read-only tools exit before the pace guard and would slip through.",
+    "PER-FAMILY: each family computes its own pace its own way (Claude = JSONL estimate + /usage anchor; Gemini = wkgemini_usage.jsonl; Codex = codex_balance.json) and against its OWN weekly/monthly target. The breaker uses the ACTIVE family's numbers. Each family's session enforces its own crossing.",
+    "FAIL-OPEN: the entire breaker is wrapped so any error (missing cache, parse failure, unknown family) results in NO block -- never brick. The user reply is always an escape, and if compliance cannot be determined, allow. ALERT: wkappbot speak --bg on the crossing so the user knows to reply.",
+    "PER-FAMILY PACE CYCLES DIFFER -- check each family's ACTUAL cycle, not weekly (user 2026-06-10): the breaker + family-pace must evaluate every cycle that EXISTS for the active family, against that cycle's own target. Claude = WEEKLY + MONTHLY. GEMINI = DAILY, per model (Gemini pace resets daily per model -- so the breaker checks Gemini's DAILY usage vs its daily target, NOT weekly). Codex = 5-HOUR + WEEKLY (from codex_balance). So the FAMILY ADAPTER's USAGE member declares which cycles that family has (daily / 5h / weekly / monthly) and supplies usage+target for each; the breaker trips when ANY existing cycle for the active family crosses 95% of its target. The earlier 'monthly-skip' rule generalizes to CYCLE-SKIP: skip any cycle a family does not have (Gemini has no weekly -> skip weekly, use daily; a model with no monthly -> skip monthly). Module 13-family-pace must likewise display each family against its OWN cycle (Gemini DAILY, Codex 5h+weekly, Claude weekly), so the operator sees the right number. NET: 'is current family over 95% of ANY of its real cycles' -- per family, per cycle.",
+    "CYCLE-SKIP = SKIP THE BLOCK, NOT THE VISIBILITY (user 2026-06-10): when a family has NO OFFICIAL limit for a cycle (e.g. Claude has no monthly cap from Anthropic), do NOT drop that cycle from the pace DISPLAY. Still ACCUMULATE the delivered usage over that cycle's window and show it as an informational HEALTH figure. The harness already sums token usage, so accumulate it (e.g. cumulative tokens over the trailing 30 days for a monthly view) and present something like 'monthly: <accumulated>M (no official cap -- informational)'. RULE SPLIT: the monthly-skip / cycle-skip applies ONLY to the 95% BREAKER (never gate/block on a cycle that has no limit), NOT to the DISPLAY (always show accumulated usage for that cycle as a health signal). Why: total cumulative usage is a real health indicator even where there is no hard cap -- the user wants to SEE it, not have it silently omitted. So family-pace shows every cycle (with target where a limit exists, or accumulated-only where it does not), and the breaker only trips on cycles that actually have a target.",
+    "MONTHLY = THE BILLING-ANCHORED TRUE BUDGET, IMMUNE TO WEEKLY-RESET DECEPTION (user 2026-06-10, strategic): the real reason to track a MONTHLY pace even though Claude exposes NO monthly cap. The weekly reset can be SUSPICIOUS -- one morning the usage dropped to 0% in a way that felt like the server gaming the meter (the user was at ~97% then suddenly 0%). DEFENSE: the MONTHLY cycle is anchored to the user's BILLING DATE -- a real, fixed one-month allowance the weekly resets CANNOT fake. So the harness self-computes monthly: (1) ANCHOR the monthly cycle to the billing date (monthly reset = the billing day each month). (2) ACCUMULATE actual token usage since the billing date. (3) ESTIMATE the monthly allowance from the ACTUAL tokens that were USABLE -- learned from observed capacity (the real consumption achieved before limits bit), refined over time, NOT a guessed constant. (4) PACE against this self-computed monthly budget. Keeping to the billing-month total is how we ESCAPE any weekly-reset eye-trick, because the billing-month allowance is the TRUE constraint. The billing date is a USER-SUPPLIED fact: ask once, store it (e.g. in the harness home as billing_anchor.json {day, estimatedMonthlyTokens}). The estimate self-improves from observed usable-token history. This is the honest pace that does not depend on trusting Claude's weekly meter.",
+    "ATTRIBUTION (user 2026-06-10): the suspicious reset / eye-trick is ANTHROPIC's opaque metering and billing layer -- NOT Claude the MODEL. Claude the model is the ALLY that helps build this very defense alongside the user; the adversary is only the untrustworthy weekly meter exposed by the platform. So everywhere this skill says 'server gaming the meter' or 'eye-trick', read it as Anthropic's metering/billing opacity, never the model. Practical consequence unchanged: we self-compute a billing-anchored monthly budget from ACTUAL usable tokens precisely because the platform weekly number cannot be trusted -- but the framing must keep the model on the user's side. Do not blame the model for the meter.",
+    "FAINT-ANCHORED LIMIT CALIBRATION (2026-06-10, user insight: 'when codex faints, the current usage IS the real limit -- write it down somewhere'): a family's FAINT (its CLI returns a quota/usage/limit error and stops working) is the ONLY GROUND-TRUTH for that family's real ceiling -- every other limit is an estimate that drifts. RULE: when ANY family (Codex/Gemini/Claude) faints, record the usage at that exact moment as the calibrated limit for that cycle, OVERRIDING the estimate. CASE: Codex fainted 2026-06-10 while wkdoctor estimated 'weekly 83% of a 2M limit' -- so the REAL weekly ceiling is ~83% of 2M (~1.66M); the 2M estimate was ~20% too high. Recalibrate codex_balance.json / the pace target DOWN to the faint-usage. SYSTEMIC (build): the harness should auto-detect a faint -- the family launcher returns a known quota/limit error string or a specific non-zero exit -- and write the current usage as that cycle's limit anchor. This is the same role the hourly 'claude /usage' anchor plays for Claude, but a faint is a HARDER anchor: it is the wall itself, not a self-report. Result: the budget becomes self-calibrating -- estimates drift, but every faint snaps the limit back to ground truth, and the 95% breaker then fires at a TRUE 95% instead of an estimated one. Where to write it: the per-family balance/anchor file (codex_balance.json, wkgemini_usage.jsonl, pace.json) with a 'faintObservedAt' + 'faintUsage' field.",
+    "SEE ALSO (reflex back-link 2026-06-11): pace-deadlock-escapes-harness-editable-and-jisikhwa-free -- the escape complement to this breaker: when the 95% breaker fires AND delegation paths are ALSO blocked (stacked failure), R1=fix the mis-firing gate as ROOT (harness is your editable proxy-code), R2=knowledge-ification stays free under pace. The breaker is not a wall; it is editable code."
+  ],
+  "comments": null,
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read pace-95-circuit-breaker",
+      "expect": "knowledge-ification",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read pace-95-circuit-breaker",
+      "expect": "TIER0",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read pace-95-circuit-breaker",
+      "expect": "FAIL-OPEN",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "pace",
+    "95",
+    "circuit-breaker",
+    "limit",
+    "faint",
+    "block",
+    "knowledge-only",
+    "per-family",
+    "weekly",
+    "monthly",
+    "fail-open"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-10T05:48:01.2721107Z",
+  "updated": "2026-06-11T13:41:48.57942Z",
+  "version": "1.12"
+}
