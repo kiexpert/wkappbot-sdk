@@ -2,9 +2,9 @@
 # Single-entry, Linux, (mostly) tokenless harness setup for cloud ROOT sessions.
 #
 # WHY: setup.ps1 is Windows-only, so new cloud (Linux) ROOT sessions came up without the harness --
-# no wkappbot CLI, no guards ("roots running wild"). This one script finishes EVERYTHING a root needs
-# that can be done from the PUBLIC checkout with no secret: npm deps, PATH, the tokenless wkappbot
-# skill-reader, and (when the PowerShell brain is present) pwsh + wkdoctor self-heal.
+# no wkappbot CLI, no guards ("roots running wild"). This one script finishes EVERYTHING a root needs:
+# the PUBLIC/tokenless parts (npm deps, PATH, the tokenless wkappbot skill-reader) always, and the FULL
+# harness brain when this environment's git credentials can reach the private kih source (path B, step 6).
 #
 # Wire it from the environment Setup script (runs once at root creation), e.g.:
 #     bash scripts/bootstrap-harness.sh "$PWD"
@@ -12,10 +12,10 @@
 #
 # Idempotent. Optional steps are best-effort and never fatal; only a missing bin/ is fatal.
 #
-# NOTE: the FULL harness (eye/cdp/wkdoctor) needs the PowerShell brain bin/wkwrap.ps1, which lives in
-# the PRIVATE kih source and is NOT in the public SDK. Until a root's setup installs that brain (with a
-# token, team-owned), this script still gives every root a working `wkappbot skill read/list/search`
-# via the tokenless fallback, so no root is ever "wild" for skills.
+# NOTE: the FULL harness (eye/cdp/wkdoctor) needs the PowerShell brain bin/wkwrap.ps1, which lives in the
+# PRIVATE kih source and is NEVER vendored into the public SDK. Step 6 installs it from kih when reachable;
+# otherwise every root still gets a working `wkappbot skill read/list/search` via the tokenless fallback,
+# so no root is ever "wild" for skills.
 set -euo pipefail
 
 REPO_ROOT="${1:-}"
@@ -87,4 +87,24 @@ else
   echo "[warn] bin/wkappbot not found -- skill CLI fallback missing"
 fi
 
-echo "[OK] harness setup complete. Skills always work; full harness (eye/cdp/wkdoctor) activates once the private wkwrap.ps1 brain + pwsh are installed by the root's setup (team-owned)."
+# 6) Full harness brain (PRIVATE kih) -- path B (owner decision via spokesman, 2026-11-04). The public SDK
+#    NEVER vendors wkwrap.ps1 (that would publish private code). Instead: if THIS environment's git
+#    credentials can reach kih, clone it and let kih's own installer set up the full harness and verify it.
+#    If unreachable, we stay on the tokenless skill CLI. Fully guarded -- never fails npm install.
+KIH_URL="https://github.com/kiexpert/wkappbot-kih.git"
+KIH_DIR="${WKAPPBOT_KIH_DIR:-$HOME/wkappbot-kih}"
+if git ls-remote "$KIH_URL" >/dev/null 2>&1; then
+  echo "[..] private harness reachable -- installing the full brain from kih"
+  if [ ! -d "$KIH_DIR/.git" ]; then
+    git clone -q --depth 1 "$KIH_URL" "$KIH_DIR" || echo "[warn] kih clone failed (non-fatal)"
+  fi
+  if [ -f "$KIH_DIR/scripts/npm-postinstall.sh" ]; then
+    sh "$KIH_DIR/scripts/npm-postinstall.sh" || echo "[warn] kih installer reported issues (non-fatal)"
+  else
+    echo "[warn] kih reachable but scripts/npm-postinstall.sh missing (non-fatal)"
+  fi
+else
+  echo "[wk-boot] private harness unreachable: tokenless skills only"
+fi
+
+echo "[OK] harness setup complete. Skills always work via the tokenless CLI; the full harness (eye/cdp/wkdoctor) activates in step 6 whenever this environment can reach the private kih brain."
