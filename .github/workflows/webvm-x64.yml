@@ -23,6 +23,9 @@ name: webvm-x64
 # AI bridge (owner 2026-11-04: intelligence tools answer at once): the real claude CLI needed 411 s under wasm TCG
 # before its first row, so claude/codex/gemini/grok/agy resolve first to /usr/local/sbin/wk-ai (the target repo's
 # webvm/x64-build/wk-ai.sh), which the page answers with the browser's own fetch; the real CLIs stay as <name>-vm.
+# In-VM harness (owner 2026-11-04: the harness must WORK inside the VM): pwsh never answers under wasm TCG and python3
+# needs 3.6 s to start, so the target repo's tools/wkharness-lite.sh --wire points the VM's Claude hooks at sh-builtin
+# hooks (intent lock, study lock, stop lint); the build then runs scripts/npm-postinstall.sh (6-check verify) and wk-verify.
 on:
   workflow_dispatch:
   push:
@@ -131,12 +134,13 @@ jobs:
             'COPY wk-ai /usr/local/sbin/wk-ai' \
             'RUN chmod 755 /usr/local/sbin/wk-ai && for c in claude codex gemini grok agy; do ln -sf wk-ai /usr/local/sbin/$c; if [ -e /usr/local/bin/$c ]; then ln -sf /usr/local/bin/$c /usr/local/bin/$c-vm; fi; done; ls -l /usr/local/sbin' \
             'RUN cd /opt/wk-harness && { bash install-linux.sh > /opt/wk-harness-install.log 2>&1; rc=$?; echo install-linux rc=$rc; tail -8 /opt/wk-harness-install.log; exit $rc; }' \
+            'RUN H=/opt/wk-harness; chmod 755 $H/tools/wkharness-lite.sh && sh $H/tools/wkharness-lite.sh --wire /root/.claude/settings.json $H/.claude/settings.json && touch /root/.wkappbot-kih-installed && mkdir -p $H/.tmp && WKAPPBOT_KIH_DIR=$H sh $H/scripts/npm-postinstall.sh | tee $H/.tmp/wk-verify-build.txt && ln -sf $H/tools/wkharness-lite.sh /usr/local/bin/wkskill && ln -sf $H/tools/wkharness-lite.sh /usr/local/bin/wk-verify && wk-verify' \
             'RUN rm -rf /usr/local/lib/node_modules/@openai/codex-linux-x64/vendor/*/codex-resources/voice; du -sh /usr/local/lib/node_modules/* /usr/local/lib/node_modules/@*/* 2>/dev/null | sort -rh | head -15' \
             | docker build --platform linux/amd64 -t wk-x64 -f - ctx
           docker run --rm --platform linux/amd64 wk-x64 sh -c '
-            v() { out=$("$@" 2>&1 | head -1); printf "\"%s\":\"%s\"," "$1" "$(printf %s "$out" | tr -d "\"\\")"; }
+            v() { out=$("$@" 2>&1 | head -1); printf "\"%s\":\"%s\"," "${1%-vm}" "$(printf %s "$out" | tr -d "\"\\")"; }
             printf "{"; v uname -m; v node --version; v npm --version; v python3 --version; v pip3 --version; v git --version;
-            v curl --version; v gh --version; v claude --version; v codex --version; v gemini --version; v pwsh --version; v agy --version; printf "\"ok\":true}"' > cli-versions.json
+            v curl --version; v gh --version; v claude-vm --version; v codex-vm --version; v gemini-vm --version; v pwsh --version; v agy-vm --version; printf "\"ok\":true}"' > cli-versions.json
           cat cli-versions.json
           # The harness QA inside the image (native run on the runner; the in-guest run is measured on the published page).
           docker run --rm --platform linux/amd64 wk-x64 sh -c 'cd /opt/wk-harness && time pwsh -NoProfile -c "\$PSVersionTable.PSVersion.ToString()"; bash tools/wk-harness-qa.sh' || true
@@ -178,7 +182,7 @@ jobs:
           hash=$(sha256sum "$f.gz" | cut -c1-16)
           split -b 45M -d -a 2 "$f.gz" "$f.gz.part" && rm "$f.gz"
           parts=$(cd out && ls -1 *.data.gz.part* | sed 's/.*/"&"/' | paste -sd, -)
-          printf '{"c2w":"%s","assets":"%s+c2w-webvm.patch","disk":"disk/","image":"alpine:3.21 + python3 pip git curl node npm gh + claude-code codex gemini-cli agy + pwsh 7.6.9 + harness (min) + wk-ai bridge","cpu":"qemu64+ssse3+sse4.1+sse4.2+popcnt+cx16+pclmulqdq","memMB":512,"encoding":"gzip","raw":%s,"hash":"%s","parts":[%s],"built":"%s"}\n' "$C2W_TAG" "$C2W_ASSETS_REV" "$raw" "$hash" "$parts" "$(date -u +%FT%TZ)" > out/manifest.json
+          printf '{"c2w":"%s","assets":"%s+c2w-webvm.patch","disk":"disk/","image":"alpine:3.21 + python3 pip git curl node npm gh + claude-code codex gemini-cli agy + pwsh 7.6.9 + harness (min, lite in-VM hooks) + wk-ai bridge","cpu":"qemu64+ssse3+sse4.1+sse4.2+popcnt+cx16+pclmulqdq","memMB":512,"encoding":"gzip","raw":%s,"hash":"%s","parts":[%s],"built":"%s"}\n' "$C2W_TAG" "$C2W_ASSETS_REV" "$raw" "$hash" "$parts" "$(date -u +%FT%TZ)" > out/manifest.json
           cat out/manifest.json
 
       - name: Take the post-boot snapshot in headless Chromium
