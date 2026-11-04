@@ -1,0 +1,146 @@
+name: private-svc-health
+
+# Item (z): a READ-ONLY health feed for the owner's live-trading system, for the portal service board.
+# It performs ONLY GitHub Actions API GET calls on two private repos found by a sha256 prefix (never named
+# here) and takes ONE cropped screenshot of a PUBLIC GitHub Pages status page. It publishes svc-health.json
+# (service, status, load, last_ok, failures_24h, chain_gap_s, screenshot) with NO order, position, balance,
+# P&L, ticker or account field. HARD RULES, enforced by what this file does and does not do:
+#   - never dispatch / rerun / cancel anything in those repos (GET only; no POST/DELETE/PATCH to them)
+#   - never read their secrets; never issue a broker (Hantoo) token; never touch any wavevault/hantoo cache
+#   - never run the trader (wk-scalper)
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '*/10 * * * *'
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/private-svc-health.yml
+      - .github/scripts/svc-health.py
+
+permissions:
+  contents: read
+
+concurrency:
+  group: private-svc-health
+  cancel-in-progress: true
+
+env:
+  CORE_HASH: 6d8d20d3350bd36c      # main trading repo (read-only), resolved at runtime, never named
+  RELAY_HASH: 97883490aa4134e3     # scalper relay repo (read-only), resolved at runtime, never named
+  RELAY_WF_HASH: 7ed75f7ae88339c7  # the relay workflow file, resolved at runtime, never named
+  STATUS_PAGE: https://kiexpert.github.io/WkFeedQuant/   # already-public GitHub Pages status page
+
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    permissions:
+      contents: write        # to publish svc-health.json to THIS repo's board release (not the trading repos)
+    steps:
+      - name: Check out this repo (for the assembler script)
+        uses: actions/checkout@v4
+
+      - name: Resolve the two private services by sha256 (never named here)
+        env:
+          T1: ${{ secrets.GH_LICENSE_TOKEN }}
+          T2: ${{ secrets.WKAPPBOT_PAT }}
+          T3: ${{ secrets.WKAPPBOT_CORE_PAT }}
+        run: |
+          set -u
+          tok=""
+          for t in "$T1" "$T2" "$T3"; do
+            [ -n "$t" ] && [ "$t" != "SET-ME" ] && { echo "::add-mask::$t"; tok="$t"; break; }
+          done
+          [ -n "$tok" ] || { echo "no read token available"; exit 1; }
+          echo "TOK=$tok" >> "$GITHUB_ENV"
+          names=$(GH_TOKEN="$tok" gh repo list kiexpert --limit 500 --json nameWithOwner -q '.[].nameWithOwner' 2>/dev/null || true)
+          core=""; relay=""
+          for n in $names; do
+            h=$(printf %s "$n" | sha256sum | cut -c1-16)
+            [ "$h" = "$CORE_HASH" ] && core="$n"
+            [ "$h" = "$RELAY_HASH" ] && relay="$n"
+          done
+          [ -n "$core" ] && [ -n "$relay" ] || { echo "could not resolve both services from the token's repo list"; exit 1; }
+          echo "::add-mask::$core"; echo "::add-mask::${core#*/}"
+          echo "::add-mask::$relay"; echo "::add-mask::${relay#*/}"
+          echo "CORE=$core" >> "$GITHUB_ENV"
+          echo "RELAY=$relay" >> "$GITHUB_ENV"
+          echo "resolved both services (names masked)"
+
+      - name: Read-only health (GitHub Actions API GET only; never mutates the trading repos)
+        run: |
+          set -eu
+          export GH_TOKEN="$TOK"
+          # (1) main trading repo: recent runs (status/conclusion/times) -> failures_24h, last_ok, load
+          gh api -X GET "repos/$CORE/actions/runs?per_page=100" > /tmp/core.json
+          # (2) scalper relay: resolve the relay workflow file by sha256 among the repo's workflows (pure shell)
+          relwf=""
+          for wf in $(gh api "repos/$RELAY/actions/workflows?per_page=100" -q '.workflows[].path'); do
+            base="${wf##*/}"
+            [ "$(printf %s "$base" | sha256sum | cut -c1-16)" = "$RELAY_WF_HASH" ] && { relwf="$base"; break; }
+          done
+          [ -n "$relwf" ] || { echo "relay workflow not resolved by sha256"; exit 1; }
+          gh api -X GET "repos/$RELAY/actions/workflows/$relwf/runs?per_page=20" > /tmp/relay.json
+          echo "fetched read-only Actions metadata for both services"
+
+      - name: Screenshot the PUBLIC status page (cropped to the status area only)
+        env:
+          PW: "1.49.1"
+        run: |
+          set -eu
+          npm init -y >/dev/null 2>&1
+          npm i --no-save "playwright@${PW}" >/dev/null 2>&1
+          npx playwright install --with-deps chromium
+          cat > shot.mjs <<'MJS'
+          import { chromium } from 'playwright';
+          const url = process.env.STATUS_PAGE;
+          const b = await chromium.launch({ args: ['--no-sandbox'] });
+          const p = await (await b.newContext({ viewport: { width: 1200, height: 800 }, deviceScaleFactor: 1 })).newPage();
+          try {
+            await p.goto(url, { waitUntil: 'networkidle', timeout: 60000 });
+            // Prefer an explicit status/daemon element. Only if none exists, take a conservative top strip,
+            // which holds the title/status banner and deliberately excludes any data tables lower on the page.
+            let el = null;
+            for (const s of ['#status', '.status', '[data-status]', '#health', '.daemon', '.health', 'header']) {
+              el = await p.$(s); if (el) break;
+            }
+            if (el) await el.screenshot({ path: 'svc-status.png' });
+            else await p.screenshot({ path: 'svc-status.png', clip: { x: 0, y: 0, width: 1200, height: 140 } });
+            console.log('screenshot ok');
+          } catch (e) {
+            console.log('screenshot skipped:', e.message);
+          }
+          await b.close();
+          MJS
+          node shot.mjs || echo "screenshot step is best-effort"
+
+      - name: Assemble svc-health.json (operational health only, no financial fields)
+        run: |
+          set -eu
+          python3 .github/scripts/svc-health.py /tmp/core.json /tmp/relay.json svc-status.png > svc-health.json
+          echo "---- svc-health.json ----"; cat svc-health.json
+          # guard: fail if any forbidden field name ever slips into the output
+          python3 - <<'PY'
+          t = open("svc-health.json").read().lower()
+          bad = [w for w in ["balance", "pnl", "p&l", "position", "order", "ticker", "account", "qty", "price"] if w in t]
+          if bad:
+              raise SystemExit("forbidden field in svc-health.json: %s" % bad)
+          print("field guard ok")
+          PY
+
+      - name: Publish svc-health.json + screenshot to the tokenless board release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          gh release view svc-health-board --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 \
+            || gh release create svc-health-board --repo "$GITHUB_REPOSITORY" \
+                 --title "Clush service health board" \
+                 --notes "Live svc-health.json (read-only operational health of the live-trading system) for the portal service board." --latest=false
+          if [ -f svc-status.png ]; then
+            gh release upload svc-health-board svc-health.json svc-status.png --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            gh release upload svc-health-board svc-health.json --repo "$GITHUB_REPOSITORY" --clobber
+          fi
+          echo "svc-health URL: https://github.com/$GITHUB_REPOSITORY/releases/download/svc-health-board/svc-health.json"
