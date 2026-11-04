@@ -31,7 +31,11 @@ echo "== install argocd CLI $ARGOCD_VERSION (core mode: talks to the kube API, n
 curl -sSLo ./argocd "https://github.com/argoproj/argo-cd/releases/download/${ARGOCD_VERSION}/argocd-linux-amd64"
 sudo install ./argocd /usr/local/bin/argocd
 argocd version --client 2>/dev/null | head -1 || true
+# core mode reads the Argo CD control-plane config (argocd-cm) from the namespace Argo CD is installed
+# in; point both the CLI and the kube-context default at it so `argocd app rollback` finds argocd-cm.
 export ARGOCD_OPTS='--core'
+export ARGOCD_NAMESPACE=argocd
+kubectl config set-context --current --namespace=argocd >/dev/null 2>&1 || true
 
 echo "== deploy the clush notice app (kubectl) =="
 cat > demo.json <<'JSON'
@@ -138,7 +142,7 @@ echo "-- rollback: argocd app rollback to the v1 deployment --"
 kubectl -n argocd patch application podinfo --type json -p '[{"op":"remove","path":"/spec/syncPolicy/automated"}]' || true
 argocd app history podinfo || true
 # pick the earliest history id whose revision is the v1 chart version (fallback to id 0)
-v1_id="$(argocd app history podinfo 2>/dev/null | awk -v v="$PODINFO_V1" 'NR>1 && $NF==v {print $1; exit}')"
+v1_id="$(argocd app history podinfo 2>/dev/null | awk -v v="$PODINFO_V1" 'NR>1 && $NF==v {print $1; exit}' || true)"
 [ -n "${v1_id:-}" ] || v1_id=0
 echo "   rolling back to history id $v1_id"
 rb_method="argocd app rollback"
