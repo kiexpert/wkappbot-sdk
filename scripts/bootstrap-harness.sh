@@ -8,7 +8,7 @@
 #
 # Wire it from the environment Setup script (runs once at root creation), e.g.:
 #     bash scripts/bootstrap-harness.sh "$PWD"
-# or add an npm hook so `npm install` runs it (see package.json proposal in the PR).
+# It also runs automatically from package.json `postinstall`, so a bare `npm install` sets up a root.
 #
 # Idempotent. Optional steps are best-effort and never fatal; only a missing bin/ is fatal.
 #
@@ -25,7 +25,11 @@ echo "[..] harness setup: repo root = $REPO_ROOT"
 [ -d "$BIN" ] || { echo "[FAIL] bin/ not found at $BIN -- not a wkappbot-sdk checkout?" >&2; exit 1; }
 
 # 1) npm deps (the root runs npm install anyway; do it here so setup is one place). Best-effort.
-if [ -f "$REPO_ROOT/package.json" ] && command -v npm >/dev/null 2>&1; then
+# Skip when we are ourselves running inside an npm lifecycle (e.g. invoked from the postinstall hook):
+# npm is already installing deps, and re-running `npm install` here would recurse infinitely.
+if [ -n "${npm_lifecycle_event:-}" ]; then
+  echo "[skip] npm install (already inside npm '$npm_lifecycle_event' -- avoiding re-entry)"
+elif [ -f "$REPO_ROOT/package.json" ] && command -v npm >/dev/null 2>&1; then
   echo "[..] npm install"
   ( cd "$REPO_ROOT" && npm install --no-audit --no-fund --silent ) && echo "[ok] npm deps installed" \
     || echo "[warn] npm install reported issues (non-fatal)"
