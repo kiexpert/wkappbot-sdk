@@ -8,7 +8,9 @@ name: private-portal-qa
 # The probe reads the runtime base URL OUT OF the portal source: a hardcoded copy measured the old
 # address for a whole day after the page had already been fixed (2026-11-01).
 # SECRETS READ: WKAPPBOT_PAT, GH_LICENSE_TOKEN, WKAPPBOT_CORE_PAT (tried in that order).
-# A value that is empty or SET-ME counts as unset.
+# Live-twin selftests additionally read WK_QA_GH_TOKEN (=WKAPPBOT_PAT) and WK_QA_GL_TOKEN
+# (=GITLAB_TOKEN), masked; they are opt-in per selftest case and do no live writes unless that
+# case is enabled. A value that is empty or SET-ME counts as unset.
 on:
   workflow_dispatch:
   push:
@@ -34,7 +36,14 @@ jobs:
       T1: ${{ secrets.WKAPPBOT_PAT }}
       T2: ${{ secrets.GH_LICENSE_TOKEN }}
       T3: ${{ secrets.WKAPPBOT_CORE_PAT }}
+      WK_QA_GH_TOKEN: ${{ secrets.WKAPPBOT_PAT }}
+      WK_QA_GL_TOKEN: ${{ secrets.GITLAB_TOKEN }}
     steps:
+      - name: Mask the live-twin tokens (explicit, on top of Actions auto-masking)
+        run: |
+          [ -n "${WK_QA_GH_TOKEN:-}" ] && echo "::add-mask::$WK_QA_GH_TOKEN" || true
+          [ -n "${WK_QA_GL_TOKEN:-}" ] && echo "::add-mask::$WK_QA_GL_TOKEN" || true
+          echo "live-twin tokens masked (gh set: $([ -n "${WK_QA_GH_TOKEN:-}" ] && echo yes || echo no), gl set: $([ -n "${WK_QA_GL_TOKEN:-}" ] && echo yes || echo no))"
       - name: Find the target repo and a token that can reach it
         run: |
           set -u
@@ -70,6 +79,12 @@ jobs:
         run: node site/ci/weblinux-probe.mjs
       - name: Screenshots, light and dark
         run: node site/ci/portal-shots.mjs
+      - name: Leak-grep the demo artifacts (fail on any token prefix)
+        run: |
+          if [ -d shots ] && grep -rEI 'ghp_[A-Za-z0-9]|github_pat_[A-Za-z0-9]|glpat-[A-Za-z0-9]|sk-ant-[A-Za-z0-9]' shots ; then
+            echo "TOKEN-PREFIX LEAK detected in demo artifacts"; exit 1
+          fi
+          echo "leak-grep: 0 (no token prefix in the demo artifacts)"
       - uses: actions/upload-artifact@v4
         with:
           name: portal-screens
