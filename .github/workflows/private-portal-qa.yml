@@ -78,7 +78,7 @@ jobs:
           echo "no token reaches the target repo"; exit 1
       - name: Check out the target
         run: git clone -q --depth 1 "https://x-access-token:${TOK}@github.com/${REPO}.git" site
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5  # v4 runs on the deprecated Node 20 runtime
         with:
           node-version: 22
       - name: Install Chromium

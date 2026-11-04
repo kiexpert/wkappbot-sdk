@@ -62,6 +62,8 @@ jobs:
         working-directory: src
         env:
           TTS_ENGINE: edge
+          # recording mode: the portal hides its 대본 selection overlay so scene clicks reach the page
+          PORTAL_REC: "1"
         run: |
           set -eu
           bash poc-site/portal/qa/build.sh "$SCHEME"
