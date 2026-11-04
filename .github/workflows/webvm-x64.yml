@@ -209,6 +209,10 @@ jobs:
           # (owner 2026-11-02: compress it; measured 129.7 MB raw -> 51.8 MB gzip). The hash keys the page's Cache Storage.
           # Lazy disk: cut /pack/rootfs.bin out of the package into out/disk/ (1 MB gzip chunks) so a cold visit fetches
           # only the blocks QEMU reads (the CLI image's disk is 1,110 MiB; preloading it cost a cold visit ~458 MB).
+          # Content-defined cuts (owner 2026-11-04, download only what changed): the disk is an ISO 9660 image, so one
+          # added package shifts every later file; fixed 1 MiB chunks shared 0 percent between two real bakes and
+          # content-defined ones 98.74 percent. The chunker is the target repo's cdc.c, compiled here.
+          if [ -f src/webvm/x64-build/cdc.c ]; then gcc -O2 -o "$PWD/wkcdc" src/webvm/x64-build/cdc.c && echo "WK_CDC=$PWD/wkcdc" >> "$GITHUB_ENV" && export WK_CDC="$PWD/wkcdc"; fi
           python3 -I src/webvm/x64-build/split-disk.py out
           f=$(ls out/*.data | head -1)
           raw=$(stat -c %s "$f")
