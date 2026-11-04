@@ -308,6 +308,11 @@ jobs:
           curl -s -H "PRIVATE-TOKEN: $GLTOK" "$GL/api/v4/projects/$enc/jobs/${deploy_jid}/artifacts/deploy-proof/cluster-metrics.json" -o /tmp/cluster-metrics.json 2>/dev/null || true
           python3 "$GITHUB_WORKSPACE/.github/scripts/clush-release-status.py" "$plid" "$st" /tmp/jobs.json /tmp/cluster-metrics.json > release-status.json
           echo "---- release-status.json ----"; cat release-status.json
+          # leak-grep the proof artifact (fail on any token prefix) before publishing
+          if grep -rEI 'ghp_[A-Za-z0-9]|github_pat_[A-Za-z0-9]|glpat-[A-Za-z0-9]|sk-ant-[A-Za-z0-9]' release-status.json ; then
+            echo "TOKEN-PREFIX LEAK detected"; exit 1
+          fi
+          echo "leak-grep: 0 (no token prefix in the proof artifacts)"
           gh release view clush-release-board --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 \
             || gh release create clush-release-board --repo "$GITHUB_REPOSITORY" --title "Clush release board" --notes "Live release-status.json for the portal release board (updated each clush-poc deploy)." --latest=false
           gh release upload clush-release-board release-status.json --repo "$GITHUB_REPOSITORY" --clobber
