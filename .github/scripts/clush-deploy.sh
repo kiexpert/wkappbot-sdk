@@ -2,13 +2,19 @@
 # Real Kubernetes deploy proof for the Clush PoC, run by the clush-poc GitLab pipeline's deploy job
 # on a tagged shell-executor runner (kind needs the host docker daemon). It creates a kind cluster,
 # installs Argo CD (pinned), deploys the project's nginx "notice" app with kubectl and verifies it
-# serves, applies an Argo CD Application (public example app) and waits for Synced/Healthy, installs
-# metrics-server and gathers release metrics (best-effort) into deploy-proof/cluster-metrics.json,
-# then saves kubectl/argocd state under deploy-proof/. No credential is ever placed on the cluster.
+# serves, then runs a REAL GitOps release cycle on a public Helm chart managed by Argo CD --
+# deploy v1 -> upgrade v2 -> `argocd app rollback` back to v1 -- checking health and the served
+# version at every step and recording the timeline in deploy-proof/rollback-timeline.json. It also
+# installs metrics-server and gathers release metrics (best-effort) into
+# deploy-proof/cluster-metrics.json, then saves kubectl/argocd state under deploy-proof/.
+# No credential is ever placed on the cluster (the Helm repo is read anonymously).
 set -euo pipefail
 
 ARGOCD_VERSION="v2.13.3"
 CLUSTER="portal-demo"
+PODINFO_REPO="https://stefanprodan.github.io/podinfo"
+PODINFO_V1="6.5.0"
+PODINFO_V2="6.5.4"
 export KUBECONFIG="${CI_PROJECT_DIR:-$PWD}/kubeconfig"
 mkdir -p deploy-proof
 
@@ -20,6 +26,12 @@ echo "== install Argo CD $ARGOCD_VERSION =="
 kubectl create namespace argocd
 kubectl apply -n argocd -f "https://raw.githubusercontent.com/argoproj/argo-cd/${ARGOCD_VERSION}/manifests/install.yaml"
 kubectl -n argocd wait --for=condition=Available deployment --all --timeout=300s
+
+echo "== install argocd CLI $ARGOCD_VERSION (core mode: talks to the kube API, no server login) =="
+curl -sSLo ./argocd "https://github.com/argoproj/argo-cd/releases/download/${ARGOCD_VERSION}/argocd-linux-amd64"
+sudo install ./argocd /usr/local/bin/argocd
+argocd version --client 2>/dev/null | head -1 || true
+export ARGOCD_OPTS='--core'
 
 echo "== deploy the clush notice app (kubectl) =="
 cat > demo.json <<'JSON'
@@ -58,24 +70,106 @@ echo "-- probe log --"; kubectl -n clush-demo logs probe || true
 kubectl -n clush-demo delete pod probe --ignore-not-found
 [ "$ph" = "Succeeded" ] || { echo "serve check did not succeed (phase=$ph)"; exit 1; }
 
-echo "== Argo CD Application (public example app) =="
-cat > app.json <<'JSON'
+# ===================== REAL Argo CD deploy -> upgrade -> rollback cycle =====================
+# podinfo is a public Helm chart (many published versions, a /version endpoint and a version-tagged
+# image), read anonymously by Argo CD, so the whole cycle is real and needs no cluster credential.
+echo "== Argo CD release cycle: deploy v$PODINFO_V1 -> upgrade v$PODINFO_V2 -> rollback v$PODINFO_V1 =="
+
+cat > podinfo.json <<JSON
 { "apiVersion": "argoproj.io/v1alpha1", "kind": "Application",
-  "metadata": { "name": "guestbook", "namespace": "argocd" },
+  "metadata": { "name": "podinfo", "namespace": "argocd" },
   "spec": {
     "project": "default",
-    "source": { "repoURL": "https://github.com/argoproj/argocd-example-apps.git", "targetRevision": "HEAD", "path": "guestbook" },
-    "destination": { "server": "https://kubernetes.default.svc", "namespace": "guestbook" },
-    "syncPolicy": { "automated": {}, "syncOptions": [ "CreateNamespace=true" ] } } }
+    "source": { "repoURL": "$PODINFO_REPO", "chart": "podinfo", "targetRevision": "$PODINFO_V1" },
+    "destination": { "server": "https://kubernetes.default.svc", "namespace": "podinfo" },
+    "syncPolicy": { "syncOptions": [ "CreateNamespace=true" ] } } }
 JSON
-kubectl apply -f app.json
-s="/"
-for i in $(seq 1 60); do
-  s="$(kubectl -n argocd get application guestbook -o jsonpath='{.status.sync.status}/{.status.health.status}' 2>/dev/null || echo "/")"
-  echo "argo guestbook: $s"
-  [ "$s" = "Synced/Healthy" ] && break
-  sleep 5
-done
+kubectl apply -f podinfo.json
+
+# served version = the running image tag (authoritative: what the cluster actually runs)
+served_ver() { kubectl -n podinfo get deploy podinfo -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null | sed 's/.*://'; }
+app_sync_health() { kubectl -n argocd get application podinfo -o jsonpath='{.status.sync.status}/{.status.health.status}' 2>/dev/null || echo "/"; }
+wait_healthy() {
+  local sh="/"
+  for _ in $(seq 1 60); do
+    sh="$(app_sync_health)"
+    echo "   argo podinfo: $sh"
+    [ "$sh" = "Synced/Healthy" ] && { echo "$sh"; return 0; }
+    sleep 5
+  done
+  echo "$sh"; return 1
+}
+
+: > /tmp/rollback_steps.jsonl
+record_step() { # step expected_version method
+  local step="$1" want="$2" method="$3" sh sv ok at
+  sh="$(app_sync_health)"; sv="$(served_ver)"; at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  ok=true; [ "$sv" = "$want" ] || ok=false; [ "$sh" = "Synced/Healthy" ] || ok=false
+  python3 - "$step" "$want" "$sv" "$sh" "$method" "$ok" "$at" >> /tmp/rollback_steps.jsonl <<'PY'
+import json, sys
+step, want, served, sh, method, ok, at = sys.argv[1:8]
+sync, _, health = sh.partition("/")
+print(json.dumps({"step": step, "method": method, "targetVersion": want, "servedVersion": served,
+                  "sync": sync or None, "health": health or None, "ok": ok == "true", "at": at}))
+PY
+  echo "   step=$step want=$want served=$sv status=$sh ok=$ok"
+  [ "$ok" = "true" ] || { echo "release-cycle step '$step' FAILED (served=$sv want=$want status=$sh)"; return 1; }
+}
+
+echo "-- v1: sync chart $PODINFO_V1 --"
+argocd app sync podinfo --timeout 300 >/dev/null 2>&1 || true
+wait_healthy >/dev/null || { echo "podinfo v1 never healthy"; exit 1; }
+kubectl -n podinfo rollout status deployment/podinfo --timeout=180s
+record_step "deploy_v1" "$PODINFO_V1" "argocd app sync" || exit 1
+
+echo "-- v2: set chart $PODINFO_V2 and sync (upgrade) --"
+argocd app set podinfo --revision "$PODINFO_V2" >/dev/null 2>&1
+argocd app sync podinfo --timeout 300 >/dev/null 2>&1 || true
+wait_healthy >/dev/null || { echo "podinfo v2 never healthy"; exit 1; }
+kubectl -n podinfo rollout status deployment/podinfo --timeout=180s
+record_step "upgrade_v2" "$PODINFO_V2" "argocd app set+sync" || exit 1
+
+echo "-- rollback: argocd app rollback to the v1 deployment --"
+argocd app history podinfo || true
+# history ids are sequential from 0; the first entry (earliest) is the v1 deploy
+v1_id="$(argocd app history podinfo 2>/dev/null | awk 'NR==2{print $1; exit}')"
+[ -n "${v1_id:-}" ] || v1_id=0
+echo "   rolling back to history id $v1_id"
+argocd app rollback podinfo "$v1_id" >/dev/null 2>&1 || { echo "argocd app rollback failed"; exit 1; }
+wait_healthy >/dev/null || { echo "podinfo rollback never healthy"; exit 1; }
+kubectl -n podinfo rollout status deployment/podinfo --timeout=180s
+record_step "rollback_v1" "$PODINFO_V1" "argocd app rollback" || exit 1
+
+echo "-- assemble rollback-timeline.json --"
+python3 - "$PODINFO_REPO" "$PODINFO_V1" "$PODINFO_V2" > deploy-proof/rollback-timeline.json <<'PY'
+import json, sys
+repo, v1, v2 = sys.argv[1:4]
+steps = [json.loads(l) for l in open("/tmp/rollback_steps.jsonl") if l.strip()]
+out = {
+    "app": "podinfo",
+    "tool": "Argo CD",
+    "chart": "podinfo (%s)" % repo,
+    "fromVersion": v1, "upgradedTo": v2, "rolledBackTo": v1,
+    "steps": steps,
+    "ok": all(s.get("ok") for s in steps) and len(steps) == 3,
+}
+print(json.dumps(out, indent=2))
+PY
+echo "---- rollback-timeline.json ----"; cat deploy-proof/rollback-timeline.json
+python3 -c "import json,sys; sys.exit(0 if json.load(open('deploy-proof/rollback-timeline.json'))['ok'] else 1)" \
+  || { echo "rollback timeline not ok"; exit 1; }
+
+# serve check: podinfo answers on its /version after the rollback
+kubectl -n podinfo port-forward svc/podinfo 19898:9898 >/dev/null 2>&1 &
+pfp=$!
+sleep 3
+pv="$(curl -s "http://127.0.0.1:19898/version" 2>/dev/null || echo "")"
+kill "$pfp" 2>/dev/null || true
+echo "podinfo served /version after rollback: $pv"
+
+# final Argo status for the cluster-metrics block below
+s="$(app_sync_health)"
+# ===================== end release cycle =====================
 
 # ---- best-effort release metrics (never fail the deploy on these) ----
 set +e
@@ -86,7 +180,7 @@ kubectl -n kube-system patch deployment metrics-server --type=json \
 kubectl -n kube-system rollout status deployment/metrics-server --timeout=180s
 
 echo "== gather release metrics (best-effort) =="
-rev="$(kubectl -n argocd get application guestbook -o jsonpath='{.status.sync.revision}' 2>/dev/null)"
+rev="$(kubectl -n argocd get application podinfo -o jsonpath='{.status.sync.revision}' 2>/dev/null)"
 pods_ready="$(kubectl -n clush-demo get deploy notice -o jsonpath='{.status.readyReplicas}/{.status.replicas}' 2>/dev/null)"
 app_image="$(kubectl -n clush-demo get deploy notice -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null)"
 kube_ctx="$(kubectl config current-context 2>/dev/null)"
@@ -130,6 +224,12 @@ d = {
   "samples": int(os.environ.get("CM_N") or 0),
   "cluster_timestamp": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
 }
+# carry the real deploy->upgrade->rollback timeline inside the metrics the pipeline already collects,
+# so the release-status assembler publishes it with no extra workflow plumbing
+try:
+    d["rollback"] = json.load(open("deploy-proof/rollback-timeline.json"))
+except Exception:
+    pass
 json.dump(d, open("deploy-proof/cluster-metrics.json", "w"), indent=2)
 print("cluster-metrics.json:", json.dumps(d))
 PY
@@ -140,9 +240,10 @@ echo "== capture artifacts =="
 echo "$s" > deploy-proof/argocd-status.txt
 kubectl get all -A > deploy-proof/kubectl-get-all.txt 2>&1 || true
 kubectl -n clush-demo get all -o wide > deploy-proof/clush-demo.txt 2>&1 || true
-kubectl -n argocd get application guestbook -o yaml > deploy-proof/argocd-app.yaml 2>&1 || true
-cp demo.json app.json deploy-proof/ 2>/dev/null || true
+kubectl -n podinfo get all -o wide > deploy-proof/podinfo.txt 2>&1 || true
+kubectl -n argocd get application podinfo -o yaml > deploy-proof/argocd-app.yaml 2>&1 || true
+cp demo.json podinfo.json deploy-proof/ 2>/dev/null || true
 
 echo "FINAL argocd status: $s"
 [ "$s" = "Synced/Healthy" ] || { echo "Argo app never reached Synced/Healthy"; exit 1; }
-echo "deploy proof complete"
+echo "deploy proof complete (release cycle: deploy v$PODINFO_V1 -> upgrade v$PODINFO_V2 -> rollback v$PODINFO_V1)"
