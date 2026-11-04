@@ -6,10 +6,9 @@
   "desc": "Blocks non-wk commands when Claude token pace exceeds target. Only wkappbot/git/gh/Agent.cmd/codex prefixed commands are allowed.",
   "steps": [
     "SAFETY: Fires when Claude weekly total or Sonnet pace exceeds target AND the command does not start with a wk-prefix (wkappbot, wkjobs, wkask, etc.), git, gh, Agent.cmd, or codex. Prevents burning expensive tokens on mechanical work.",
-    "SOLUTION: Prefix any command with a wk-tool: use 'wkappbot ...', 'git ...', 'gh ...', 'Agent.cmd ...', or 'wkcodex.sh ...'. These are exempt because they are cheap/delegating operations. OR delegate the entire task via Agent.cmd --model haiku.",
-    "PREVENTION: When pace is over target, use wk-prefix tools only. Delegate heavy work to cheap agents. Running 'wkappbot skill read ...' is always free (TIER0)."
+    "PREVENTION: When pace is over target, use wk-prefix tools only. Delegate heavy work to cheap agents. Running 'wkappbot skill read ...' is always free (TIER0). //why:post reset gauge kept pwsh lint refused for hours",
+    "MEASURED 2026-09-07, read this BEFORE re-shaping a command: this gate shares its block surface with several others, so a refusal is often not this gate at all. One session had the SAME wkappbot file edit call refused in turn by busy-fleet (no delegation in the last 3 minutes), by heart-v2 singlewrite (a git commit carrying a heredoc could not be parsed into segments and was refused fail-closed), by the study-lock (seven skills unread), and finally by skill-currency (one lock skill over 30 days behind its source). ALWAYS read the bracketed guard name in the refusal -- it is always there -- and take THAT guard's remedy: a wk-prefix satisfies this gate and does nothing for the other four. Two remedies that recurred: for singlewrite run ONE command per call and pass a multi-paragraph commit message as repeated -m flags rather than a heredoc, which cannot be segmented; for busy-fleet dispatch real work, since a COMPLETED delegation is what reopens the window. SOLUTION: Prefix any command with a wk-tool: use 'wkappbot ...', 'git ...', 'gh ...', 'Agent.cmd ...', or 'wkcodex.sh ...'. These are exempt because they are cheap/delegating operations. OR delegate the entire task via Agent.cmd --model haiku."
   ],
-  "comments": null,
   "requirements": [
     {
       "cmd": "wkappbot skill read harness-wk-only-gate",
@@ -40,6 +39,6 @@
   "regression_script": null,
   "author": "claude",
   "created": "2026-06-11T08:09:00.7480398Z",
-  "updated": "2026-06-11T08:09:00.7480485Z",
-  "version": "1.0"
+  "updated": "2026-11-04T22:49:05.7998721Z",
+  "version": "1.2"
 }
