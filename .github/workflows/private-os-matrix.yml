@@ -66,6 +66,13 @@ jobs:
           git clone -q --depth 1 "https://x-access-token:${TOK}@github.com/${REPO}.git" src
           cd src
           node ci/os-deploy.mjs "${{ matrix.os }}"
+      - name: Leak-grep the proof artifacts (fail on any token prefix)
+        shell: bash
+        run: |
+          if grep -rEI 'ghp_[A-Za-z0-9]|github_pat_[A-Za-z0-9]|glpat-[A-Za-z0-9]|sk-ant-[A-Za-z0-9]' src/ci-os-status.json ; then
+            echo "TOKEN-PREFIX LEAK detected"; exit 1
+          fi
+          echo "leak-grep: 0 (no token prefix in the proof artifacts)"
       - uses: actions/upload-artifact@v4
         with:
           name: os-status-${{ matrix.os }}
