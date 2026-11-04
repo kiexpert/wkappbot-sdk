@@ -59,6 +59,11 @@ jobs:
           if git -C src fetch -q --depth 1 origin relay/blackbox 2>/dev/null; then
             git -C src show FETCH_HEAD:results.json > out/portal/modules-results.json || rm -f out/portal/modules-results.json
           fi
+          # token-safety: never publish a token into the public gh-pages payload
+          if grep -rEI 'ghp_[A-Za-z0-9]|github_pat_[A-Za-z0-9]|glpat-[A-Za-z0-9]|sk-ant-[A-Za-z0-9]' out ; then
+            echo "TOKEN-PREFIX LEAK detected in pages payload"; exit 1
+          fi
+          echo "leak-grep: 0 (no token prefix in the pages payload)"
           cd out
           git init -q -b gh-pages
           git config user.name "pages-relay"
