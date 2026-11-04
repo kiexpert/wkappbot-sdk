@@ -216,7 +216,8 @@ jobs:
           git config user.email "pages-relay@users.noreply.github.com"
           git add -A
           git commit -q -m "webvm x64 $(date -u +%FT%TZ) c2w $C2W_TAG snapshot" || { echo "x64 unchanged"; exit 0; }
-          git push -q "https://x-access-token:${TOK}@github.com/${REPO}.git" gh-pages
+          # Run 41805660921 built everything, then lost the publish to one GitHub 500 on push; retry 3 times, 20 s apart.
+          for i in 1 2 3; do git push -q "https://x-access-token:${TOK}@github.com/${REPO}.git" gh-pages && break; [ "$i" = 3 ] && exit 1; sleep 20; done
           echo "x64 published"
 
       - name: Request a Pages build
