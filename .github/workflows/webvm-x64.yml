@@ -134,6 +134,8 @@ jobs:
           bash src/tools/wk-harness-min-copy.sh "$PWD/src" "$PWD/ctx/harness" src/tools/wk-harness-min-manifest.txt
           du -sh ctx/harness
           cp src/webvm/x64-build/wk-ai.sh ctx/wk-ai
+          # Harness web install (owner 2026-11-04): the same scrubbed minimal harness as a tarball for the page.
+          mkdir -p harnesspkg && tar --exclude=.git -czf harnesspkg/wk-harness-min.tar.gz -C ctx/harness . && ls -la harnesspkg
 
       - name: Build the x86_64 image and convert it to a browser bundle
         if: env.BAKE == '1'
@@ -190,6 +192,7 @@ jobs:
         run: |
           set -eu
           cp src/webvm/x64/index.html out/index.html
+          mkdir -p out/harness && cp harnesspkg/wk-harness-min.tar.gz out/harness/ && cp src/webvm/x64-build/harness-install.sh out/harness/install.sh
           cp cli-versions.json out/cli-versions.json
           npm pack -s coi-serviceworker@0.1.7 >/dev/null
           tar -xzf coi-serviceworker-0.1.7.tgz
