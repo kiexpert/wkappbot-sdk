@@ -180,6 +180,12 @@ jobs:
         run: |
           echo "=== daemon ==="; cat results/daemon-result/daemon-result.json 2>/dev/null || echo "(no daemon result)"
           echo "=== page ==="; cat results/page-result/page-result.json 2>/dev/null || echo "(no page result)"
+      - name: Leak-grep the proof artifacts (fail on any token prefix)
+        run: |
+          if grep -rEI 'ghp_[A-Za-z0-9]|github_pat_[A-Za-z0-9]|glpat-[A-Za-z0-9]|sk-ant-[A-Za-z0-9]' results/ ; then
+            echo "TOKEN-PREFIX LEAK detected in results artifacts"; exit 1
+          fi
+          echo "leak-grep: 0 (no token prefix in the proof artifacts)"
       - name: Close the throwaway issues
         if: always()
         env:
