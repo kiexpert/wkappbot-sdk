@@ -67,6 +67,12 @@ jobs:
           bash poc-site/portal/qa/build.sh "$SCHEME"
           echo "=== qa-video.json ==="; cat poc-site/portal/qa/qa-video.json
           ls -la poc-site/portal/qa/qa-video.mp4 poc-site/portal/qa/qa-video.webm poc-site/portal/qa/qa-video.vtt poc-site/portal/qa/qa-video.json
+      - name: Leak-grep the proof artifacts (fail on any token prefix)
+        run: |
+          if grep -rEI 'ghp_[A-Za-z0-9]|github_pat_[A-Za-z0-9]|glpat-[A-Za-z0-9]|sk-ant-[A-Za-z0-9]' src/poc-site/portal/qa ; then
+            echo "TOKEN-PREFIX LEAK detected"; exit 1
+          fi
+          echo "leak-grep: 0 (no token prefix in the proof artifacts)"
       - name: Upload the built video
         uses: actions/upload-artifact@v4
         with:
