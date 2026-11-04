@@ -146,11 +146,11 @@ v1_id="$(argocd app history podinfo 2>/dev/null | awk -v v="$PODINFO_V1" 'NR>1 &
 [ -n "${v1_id:-}" ] || v1_id=0
 echo "   rolling back to history id $v1_id"
 rb_method="argocd app rollback"
-if ! argocd app rollback podinfo "$v1_id"; then
-  echo "argocd app rollback errored -- kubectl fallback (set targetRevision $PODINFO_V1 + re-enable auto-sync)"
-  rb_method="argocd app rollback (kubectl fallback)"
-  kubectl -n argocd patch application podinfo --type merge -p "{\"spec\":{\"source\":{\"targetRevision\":\"$PODINFO_V1\"},\"syncPolicy\":{\"automated\":{}}}}"
-fi
+argocd app rollback podinfo "$v1_id" || { echo "argocd app rollback errored; the targetRevision realign below still completes the rollback"; rb_method="argocd app rollback (kubectl fallback)"; }
+# `argocd app rollback` reverts the workload to the v1 manifests but leaves spec.source.targetRevision
+# at v2, so Argo reports OutOfSync; realign the declared target to v1 and re-enable auto-sync so the
+# app reconciles to Synced/Healthy at v1 (and if the CLI errored, the controller converges here too).
+kubectl -n argocd patch application podinfo --type merge -p "{\"spec\":{\"source\":{\"targetRevision\":\"$PODINFO_V1\"},\"syncPolicy\":{\"automated\":{}}}}"
 wait_version "$PODINFO_V1" || { echo "podinfo rollback never reached Synced/Healthy at $PODINFO_V1"; exit 1; }
 kubectl -n podinfo rollout status deployment/podinfo --timeout=180s
 record_step "rollback_v1" "$PODINFO_V1" "$rb_method" || exit 1
