@@ -30,7 +30,7 @@ jobs:
       T2: ${{ secrets.WKAPPBOT_PAT }}
       T3: ${{ secrets.WKAPPBOT_CORE_PAT }}
       SCHEME: dark
-      SRC_REF: qa-video/qa-rebuild
+      SRC_REF: main
     steps:
       - name: Find the target repo and a token that can reach it
         run: |
