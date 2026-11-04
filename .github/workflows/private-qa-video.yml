@@ -8,6 +8,19 @@ name: private-qa-video
 # SECRETS: GH_LICENSE_TOKEN / WKAPPBOT_PAT / WKAPPBOT_CORE_PAT (to find + clone the target). No other secret is used.
 on:
   workflow_dispatch:
+    inputs:
+      src_ref:
+        description: 'Target branch or tag to build the video from'
+        required: false
+        default: main
+      expect_sha:
+        description: 'Optional commit sha prefix the checked-out ref must match (pins the build)'
+        required: false
+        default: ''
+      scheme:
+        description: 'Color scheme (dark or light)'
+        required: false
+        default: dark
   push:
     branches: ['qa-video/**']
     paths:
@@ -29,8 +42,9 @@ jobs:
       T1: ${{ secrets.GH_LICENSE_TOKEN }}
       T2: ${{ secrets.WKAPPBOT_PAT }}
       T3: ${{ secrets.WKAPPBOT_CORE_PAT }}
-      SCHEME: dark
-      SRC_REF: main
+      SCHEME: ${{ inputs.scheme || 'dark' }}
+      SRC_REF: ${{ inputs.src_ref || 'main' }}
+      EXPECT_SHA: ${{ inputs.expect_sha || '' }}
     steps:
       - name: Find the target repo and a token that can reach it
         run: |
@@ -56,7 +70,14 @@ jobs:
       - name: Clone the target and install Playwright
         run: |
           set -eu
-          git clone -q --depth 5 --branch "$SRC_REF" "https://x-access-token:${TOK}@github.com/${REPO}.git" src
+          case "$SRC_REF" in *[!A-Za-z0-9._/-]*|-*|'') echo "bad src_ref"; exit 1;; esac
+          case "$EXPECT_SHA" in *[!0-9a-f]*) echo "bad expect_sha"; exit 1;; esac
+          case "$SCHEME" in dark|light) ;; *) echo "bad scheme"; exit 1;; esac
+          git clone -q --depth 20 --branch "$SRC_REF" "https://x-access-token:${TOK}@github.com/${REPO}.git" src
+          head=$(git -C src rev-parse HEAD); echo "SRC_REF=$SRC_REF HEAD=${head:0:12}"
+          if [ -n "$EXPECT_SHA" ]; then
+            case "$head" in "$EXPECT_SHA"*) echo "pinned sha matches";; *) echo "HEAD ${head:0:12} does not match expect_sha $EXPECT_SHA"; exit 1;; esac
+          fi
           cd src && npm init -y >/dev/null 2>&1 && npm i --no-save playwright@1.48.0 >/dev/null 2>&1 && npx playwright install --with-deps chromium
       - name: Build the QA video (neural voice)
         working-directory: src
