@@ -90,5 +90,3 @@ jobs:
           name: portal-screens
           path: shots
           retention-days: 14
-
-# re-run 2026-11-03T11:42Z (skhy-clush d9d2397: P89 wall-clock flake fixed; expect green)
