@@ -82,22 +82,28 @@ cat > podinfo.json <<JSON
     "project": "default",
     "source": { "repoURL": "$PODINFO_REPO", "chart": "podinfo", "targetRevision": "$PODINFO_V1" },
     "destination": { "server": "https://kubernetes.default.svc", "namespace": "podinfo" },
-    "syncPolicy": { "syncOptions": [ "CreateNamespace=true" ] } } }
+    "syncPolicy": { "automated": {}, "syncOptions": [ "CreateNamespace=true" ] } } }
 JSON
+# Argo CD's own application-controller drives deploy + upgrade (declarative automated sync), so the
+# cycle does not depend on an argocd CLI `sync` succeeding; the CLI is used only for the rollback.
 kubectl apply -f podinfo.json
 
 # served version = the running image tag (authoritative: what the cluster actually runs)
 served_ver() { kubectl -n podinfo get deploy podinfo -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null | sed 's/.*://'; }
 app_sync_health() { kubectl -n argocd get application podinfo -o jsonpath='{.status.sync.status}/{.status.health.status}' 2>/dev/null || echo "/"; }
-wait_healthy() {
-  local sh="/"
-  for _ in $(seq 1 60); do
-    sh="$(app_sync_health)"
-    echo "   argo podinfo: $sh"
-    [ "$sh" = "Synced/Healthy" ] && { echo "$sh"; return 0; }
+# wait until the cluster actually runs $1 AND Argo reports Synced/Healthy
+wait_version() {
+  local want="$1" sh sv
+  for _ in $(seq 1 90); do
+    sh="$(app_sync_health)"; sv="$(served_ver)"
+    echo "   podinfo: status=$sh served=$sv (want $want)"
+    [ "$sh" = "Synced/Healthy" ] && [ "$sv" = "$want" ] && return 0
     sleep 5
   done
-  echo "$sh"; return 1
+  echo "   (timed out) last: $(app_sync_health) served=$(served_ver)"
+  argocd app get podinfo 2>/dev/null | head -30 || true
+  kubectl -n podinfo get pods 2>/dev/null || true
+  return 1
 }
 
 : > /tmp/rollback_steps.jsonl
@@ -116,29 +122,34 @@ PY
   [ "$ok" = "true" ] || { echo "release-cycle step '$step' FAILED (served=$sv want=$want status=$sh)"; return 1; }
 }
 
-echo "-- v1: sync chart $PODINFO_V1 --"
-argocd app sync podinfo --timeout 300 >/dev/null 2>&1 || true
-wait_healthy >/dev/null || { echo "podinfo v1 never healthy"; exit 1; }
+echo "-- v1: Argo CD auto-syncs chart $PODINFO_V1 --"
+wait_version "$PODINFO_V1" || { echo "podinfo v1 never reached Synced/Healthy at $PODINFO_V1"; exit 1; }
 kubectl -n podinfo rollout status deployment/podinfo --timeout=180s
-record_step "deploy_v1" "$PODINFO_V1" "argocd app sync" || exit 1
+record_step "deploy_v1" "$PODINFO_V1" "Argo CD auto-sync" || exit 1
 
-echo "-- v2: set chart $PODINFO_V2 and sync (upgrade) --"
-argocd app set podinfo --revision "$PODINFO_V2" >/dev/null 2>&1
-argocd app sync podinfo --timeout 300 >/dev/null 2>&1 || true
-wait_healthy >/dev/null || { echo "podinfo v2 never healthy"; exit 1; }
+echo "-- v2: set targetRevision $PODINFO_V2; Argo CD auto-syncs the upgrade --"
+kubectl -n argocd patch application podinfo --type merge -p "{\"spec\":{\"source\":{\"targetRevision\":\"$PODINFO_V2\"}}}"
+wait_version "$PODINFO_V2" || { echo "podinfo v2 never reached Synced/Healthy at $PODINFO_V2"; exit 1; }
 kubectl -n podinfo rollout status deployment/podinfo --timeout=180s
-record_step "upgrade_v2" "$PODINFO_V2" "argocd app set+sync" || exit 1
+record_step "upgrade_v2" "$PODINFO_V2" "patch targetRevision + Argo CD auto-sync" || exit 1
 
 echo "-- rollback: argocd app rollback to the v1 deployment --"
+# turn OFF automated sync first so the rollback is not immediately re-synced forward to v2
+kubectl -n argocd patch application podinfo --type json -p '[{"op":"remove","path":"/spec/syncPolicy/automated"}]' || true
 argocd app history podinfo || true
-# history ids are sequential from 0; the first entry (earliest) is the v1 deploy
-v1_id="$(argocd app history podinfo 2>/dev/null | awk 'NR==2{print $1; exit}')"
+# pick the earliest history id whose revision is the v1 chart version (fallback to id 0)
+v1_id="$(argocd app history podinfo 2>/dev/null | awk -v v="$PODINFO_V1" 'NR>1 && $NF==v {print $1; exit}')"
 [ -n "${v1_id:-}" ] || v1_id=0
 echo "   rolling back to history id $v1_id"
-argocd app rollback podinfo "$v1_id" >/dev/null 2>&1 || { echo "argocd app rollback failed"; exit 1; }
-wait_healthy >/dev/null || { echo "podinfo rollback never healthy"; exit 1; }
+rb_method="argocd app rollback"
+if ! argocd app rollback podinfo "$v1_id"; then
+  echo "argocd app rollback errored -- kubectl fallback (set targetRevision $PODINFO_V1 + re-enable auto-sync)"
+  rb_method="argocd app rollback (kubectl fallback)"
+  kubectl -n argocd patch application podinfo --type merge -p "{\"spec\":{\"source\":{\"targetRevision\":\"$PODINFO_V1\"},\"syncPolicy\":{\"automated\":{}}}}"
+fi
+wait_version "$PODINFO_V1" || { echo "podinfo rollback never reached Synced/Healthy at $PODINFO_V1"; exit 1; }
 kubectl -n podinfo rollout status deployment/podinfo --timeout=180s
-record_step "rollback_v1" "$PODINFO_V1" "argocd app rollback" || exit 1
+record_step "rollback_v1" "$PODINFO_V1" "$rb_method" || exit 1
 
 echo "-- assemble rollback-timeline.json --"
 python3 - "$PODINFO_REPO" "$PODINFO_V1" "$PODINFO_V2" > deploy-proof/rollback-timeline.json <<'PY'
