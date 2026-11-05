@@ -1,8 +1,14 @@
 name: runner-desktop
 
-# On-demand, time-boxed live desktop of a GitHub-hosted Windows / macOS runner, for SDK release QA
-# (watch or drive a QA session on the real OS). Deliberately NOT always-on: no schedule and no self-re-dispatch,
-# because GitHub's Actions terms limit hosted runners to work for this project (build / test / release).
+# Live desktops of GitHub-hosted Windows / macOS runners, shown in the owner's portal VM panel.
+# Roles (one boot script for all, .github/scripts/runner-desktop/boot.sh):
+#   owner -- the owner's always-available desktop. Lives ~5h45m, then hands over to a fresh run that it dispatches
+#            itself ~15 min before the 6h cap (treat it as a reboot: the work folder, app list and installed-software
+#            footprint carry over through an encrypted snapshot). A schedule re-arms it if the chain ever breaks.
+#            After SLEEP_AFTER idle minutes with no viewer it SLEEPS (snapshot, runner ends); the portal wakes it by
+#            dispatching mode=owner again.
+#   qa    -- time-boxed (<= 120 min) desktop for a QA session; a QA job can run beside the viewer.
+#   proof -- CI proof with a throwaway password: gate check from outside, then handover, restore and sleep.
 #
 # ACCESS GATE (mandatory, fail-closed):
 #   - owner secret RUNNER_DESKTOP_PASSWORD (>= 12 chars). Absent / SET-ME -> the job starts NOTHING and says so.
@@ -10,10 +16,8 @@ name: runner-desktop
 #     the VNC server itself is password-gated too (first 8 chars); noVNC sits under a random per-boot path.
 #   - the viewer URL is never printed; it is written only to the owner's private relay (found by sha256 prefix,
 #     never named here) as relay/desktop-<os>:status.json, which the portal reads with a conditional GET.
-# proof=true: uses a throwaway random password instead of the secret, proves the gate from outside
-#   (unauthenticated -> 401, authed -> 200 + RFB banner), then shuts down after `minutes`.
-# Shared boot: .github/scripts/runner-desktop/boot.sh is the one boot script; a QA job can call it, then run
-#   its own steps while the desktop stays up (the viewer never takes focus or restarts the session).
+#   - snapshots are AES-256 encrypted with a key derived from the owner password before they reach actions/cache;
+#     they never contain browser profiles, cookies or certificates (NPKI / pfx / key files are filtered out).
 on:
   workflow_dispatch:
     inputs:
@@ -22,17 +26,24 @@ on:
         default: both
         type: choice
         options: [both, windows, macos]
+      mode:
+        description: 'owner (always-on with handover), qa (time-boxed) or proof (CI proof)'
+        default: owner
+        type: choice
+        options: [owner, qa, proof]
       minutes:
-        description: 'minutes to stay up (max 120)'
+        description: 'qa: minutes to stay up (max 120); proof: minutes before handover'
         default: '60'
       sleep_after:
-        description: 'SLEEP after N idle minutes with no viewer (0 = never)'
-        default: '15'
-      proof:
-        description: 'gate proof with a throwaway password'
-        type: boolean
-        default: false
-  # proof-only: a push touching these files runs the gate proof (throwaway password, 8 min), never the owner role
+        description: 'SLEEP after N idle minutes with no viewer (0 = never; owner default 30)'
+        default: ''
+      handoff_from:
+        description: 'internal: run id of the run handing over (empty = fresh start)'
+        default: ''
+  schedule:
+    # re-arm only: starts an owner desktop for an OS whose chain broke (not up / sleeping)
+    - cron: '41 */2 * * *'
+  # proof: a push touching these files runs the CI proof (throwaway password)
   push:
     paths:
       - .github/workflows/runner-desktop.yml
@@ -50,18 +61,18 @@ jobs:
           - { osn: windows, runner: windows-latest }
           - { osn: macos, runner: macos-latest }
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 140
-    concurrency:
-      group: runner-desktop-${{ matrix.osn }}
-      cancel-in-progress: false
+    timeout-minutes: 358
+    permissions:
+      contents: read
+      actions: write        # dispatch the successor run at handover
     defaults:
       run:
         shell: bash
     env:
       TARGET_HASH: ce712644e054789d
       DESKTOP_OS: ${{ matrix.osn }}
-      SLEEP_AFTER: ${{ inputs.sleep_after || (github.event_name == 'push' && '3') || '15' }}
-      DESKTOP_ROLE: ${{ (github.event_name == 'push' || inputs.proof) && 'proof' || 'qa' }}
+      MODE: ${{ github.event_name == 'push' && 'proof' || inputs.mode || 'owner' }}
+      HANDOFF_FROM: ${{ inputs.handoff_from }}
       T1: ${{ secrets.GH_LICENSE_TOKEN }}
       T2: ${{ secrets.WKAPPBOT_PAT }}
       T3: ${{ secrets.WKAPPBOT_CORE_PAT }}
@@ -71,14 +82,14 @@ jobs:
         env:
           OWNER_PW: ${{ secrets.RUNNER_DESKTOP_PASSWORD }}
           SEL: ${{ inputs.os || 'both' }}
-          PROOF: ${{ github.event_name == 'push' || inputs.proof }}
-          MINUTES: ${{ inputs.minutes || '8' }}
+          MINUTES: ${{ inputs.minutes }}
+          SLEEP_IN: ${{ inputs.sleep_after }}
         run: |
           set -u
           if [ "$SEL" != both ] && [ "$SEL" != "$DESKTOP_OS" ]; then echo "run=false" >> "$GITHUB_OUTPUT"; echo "not selected"; exit 0; fi
           PY=python3; python3 -c 1 2>/dev/null || PY=python
           echo "PY=$PY" >> "$GITHUB_ENV"
-          if [ "$PROOF" = true ]; then
+          if [ "$MODE" = proof ]; then
             pw=$("$PY" -c 'import secrets;print(secrets.token_urlsafe(18))')
           else
             pw="$OWNER_PW"
@@ -87,10 +98,24 @@ jobs:
           [ "${#pw}" -ge 12 ] || { echo "::error::RUNNER_DESKTOP_PASSWORD shorter than 12 chars -- no desktop started"; echo "run=false" >> "$GITHUB_OUTPUT"; exit 0; }
           echo "::add-mask::$pw"; echo "::add-mask::${pw:0:8}"
           echo "DESKTOP_PASSWORD=$pw" >> "$GITHUB_ENV"
-          m=$(( ${MINUTES:-60} )); [ "$m" -gt 120 ] && m=120; [ "$m" -lt 5 ] && m=5
-          echo "DESKTOP_DEADLINE=$(( $(date +%s) + m * 60 ))" >> "$GITHUB_ENV"
-          echo "DESKTOP_BOOTED_AT=$(date +%s)" >> "$GITHUB_ENV"
-          echo "run=true" >> "$GITHUB_OUTPUT"; echo "gate open for $m min (role $DESKTOP_ROLE)"
+          now=$(date +%s)
+          # lifetime / handover lead / sleep per role
+          case "$MODE" in
+            owner) life=345; lead=15; slp=${SLEEP_IN:-30}; role=owner ;;
+            qa)    m=$(( ${MINUTES:-60} )); [ "$m" -gt 120 ] && m=120; [ "$m" -lt 5 ] && m=5
+                   life=$m; lead=0; slp=${SLEEP_IN:-0}; role=qa ;;
+            proof) if [ -z "$HANDOFF_FROM" ]; then life=12; lead=6; slp=0     # 1st: hand over after ~6 min
+                   else life=12; lead=0; slp=3; fi; role=proof ;;            # 2nd: restore, then sleep after 3 idle min
+          esac
+          {
+            echo "DESKTOP_ROLE=$role"
+            echo "DESKTOP_BOOTED_AT=$now"
+            echo "DESKTOP_DEADLINE=$(( now + life * 60 ))"
+            echo "HANDOFF_AT=$( [ "$lead" -gt 0 ] && echo $(( now + (life - lead) * 60 )) || echo 0 )"
+            echo "SLEEP_AFTER=$slp"
+          } >> "$GITHUB_ENV"
+          echo "run=true" >> "$GITHUB_OUTPUT"
+          echo "gate open: role=$role life=${life}m handover_lead=${lead}m sleep_after=${slp}m from=${HANDOFF_FROM:-fresh}"
 
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4
         if: steps.gate.outputs.run == 'true'
@@ -111,51 +136,92 @@ jobs:
           done
           echo "::error::no token reaches the private relay -- refusing to boot (the URL would have nowhere private to go)"; exit 1
 
-      - name: Restore the last sleep snapshot (encrypted)
+      - name: Schedule re-arm -- only if this OS's chain is broken
+        id: rearm
+        if: steps.gate.outputs.run == 'true' && github.event_name == 'schedule'
+        run: |
+          set -u
+          st=$("$PY" .github/scripts/runner-desktop/status.py --read || echo '{}')
+          echo "current: $(echo "$st" | "$PY" -c 'import json,sys;d=json.load(sys.stdin);print(d.get("state"),d.get("updated_at"))')"
+          if echo "$st" | "$PY" -c 'import json,sys,time,calendar
+          d=json.load(sys.stdin); s=d.get("state"); u=d.get("updated_at")
+          age=time.time()-calendar.timegm(time.strptime(u,"%Y-%m-%dT%H:%M:%SZ")) if u else 1e9
+          live = s in ("booting","waking","up","handover") and age < 900
+          sys.exit(0 if (live or s=="sleeping") else 1)'; then
+            echo "chain alive or sleeping -- schedule does nothing"; echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Restore the last snapshot (encrypted)
         id: snap
-        if: steps.gate.outputs.run == 'true'
+        if: steps.gate.outputs.run == 'true' && steps.rearm.outputs.skip != 'true'
         uses: actions/cache/restore@v4
         with:
           path: ${{ runner.temp }}/desktop-snap/snap.enc
-          key: desktop-snap-${{ matrix.osn }}-${{ github.run_id }}
-          restore-keys: desktop-snap-${{ matrix.osn }}-
+          key: desktop-snap-${{ env.MODE == 'proof' && 'proof-' || '' }}${{ matrix.osn }}-${{ github.run_id }}
+          restore-keys: desktop-snap-${{ env.MODE == 'proof' && 'proof-' || '' }}${{ matrix.osn }}-
 
       - name: Status booting / waking
-        if: steps.gate.outputs.run == 'true'
+        id: live
+        if: steps.gate.outputs.run == 'true' && steps.rearm.outputs.skip != 'true'
         run: |
           st=booting; [ -n "${{ steps.snap.outputs.cache-matched-key }}" ] && st=waking
           echo "WAKE_STATE=$st" >> "$GITHUB_ENV"
-          "$PY" .github/scripts/runner-desktop/status.py $st
+          echo "on=true" >> "$GITHUB_OUTPUT"
+          "$PY" .github/scripts/runner-desktop/status.py $st --force
+
+      - name: Software baseline (before any restore or install)
+        if: steps.live.outputs.on == 'true'
+        run: |
+          PY="$PY" bash .github/scripts/runner-desktop/snapshot.sh baseline
 
       - name: BOOT (VNC + noVNC/websockify + quick tunnel)
-        if: steps.gate.outputs.run == 'true'
+        if: steps.live.outputs.on == 'true'
         run: |
           bash .github/scripts/runner-desktop/boot.sh
           cat "$RUNNER_TEMP/desktop/env" >> "$GITHUB_ENV"
 
-      - name: Wake -- restore work folder + relaunch apps
-        if: steps.gate.outputs.run == 'true' && env.WAKE_STATE == 'waking'
+      - name: Wake -- restore software, work folder, Chrome (profile + cookies), apps
+        if: steps.live.outputs.on == 'true'
         run: |
+          t0=$(date +%s)
           PY="$PY" bash .github/scripts/runner-desktop/snapshot.sh restore
+          echo "RESTORE_S=$(( $(date +%s) - t0 ))" >> "$GITHUB_ENV"
 
       - name: Status up
-        if: steps.gate.outputs.run == 'true'
+        if: steps.live.outputs.on == 'true'
         run: |
           echo "DESKTOP_UP_AT=$(date +%s)" >> "$GITHUB_ENV"
           DESKTOP_UP_AT=$(date +%s) "$PY" .github/scripts/runner-desktop/status.py up --force
+          echo "boot->up $(( $(date +%s) - DESKTOP_BOOTED_AT ))s (restore ${RESTORE_S:-0}s, from ${HANDOFF_FROM:-fresh})"
 
-      - name: Gate proof from outside (unauthenticated must be refused)
-        if: steps.gate.outputs.run == 'true' && env.DESKTOP_ROLE == 'proof'
+      - name: Proof -- gate from outside + material for the next wake
+        if: steps.live.outputs.on == 'true' && env.DESKTOP_ROLE == 'proof'
         run: |
           "$PY" .github/scripts/runner-desktop/verify.py
-          # sleep/wake proof material: a work-folder file and one open app the next wake must bring back
-          ls "$HOME/desktop-work" 2>/dev/null | sed 's/^/carried over from last sleep: /' || true
-          mkdir -p "$HOME/desktop-work" && date -u +%FT%TZ > "$HOME/desktop-work/proof-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.txt"
+          ls "$HOME/desktop-work" 2>/dev/null | sed 's/^/carried over: /' || true
+          mkdir -p "$HOME/desktop-work" && date -u +%FT%TZ > "$HOME/desktop-work/proof-${GITHUB_RUN_ID}.txt"
+          C=.github/scripts/runner-desktop/chrome.py
+          if [ -z "$HANDOFF_FROM" ]; then
+            # material the successor must get back: an installed program and two cookies on a real site
+            if [ "$DESKTOP_OS" = macos ]; then brew install --cask --quiet rectangle >/dev/null && echo "installed Rectangle.app"
+            else choco install 7zip -y --no-progress >/dev/null && echo "installed 7-Zip"; fi
+            "$PY" $C set-cookie wkproof_httponly "run$GITHUB_RUN_ID" httpbin.org          # HttpOnly, set over CDP
+            "$PY" $C probe "https://httpbin.org/cookies/set?wkproof_site=run$GITHUB_RUN_ID" >/dev/null   # set by the site
+            "$PY" $C probe https://httpbin.org/cookies | tr -d ' \n' | grep -oE 'wkproof_[a-z]+' | sort -u | sed 's/^/cookie set: /'
+          else
+            seen=$("$PY" $C probe https://httpbin.org/cookies | tr -d ' \n')
+            for c in wkproof_httponly wkproof_site; do
+              echo "$seen" | grep -q "\"$c\":\"run$HANDOFF_FROM\"" && echo "PASS site still sees $c from run $HANDOFF_FROM" \
+                || { echo "FAIL $c not carried over"; exit 1; }
+            done
+            ls /Applications/Rectangle.app >/dev/null 2>&1 && echo "PASS Rectangle.app back without reinstall" || true
+            [ -d "/c/Program Files/7-Zip" ] && echo "PASS 7-Zip back without reinstall" || true
+          fi
           if [ "$DESKTOP_OS" = macos ]; then open -a TextEdit; else (notepad.exe &) ; fi
 
-      - name: Hold until the deadline or SLEEP when idle (heartbeat <= 1/min)
+      - name: Hold -- heartbeat, SLEEP when idle, stop at handover time or deadline
         id: hold
-        if: steps.gate.outputs.run == 'true'
+        if: steps.live.outputs.on == 'true'
         run: |
           set -u
           D="$RUNNER_TEMP/desktop"; S=.github/scripts/runner-desktop
@@ -165,29 +231,59 @@ jobs:
             kill -0 "$(cat "$D/cf.pid")" 2>/dev/null || alive=0
             kill -0 "$(cat "$D/ws.pid")" 2>/dev/null || alive=0
             if [ "$alive" = 0 ]; then echo "::warning::tunnel or websockify exited"; "$PY" $S/status.py down --force; exit 1; fi
+            if [ "$HANDOFF_AT" -gt 0 ] && [ "$(date +%s)" -ge "$HANDOFF_AT" ]; then
+              echo "handover time -> snapshot + successor"
+              PY="$PY" bash $S/snapshot.sh save
+              "$PY" $S/status.py handover --force
+              echo "next=handover" >> "$GITHUB_OUTPUT"; exit 0
+            fi
             if [ "$idle_s" -gt 0 ] && [ $(( $(date +%s) - DESKTOP_UP_AT )) -ge "$idle_s" ]; then
               read -r viewers input_idle < <(PY="$PY" bash $S/snapshot.sh idle)
               echo "viewers=$viewers input_idle=${input_idle}s"
               if [ "$viewers" = 0 ] && [ "$input_idle" -ge "$idle_s" ]; then
                 echo "idle ${SLEEP_AFTER} min with no viewer -> SLEEP"
-                PY="$PY" bash $S/snapshot.sh save
+                t0=$(date +%s); PY="$PY" bash $S/snapshot.sh save
+                echo "SLEEP_SAVE_S=$(( $(date +%s) - t0 ))" >> "$GITHUB_ENV"
                 "$PY" $S/status.py sleeping --force
-                echo "slept=true" >> "$GITHUB_OUTPUT"; exit 0
+                echo "next=sleep" >> "$GITHUB_OUTPUT"; exit 0
               fi
             fi
             "$PY" $S/status.py up || true   # self-limited: state change or 5-min heartbeat
-            sleep 60
+            sleep 30
           done
           echo "deadline reached after $(( ($(date +%s) - DESKTOP_BOOTED_AT) / 60 )) min"
 
-      - name: Save the sleep snapshot (encrypted)
-        if: steps.hold.outputs.slept == 'true'
+      - name: Save the snapshot (encrypted)
+        if: steps.hold.outputs.next == 'handover' || steps.hold.outputs.next == 'sleep'
         uses: actions/cache/save@v4
         with:
           path: ${{ runner.temp }}/desktop-snap/snap.enc
-          key: desktop-snap-${{ matrix.osn }}-${{ github.run_id }}-${{ github.run_attempt }}
+          key: desktop-snap-${{ env.MODE == 'proof' && 'proof-' || '' }}${{ matrix.osn }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ steps.hold.outputs.next }}
+
+      - name: Handover -- dispatch the successor, keep serving until it is up
+        if: steps.hold.outputs.next == 'handover'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -u
+          t_dispatch=$(date +%s)
+          gh workflow run runner-desktop.yml --repo "$GITHUB_REPOSITORY" --ref "$GITHUB_REF_NAME" \
+            -f os="$DESKTOP_OS" -f mode="$MODE" -f handoff_from="$GITHUB_RUN_ID" -f sleep_after="${SLEEP_AFTER}"
+          echo "successor dispatched"
+          while [ "$(date +%s)" -lt $(( DESKTOP_DEADLINE + 10 * 60 )) ]; do
+            st=$("$PY" .github/scripts/runner-desktop/status.py --read || echo '{}')
+            if echo "$st" | "$PY" -c 'import json,os,sys;d=json.load(sys.stdin);sys.exit(0 if d.get("state")=="up" and d.get("run_id")!=os.environ["GITHUB_RUN_ID"] else 1)'; then
+              t_up=$(date +%s)
+              echo "successor up $(( t_up - t_dispatch ))s after dispatch: $(echo "$st" | "$PY" -c 'import json,sys;d=json.load(sys.stdin);print("run",d.get("run_id"),"wake",d.get("wake_seconds"),"s")')"
+              sleep 20   # let viewers reconnect to the new URL before this desktop goes away
+              echo "measured overlap: both desktops served for $(( $(date +%s) - t_up ))s after the successor came up; this run served $(( $(date +%s) - DESKTOP_BOOTED_AT ))s in total"
+              exit 0
+            fi
+            sleep 15
+          done
+          echo "::error::successor never reported up -- the schedule will re-arm"; "$PY" .github/scripts/runner-desktop/status.py down --force; exit 1
 
       - name: Status down
-        if: always() && steps.gate.outputs.run == 'true' && env.REPO != '' && steps.hold.outputs.slept != 'true'
+        if: always() && steps.live.outputs.on == 'true' && env.REPO != '' && steps.hold.outputs.next == ''
         run: |
           "$PY" .github/scripts/runner-desktop/status.py down --force
