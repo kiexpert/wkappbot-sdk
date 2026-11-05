@@ -59,13 +59,18 @@ jobs:
         run: git clone -q --depth 1 "https://x-access-token:${TOK}@github.com/${REPO}.git" docsrepo
       - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6
         with:
-          python-version: '3.x'
+          # 3.12, not '3.x': '3.x' resolved to a just-released 3.15 that PyMuPDF (court_pdf) had no build for.
+          python-version: '3.12'
       - name: Run each read-only tool and record PASS or FAIL
         shell: bash
         working-directory: docsrepo
         run: |
           [ -f requirements.txt ] && python -m pip install -q -r requirements.txt > /dev/null 2>&1 || true
           python -m pip install -q pymupdf > /dev/null 2>&1 || true  # court_pdf imports fitz
+          python -c 'import fitz' 2>/dev/null && echo "pymupdf: importable" || echo "pymupdf: NOT importable"
+          # The tools read their settings from a .env that holds the owner's credentials and is never in the repo or
+          # on a runner. An empty placeholder lets the credential-free paths (--help, --dry-run) run; nothing real is in it.
+          [ -f .env ] || : > .env
           printf '# QA sample\n\nOne paragraph of text for the A4 render check.\n' > "$RUNNER_TEMP/sample.md"
           pass=0; total=4
           # Tool output can hold personal data and this repo's logs are public: print only the case line and exit code, never the output.
@@ -85,7 +90,8 @@ jobs:
               tools=$(grep -oiE 'chrom(e|ium)|playwright|wkhtmltopdf|weasyprint|pandoc|libreoffice|soffice|fitz|pymupdf|font|credentials|token|config|\.env' "$err" | tr 'A-Z' 'a-z' | sort -u | tr '\n' ' ' || true)
               echo "CASE $name FAIL (rc=$rc ${cls:-no-exception-class}${mod:+ module $mod}${flags:+ flags $flags}${miss:+ missing-file $miss}${tools:+ mentions $tools})"; fi
           }
-          chk calendar-list gcal.py
+          # listing a real calendar needs the owner's Google credentials, which CI never holds: check the CLI loads
+          chk calendar-help gcal.py --help
           chk court-pdf court_pdf.py "$RUNNER_TEMP/sample.md"
           chk mail-send-dry-run naver_send.py --dry-run --to qa@example.invalid --subject qa-dry-run --body qa-dry-run
           chk mail-sync-help naver_mail_sync.py --help
