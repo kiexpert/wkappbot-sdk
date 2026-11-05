@@ -55,12 +55,14 @@ esac
 wait_port 127.0.0.1 $VNC_PORT 90 || { echo "VNC server did not come up on :$VNC_PORT"; exit 3; }
 
 # noVNC under the random path; the web root itself serves nothing but a 401 (basic auth) or an empty page
-$PY -m pip install -q --disable-pip-version-check websockify==0.12.0
+$PY -m venv venv   # PEP 668: Homebrew python refuses system pip installs
+VPY=venv/bin/python; [ -x "$VPY" ] || VPY=venv/Scripts/python.exe
+"$VPY" -m pip install -q --disable-pip-version-check websockify==0.12.0
 git clone -q --depth 1 -b v1.5.0 https://github.com/novnc/noVNC.git novnc-src
 mkdir -p web && mv novnc-src "web/$TOKEN" && rm -rf "web/$TOKEN/.git"
 printf '<!doctype html><title>desktop</title>\n' > web/index.html
 AUTH_SRC="owner:$DESKTOP_PASSWORD"
-nohup $PY -m websockify --web "$DESKTOP_DIR/web" \
+nohup "$VPY" -m websockify --web "$DESKTOP_DIR/web" \
   --auth-plugin websockify.auth_plugins.BasicHTTPAuth --auth-source "$AUTH_SRC" --web-auth \
   127.0.0.1:$WEB_PORT 127.0.0.1:$VNC_PORT > websockify.log 2>&1 &
 echo $! > ws.pid

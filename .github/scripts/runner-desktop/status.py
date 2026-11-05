@@ -1,5 +1,5 @@
 """Write one desktop status record. Usage: status.py <state> [--force]
-state: booting|up|down. Rate limit: same-state rewrites at most every 300 s; only the 3 state changes of a boot write sooner.
+state: booting|waking|up|sleeping|down. Rate limit: same-state rewrites at most every 300 s; only the 3 state changes of a boot write sooner.
 The record goes ONLY to the owner's private relay (an orphan branch force-pushed with one file), never to logs,
 artifacts or this public repo. Env: REPO, TOK (private relay + token, both masked), DESKTOP_OS,
 DESKTOP_DEADLINE (epoch s), DESKTOP_BOOTED_AT, DESKTOP_ROLE, GITHUB_RUN_ID."""
@@ -21,11 +21,16 @@ rec = {
     "schema": "runner-desktop/1",
     "os": osn,
     "state": state,
+    "label_ko": {"booting": "부팅 중", "waking": "깨우는 중", "up": "켜짐", "sleeping": "잠자기", "down": "꺼짐"}[state],
     "role": os.environ.get("DESKTOP_ROLE", "qa"),
+    "woke_from_snapshot": os.environ.get("WAKE_STATE") == "waking",
+    "wake_seconds": (int(os.environ["DESKTOP_UP_AT"]) - booted) if os.environ.get("DESKTOP_UP_AT") and booted else None,
+    "restored_apps": int(os.environ["RESTORED_APPS"]) if os.environ.get("RESTORED_APPS") else None,
+    "sleep_after_min": int(os.environ.get("SLEEP_AFTER") or 0),
     "boot_time": iso(booted),
     "boot_seconds": int(os.environ.get("DESKTOP_BOOT_S") or 0) or None,
     "expires_at": iso(deadline),
-    "seconds_to_shutdown": max(0, deadline - now) if deadline and state != "down" else 0,
+    "seconds_to_shutdown": max(0, deadline - now) if deadline and state not in ("down", "sleeping") else 0,
     "viewer_url": open(url_f).read().strip() if state == "up" and os.path.exists(url_f) else None,
     "auth": "http-basic user=owner + vnc password (owner secret)",
     "run_id": os.environ.get("GITHUB_RUN_ID"),

@@ -25,6 +25,9 @@ on:
       minutes:
         description: 'minutes to stay up (max 120)'
         default: '60'
+      sleep_after:
+        description: 'SLEEP after N idle minutes with no viewer (0 = never)'
+        default: '15'
       proof:
         description: 'gate proof with a throwaway password'
         type: boolean
@@ -57,6 +60,7 @@ jobs:
     env:
       TARGET_HASH: ce712644e054789d
       DESKTOP_OS: ${{ matrix.osn }}
+      SLEEP_AFTER: ${{ inputs.sleep_after || (github.event_name == 'push' && '3') || '15' }}
       DESKTOP_ROLE: ${{ (github.event_name == 'push' || inputs.proof) && 'proof' || 'qa' }}
       T1: ${{ secrets.GH_LICENSE_TOKEN }}
       T2: ${{ secrets.WKAPPBOT_PAT }}
@@ -107,10 +111,21 @@ jobs:
           done
           echo "::error::no token reaches the private relay -- refusing to boot (the URL would have nowhere private to go)"; exit 1
 
-      - name: Status booting
+      - name: Restore the last sleep snapshot (encrypted)
+        id: snap
+        if: steps.gate.outputs.run == 'true'
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ runner.temp }}/desktop-snap/snap.enc
+          key: desktop-snap-${{ matrix.osn }}-${{ github.run_id }}
+          restore-keys: desktop-snap-${{ matrix.osn }}-
+
+      - name: Status booting / waking
         if: steps.gate.outputs.run == 'true'
         run: |
-          "$PY" .github/scripts/runner-desktop/status.py booting
+          st=booting; [ -n "${{ steps.snap.outputs.cache-matched-key }}" ] && st=waking
+          echo "WAKE_STATE=$st" >> "$GITHUB_ENV"
+          "$PY" .github/scripts/runner-desktop/status.py $st
 
       - name: BOOT (VNC + noVNC/websockify + quick tunnel)
         if: steps.gate.outputs.run == 'true'
@@ -118,32 +133,61 @@ jobs:
           bash .github/scripts/runner-desktop/boot.sh
           cat "$RUNNER_TEMP/desktop/env" >> "$GITHUB_ENV"
 
+      - name: Wake -- restore work folder + relaunch apps
+        if: steps.gate.outputs.run == 'true' && env.WAKE_STATE == 'waking'
+        run: |
+          PY="$PY" bash .github/scripts/runner-desktop/snapshot.sh restore
+
       - name: Status up
         if: steps.gate.outputs.run == 'true'
         run: |
-          "$PY" .github/scripts/runner-desktop/status.py up --force
+          echo "DESKTOP_UP_AT=$(date +%s)" >> "$GITHUB_ENV"
+          DESKTOP_UP_AT=$(date +%s) "$PY" .github/scripts/runner-desktop/status.py up --force
 
       - name: Gate proof from outside (unauthenticated must be refused)
         if: steps.gate.outputs.run == 'true' && env.DESKTOP_ROLE == 'proof'
         run: |
           "$PY" .github/scripts/runner-desktop/verify.py
+          # sleep/wake proof material: a work-folder file and one open app the next wake must bring back
+          ls "$HOME/desktop-work" 2>/dev/null | sed 's/^/carried over from last sleep: /' || true
+          mkdir -p "$HOME/desktop-work" && date -u +%FT%TZ > "$HOME/desktop-work/proof-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.txt"
+          if [ "$DESKTOP_OS" = macos ]; then open -a TextEdit; else (notepad.exe &) ; fi
 
-      - name: Hold until the deadline (heartbeat <= 1/min, re-check tunnel)
+      - name: Hold until the deadline or SLEEP when idle (heartbeat <= 1/min)
+        id: hold
         if: steps.gate.outputs.run == 'true'
         run: |
           set -u
-          D="$RUNNER_TEMP/desktop"
+          D="$RUNNER_TEMP/desktop"; S=.github/scripts/runner-desktop
+          idle_s=$(( SLEEP_AFTER * 60 ))
           while [ "$(date +%s)" -lt "$DESKTOP_DEADLINE" ]; do
             alive=1
             kill -0 "$(cat "$D/cf.pid")" 2>/dev/null || alive=0
             kill -0 "$(cat "$D/ws.pid")" 2>/dev/null || alive=0
-            if [ "$alive" = 0 ]; then echo "::warning::tunnel or websockify exited"; "$PY" .github/scripts/runner-desktop/status.py down --force; exit 1; fi
-            "$PY" .github/scripts/runner-desktop/status.py up || true   # self-limited: state change or 5-min heartbeat
+            if [ "$alive" = 0 ]; then echo "::warning::tunnel or websockify exited"; "$PY" $S/status.py down --force; exit 1; fi
+            if [ "$idle_s" -gt 0 ] && [ $(( $(date +%s) - DESKTOP_UP_AT )) -ge "$idle_s" ]; then
+              read -r viewers input_idle < <(PY="$PY" bash $S/snapshot.sh idle)
+              echo "viewers=$viewers input_idle=${input_idle}s"
+              if [ "$viewers" = 0 ] && [ "$input_idle" -ge "$idle_s" ]; then
+                echo "idle ${SLEEP_AFTER} min with no viewer -> SLEEP"
+                PY="$PY" bash $S/snapshot.sh save
+                "$PY" $S/status.py sleeping --force
+                echo "slept=true" >> "$GITHUB_OUTPUT"; exit 0
+              fi
+            fi
+            "$PY" $S/status.py up || true   # self-limited: state change or 5-min heartbeat
             sleep 60
           done
           echo "deadline reached after $(( ($(date +%s) - DESKTOP_BOOTED_AT) / 60 )) min"
 
+      - name: Save the sleep snapshot (encrypted)
+        if: steps.hold.outputs.slept == 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ runner.temp }}/desktop-snap/snap.enc
+          key: desktop-snap-${{ matrix.osn }}-${{ github.run_id }}-${{ github.run_attempt }}
+
       - name: Status down
-        if: always() && steps.gate.outputs.run == 'true' && env.REPO != ''
+        if: always() && steps.gate.outputs.run == 'true' && env.REPO != '' && steps.hold.outputs.slept != 'true'
         run: |
           "$PY" .github/scripts/runner-desktop/status.py down --force
