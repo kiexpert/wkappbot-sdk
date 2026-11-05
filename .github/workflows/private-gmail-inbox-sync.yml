@@ -63,7 +63,26 @@ jobs:
           echo "no token reaches the target repo"; exit 1
       - name: Clone the target repo
         if: steps.gate.outputs.ready == 'true'
-        run: git clone -q --depth 1 "https://x-access-token:${TOK}@github.com/${REPO}.git" src
+        run: git clone -q --filter=blob:none "https://x-access-token:${TOK}@github.com/${REPO}.git" src
+      - name: Restore the gmail folder to its state before the CI syncs (runs once)
+        if: steps.gate.outputs.ready == 'true'
+        working-directory: src
+        # Every CI sync up to 2026-11-05 10:00 UTC filed the kivilab account under gkiexpert (the
+        # GMAIL_EMAIL secret lacks the 'kivilab' slug the script tests). Put the folder back to the
+        # commit before the first CI sync, once: the restore commit's own subject marks it done.
+        run: |
+          set -eu
+          git config user.name "gmail-inbox-sync"
+          git config user.email "gmail-inbox-sync@users.noreply.github.com"
+          if git log --format=%s | grep -qx "gmail inbox restore before CI syncs"; then echo "restore already done"; exit 0; fi
+          first=$(git log --reverse --format=%H --author=gmail-inbox-sync | head -n 1 || true)
+          if [ -z "$first" ]; then echo "no CI sync to undo"; exit 0; fi
+          others=$(git log --format=%an "$first^..HEAD" -- resume/drafts/gmail | grep -vxc gmail-inbox-sync || true)
+          if [ "$others" != "0" ]; then echo "another writer touched the folder since; restore skipped"; exit 0; fi
+          git rm -r -q resume/drafts/gmail
+          git checkout "$first^" -- resume/drafts/gmail
+          git commit -q -m "gmail inbox restore before CI syncs"
+          echo "restored the gmail folder to the commit before the first CI sync"
       - uses: actions/setup-python@v5
         if: steps.gate.outputs.ready == 'true'
         with:
@@ -88,9 +107,10 @@ jobs:
             echo "GMAIL_REFRESH_TOKEN=$GMAIL_REFRESH_TOKEN"
             echo "GMAIL_REFRESH_TOKEN_GKIEXPERT=$GMAIL_REFRESH_TOKEN_GKIEXPERT"
             # The script calls the API as users/me and uses the address only to pick the account
-            # folder ('kivilab' in it or not), so a placeholder that carries the slug is enough.
-            echo "GMAIL_EMAIL=${GMAIL_EMAIL:-kivilab@ci.invalid}"
-            echo "GMAIL_EMAIL_2=${GMAIL_EMAIL_2:-gkiexpert@ci.invalid}"
+            # folder ('kivilab' in it or not), so fixed slug-carrying placeholders are used: the
+            # GMAIL_EMAIL secret lacks the slug and sent kivilab mail into the gkiexpert folder.
+            echo "GMAIL_EMAIL=kivilab@ci.invalid"
+            echo "GMAIL_EMAIL_2=gkiexpert@ci.invalid"
           } > "$envf"
           log="$RUNNER_TEMP/gmail.log"
           set +e
@@ -138,7 +158,10 @@ jobs:
           echo "files in the tree dated $today (count account kind):"
           find resume/drafts/gmail -type f -path "*$today*" | sed -E 's#^resume/drafts/gmail/##' \
             | awk -F/ '{a=($1=="kivilab")?"A":(($1=="gkiexpert")?"B":"?"); print a" "$2}' | sort | uniq -c | sed 's/^/  /' || true
-          if git diff --cached --quiet; then echo "no new mail"; exit 0; fi
+          if git diff --cached --quiet; then
+            if [ "$(git rev-list --count origin/main..HEAD)" -gt 0 ]; then git push -q origin HEAD:main; echo "restore pushed, no new mail"; else echo "no new mail"; fi
+            exit 0
+          fi
           git commit -q -m "gmail inbox sync $(date -u +%F) per-account"
           git push -q origin HEAD:main
           echo "sync committed: $(git diff --stat HEAD~1 | tail -n 1)"
