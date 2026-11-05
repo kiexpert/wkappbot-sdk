@@ -1,0 +1,126 @@
+name: private-gmail-inbox-sync
+
+# Daily Gmail inbox sync for the owner's two accounts into one private repo of this account (its
+# tools/gmail_mail_sync.py writes resume/drafts/gmail/<account>/inbox/<date>), then commits the
+# result back. Twin of private-naver-inbox-sync.yml. The script reads a fixed Windows .env path and
+# a fixed Windows output path, so this job loads it as a module and points both at the runner.
+# Secrets: GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN, GMAIL_REFRESH_TOKEN_GKIEXPERT
+# (GMAIL_EMAIL and GMAIL_EMAIL_2 are optional; the Gmail API user 'me' is used when unset).
+# The script output stays in a file: the log shows counts, an exception class or the invalid_grant
+# line only, never mail text. The target repo is found by a sha256 prefix, never named.
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/private-gmail-inbox-sync.yml
+  schedule:
+    - cron: '23 22 * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: private-gmail-inbox-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      TARGET_HASH: c48fcce9e0c13229
+      T1: ${{ secrets.GH_LICENSE_TOKEN }}
+      T2: ${{ secrets.WKAPPBOT_PAT }}
+      T3: ${{ secrets.WKAPPBOT_CORE_PAT }}
+    steps:
+      - name: Skip until the Gmail secrets exist
+        id: gate
+        env:
+          CID: ${{ secrets.GMAIL_CLIENT_ID }}
+          CS: ${{ secrets.GMAIL_CLIENT_SECRET }}
+          RT1: ${{ secrets.GMAIL_REFRESH_TOKEN }}
+          RT2: ${{ secrets.GMAIL_REFRESH_TOKEN_GKIEXPERT }}
+        run: |
+          if [ -n "$CID" ] && [ -n "$CS" ] && { [ -n "$RT1" ] || [ -n "$RT2" ]; }; then echo "ready=true" >> "$GITHUB_OUTPUT"
+            echo "secrets present: client=yes kivilab=$([ -n "$RT1" ] && echo yes || echo no) gkiexpert=$([ -n "$RT2" ] && echo yes || echo no)"
+          else echo "Gmail client or refresh-token secrets are not set: nothing to do"; echo "ready=false" >> "$GITHUB_OUTPUT"; fi
+      - name: Find the target repo and a token that can reach it
+        if: steps.gate.outputs.ready == 'true'
+        run: |
+          set -u
+          for t in "$T1" "$T2" "$T3"; do
+            [ -n "$t" ] || continue
+            echo "::add-mask::$t"
+            names=$(GH_TOKEN="$t" gh repo list kiexpert --visibility private --limit 300 --json nameWithOwner -q '.[].nameWithOwner' 2>/dev/null || true)
+            for n in $names; do
+              if [ "$(printf %s "$n" | sha256sum | cut -c1-16)" = "$TARGET_HASH" ]; then
+                echo "::add-mask::$n"; echo "::add-mask::${n#*/}"
+                { echo "REPO=$n"; echo "TOK=$t"; } >> "$GITHUB_ENV"
+                echo "target found"; exit 0
+              fi
+            done
+          done
+          echo "no token reaches the target repo"; exit 1
+      - name: Clone the target repo
+        if: steps.gate.outputs.ready == 'true'
+        run: git clone -q --depth 1 "https://x-access-token:${TOK}@github.com/${REPO}.git" src
+      - uses: actions/setup-python@v5
+        if: steps.gate.outputs.ready == 'true'
+        with:
+          python-version: '3.11'
+      - name: Sync both Gmail inboxes
+        if: steps.gate.outputs.ready == 'true'
+        working-directory: src
+        env:
+          GMAIL_CLIENT_ID: ${{ secrets.GMAIL_CLIENT_ID }}
+          GMAIL_CLIENT_SECRET: ${{ secrets.GMAIL_CLIENT_SECRET }}
+          GMAIL_REFRESH_TOKEN: ${{ secrets.GMAIL_REFRESH_TOKEN }}
+          GMAIL_REFRESH_TOKEN_GKIEXPERT: ${{ secrets.GMAIL_REFRESH_TOKEN_GKIEXPERT }}
+          GMAIL_EMAIL: ${{ secrets.GMAIL_EMAIL }}
+          GMAIL_EMAIL_2: ${{ secrets.GMAIL_EMAIL_2 }}
+        run: |
+          [ -f requirements.txt ] && python -m pip install -q -r requirements.txt > /dev/null 2>&1 || true
+          envf="$RUNNER_TEMP/gmail.env"
+          umask 077
+          {
+            echo "GMAIL_CLIENT_ID=$GMAIL_CLIENT_ID"
+            echo "GMAIL_CLIENT_SECRET=$GMAIL_CLIENT_SECRET"
+            echo "GMAIL_REFRESH_TOKEN=$GMAIL_REFRESH_TOKEN"
+            echo "GMAIL_REFRESH_TOKEN_GKIEXPERT=$GMAIL_REFRESH_TOKEN_GKIEXPERT"
+            echo "GMAIL_EMAIL=${GMAIL_EMAIL:-me}"
+            echo "GMAIL_EMAIL_2=${GMAIL_EMAIL_2:-me}"
+          } > "$envf"
+          log="$RUNNER_TEMP/gmail.log"
+          set +e
+          ENVF="$envf" OUTD="$PWD/resume/drafts/gmail" python - > "$log" 2>&1 <<'PY'
+          import importlib.util, os, pathlib, sys
+          spec = importlib.util.spec_from_file_location("gmail_mail_sync", "tools/gmail_mail_sync.py")
+          m = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(m)
+          m.ENV_FILE = pathlib.Path(os.environ["ENVF"])
+          m.BASE_DIR = pathlib.Path(os.environ["OUTD"])
+          sys.argv = ["gmail_mail_sync.py", "--account", "all", "--days", "30"]
+          m.main()
+          PY
+          rc=$?
+          set -e
+          rm -f "$envf"
+          grep -m 3 -oE 'invalid_grant[^"]{0,80}' "$log" | sed -E 's/[^ ]+@[^ ]+/<addr>/g' || true
+          if [ "$rc" -ne 0 ]; then
+            cls=$(grep -oE '^[A-Za-z_.]*(Error|Exception)[A-Za-z]*' "$log" | tail -n 1 || true)
+            echo "gmail sync FAIL rc=$rc ${cls:-no-exception-class}"; exit 1
+          fi
+          echo "gmail sync OK; new inbox folders:"
+          for d in resume/drafts/gmail/*/inbox; do if [ -d "$d" ]; then echo "  newest $(ls "$d" | grep -oE '^[0-9]{8}' | sort | tail -n 1 || true)"; fi; done
+      - name: Commit the sync back
+        if: steps.gate.outputs.ready == 'true'
+        working-directory: src
+        run: |
+          set -eu
+          git config user.name "gmail-inbox-sync"
+          git config user.email "gmail-inbox-sync@users.noreply.github.com"
+          git add -A resume/drafts/gmail
+          if git diff --cached --quiet; then echo "no new mail"; exit 0; fi
+          git commit -q -m "gmail inbox sync $(date -u +%F)"
+          git push -q origin HEAD:main
+          echo "sync committed: $(git diff --stat HEAD~1 | tail -n 1)"
