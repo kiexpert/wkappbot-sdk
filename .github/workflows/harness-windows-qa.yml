@@ -84,7 +84,7 @@ jobs:
           }
           chk calendar-list gcal.py
           chk court-pdf court_pdf.py "$RUNNER_TEMP/sample.md"
-          chk mail-send-dry-run naver_send.py --dry-run --to qa@example.invalid --subject qa-dry-run
+          chk mail-send-dry-run naver_send.py --dry-run --to qa@example.invalid --subject qa-dry-run --body qa-dry-run
           chk mail-sync-help naver_mail_sync.py --help
           echo "RESULT $pass/$total"
           [ "$pass" -eq "$total" ]
