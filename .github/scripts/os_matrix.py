@@ -2,6 +2,7 @@
 """Build os-matrix.json for the portal release board from one "Harness QA (Windows + macOS)" run.
 
 Usage: os_matrix.py <repo owner/name> <run_id> <out.json>      (GITHUB_TOKEN in the environment)
+       os_matrix.py [--self-test]                                (no arguments runs the self-test)
 
 One row per OS (windows-*, macos-*; ubuntu kept if present). conclusion is "success" only when every job of
 that OS in the run succeeded; otherwise the first non-success conclusion. last_screen is the last lines of the
@@ -108,7 +109,8 @@ def build(repo, run_id, fetch=get):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) == 2 and sys.argv[1] == "--self-test":
+    # No arguments (the repo script-selftest runs every changed script that way) or --self-test: run the self-test.
+    if len(sys.argv) == 1 or (len(sys.argv) == 2 and sys.argv[1] == "--self-test"):
         log = ("2026-11-05T01:00:00.0Z \x1b[32mRESULT ok\x1b[0m\n2026-11-05T01:00:01.0Z token: ghp_abcdefghijklmnopqrstuv\n"
                "2026-11-05T01:00:01.0Z ##[group]x\n2026-11-05T01:00:02.0Z CASE 3 pass key=" + "A" * 40 + "\n"
                "2026-11-05T01:00:03.0Z Post job cleanup.\n2026-11-05T01:00:04.0Z after cleanup\n")
