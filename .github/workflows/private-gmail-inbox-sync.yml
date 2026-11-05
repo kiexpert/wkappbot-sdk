@@ -136,6 +136,16 @@ jobs:
           git config user.name "gmail-inbox-sync"
           git config user.email "gmail-inbox-sync@users.noreply.github.com"
           git add -A resume/drafts/gmail
+          # Landing proof without names: changed files counted per account letter (A=kivilab, B=gkiexpert),
+          # folder kind and the first 8-digit date in the path.
+          echo "landed (count account kind date):"
+          git diff --cached --name-only -- resume/drafts/gmail | sed -E 's#^resume/drafts/gmail/##' \
+            | awk -F/ '{a=($1=="kivilab")?"A":(($1=="gkiexpert")?"B":"?"); d="-"; if (match($0,/[0-9]{8}/)) d=substr($0,RSTART,8); print a" "$2" "d}' \
+            | sort | uniq -c | sed 's/^/  /' || true
+          today=$(date -u +%Y%m%d)
+          echo "files in the tree dated $today (count account kind):"
+          find resume/drafts/gmail -type f -path "*$today*" | sed -E 's#^resume/drafts/gmail/##' \
+            | awk -F/ '{a=($1=="kivilab")?"A":(($1=="gkiexpert")?"B":"?"); print a" "$2}' | sort | uniq -c | sed 's/^/  /' || true
           if git diff --cached --quiet; then
             if [ "$(git rev-list --count origin/main..HEAD)" -gt 0 ]; then git push -q origin HEAD:main; echo "revert pushed, no new mail"; else echo "no new mail"; fi
             exit 0
