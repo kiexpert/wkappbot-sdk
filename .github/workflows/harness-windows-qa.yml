@@ -76,7 +76,10 @@ jobs:
             p=$(find . -path ./.git -prune -o -type f -name "$base" -print | head -n 1)
             if [ -z "$p" ]; then echo "CASE $name MISSING (script not in repo)"; return; fi
             if python "$p" "$@" > /dev/null 2> "$err"; then pass=$((pass + 1)); echo "CASE $name PASS"
-            else rc=$?; cls=$(grep -oE '^[A-Za-z_.]*(Error|Exception|Exit)[A-Za-z]*' "$err" | tail -n 1 || true); echo "CASE $name FAIL (rc=$rc ${cls:-no-exception-class})"; fi
+            else rc=$?; cls=$(grep -oE '^[A-Za-z_.]*(Error|Exception|Exit)[A-Za-z]*' "$err" | tail -n 1 || true)
+              mod=$(grep -oE "No module named '[A-Za-z0-9_.]+'" "$err" | tail -n 1 | grep -oE "'[^']+'" || true)
+              flags=$(grep -E 'error:' "$err" | grep -oE -- '--[a-z][a-z0-9-]*' | sort -u | tr '\n' ' ' || true)
+              echo "CASE $name FAIL (rc=$rc ${cls:-no-exception-class}${mod:+ module $mod}${flags:+ flags $flags})"; fi
           }
           chk calendar-list gcal.py
           chk court-pdf court_pdf.py "$RUNNER_TEMP/sample.md"
