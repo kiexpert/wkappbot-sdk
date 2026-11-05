@@ -59,12 +59,14 @@ switch ($Cmd) {
     foreach ($r in $m.reg) { reg import (Join-Path $Dir $r.file) 2>$null; if ($LASTEXITCODE -eq 0) { $ok += "reg:$($r.key)" } else { $fail += "reg:$($r.key): import failed" } }
     foreach ($r in $m.run) { New-ItemProperty -Path $r.key -Name $r.name -Value $r.value -Force | Out-Null; $ok += "run:$($r.name)" }
     foreach ($s in $m.services) {
-      $st = @{ Auto = 'auto'; Manual = 'demand'; Disabled = 'disabled' }[$s.start]; if (-not $st) { $st = 'demand' }
-      sc.exe create $s.name binPath= $s.bin start= $st DisplayName= $s.display | Out-Null
-      if ($LASTEXITCODE -eq 0 -or $LASTEXITCODE -eq 1073) {
-        if ($st -eq 'auto') { sc.exe start $s.name | Out-Null }
-        if ((Get-Service $s.name -ErrorAction SilentlyContinue)) { $ok += "svc:$($s.name)" } else { $fail += "svc:$($s.name): not registered" }
-      } else { $fail += "svc:$($s.name): sc create rc=$LASTEXITCODE (machine-bound or driver-dependent?)" }
+      $st = @{ Auto = 'Automatic'; Manual = 'Manual'; Disabled = 'Disabled' }[$s.start]; if (-not $st) { $st = 'Manual' }
+      try {
+        if (-not (Get-Service $s.name -ErrorAction SilentlyContinue)) {
+          New-Service -Name $s.name -BinaryPathName $s.bin -DisplayName $s.display -StartupType $st -ErrorAction Stop | Out-Null
+        }
+        if ($st -eq 'Automatic') { Start-Service $s.name -ErrorAction SilentlyContinue }
+        $ok += "svc:$($s.name)"
+      } catch { $fail += "svc:$($s.name): $($_.Exception.Message) (machine-bound or driver-dependent?)" }
     }
     foreach ($r in $m.run) { $exe = ($r.value -replace '^"([^"]+)".*$', '$1') -replace '^(\S+\.exe).*$', '$1'; if (Test-Path $exe) { Start-Process $exe -ErrorAction SilentlyContinue } }
     [pscustomobject]@{ restored = $ok; failed = $fail } | ConvertTo-Json -Depth 3 -Compress

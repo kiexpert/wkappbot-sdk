@@ -169,16 +169,16 @@ jobs:
           echo "on=true" >> "$GITHUB_OUTPUT"
           "$PY" .github/scripts/runner-desktop/status.py $st --force
 
-      - name: Software baseline (before any restore or install)
-        if: steps.live.outputs.on == 'true'
-        run: |
-          PY="$PY" bash .github/scripts/runner-desktop/snapshot.sh baseline
-
       - name: BOOT (VNC + noVNC/websockify + quick tunnel)
         if: steps.live.outputs.on == 'true'
         run: |
           bash .github/scripts/runner-desktop/boot.sh
           cat "$RUNNER_TEMP/desktop/env" >> "$GITHUB_ENV"
+
+      - name: Software baseline (after BOOT, before restore -- the desktop stack itself is not user software)
+        if: steps.live.outputs.on == 'true'
+        run: |
+          PY="$PY" bash .github/scripts/runner-desktop/snapshot.sh baseline
 
       - name: Wake -- restore software, work folder, Chrome (profile + cookies), apps
         if: steps.live.outputs.on == 'true'
@@ -204,7 +204,7 @@ jobs:
           if [ -z "$HANDOFF_FROM" ]; then
             # material the successor must get back: an installed program and two cookies on a real site
             if [ "$DESKTOP_OS" = macos ]; then brew install --cask --quiet rectangle >/dev/null && echo "installed Rectangle.app"
-            else choco install 7zip -y --no-progress >/dev/null && echo "installed 7-Zip"; fi
+            else choco install notepadplusplus.install -y --no-progress >/dev/null && echo "installed Notepad++"; fi
             "$PY" $C set-cookie wkproof_httponly "run$GITHUB_RUN_ID" httpbin.org          # HttpOnly, set over CDP
             "$PY" $C probe "https://httpbin.org/cookies/set?wkproof_site=run$GITHUB_RUN_ID" >/dev/null   # set by the site
             "$PY" $C probe https://httpbin.org/cookies | tr -d ' \n' | grep -oE 'wkproof_[a-z]+' | sort -u | sed 's/^/cookie set: /'
@@ -214,8 +214,8 @@ jobs:
               echo "$seen" | grep -q "\"$c\":\"run$HANDOFF_FROM\"" && echo "PASS site still sees $c from run $HANDOFF_FROM" \
                 || { echo "FAIL $c not carried over"; exit 1; }
             done
-            ls /Applications/Rectangle.app >/dev/null 2>&1 && echo "PASS Rectangle.app back without reinstall" || true
-            [ -d "/c/Program Files/7-Zip" ] && echo "PASS 7-Zip back without reinstall" || true
+            if [ "$DESKTOP_OS" = macos ]; then ls /Applications/Rectangle.app >/dev/null 2>&1 && echo "PASS Rectangle.app back without reinstall" || { echo "FAIL Rectangle.app not restored"; exit 1; }; fi
+            if [ "$DESKTOP_OS" = windows ]; then [ -f "/c/Program Files/Notepad++/notepad++.exe" ] && echo "PASS Notepad++ back without reinstall" || { echo "FAIL Notepad++ not restored"; exit 1; }; fi
           fi
           if [ "$DESKTOP_OS" = macos ]; then open -a TextEdit; else (notepad.exe &) ; fi
 
