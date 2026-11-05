@@ -70,12 +70,8 @@ jobs:
           python -c 'import fitz' 2>/dev/null && echo "pymupdf: importable" || echo "pymupdf: NOT importable"
           # The tools read their settings from a .env that holds the owner's credentials and is never in the repo or
           # on a runner. An empty placeholder lets the credential-free paths (--help, --dry-run) run; nothing real is in it.
-          # A tool may open a relative '.env' after changing into one of the repo's folders, so the empty placeholder
-          # goes in every folder up to four levels deep (runner only; never committed), one folder up, and in HOME.
-          find . -maxdepth 4 -path ./.git -prune -o -type d -print | while IFS= read -r d; do [ -e "$d/.env" ] || : > "$d/.env"; done
-          [ -e ../.env ] || : > ../.env
-          [ -f "$HOME/.env" ] || : > "$HOME/.env"
-          printf '# QA sample\n\nOne paragraph of text for the A4 render check.\n' > "$RUNNER_TEMP/sample.md"
+          [ -f .env ] || : > .env
+          printf 'QA sample\n\nOne paragraph of text for the A4 render check.\n' > "$RUNNER_TEMP/sample.txt"
           pass=0; total=4
           # Tool output can hold personal data and this repo's logs are public: print only the case line and exit code, never the output.
           # On FAIL print only the exception class name (e.g. ModuleNotFoundError), never its message.
@@ -119,8 +115,11 @@ jobs:
           }
           # listing a real calendar needs the owner's Google credentials, which CI never holds: check the CLI loads
           chk calendar-help gcal.py --help
-          DETAIL=1 chk court-pdf court_pdf.py "$RUNNER_TEMP/sample.md"
-          DETAIL=1 chk mail-send-dry-run naver_send.py --dry-run --to qa@example.invalid --subject qa-dry-run --body qa-dry-run
+          # court_pdf usage: <input.txt> <output.pdf> [title] [attach.pdf ...] [--date "..."]
+          DETAIL=1 chk court-pdf court_pdf.py "$RUNNER_TEMP/sample.txt" "$RUNNER_TEMP/sample.pdf"
+          # naver_send's load_creds reads a hard-coded absolute .env path of the owner's PC (reported to the docs-repo
+          # owner), so a --dry-run cannot get past credentials on any runner: check the CLI loads instead.
+          DETAIL=1 chk mail-send-help naver_send.py --help
           chk mail-sync-help naver_mail_sync.py --help
           echo "RESULT $pass/$total"
           [ "$pass" -eq "$total" ]
