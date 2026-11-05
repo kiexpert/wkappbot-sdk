@@ -112,6 +112,12 @@ jobs:
             cls=$(grep -oE '^[A-Za-z_.]*(Error|Exception)[A-Za-z]*' "$log" | tail -n 1 || true)
             echo "gmail sync FAIL rc=$rc ${cls:-no-exception-class}"; exit 1
           fi
+          # Per-account counts only: the account line loses its address, and an error keeps only its type or HTTP code.
+          echo "per-account summary (A=kivilab, B=gkiexpert):"
+          grep -E '^\[(kivilab|gkiexpert)\]|^  Total: |^  (INBOX|SENT|SPAM|TRASH): ' "$log" \
+            | sed -E 's/^\[kivilab\].*/  [A]/; s/^\[gkiexpert\].*/  [B]/; s/(ERROR) .*/\1/' || true
+          echo "error kinds (count kind):"
+          grep -oE 'HTTP Error [0-9]+|invalid_grant|[A-Za-z]+(Error|Exception)\b' "$log" | sort | uniq -c | sed 's/^/  /' || true
           echo "gmail sync OK; new inbox folders:"
           for d in resume/drafts/gmail/*/inbox; do if [ -d "$d" ]; then echo "  newest $(ls "$d" | grep -oE '^[0-9]{8}' | sort | tail -n 1 || true)"; fi; done
       - name: Commit the sync back
