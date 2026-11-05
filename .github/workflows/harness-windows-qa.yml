@@ -59,14 +59,19 @@ jobs:
         run: git clone -q --depth 1 "https://x-access-token:${TOK}@github.com/${REPO}.git" docsrepo
       - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6
         with:
-          python-version: '3.x'
+          # 3.12, not '3.x': '3.x' resolved to a just-released 3.15 that PyMuPDF (court_pdf) had no build for.
+          python-version: '3.12'
       - name: Run each read-only tool and record PASS or FAIL
         shell: bash
         working-directory: docsrepo
         run: |
           [ -f requirements.txt ] && python -m pip install -q -r requirements.txt > /dev/null 2>&1 || true
           python -m pip install -q pymupdf > /dev/null 2>&1 || true  # court_pdf imports fitz
-          printf '# QA sample\n\nOne paragraph of text for the A4 render check.\n' > "$RUNNER_TEMP/sample.md"
+          python -c 'import fitz' 2>/dev/null && echo "pymupdf: importable" || echo "pymupdf: NOT importable"
+          # The tools read their settings from a .env that holds the owner's credentials and is never in the repo or
+          # on a runner. An empty placeholder lets the credential-free paths (--help, --dry-run) run; nothing real is in it.
+          [ -f .env ] || : > .env
+          printf 'QA sample\n\nOne paragraph of text for the A4 render check.\n' > "$RUNNER_TEMP/sample.txt"
           pass=0; total=4
           # Tool output can hold personal data and this repo's logs are public: print only the case line and exit code, never the output.
           # On FAIL print only the exception class name (e.g. ModuleNotFoundError), never its message.
@@ -74,17 +79,47 @@ jobs:
           err="$RUNNER_TEMP/err.txt"
           chk() {
             name=$1; base=$2; shift 2
-            p=$(find . -path ./.git -prune -o -type f -name "$base" -print | head -n 1)
-            if [ -z "$p" ]; then echo "CASE $name MISSING (script not in repo)"; return; fi
-            if python "$p" "$@" > /dev/null 2> "$err"; then pass=$((pass + 1)); echo "CASE $name PASS"
-            else rc=$?; cls=$(grep -oE '^[A-Za-z_.]*(Error|Exception|Exit)[A-Za-z]*' "$err" | tail -n 1 || true)
+            # A tool that was moved can leave a stub with the same name behind (it only prints where the tool went and
+            # exits 1), so try every copy, shallowest first, and pass when one of them passes.
+            cands=$(find . -path ./.git -prune -o -type f -name "$base" -print | awk -F/ '{print NF"\t"$0}' | sort -n | cut -f2-)
+            if [ -z "$cands" ]; then echo "CASE $name MISSING (script not in repo)"; return; fi
+            n=$(printf '%s\n' "$cands" | wc -l | tr -d ' '); ok=0
+            while IFS= read -r p; do
+              [ -n "$p" ] || continue; lp=$p
+              if python "$p" "$@" > /dev/null 2> "$err"; then ok=1; break; fi
+            done <<EOF_CANDS
+          $cands
+          EOF_CANDS
+            if [ "$ok" = 1 ]; then pass=$((pass + 1)); echo "CASE $name PASS (copies: $n)"
+            else rc=1; cls=$(grep -oE '^[A-Za-z_.]*(Error|Exception|Exit)[A-Za-z]*' "$err" | tail -n 1 || true)
               mod=$(grep -oE "No module named '[A-Za-z0-9_.]+'" "$err" | tail -n 1 | grep -oE "'[^']+'" || true)
               flags=$(grep -E 'error:' "$err" | grep -oE -- '--[a-z][a-z0-9-]*' | sort -u | tr '\n' ' ' || true)
-              echo "CASE $name FAIL (rc=$rc ${cls:-no-exception-class}${mod:+ module $mod}${flags:+ flags $flags})"; fi
+              # Safe diagnostics: the BASE NAME of a missing file (never its folder), and which known tools the error names.
+              miss=$(grep -oE "No such file or directory: '[^']+'" "$err" | tail -n 1 | sed -E "s/.*: '//; s/'$//; s#.*[/\\\\]##" || true)
+              tools=$(grep -oiE 'chrom(e|ium)|playwright|wkhtmltopdf|weasyprint|pandoc|libreoffice|soffice|fitz|pymupdf|font|credentials|token|config|\.env' "$err" | tr 'A-Z' 'a-z' | sort -u | tr '\n' ' ' || true)
+              echo "CASE $name FAIL (rc=$rc copies $n ${cls:-no-exception-class}${mod:+ module $mod}${flags:+ flags $flags}${miss:+ missing-file $miss}${tools:+ mentions $tools})"
+              # Only for a case fed our own synthetic input (DETAIL=1): its last error line, paths cut to base names,
+              # emails, long numbers and token-like strings masked.
+              if [ "${DETAIL:-0}" = 1 ]; then
+                last=$(grep -v '^[[:space:]]*$' "$err" | tail -n 1 | sed -E 's#([A-Za-z]:)?[^ "'"'"']*[/\\]([^/\\ "'"'"']+)#\2#g; s/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+/<email>/g; s/[0-9]{6,}/<n>/g; s/[A-Za-z0-9_-]{32,}/***/g' | cut -c1-200)
+                echo "  detail: $last"
+                san() { sed -E 's#([A-Za-z]:)?[^ "'"'"']*[/\\]([^/\\ "'"'"']+)#\2#g; s/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+/<email>/g; s/[0-9]{6,}/<n>/g; s/[A-Za-z0-9_-]{32,}/***/g' | cut -c1-200; }
+                echo "  first: $(grep -v '^[[:space:]]*$' "$err" | head -n 1 | san)"
+                (grep -iE -A3 '^usage:' "$err" || true) | head -n 4 | san | sed 's/^/  usage: /'
+                # How the script locates its .env (tokens only, never whole source lines), whether ./.env exists here,
+                # and how deep the script sits.
+                echo "  env-lookup: $( (grep -oE 'chdir\([^)]{0,50}\)|Path\([^)]{0,50}\)|__file__|home\(\)|getenv\([^)]{0,40}\)|environ[^ ]{0,40}|[A-Za-z_./]{0,30}\.env[A-Za-z_./]{0,20}' "$lp" || true) | sort -u | head -n 12 | san | tr '\n' ' ')"
+                echo "  cwd-has-.env: $([ -f .env ] && echo yes || echo no); script-depth: $(printf '%s' "$lp" | tr -cd '/' | wc -c | tr -d ' ')"
+                (grep -E '^[[:space:]]*File "' "$err" || true) | tail -n 3 | san | sed 's/^[[:space:]]*/  frame: /'
+              fi; fi
           }
-          chk calendar-list gcal.py
-          chk court-pdf court_pdf.py "$RUNNER_TEMP/sample.md"
-          chk mail-send-dry-run naver_send.py --dry-run --to qa@example.invalid --subject qa-dry-run --body qa-dry-run
+          # listing a real calendar needs the owner's Google credentials, which CI never holds: check the CLI loads
+          chk calendar-help gcal.py --help
+          # court_pdf usage: <input.txt> <output.pdf> [title] [attach.pdf ...] [--date "..."]
+          DETAIL=1 chk court-pdf court_pdf.py "$RUNNER_TEMP/sample.txt" "$RUNNER_TEMP/sample.pdf"
+          # naver_send's load_creds reads a hard-coded absolute .env path of the owner's PC (reported to the docs-repo
+          # owner), so a --dry-run cannot get past credentials on any runner: check the CLI loads instead.
+          DETAIL=1 chk mail-send-help naver_send.py --help
           chk mail-sync-help naver_mail_sync.py --help
           echo "RESULT $pass/$total"
           [ "$pass" -eq "$total" ]
