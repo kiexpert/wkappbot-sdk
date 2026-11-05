@@ -68,11 +68,20 @@ jobs:
           printf '# QA sample\n\nOne paragraph of text for the A4 render check.\n' > "$RUNNER_TEMP/sample.md"
           pass=0; total=4
           # Tool output can hold personal data and this repo's logs are public: print only the case line and exit code, never the output.
-          chk() { name=$1; shift; if "$@" > /dev/null 2>&1; then pass=$((pass + 1)); echo "CASE $name PASS"; else echo "CASE $name FAIL (rc=$?)"; fi; }
-          chk calendar-list python tools/gcal.py
-          chk court-pdf python tools/court_pdf.py "$RUNNER_TEMP/sample.md"
-          chk mail-send-dry-run python tools/naver_send.py --dry-run
-          chk mail-sync-help python scripts/naver_mail_sync.py --help
+          # On FAIL print only the exception class name (e.g. ModuleNotFoundError), never its message.
+          # Each script is resolved by base name, since its folder may differ; the path is never printed.
+          err="$RUNNER_TEMP/err.txt"
+          chk() {
+            name=$1; base=$2; shift 2
+            p=$(find . -path ./.git -prune -o -type f -name "$base" -print | head -n 1)
+            if [ -z "$p" ]; then echo "CASE $name MISSING (script not in repo)"; return; fi
+            if python "$p" "$@" > /dev/null 2> "$err"; then pass=$((pass + 1)); echo "CASE $name PASS"
+            else rc=$?; cls=$(grep -oE '^[A-Za-z_.]*(Error|Exception|Exit)[A-Za-z]*' "$err" | tail -n 1 || true); echo "CASE $name FAIL (rc=$rc ${cls:-no-exception-class})"; fi
+          }
+          chk calendar-list gcal.py
+          chk court-pdf court_pdf.py "$RUNNER_TEMP/sample.md"
+          chk mail-send-dry-run naver_send.py --dry-run
+          chk mail-sync-help naver_mail_sync.py --help
           echo "RESULT $pass/$total"
           [ "$pass" -eq "$total" ]
 
