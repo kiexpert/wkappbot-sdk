@@ -146,4 +146,30 @@ Source run: 41980395003 (harness-windows-qa, branch of PR #445, merged as ad9740
 | harness-qa | macos | 41980395003 | FAIL | Failed step not inspected yet; most likely the same kih main regression. |
 | portal-selftest | windows | 41980395003 | FAIL 79/83 | P72/P73: `#termToggle` label clipped by 101px at 390 wide; `run`: waitForFunction timeout at selftest.js:2144. Portal-side. |
 | portal-selftest | macos | 41980395003 | FAIL 141/152 | P120: rhythm clock 6.9 cps vs the 12 target; P137: viewport 484 wide vs 390. Portal-side. |
-| personal-docs daily tools | macos | - | NOT RUN | No tool paths or commands available to this session yet. |
+
+### Re-run 2026-11-05 (branch ci/daily-tools-matrix)
+
+The docs repo is found by sha256 prefix and is not named. The daily-tools job prints only the case line, the exit code and the exception class, because tool output can hold personal data and these logs are public.
+
+| Job | OS | Run ID | Result | Notes |
+|---|---|---|---|---|
+| harness-qa | windows | 41993715640 | PASS | Python, launcher and Bash self-tests all green on kih main (families selftest regression fixed upstream). |
+| harness-qa | macos | 41993715640 | PASS | Same, plus the stock /bin/bash 3.2 pass. |
+| portal-selftest | macos | 41993715640 | FAIL 142/154 | P73, P75, P79, P87, P92, P93, P102, P120 (6.9-7.7 cps vs 12), P135, P137, P141 and one more. Portal-side. |
+| daily-tools | windows | 41993715640 | FAIL 1/4 | calendar-list FileNotFoundError (no credential file on CI); court-pdf ModuleNotFoundError; mail-send-dry-run rc=2 (argument usage); mail-sync-help PASS. |
+| daily-tools | macos | 41993715640 | FAIL 1/4 | Identical to Windows: the failures are setup, not platform. |
+| daily-tools | both | 41990213734 | FAIL 0/4 | First run: output fully discarded and scripts called by fixed paths, so no cause was visible. |
+| daily-tools | both | 42003780494 | FAIL 1/4 | After pymupdf and the dry-run args: mail-sync-help PASS; calendar-list and mail-send-dry-run FileNotFoundError (credential files exist only on the owner PC); court-pdf rc=1 with no exception class. CI-environment limits, not platform defects. |
+
+### Gmail inbox sync twin (private-gmail-inbox-sync.yml)
+
+The docs repo's Gmail sync script hard-codes a Windows .env path and output path, so it had only run on the owner PC and the inbox folders stopped at 2026-10-16. The new SDK workflow loads the script as a module and points both paths at the runner. Account letters: A and B; addresses are never logged.
+
+| Run ID | Result | Notes |
+|---|---|---|
+| 41999934318 | PASS (misfiled) | 74 files committed, but account A landed in B's folder: the address secret lacks the slug the script tests. |
+| 42003780766 | FAIL | One-time undo step reran a revert that was already applied; step removed. |
+| 42007793451 | PASS | Per-account summary: A syncs normally; B token refresh fails with HTTP Error 400. |
+| 42009675181 | FAIL at push | Restore and correct sync done (A inbox through 20261104), push rejected non-fast-forward. |
+| 42011155457 | PASS | Restore, correct sync and push landed: 72 files. A is current through its newest mail (20261104); no mail dated 20261105 yet. B needs a new refresh token (owner-only). |
+

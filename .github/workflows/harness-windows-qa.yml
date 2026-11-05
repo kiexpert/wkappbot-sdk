@@ -21,6 +21,74 @@ permissions:
   contents: read
 
 jobs:
+  # Read-only daily tools of the owner's docs repo on both desktop platforms (owner 2026-11-05).
+  # The repo is found by sha256 prefix and never named. No live IMAP, no calendar writes, no browser.
+  daily-tools:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    env:
+      TARGET_HASH: c48fcce9e0c13229
+      T1: ${{ secrets.WKAPPBOT_PAT }}
+      T2: ${{ secrets.GH_LICENSE_TOKEN }}
+      T3: ${{ secrets.WKAPPBOT_CORE_PAT }}
+    steps:
+      - name: Find the docs repo and a token that can reach it
+        shell: bash
+        run: |
+          set -u
+          h16() { if command -v sha256sum >/dev/null 2>&1; then printf %s "$1" | sha256sum | cut -c1-16; else printf %s "$1" | shasum -a 256 | cut -c1-16; fi; }
+          for t in "$T1" "$T2" "$T3"; do
+            [ -n "$t" ] && [ "$t" != "SET-ME" ] || continue
+            echo "::add-mask::$t"
+            names=$(GH_TOKEN="$t" gh repo list kiexpert --visibility private --limit 300 --json nameWithOwner -q '.[].nameWithOwner' 2>/dev/null || true)
+            for n in $names; do
+              if [ "$(h16 "$n")" = "$TARGET_HASH" ]; then
+                echo "::add-mask::$n"; echo "::add-mask::${n#*/}"
+                { echo "REPO=$n"; echo "TOK=$t"; } >> "$GITHUB_ENV"
+                echo "target found"; exit 0
+              fi
+            done
+          done
+          echo "no token reaches the docs repo"; exit 1
+      - name: Check out the docs repo
+        shell: bash
+        run: git clone -q --depth 1 "https://x-access-token:${TOK}@github.com/${REPO}.git" docsrepo
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6
+        with:
+          python-version: '3.x'
+      - name: Run each read-only tool and record PASS or FAIL
+        shell: bash
+        working-directory: docsrepo
+        run: |
+          [ -f requirements.txt ] && python -m pip install -q -r requirements.txt > /dev/null 2>&1 || true
+          python -m pip install -q pymupdf > /dev/null 2>&1 || true  # court_pdf imports fitz
+          printf '# QA sample\n\nOne paragraph of text for the A4 render check.\n' > "$RUNNER_TEMP/sample.md"
+          pass=0; total=4
+          # Tool output can hold personal data and this repo's logs are public: print only the case line and exit code, never the output.
+          # On FAIL print only the exception class name (e.g. ModuleNotFoundError), never its message.
+          # Each script is resolved by base name, since its folder may differ; the path is never printed.
+          err="$RUNNER_TEMP/err.txt"
+          chk() {
+            name=$1; base=$2; shift 2
+            p=$(find . -path ./.git -prune -o -type f -name "$base" -print | head -n 1)
+            if [ -z "$p" ]; then echo "CASE $name MISSING (script not in repo)"; return; fi
+            if python "$p" "$@" > /dev/null 2> "$err"; then pass=$((pass + 1)); echo "CASE $name PASS"
+            else rc=$?; cls=$(grep -oE '^[A-Za-z_.]*(Error|Exception|Exit)[A-Za-z]*' "$err" | tail -n 1 || true)
+              mod=$(grep -oE "No module named '[A-Za-z0-9_.]+'" "$err" | tail -n 1 | grep -oE "'[^']+'" || true)
+              flags=$(grep -E 'error:' "$err" | grep -oE -- '--[a-z][a-z0-9-]*' | sort -u | tr '\n' ' ' || true)
+              echo "CASE $name FAIL (rc=$rc ${cls:-no-exception-class}${mod:+ module $mod}${flags:+ flags $flags})"; fi
+          }
+          chk calendar-list gcal.py
+          chk court-pdf court_pdf.py "$RUNNER_TEMP/sample.md"
+          chk mail-send-dry-run naver_send.py --dry-run --to qa@example.invalid --subject qa-dry-run --body qa-dry-run
+          chk mail-sync-help naver_mail_sync.py --help
+          echo "RESULT $pass/$total"
+          [ "$pass" -eq "$total" ]
+
   # Portal selftests on the owner's two desktop platforms (owner 2026-11-05: compatibility demo on GitHub runners).
   # The portal repo is found by sha256 prefix and never named; its name and every token are masked.
   portal-selftest:

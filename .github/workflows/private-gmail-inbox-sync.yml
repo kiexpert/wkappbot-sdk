@@ -1,0 +1,167 @@
+name: private-gmail-inbox-sync
+
+# Daily Gmail inbox sync for the owner's two accounts into one private repo of this account (its
+# tools/gmail_mail_sync.py writes resume/drafts/gmail/<account>/inbox/<date>), then commits the
+# result back. Twin of private-naver-inbox-sync.yml. The script reads a fixed Windows .env path and
+# a fixed Windows output path, so this job loads it as a module and points both at the runner.
+# Secrets: GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN, GMAIL_REFRESH_TOKEN_GKIEXPERT
+# (GMAIL_EMAIL and GMAIL_EMAIL_2 are optional; the Gmail API user 'me' is used when unset).
+# The script output stays in a file: the log shows counts, an exception class or the invalid_grant
+# line only, never mail text. The target repo is found by a sha256 prefix, never named.
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/private-gmail-inbox-sync.yml
+  schedule:
+    - cron: '23 22 * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: private-gmail-inbox-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      TARGET_HASH: c48fcce9e0c13229
+      T1: ${{ secrets.GH_LICENSE_TOKEN }}
+      T2: ${{ secrets.WKAPPBOT_PAT }}
+      T3: ${{ secrets.WKAPPBOT_CORE_PAT }}
+    steps:
+      - name: Skip until the Gmail secrets exist
+        id: gate
+        env:
+          CID: ${{ secrets.GMAIL_CLIENT_ID }}
+          CS: ${{ secrets.GMAIL_CLIENT_SECRET }}
+          RT1: ${{ secrets.GMAIL_REFRESH_TOKEN }}
+          RT2: ${{ secrets.GMAIL_REFRESH_TOKEN_GKIEXPERT }}
+        run: |
+          if [ -n "$CID" ] && [ -n "$CS" ] && { [ -n "$RT1" ] || [ -n "$RT2" ]; }; then echo "ready=true" >> "$GITHUB_OUTPUT"
+            echo "secrets present: client=yes kivilab=$([ -n "$RT1" ] && echo yes || echo no) gkiexpert=$([ -n "$RT2" ] && echo yes || echo no)"
+          else echo "Gmail client or refresh-token secrets are not set: nothing to do"; echo "ready=false" >> "$GITHUB_OUTPUT"; fi
+      - name: Find the target repo and a token that can reach it
+        if: steps.gate.outputs.ready == 'true'
+        run: |
+          set -u
+          for t in "$T1" "$T2" "$T3"; do
+            [ -n "$t" ] || continue
+            echo "::add-mask::$t"
+            names=$(GH_TOKEN="$t" gh repo list kiexpert --visibility private --limit 300 --json nameWithOwner -q '.[].nameWithOwner' 2>/dev/null || true)
+            for n in $names; do
+              if [ "$(printf %s "$n" | sha256sum | cut -c1-16)" = "$TARGET_HASH" ]; then
+                echo "::add-mask::$n"; echo "::add-mask::${n#*/}"
+                { echo "REPO=$n"; echo "TOK=$t"; } >> "$GITHUB_ENV"
+                echo "target found"; exit 0
+              fi
+            done
+          done
+          echo "no token reaches the target repo"; exit 1
+      - name: Clone the target repo
+        if: steps.gate.outputs.ready == 'true'
+        run: git clone -q --filter=blob:none "https://x-access-token:${TOK}@github.com/${REPO}.git" src
+      - name: Restore the gmail folder to its state before the CI syncs (runs once)
+        if: steps.gate.outputs.ready == 'true'
+        working-directory: src
+        # Every CI sync up to 2026-11-05 10:00 UTC filed the kivilab account under gkiexpert (the
+        # GMAIL_EMAIL secret lacks the 'kivilab' slug the script tests). Put the folder back to the
+        # commit before the first CI sync, once: the restore commit's own subject marks it done.
+        run: |
+          set -eu
+          git config user.name "gmail-inbox-sync"
+          git config user.email "gmail-inbox-sync@users.noreply.github.com"
+          if git log --format=%s | grep -qx "gmail inbox restore before CI syncs"; then echo "restore already done"; exit 0; fi
+          first=$(git log --reverse --format=%H --author=gmail-inbox-sync | head -n 1 || true)
+          if [ -z "$first" ]; then echo "no CI sync to undo"; exit 0; fi
+          others=$(git log --format=%an "$first^..HEAD" -- resume/drafts/gmail | grep -vxc gmail-inbox-sync || true)
+          if [ "$others" != "0" ]; then echo "another writer touched the folder since; restore skipped"; exit 0; fi
+          git rm -r -q resume/drafts/gmail
+          git checkout "$first^" -- resume/drafts/gmail
+          git commit -q -m "gmail inbox restore before CI syncs"
+          echo "restored the gmail folder to the commit before the first CI sync"
+      - uses: actions/setup-python@v5
+        if: steps.gate.outputs.ready == 'true'
+        with:
+          python-version: '3.11'
+      - name: Sync both Gmail inboxes
+        if: steps.gate.outputs.ready == 'true'
+        working-directory: src
+        env:
+          GMAIL_CLIENT_ID: ${{ secrets.GMAIL_CLIENT_ID }}
+          GMAIL_CLIENT_SECRET: ${{ secrets.GMAIL_CLIENT_SECRET }}
+          GMAIL_REFRESH_TOKEN: ${{ secrets.GMAIL_REFRESH_TOKEN }}
+          GMAIL_REFRESH_TOKEN_GKIEXPERT: ${{ secrets.GMAIL_REFRESH_TOKEN_GKIEXPERT }}
+          GMAIL_EMAIL: ${{ secrets.GMAIL_EMAIL }}
+          GMAIL_EMAIL_2: ${{ secrets.GMAIL_EMAIL_2 }}
+        run: |
+          [ -f requirements.txt ] && python -m pip install -q -r requirements.txt > /dev/null 2>&1 || true
+          envf="$RUNNER_TEMP/gmail.env"
+          umask 077
+          {
+            echo "GMAIL_CLIENT_ID=$GMAIL_CLIENT_ID"
+            echo "GMAIL_CLIENT_SECRET=$GMAIL_CLIENT_SECRET"
+            echo "GMAIL_REFRESH_TOKEN=$GMAIL_REFRESH_TOKEN"
+            echo "GMAIL_REFRESH_TOKEN_GKIEXPERT=$GMAIL_REFRESH_TOKEN_GKIEXPERT"
+            # The script calls the API as users/me and uses the address only to pick the account
+            # folder ('kivilab' in it or not), so fixed slug-carrying placeholders are used: the
+            # GMAIL_EMAIL secret lacks the slug and sent kivilab mail into the gkiexpert folder.
+            echo "GMAIL_EMAIL=kivilab@ci.invalid"
+            echo "GMAIL_EMAIL_2=gkiexpert@ci.invalid"
+          } > "$envf"
+          log="$RUNNER_TEMP/gmail.log"
+          set +e
+          ENVF="$envf" OUTD="$PWD/resume/drafts/gmail" python - > "$log" 2>&1 <<'PY'
+          import importlib.util, os, pathlib, sys
+          spec = importlib.util.spec_from_file_location("gmail_mail_sync", "tools/gmail_mail_sync.py")
+          m = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(m)
+          m.ENV_FILE = pathlib.Path(os.environ["ENVF"])
+          m.BASE_DIR = pathlib.Path(os.environ["OUTD"])
+          sys.argv = ["gmail_mail_sync.py", "--account", "all", "--days", "30"]
+          m.main()
+          PY
+          rc=$?
+          set -e
+          rm -f "$envf"
+          grep -m 3 -oE 'invalid_grant[^"]{0,80}' "$log" | sed -E 's/[^ ]+@[^ ]+/<addr>/g' || true
+          if [ "$rc" -ne 0 ]; then
+            cls=$(grep -oE '^[A-Za-z_.]*(Error|Exception)[A-Za-z]*' "$log" | tail -n 1 || true)
+            echo "gmail sync FAIL rc=$rc ${cls:-no-exception-class}"; exit 1
+          fi
+          # Per-account counts only: the account line loses its address, and an error keeps only its type or HTTP code.
+          echo "per-account summary (A=kivilab, B=gkiexpert):"
+          grep -E '^\[(kivilab|gkiexpert)\]|^  Total: |^  (INBOX|SENT|SPAM|TRASH): ' "$log" \
+            | sed -E 's/^\[kivilab\].*/  [A]/; s/^\[gkiexpert\].*/  [B]/; s/(ERROR) .*/\1/' || true
+          echo "error kinds (count kind):"
+          grep -oE 'HTTP Error [0-9]+|invalid_grant|[A-Za-z]+(Error|Exception)\b' "$log" | sort | uniq -c | sed 's/^/  /' || true
+          echo "gmail sync OK; new inbox folders:"
+          for d in resume/drafts/gmail/*/inbox; do if [ -d "$d" ]; then echo "  newest $(ls "$d" | grep -oE '^[0-9]{8}' | sort | tail -n 1 || true)"; fi; done
+      - name: Commit the sync back
+        if: steps.gate.outputs.ready == 'true'
+        working-directory: src
+        run: |
+          set -eu
+          git config user.name "gmail-inbox-sync"
+          git config user.email "gmail-inbox-sync@users.noreply.github.com"
+          git add -A resume/drafts/gmail
+          # Landing proof without names: changed files counted per account letter (A=kivilab, B=gkiexpert),
+          # folder kind and the first 8-digit date in the path.
+          echo "landed (count account kind date):"
+          git diff --cached --name-only -- resume/drafts/gmail | sed -E 's#^resume/drafts/gmail/##' \
+            | awk -F/ '{a=($1=="kivilab")?"A":(($1=="gkiexpert")?"B":"?"); d="-"; if (match($0,/[0-9]{8}/)) d=substr($0,RSTART,8); print a" "$2" "d}' \
+            | sort | uniq -c | sed 's/^/  /' || true
+          today=$(date -u +%Y%m%d)
+          echo "files in the tree dated $today (count account kind):"
+          find resume/drafts/gmail -type f -path "*$today*" | sed -E 's#^resume/drafts/gmail/##' \
+            | awk -F/ '{a=($1=="kivilab")?"A":(($1=="gkiexpert")?"B":"?"); print a" "$2}' | sort | uniq -c | sed 's/^/  /' || true
+          if git diff --cached --quiet; then
+            if [ "$(git rev-list --count origin/main..HEAD)" -gt 0 ]; then git pull -q --rebase origin main && git push -q origin HEAD:main; echo "restore pushed, no new mail"; else echo "no new mail"; fi
+            exit 0
+          fi
+          git commit -q -m "gmail inbox sync $(date -u +%F) per-account"
+          git pull -q --rebase origin main && git push -q origin HEAD:main
+          echo "sync committed: $(git diff --stat HEAD~1 | tail -n 1)"
