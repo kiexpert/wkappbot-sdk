@@ -24,6 +24,9 @@ PY=${PY:-python3}
 if [ "${DESKTOP_ROLE:-}" = proof ]; then export SNAP_PASS="$TOK"; else export SNAP_PASS="$DESKTOP_PASSWORD"; fi
 ENC=(openssl enc -aes-256-cbc -pbkdf2 -md sha256 -iter 600000 -pass env:SNAP_PASS)
 case "$(uname -s)" in Darwin) OSN=macos;; *) OSN=windows;; esac
+# Windows: GNU tar reads "D:\..." as host:path, so keep bash-side paths in /d/... form; native tools get wp() paths
+if [ $OSN = windows ]; then SNAP_DIR=$(cygpath -u "$SNAP_DIR"); WORK=$(cygpath -u "$WORK"); fi
+wp() { if [ $OSN = windows ]; then cygpath -w "$1"; else printf '%s' "$1"; fi; }
 fp()  { powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(cygpath -w "$HERE/footprint-win.ps1")" "$@"; }
 win() { powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(cygpath -w "$HERE/snapshot-win.ps1")" "$@"; }
 envout() { echo "$1" >> "${GITHUB_ENV:-/dev/null}"; }
@@ -55,7 +58,7 @@ case "$cmd" in
       win save "$(cygpath -w "$st/apps.json")"
     fi
     tar -C "$HOME" -czf "$st/work.tgz" desktop-work
-    "$PY" "$HERE/chrome.py" save "$st" | tee "$SNAP_DIR/chrome.save.log" | grep -v '^COOKIES_SAVED=' || true
+    "$PY" "$HERE/chrome.py" save "$(wp "$st")" | tee "$SNAP_DIR/chrome.save.log" | grep -v '^COOKIES_SAVED=' || true
     envout "$(grep '^COOKIES_SAVED=' "$SNAP_DIR/chrome.save.log" || echo COOKIES_SAVED=0)"
     if [ $OSN = macos ]; then
       for d in "${MAC_SW_DIRS[@]}"; do ls -1 "$d" 2>/dev/null | sed "s|^|$d/|"; done | grep -vxF -f "$SNAP_DIR/mac.baseline" > "$st/sw/new.txt" || true
@@ -103,10 +106,10 @@ case "$cmd" in
       else
         fp restore "$(cygpath -w "$st/sw")" | tr -d '\r' | tail -1 > "$SNAP_DIR/restore.json"
       fi
-      "$PY" -c 'import json,sys;r=json.load(open(sys.argv[1]));r={k:(v if isinstance(v,list) else ([v] if v else [])) for k,v in r.items()};json.dump(r,open(sys.argv[1],"w"));print("software restored:",len(r["restored"]),"failed:",len(r["failed"]));[print("  OK",x) for x in r["restored"]];[print("  FAILED",f) for f in r["failed"]]' "$SNAP_DIR/restore.json"
+      "$PY" -c 'import json,sys;r=json.load(open(sys.argv[1],encoding="utf-8-sig"));r={k:(v if isinstance(v,list) else ([v] if v else [])) for k,v in r.items()};json.dump(r,open(sys.argv[1],"w"));print("software restored:",len(r["restored"]),"failed:",len(r["failed"]));[print("  OK",x) for x in r["restored"]];[print("  FAILED",f) for f in r["failed"]]' "$(wp "$SNAP_DIR/restore.json")"
     fi
     # 2) Chrome: profile back before Chrome starts, then the CDP cookie import and the tabs
-    "$PY" "$HERE/chrome.py" restore "$st" | tee "$SNAP_DIR/chrome.restore.log" | grep -v '^COOKIES_RESTORED=' || true
+    "$PY" "$HERE/chrome.py" restore "$(wp "$st")" | tee "$SNAP_DIR/chrome.restore.log" | grep -v '^COOKIES_RESTORED=' || true
     envout "$(grep '^COOKIES_RESTORED=' "$SNAP_DIR/chrome.restore.log" || echo COOKIES_RESTORED=0)"
     # 3) the other open apps
     n=0
