@@ -65,6 +65,7 @@ jobs:
         working-directory: docsrepo
         run: |
           [ -f requirements.txt ] && python -m pip install -q -r requirements.txt > /dev/null 2>&1 || true
+          python -m pip install -q pymupdf > /dev/null 2>&1 || true  # court_pdf imports fitz
           printf '# QA sample\n\nOne paragraph of text for the A4 render check.\n' > "$RUNNER_TEMP/sample.md"
           pass=0; total=4
           # Tool output can hold personal data and this repo's logs are public: print only the case line and exit code, never the output.
@@ -83,7 +84,7 @@ jobs:
           }
           chk calendar-list gcal.py
           chk court-pdf court_pdf.py "$RUNNER_TEMP/sample.md"
-          chk mail-send-dry-run naver_send.py --dry-run
+          chk mail-send-dry-run naver_send.py --dry-run --to qa@example.invalid --subject qa-dry-run
           chk mail-sync-help naver_mail_sync.py --help
           echo "RESULT $pass/$total"
           [ "$pass" -eq "$total" ]
