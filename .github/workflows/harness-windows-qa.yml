@@ -117,9 +117,8 @@ jobs:
           chk calendar-help gcal.py --help
           # court_pdf usage: <input.txt> <output.pdf> [title] [attach.pdf ...] [--date "..."]
           DETAIL=1 chk court-pdf court_pdf.py "$RUNNER_TEMP/sample.txt" "$RUNNER_TEMP/sample.pdf"
-          # naver_send's load_creds reads a hard-coded absolute .env path of the owner's PC (reported to the docs-repo
-          # owner), so a --dry-run cannot get past credentials on any runner: check the CLI loads instead.
-          DETAIL=1 chk mail-send-help naver_send.py --help
+          # naver_send --dry-run runs with no .env (docs repo fix 2026-11-05) and prints no secret values; stdout is discarded.
+          DETAIL=1 chk mail-send-dry-run naver_send.py --dry-run --to qa@example.invalid --subject qa-dry-run --body qa-dry-run
           chk mail-sync-help naver_mail_sync.py --help
           echo "RESULT $pass/$total"
           [ "$pass" -eq "$total" ]
