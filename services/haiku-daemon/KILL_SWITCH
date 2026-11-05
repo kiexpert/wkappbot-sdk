@@ -1,0 +1,6 @@
+# Haiku service kill switch. First non-comment word: closed | open.
+# closed (default): no PUBLIC request reaches claude; visitors get status "refused".
+#   Internal requests from the runner's own inbox are still answered (CI self-test).
+# open: public requests are answered, which spends the owner's subscription.
+#   Do NOT change this to open without the owner's explicit go.
+closed
