@@ -5,6 +5,7 @@ export class EtagPoller {
     Object.assign(this, { fetchFn, pacer, headers });
     this.cache = new Map(); // url -> { etag, body }
     this.stats = { requests: 0, notModified: 0 };
+    this.last = null; // { status, remaining, limit } of the last response, for budget-aware cadence
   }
   async get(url) {
     if (this.pacer) await this.pacer.acquire();
@@ -13,6 +14,10 @@ export class EtagPoller {
     if (hit?.etag) h['If-None-Match'] = hit.etag;
     this.stats.requests++;
     const res = await this.fetchFn(url, { headers: h });
+    const hv = (k) => res.headers?.get?.(k) ?? null;
+    const num = (x) => (x == null ? null : Number(x));
+    this.last = { status: res.status, remaining: num(hv('x-ratelimit-remaining') ?? hv('ratelimit-remaining')),
+      limit: num(hv('x-ratelimit-limit') ?? hv('ratelimit-limit')) };
     if (res.status === 304 && hit) {
       this.stats.notModified++;
       return { status: 304, changed: false, body: hit.body };

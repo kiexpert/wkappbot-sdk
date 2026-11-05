@@ -35,15 +35,32 @@ test('read pacer: slow callers (2/s) are never delayed', async () => {
 });
 
 test('write pacer: never more than perMinute writes in any 60 s window', async () => {
-  const c = fakeClock(0); const p = new WritePacer({ clock: c, perMinute: 60 });
+  const c = fakeClock(0); const p = new WritePacer({ clock: c, perMinute: 60, perHour: 499 });
   const t = [];
   for (let i = 0; i < 200; i++) t.push(await p.acquire());
   for (let i = 60; i < t.length; i++) assert.ok(t[i] - t[i - 60] >= 60_000, `window at ${i}`);
   assert.equal(t[59], 0); assert.equal(t[60], 60_000);
 });
 
-test('write pacer: refuses a limit at or over 80/min', () => {
+test('write pacer: refuses a limit at or over 80/min or 500/h', () => {
   assert.throws(() => new WritePacer({ perMinute: 80 }));
+  assert.throws(() => new WritePacer({ perHour: 500 }));
+});
+
+test('write pacer: defaults hold 70/min and 450/h', async () => {
+  const c = fakeClock(0); const p = new WritePacer({ clock: c });
+  const t = [];
+  for (let i = 0; i < 1000; i++) t.push(await p.acquire());
+  for (let i = 70; i < t.length; i++) assert.ok(t[i] - t[i - 70] >= 60_000, `minute window at ${i}`);
+  for (let i = 450; i < t.length; i++) assert.ok(t[i] - t[i - 450] >= 3_600_000, `hour window at ${i}`);
+  assert.equal(t[449] < 3_600_000, true); assert.equal(t[450] >= 3_600_000, true);
+});
+
+test('write pacer: Retry-After blocks the next write', async () => {
+  const c = fakeClock(0); const p = new WritePacer({ clock: c });
+  await p.acquire();
+  p.backoff(30);
+  assert.equal(await p.acquire(), 30_000);
 });
 
 test('read pacer: a sustained hammer settles at 2 per second', async () => {

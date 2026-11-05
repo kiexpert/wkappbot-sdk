@@ -7,7 +7,7 @@ import { Conflict } from './publisher.mjs';
 import { realClock } from './clock.mjs';
 
 export const DEFAULTS = {
-  tickMs: 2000, statusEveryMs: 60_000, idleStatusEveryMs: 300_000, staleMs: 15 * 60_000,
+  tickMs: 2000, statusEveryMs: 60_000 /* status at most once a minute */, idleStatusEveryMs: 300_000, staleMs: 15 * 60_000,
   handoffAfterMs: (5 * 60 + 15) * 60_000, maxRunMs: (5 * 60 + 45) * 60_000,
 };
 
@@ -55,7 +55,7 @@ export async function runDaemon({ service, publisher, dispatchSuccessor = async 
       lastStatus = clock.now();
       lastAnswered = service.status.answered_count + service.status.refused_count;
     }
-    await clock.sleep(o.tickMs);
+    await clock.sleep(service.nextDelayMs(o.tickMs));
   }
 
   async function handedOff() {

@@ -8,7 +8,7 @@ import { fakeClock } from '../lib/clock.mjs';
 import { HaikuService } from '../lib/service.mjs';
 import { LocalDirWire } from '../lib/wire.mjs';
 import { LocalPublisher } from '../lib/publisher.mjs';
-import { askClaude } from '../lib/answer.mjs';
+import { askProvider, slotCommand, loadProvider } from '../lib/answer.mjs';
 import { runDaemon } from '../lib/runner.mjs';
 
 const FAKE = fileURLToPath(new URL('./fake-claude.sh', import.meta.url));
@@ -21,22 +21,47 @@ function setup({ killSwitch = 'closed', clock = fakeClock(Date.parse('2026-11-05
   const pub = new LocalDirWire({ inbox: join(root, 'pub-in'), outbox: join(root, 'pub-out'), origin: 'public' });
   const int = new LocalDirWire({ inbox: join(root, 'int-in'), outbox: join(root, 'int-out'), origin: 'internal' });
   const svc = new HaikuService({ dir: join(root, 'state'), wires: [pub, int], killSwitchPath: ks(killSwitch), clock,
-    ask: ask || ((p) => askClaude(p, { bin: FAKE })), runId: 'run-A' });
+    ask: ask || ((p) => askProvider(p, { env: { ...process.env, CLAUDE_BIN: FAKE } })), runId: 'run-A', simulate: false });
   return { root, pub, int, svc, clock };
 }
 const out = (dir, id) => JSON.parse(readFileSync(join(dir, `${id}.json`), 'utf8'));
 
-test('fake claude: argv is haiku, text output, every tool disabled', async () => {
+test('fake claude: provider slot runs haiku, text output, every tool disabled, token cap', async () => {
   const argsFile = join(tmp(), 'argv');
-  const r = await askClaude('ping', { bin: FAKE, env: { ...process.env, FAKE_CLAUDE_ARGS: argsFile } });
-  assert.deepEqual(r, { ok: true, text: 'fake-haiku: ping' });
-  const argv = readFileSync(argsFile, 'utf8');
-  assert.match(argv, /-p --model haiku --tools {2}--output-format text/);
+  const r = await askProvider('ping', { env: { ...process.env, CLAUDE_BIN: FAKE, FAKE_CLAUDE_ARGS: argsFile } });
+  assert.equal(r.ok, true); assert.equal(r.text, 'fake-haiku: ping');
+  assert.ok(r.first_byte_ms >= 0 && r.first_byte_ms <= r.total_ms);
+  assert.match(readFileSync(argsFile, 'utf8'), /-p --model haiku --tools {2}--output-format text/);
+  const cmd = slotCommand(loadProvider(), {});
+  assert.equal(cmd.bin, 'claude');
+  assert.equal(cmd.env.CLAUDE_CODE_MAX_OUTPUT_TOKENS, '600');
+  assert.match(cmd.args[cmd.args.indexOf('--system-prompt') + 1], /Korean in-house assistant/);
+});
+
+test('provider slot: another family is a config change, not a code change', () => {
+  const cfg = { ...loadProvider(), slot: { family: 'agy', model: 'flash-lite' },
+    families: { agy: { bin: 'agy', args: ['--model', '{model}'], env: {} } } };
+  assert.deepEqual(slotCommand(cfg, {}).args, ['--model', 'flash-lite']);
+  assert.throws(() => slotCommand({ ...cfg, slot: { family: 'nope', model: 'x' } }, {}));
 });
 
 test('fake claude: a failing binary becomes an error answer, not a crash', async () => {
-  const r = await askClaude('x', { bin: FAKE, env: { ...process.env, FAKE_CLAUDE_FAIL: '1' } });
+  const r = await askProvider('x', { env: { ...process.env, CLAUDE_BIN: FAKE, FAKE_CLAUDE_FAIL: '1' } });
   assert.equal(r.ok, false); assert.equal(r.error, 'exit 1');
+});
+
+test('simulation: occasional 429 and in-house latency', async () => {
+  const clock = fakeClock(0);
+  const { root, svc } = setup({ killSwitch: 'open', clock, ask: async () => ({ ok: true, text: 'x', first_byte_ms: 5, total_ms: 10 }) });
+  svc.simulate = true; svc.cfg = { ...svc.cfg, simulate: { latency_ms: [300, 900], rate_429: 0.5 } };
+  const rolls = [0.9, 0.5, 0.1]; svc.rng = () => rolls.shift();
+  drop(join(root, 'pub-in'), { id: 'a', visitor: 'v1', prompt: 'q' });
+  drop(join(root, 'pub-in'), { id: 'b', visitor: 'v2', prompt: 'q' });
+  await svc.tick();
+  const st = ['a', 'b'].map((id) => out(join(root, 'pub-out'), id));
+  assert.equal(st.filter((x) => x.reason === 'simulated_429').length, 1);
+  const ok = st.find((x) => x.status === 'ok');
+  assert.equal(ok.latency_ms, 300 + Math.floor(0.5 * 600)); // rolls: a passes 429 (0.9), sleeps 0.5; b gets 429 (0.1)
 });
 
 test('kill switch closed: public request refused, internal answered, one object each', async () => {

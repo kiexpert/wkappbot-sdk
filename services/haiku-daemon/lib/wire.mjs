@@ -22,7 +22,9 @@ export function normalize(raw) {
     ({ id, visitor, prompt } = raw);
   }
   if (typeof id !== 'string' || typeof prompt !== 'string' || !prompt.trim()) return null;
-  return { id, visitor: String(visitor || 'anonymous').slice(0, 80), prompt: prompt.slice(0, MAX_PROMPT), dialect };
+  const out = { id, visitor: String(visitor || 'anonymous').slice(0, 80), prompt: prompt.slice(0, MAX_PROMPT), dialect };
+  if (raw.meta && typeof raw.meta === 'object') out.meta = raw.meta; // wire routing (peer id, turn)
+  return out;
 }
 
 const lowerKeys = (o) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k.toLowerCase(), v]));
