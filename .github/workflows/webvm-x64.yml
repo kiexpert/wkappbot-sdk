@@ -232,10 +232,11 @@ jobs:
           start=$(date +%s)
           NODE_PATH="$PWD/snaptool/node_modules" node src/webvm/x64-build/snap-ci.js out snap.state
           echo "snapshot took $(( $(date +%s) - start )) s"
-          if [ -f src/webvm/x64-build/snapshot-chunks.py ]; then
-            # Incremental download (owner 2026-11-04): 1 MiB pieces named by content hash under snap/, cached by name in
-            # the page, so a returning browser fetches only the pieces a new bake changed (the disk chunks do the same).
-            python3 -I src/webvm/x64-build/snapshot-chunks.py snap.state out && rm snap.state
+          if [ -f src/webvm/x64-build/snapshot-pages.py ]; then
+            # Page store (2026-11-05): a per-bake glue file plus content-addressed page bodies under pages/
+            # (pages.bin, index.json, glue.gz), cached by page hash in the page, so a warm revisit after a one-package
+            # bake fetches the glue and only the pages that are new (the disk chunks do the same by name).
+            python3 -I src/webvm/x64-build/snapshot-pages.py snap.state out && rm snap.state
             python3 -c 'import json,os; m=json.load(open("out/manifest.json")); m["snapshot"]["warm"]="python3 git"; m["packed"]=sum(os.path.getsize("out/"+p) for p in m["parts"])+m["snapshot"]["packed"]; m["imageHash"]=os.environ["IMG_HASH"]; json.dump(m,open("out/manifest.json","w"))'
           else
           raw=$(stat -c %s snap.state)
@@ -249,7 +250,7 @@ jobs:
           ls -la out
           find out -type f -size +95M -print -exec false {} + || { echo "a file is over the 100 MB push limit"; exit 1; }
           echo "disk: $(ls out/disk | wc -l) files, $(du -sh out/disk | cut -f1)"; cat out/disk/index.json | head -c 300; echo
-          [ ! -d out/snap ] || echo "snapshot: $(ls out/snap | wc -l) files, $(du -sh out/snap | cut -f1)"
+          [ ! -d out/pages ] || echo "snapshot pages: $(ls out/pages | wc -l) files, $(du -sh out/pages | cut -f1)"
 
       - name: Publish as webvm/x64 beside the page
         if: env.BAKE == '1'
