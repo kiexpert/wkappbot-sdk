@@ -89,6 +89,7 @@ jobs:
             if [ -z "$cands" ]; then echo "CASE $name MISSING (script not in repo)"; return; fi
             n=$(printf '%s\n' "$cands" | wc -l | tr -d ' '); ok=0
             while IFS= read -r p; do
+              [ -n "$p" ] || continue; lp=$p
               if python "$p" "$@" > /dev/null 2> "$err"; then ok=1; break; fi
             done <<EOF_CANDS
           $cands
@@ -108,7 +109,11 @@ jobs:
                 echo "  detail: $last"
                 san() { sed -E 's#([A-Za-z]:)?[^ "'"'"']*[/\\]([^/\\ "'"'"']+)#\2#g; s/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+/<email>/g; s/[0-9]{6,}/<n>/g; s/[A-Za-z0-9_-]{32,}/***/g' | cut -c1-200; }
                 echo "  first: $(grep -v '^[[:space:]]*$' "$err" | head -n 1 | san)"
-                u=$( (grep -iE '^usage:' "$err" || true) | head -n 1 | san); [ -z "$u" ] || echo "  usage: $u"
+                (grep -iE -A3 '^usage:' "$err" || true) | head -n 4 | san | sed 's/^/  usage: /'
+                # How the script locates its .env (tokens only, never whole source lines), whether ./.env exists here,
+                # and how deep the script sits.
+                echo "  env-lookup: $( (grep -oE 'chdir\([^)]{0,50}\)|Path\([^)]{0,50}\)|__file__|home\(\)|getenv\([^)]{0,40}\)|environ[^ ]{0,40}|[A-Za-z_./]{0,30}\.env[A-Za-z_./]{0,20}' "$lp" || true) | sort -u | head -n 12 | san | tr '\n' ' ')"
+                echo "  cwd-has-.env: $([ -f .env ] && echo yes || echo no); script-depth: $(printf '%s' "$lp" | tr -cd '/' | wc -c | tr -d ' ')"
                 (grep -E '^[[:space:]]*File "' "$err" || true) | tail -n 3 | san | sed 's/^[[:space:]]*/  frame: /'
               fi; fi
           }
