@@ -14,6 +14,7 @@ import re
 import sys
 import os
 import datetime
+import urllib.error
 import urllib.request
 
 API = "https://api.github.com"
@@ -36,11 +37,24 @@ NOISE = re.compile(r"^(##\[(group|endgroup|debug)\]|\[command\]|Cleaning up orph
                    r"\(Use `node --trace-deprecation)")
 
 
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, *a, **k):
+        return None
+
+
 def get(url, raw=False):
+    """GET with the token. A job-log download answers 302 to a signed storage URL that must be fetched
+    WITHOUT the Authorization header (urllib would forward it and the storage rejects the request)."""
     req = urllib.request.Request(url, headers={"Authorization": f"Bearer {os.environ['GITHUB_TOKEN']}",
                                                "Accept": "application/vnd.github+json"})
-    with urllib.request.urlopen(req, timeout=60) as r:
-        data = r.read()
+    try:
+        with urllib.request.build_opener(_NoRedirect).open(req, timeout=60) as r:
+            data = r.read()
+    except urllib.error.HTTPError as e:
+        if e.code not in (301, 302, 303, 307, 308) or not e.headers.get("Location"):
+            raise
+        with urllib.request.urlopen(e.headers["Location"], timeout=60) as r:
+            data = r.read()
     return data.decode("utf-8", "replace") if raw else json.loads(data)
 
 
