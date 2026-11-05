@@ -1,0 +1,16 @@
+{
+  "slot": { "family": "claude", "model": "haiku" },
+  "display_name": "WK in-house model",
+  "max_tokens": 600,
+  "timeout_ms": 120000,
+  "families": {
+    "claude": {
+      "bin": "claude",
+      "args": ["-p", "--model", "{model}", "--tools", "", "--output-format", "text",
+               "--no-session-persistence", "--strict-mcp-config", "--system-prompt", "{system}"],
+      "env": { "CLAUDE_CODE_MAX_OUTPUT_TOKENS": "{max_tokens}" }
+    }
+  },
+  "simulate": { "latency_ms": [300, 900], "rate_429": 0.03 },
+  "limits": { "per_visitor_max": 3, "per_visitor_window_min": 10, "daily_cap_writes": 400 }
+}

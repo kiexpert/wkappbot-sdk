@@ -1,0 +1,149 @@
+name: haiku-service
+
+# Haiku service daemon for AppBot Code (services/haiku-daemon). Three jobs:
+#   unit    : node --test with a fake claude binary and a fake clock (every push/PR touching the daemon)
+#   selftest: ONE real Haiku call through the daemon's internal inbox, with the kill switch CLOSED to the
+#             public (the internal request is the only one answered). Prints the measured answer latency.
+#   serve   : the long-running daemon (dispatch or the */30 watchdog). It holds a lease in status.json on
+#             branch svc/haiku-daemon, dispatches its successor at 5h15m and drains out when the successor
+#             takes the lease, before the 6 h runner cap. A watchdog run that finds a live lease exits at once.
+# The kill switch is services/haiku-daemon/KILL_SWITCH on main, closed by default; opening it spends the
+# owner's subscription and needs the owner's explicit go.
+# SECRETS READ: CLAUDE_CODE_OAUTH_TOKEN (subscription, workflow secret only), HAIKU_RELAY_LINK (the signaler
+# share link: channel repo, issue, session, AES key; unset = no public wire) and HAIKU_WIRE_TOKEN (a token
+# that can read and comment on that channel issue). The channel is never named in this public repo.
+on:
+  push:
+    branches: [main]
+    paths:
+      - services/haiku-daemon/**
+      - .github/workflows/haiku-service.yml
+  pull_request:
+    paths:
+      - services/haiku-daemon/**
+      - .github/workflows/haiku-service.yml
+  workflow_dispatch:
+    inputs:
+      takeover:
+        description: 'Take the lease from a live run (set by the predecessor at handoff)'
+        required: false
+        default: 'false'
+  schedule:
+    - cron: '7,37 * * * *'
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Unit tests (fake claude, fake clock)
+        working-directory: services/haiku-daemon
+        run: node --test test/*.test.mjs
+
+  selftest:
+    needs: unit
+    if: (github.event_name == 'push' || github.event_name == 'pull_request') && github.event.pull_request.head.repo.fork != true
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+      HAIKU_SIM: '0'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Gate on the claude credential
+        id: gate
+        run: |
+          if [ -n "$CLAUDE_CODE_OAUTH_TOKEN" ] && [ "$CLAUDE_CODE_OAUTH_TOKEN" != "SET-ME" ]; then echo "ready=true" >> "$GITHUB_OUTPUT"
+          else echo "CLAUDE_CODE_OAUTH_TOKEN is not set: skipping the real call"; echo "ready=false" >> "$GITHUB_OUTPUT"; fi
+      - name: Install Claude Code
+        if: steps.gate.outputs.ready == 'true'
+        run: npm install -g @anthropic-ai/claude-code >/dev/null 2>&1 && claude --version
+      - name: One internal request, one public request, kill switch closed
+        if: steps.gate.outputs.ready == 'true'
+        working-directory: services/haiku-daemon
+        run: |
+          set -eu
+          grep -qx closed KILL_SWITCH
+          mkdir -p "$RUNNER_TEMP/in" "$RUNNER_TEMP/pub"
+          printf '{"headers":{"X-Request-Id":"ci-%s","X-Visitor-Id":"ci"},"body":{"prompt":"Reply with exactly the word: pong"}}' \
+            "$GITHUB_RUN_ID" > "$RUNNER_TEMP/in/ci.json"
+          printf '{"id":"pub-%s","visitor":"v","prompt":"must not reach claude"}' "$GITHUB_RUN_ID" > "$RUNNER_TEMP/pub/p.json"
+          # internal inbox: answered
+          node daemon.mjs --once --dir "$RUNNER_TEMP/state" --inbox "$RUNNER_TEMP/in" --outbox "$RUNNER_TEMP/out" | tee status-int.json
+          # public inbox: refused while the switch is closed
+          node daemon.mjs --once --dir "$RUNNER_TEMP/state2" --inbox "$RUNNER_TEMP/pub" --outbox "$RUNNER_TEMP/out" --origin public | tee status-pub.json
+          python3 - "$RUNNER_TEMP/out" "$GITHUB_RUN_ID" <<'PY'
+          import json, sys, os
+          out, rid = sys.argv[1], sys.argv[2]
+          a = json.load(open(os.path.join(out, f"ci-{rid}.json")))
+          p = json.load(open(os.path.join(out, f"pub-{rid}.json")))
+          s = json.load(open("status-int.json"))
+          print(f"internal: status={a['status']} latency_ms={a.get('latency_ms')} first_byte_ms={a.get('first_byte_ms')} text={a.get('text','')[:60]!r}")
+          print(f"public:   status={p['status']} reason={p.get('reason')}")
+          print(f"status:   kill_switch={s['kill_switch']} answered={s['answered_count']} last_latency_ms={s['last_latency_ms']}")
+          assert a["status"] == "ok" and "pong" in a["text"].lower(), a
+          assert p["status"] == "refused" and p["reason"] == "kill_switch_closed", p
+          assert s["kill_switch"] == "closed" and s["answered_count"] == 1
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as f:
+              f.write(f"Haiku self-test: ok, first byte {a.get('first_byte_ms')} ms, answer latency {a['latency_ms']} ms, public request refused (kill switch closed)\n")
+          PY
+
+  serve:
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 355
+    permissions:
+      contents: write
+      actions: write
+    env:
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+      HAIKU_RELAY_LINK: ${{ secrets.HAIKU_RELAY_LINK }}
+      HAIKU_WIRE_TOKEN: ${{ secrets.HAIKU_WIRE_TOKEN }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      STATUS_BRANCH: svc/haiku-daemon
+      HANDOFF_WORKFLOW: haiku-service.yml
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Gate on the claude credential
+        id: gate
+        run: |
+          if [ -n "$CLAUDE_CODE_OAUTH_TOKEN" ] && [ "$CLAUDE_CODE_OAUTH_TOKEN" != "SET-ME" ]; then echo "ready=true" >> "$GITHUB_OUTPUT"
+          else echo "CLAUDE_CODE_OAUTH_TOKEN is not set: nothing to serve"; echo "ready=false" >> "$GITHUB_OUTPUT"; fi
+      - name: Create the status branch if missing (or reset its history on a takeover)
+        if: steps.gate.outputs.ready == 'true'
+        env:
+          TAKEOVER: ${{ inputs.takeover }}
+        run: |
+          set -eu
+          if git ls-remote --exit-code --heads origin "$STATUS_BRANCH" >/dev/null && [ "$TAKEOVER" != "true" ]; then exit 0; fi
+          d=$(mktemp -d); cd "$d"; git init -q; git checkout -q --orphan "$STATUS_BRANCH"
+          printf '{"schema":1,"service":"haiku-daemon","state":"starting","kill_switch":"closed","queue":0,"requests_today":0,"answered_count":0,"last_answer_at":null,"last_latency_ms":null,"run_id":"%s","runner_id":"%s","started_at":"%s","updated_at":"%s"}\n' \
+            "$GITHUB_RUN_ID" "$RUNNER_NAME" "$(date -u +%Y-%m-%dT%H:%M:%S.000Z)" "$(date -u +%Y-%m-%dT%H:%M:%S.000Z)" > status.json
+          git add status.json
+          git -c user.name=haiku-service -c user.email=haiku-service@users.noreply.github.com commit -qm "status: reset by run $GITHUB_RUN_ID"
+          git push -q --force "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:$STATUS_BRANCH"
+      - name: Install Claude Code
+        if: steps.gate.outputs.ready == 'true'
+        run: npm install -g @anthropic-ai/claude-code >/dev/null 2>&1 && claude --version
+      - name: Serve
+        if: steps.gate.outputs.ready == 'true'
+        working-directory: services/haiku-daemon
+        run: |
+          [ -n "$HAIKU_RELAY_LINK" ] && echo "::add-mask::$HAIKU_RELAY_LINK"
+          [ -n "$HAIKU_WIRE_TOKEN" ] && echo "::add-mask::$HAIKU_WIRE_TOKEN"
+          node daemon.mjs --serve --dir "$RUNNER_TEMP/state" ${{ inputs.takeover == 'true' && '--takeover' || '' }}
