@@ -1,0 +1,149 @@
+name: runner-desktop
+
+# On-demand, time-boxed live desktop of a GitHub-hosted Windows / macOS runner, for SDK release QA
+# (watch or drive a QA session on the real OS). Deliberately NOT always-on: no schedule and no self-re-dispatch,
+# because GitHub's Actions terms limit hosted runners to work for this project (build / test / release).
+#
+# ACCESS GATE (mandatory, fail-closed):
+#   - owner secret RUNNER_DESKTOP_PASSWORD (>= 12 chars). Absent / SET-ME -> the job starts NOTHING and says so.
+#   - every HTTP and websocket request through the tunnel needs HTTP basic auth (user "owner" + that secret);
+#     the VNC server itself is password-gated too (first 8 chars); noVNC sits under a random per-boot path.
+#   - the viewer URL is never printed; it is written only to the owner's private relay (found by sha256 prefix,
+#     never named here) as relay/desktop-<os>:status.json, which the portal reads with a conditional GET.
+# proof=true: uses a throwaway random password instead of the secret, proves the gate from outside
+#   (unauthenticated -> 401, authed -> 200 + RFB banner), then shuts down after `minutes`.
+# Shared boot: .github/scripts/runner-desktop/boot.sh is the one boot script; a QA job can call it, then run
+#   its own steps while the desktop stays up (the viewer never takes focus or restarts the session).
+on:
+  workflow_dispatch:
+    inputs:
+      os:
+        description: 'windows, macos or both'
+        default: both
+        type: choice
+        options: [both, windows, macos]
+      minutes:
+        description: 'minutes to stay up (max 120)'
+        default: '60'
+      proof:
+        description: 'gate proof with a throwaway password'
+        type: boolean
+        default: false
+  # proof-only: a push touching these files runs the gate proof (throwaway password, 8 min), never the owner role
+  push:
+    paths:
+      - .github/workflows/runner-desktop.yml
+      - .github/scripts/runner-desktop/**
+
+permissions:
+  contents: read
+
+jobs:
+  desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { osn: windows, runner: windows-latest }
+          - { osn: macos, runner: macos-latest }
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 140
+    concurrency:
+      group: runner-desktop-${{ matrix.osn }}
+      cancel-in-progress: false
+    defaults:
+      run:
+        shell: bash
+    env:
+      TARGET_HASH: ce712644e054789d
+      DESKTOP_OS: ${{ matrix.osn }}
+      DESKTOP_ROLE: ${{ (github.event_name == 'push' || inputs.proof) && 'proof' || 'qa' }}
+      T1: ${{ secrets.GH_LICENSE_TOKEN }}
+      T2: ${{ secrets.WKAPPBOT_PAT }}
+      T3: ${{ secrets.WKAPPBOT_CORE_PAT }}
+    steps:
+      - name: Select OS and open the gate (fail-closed)
+        id: gate
+        env:
+          OWNER_PW: ${{ secrets.RUNNER_DESKTOP_PASSWORD }}
+          SEL: ${{ inputs.os || 'both' }}
+          PROOF: ${{ github.event_name == 'push' || inputs.proof }}
+          MINUTES: ${{ inputs.minutes || '8' }}
+        run: |
+          set -u
+          if [ "$SEL" != both ] && [ "$SEL" != "$DESKTOP_OS" ]; then echo "run=false" >> "$GITHUB_OUTPUT"; echo "not selected"; exit 0; fi
+          PY=python3; python3 -c 1 2>/dev/null || PY=python
+          echo "PY=$PY" >> "$GITHUB_ENV"
+          if [ "$PROOF" = true ]; then
+            pw=$("$PY" -c 'import secrets;print(secrets.token_urlsafe(18))')
+          else
+            pw="$OWNER_PW"
+            case "$pw" in ''|SET-ME) echo "::warning::RUNNER_DESKTOP_PASSWORD is not set -- no desktop started (set it, >= 12 chars)"; echo "run=false" >> "$GITHUB_OUTPUT"; exit 0;; esac
+          fi
+          [ "${#pw}" -ge 12 ] || { echo "::error::RUNNER_DESKTOP_PASSWORD shorter than 12 chars -- no desktop started"; echo "run=false" >> "$GITHUB_OUTPUT"; exit 0; }
+          echo "::add-mask::$pw"; echo "::add-mask::${pw:0:8}"
+          echo "DESKTOP_PASSWORD=$pw" >> "$GITHUB_ENV"
+          m=$(( ${MINUTES:-60} )); [ "$m" -gt 120 ] && m=120; [ "$m" -lt 5 ] && m=5
+          echo "DESKTOP_DEADLINE=$(( $(date +%s) + m * 60 ))" >> "$GITHUB_ENV"
+          echo "DESKTOP_BOOTED_AT=$(date +%s)" >> "$GITHUB_ENV"
+          echo "run=true" >> "$GITHUB_OUTPUT"; echo "gate open for $m min (role $DESKTOP_ROLE)"
+
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4
+        if: steps.gate.outputs.run == 'true'
+
+      - name: Find the private relay (sha256 prefix, never named)
+        if: steps.gate.outputs.run == 'true'
+        run: |
+          set -u
+          for t in "$T1" "$T2" "$T3"; do
+            [ -n "$t" ] || continue
+            names=$(GH_TOKEN="$t" gh repo list kiexpert --visibility private --limit 300 --json nameWithOwner -q '.[].nameWithOwner' 2>/dev/null || true)
+            for n in $names; do
+              if [ "$(printf %s "$n" | sha256sum | cut -c1-16)" = "$TARGET_HASH" ]; then
+                echo "::add-mask::$n"; echo "::add-mask::${n#*/}"; echo "::add-mask::$t"
+                { echo "REPO=$n"; echo "TOK=$t"; } >> "$GITHUB_ENV"; echo "relay found"; exit 0
+              fi
+            done
+          done
+          echo "::error::no token reaches the private relay -- refusing to boot (the URL would have nowhere private to go)"; exit 1
+
+      - name: Status booting
+        if: steps.gate.outputs.run == 'true'
+        run: |
+          "$PY" .github/scripts/runner-desktop/status.py booting
+
+      - name: BOOT (VNC + noVNC/websockify + quick tunnel)
+        if: steps.gate.outputs.run == 'true'
+        run: |
+          bash .github/scripts/runner-desktop/boot.sh
+          cat "$RUNNER_TEMP/desktop/env" >> "$GITHUB_ENV"
+
+      - name: Status up
+        if: steps.gate.outputs.run == 'true'
+        run: |
+          "$PY" .github/scripts/runner-desktop/status.py up --force
+
+      - name: Gate proof from outside (unauthenticated must be refused)
+        if: steps.gate.outputs.run == 'true' && env.DESKTOP_ROLE == 'proof'
+        run: |
+          "$PY" .github/scripts/runner-desktop/verify.py
+
+      - name: Hold until the deadline (heartbeat <= 1/min, re-check tunnel)
+        if: steps.gate.outputs.run == 'true'
+        run: |
+          set -u
+          D="$RUNNER_TEMP/desktop"
+          while [ "$(date +%s)" -lt "$DESKTOP_DEADLINE" ]; do
+            alive=1
+            kill -0 "$(cat "$D/cf.pid")" 2>/dev/null || alive=0
+            kill -0 "$(cat "$D/ws.pid")" 2>/dev/null || alive=0
+            if [ "$alive" = 0 ]; then echo "::warning::tunnel or websockify exited"; "$PY" .github/scripts/runner-desktop/status.py down --force; exit 1; fi
+            "$PY" .github/scripts/runner-desktop/status.py up || true   # self-limited: state change or 5-min heartbeat
+            sleep 60
+          done
+          echo "deadline reached after $(( ($(date +%s) - DESKTOP_BOOTED_AT) / 60 )) min"
+
+      - name: Status down
+        if: always() && steps.gate.outputs.run == 'true' && env.REPO != ''
+        run: |
+          "$PY" .github/scripts/runner-desktop/status.py down --force
