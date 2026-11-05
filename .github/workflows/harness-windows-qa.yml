@@ -70,12 +70,10 @@ jobs:
           python -c 'import fitz' 2>/dev/null && echo "pymupdf: importable" || echo "pymupdf: NOT importable"
           # The tools read their settings from a .env that holds the owner's credentials and is never in the repo or
           # on a runner. An empty placeholder lets the credential-free paths (--help, --dry-run) run; nothing real is in it.
-          # Each tool may look for it beside itself, one folder up, or in HOME, so the placeholder goes in each of those.
-          for s in gcal.py court_pdf.py naver_send.py naver_mail_sync.py; do
-            p=$(find . -path ./.git -prune -o -type f -name "$s" -print | head -n 1); [ -n "$p" ] || continue
-            d=$(dirname "$p"); for e in "$d/.env" "$d/../.env"; do [ -f "$e" ] || : > "$e"; done
-          done
-          [ -f .env ] || : > .env
+          # A tool may open a relative '.env' after changing into one of the repo's folders, so the empty placeholder
+          # goes in every folder up to four levels deep (runner only; never committed), one folder up, and in HOME.
+          find . -maxdepth 4 -path ./.git -prune -o -type d -print | while IFS= read -r d; do [ -e "$d/.env" ] || : > "$d/.env"; done
+          [ -e ../.env ] || : > ../.env
           [ -f "$HOME/.env" ] || : > "$HOME/.env"
           printf '# QA sample\n\nOne paragraph of text for the A4 render check.\n' > "$RUNNER_TEMP/sample.md"
           pass=0; total=4
@@ -108,6 +106,10 @@ jobs:
               if [ "${DETAIL:-0}" = 1 ]; then
                 last=$(grep -v '^[[:space:]]*$' "$err" | tail -n 1 | sed -E 's#([A-Za-z]:)?[^ "'"'"']*[/\\]([^/\\ "'"'"']+)#\2#g; s/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+/<email>/g; s/[0-9]{6,}/<n>/g; s/[A-Za-z0-9_-]{32,}/***/g' | cut -c1-200)
                 echo "  detail: $last"
+                san() { sed -E 's#([A-Za-z]:)?[^ "'"'"']*[/\\]([^/\\ "'"'"']+)#\2#g; s/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+/<email>/g; s/[0-9]{6,}/<n>/g; s/[A-Za-z0-9_-]{32,}/***/g' | cut -c1-200; }
+                echo "  first: $(grep -v '^[[:space:]]*$' "$err" | head -n 1 | san)"
+                u=$( (grep -iE '^usage:' "$err" || true) | head -n 1 | san); [ -z "$u" ] || echo "  usage: $u"
+                (grep -E '^[[:space:]]*File "' "$err" || true) | tail -n 3 | san | sed 's/^[[:space:]]*/  frame: /'
               fi; fi
           }
           # listing a real calendar needs the owner's Google credentials, which CI never holds: check the CLI loads
