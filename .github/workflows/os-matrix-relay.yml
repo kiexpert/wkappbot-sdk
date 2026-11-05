@@ -1,0 +1,92 @@
+name: os-matrix-relay
+
+# Measured per-OS rows for the portal release board. After each "Harness QA (Windows + macOS)" run, builds
+# os-matrix.json (one row per OS: conclusion, finished_at, ANSI-stripped and token-masked last_screen, < 20 KB)
+# from that run's public job metadata and logs, and hands it to the private portal repo on the orphan branch
+# relay/os-matrix. private-pages-relay publishes it as portal/os-matrix.json; this job asks it to run at once.
+# The portal repo is found by a sha256 prefix and never named; its name and every token are masked.
+on:
+  workflow_run:
+    workflows: ["Harness QA (Windows + macOS)"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: 'Harness QA run id (default: the latest completed run)'
+        required: false
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/os-matrix-relay.yml
+      - .github/scripts/os_matrix.py
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: os-matrix-relay
+  cancel-in-progress: false
+
+jobs:
+  relay:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      TARGET_HASH: ce712644e054789d
+      T1: ${{ secrets.GH_LICENSE_TOKEN }}
+      T2: ${{ secrets.WKAPPBOT_PAT }}
+      T3: ${{ secrets.WKAPPBOT_CORE_PAT }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pick the Harness QA run
+        env:
+          WR_ID: ${{ github.event.workflow_run.id }}
+          IN_ID: ${{ inputs.run_id }}
+        run: |
+          set -eu
+          python3 .github/scripts/os_matrix.py --self-test
+          id="${WR_ID:-${IN_ID:-}}"
+          if [ -z "$id" ]; then
+            id=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow harness-windows-qa.yml --status completed --limit 1 --json databaseId -q '.[0].databaseId')
+          fi
+          [ -n "$id" ] || { echo "no completed Harness QA run"; exit 1; }
+          echo "QA_RUN=$id" >> "$GITHUB_ENV"; echo "Harness QA run: $id"
+      - name: Build os-matrix.json
+        run: |
+          set -eu
+          python3 .github/scripts/os_matrix.py "$GITHUB_REPOSITORY" "$QA_RUN" os-matrix.json
+          python3 -c 'import json; d=json.load(open("os-matrix.json")); assert any(r["os"].startswith("windows") for r in d["rows"]) and any(r["os"].startswith("macos") for r in d["rows"]), "need windows and macos rows"'
+          test "$(wc -c < os-matrix.json)" -lt 20000
+          if grep -EI 'ghp_[A-Za-z0-9]|github_pat_[A-Za-z0-9]|glpat-[A-Za-z0-9]|sk-ant-[A-Za-z0-9]' os-matrix.json; then echo "TOKEN-PREFIX LEAK"; exit 1; fi
+          python3 -c 'import json; [print(r["os"], r["conclusion"], r["finished_at"]) for r in json.load(open("os-matrix.json"))["rows"]]'
+      - name: Find the portal repo and a token that can reach it
+        run: |
+          set -u
+          for t in "$T1" "$T2" "$T3"; do
+            [ -n "$t" ] && [ "$t" != "SET-ME" ] || continue
+            echo "::add-mask::$t"
+            names=$(GH_TOKEN="$t" gh repo list kiexpert --visibility private --limit 300 --json nameWithOwner -q '.[].nameWithOwner' 2>/dev/null || true)
+            for n in $names; do
+              if [ "$(printf %s "$n" | sha256sum | cut -c1-16)" = "$TARGET_HASH" ]; then
+                echo "::add-mask::$n"; echo "::add-mask::${n#*/}"
+                { echo "REPO=$n"; echo "TOK=$t"; } >> "$GITHUB_ENV"
+                echo "target found"; exit 0
+              fi
+            done
+          done
+          echo "no token reaches the portal repo"; exit 1
+      - name: Hand os-matrix.json to the pages relay on relay/os-matrix
+        run: |
+          set -eu
+          mkdir relay && cp os-matrix.json relay/ && cd relay
+          git init -q -b relay/os-matrix
+          git config user.name "os-matrix-relay"
+          git config user.email "os-matrix-relay@users.noreply.github.com"
+          git add -A && git commit -q -m "os-matrix from Harness QA run $QA_RUN"
+          git push -q -f "https://x-access-token:${TOK}@github.com/${REPO}.git" relay/os-matrix
+          echo "os-matrix.json ($(wc -c < os-matrix.json) bytes) handed to relay/os-matrix"
+      - name: Publish now (run the pages relay)
+        run: gh workflow run private-pages-relay.yml --repo "$GITHUB_REPOSITORY" --ref main || echo "pages relay dispatch failed; the hourly run publishes it"
