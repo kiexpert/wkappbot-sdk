@@ -63,7 +63,21 @@ jobs:
           echo "no token reaches the target repo"; exit 1
       - name: Clone the target repo
         if: steps.gate.outputs.ready == 'true'
-        run: git clone -q --depth 1 "https://x-access-token:${TOK}@github.com/${REPO}.git" src
+        run: git clone -q --depth 50 "https://x-access-token:${TOK}@github.com/${REPO}.git" src
+      - name: Undo the 2026-11-05 misfiled sync (one-time)
+        if: steps.gate.outputs.ready == 'true'
+        working-directory: src
+        # The first run (41999934318) had no GMAIL_EMAIL secret, so the script's account slug test
+        # ('kivilab' in email) sent kivilab mail into the gkiexpert folder. Revert that one commit
+        # by its exact subject; later commits carry a different subject, so this never repeats.
+        run: |
+          set -eu
+          git config user.name "gmail-inbox-sync"
+          git config user.email "gmail-inbox-sync@users.noreply.github.com"
+          bad=$(git log -n 50 --format='%H|%an|%s' | awk -F'|' '$2=="gmail-inbox-sync" && $3=="gmail inbox sync 2026-11-05" {print $1}')
+          if [ -z "$bad" ]; then echo "no misfiled sync to undo"; exit 0; fi
+          for c in $bad; do git revert --no-edit "$c" > /dev/null; done
+          echo "reverted $(echo "$bad" | wc -w) misfiled sync commit(s)"
       - uses: actions/setup-python@v5
         if: steps.gate.outputs.ready == 'true'
         with:
@@ -87,8 +101,10 @@ jobs:
             echo "GMAIL_CLIENT_SECRET=$GMAIL_CLIENT_SECRET"
             echo "GMAIL_REFRESH_TOKEN=$GMAIL_REFRESH_TOKEN"
             echo "GMAIL_REFRESH_TOKEN_GKIEXPERT=$GMAIL_REFRESH_TOKEN_GKIEXPERT"
-            echo "GMAIL_EMAIL=${GMAIL_EMAIL:-me}"
-            echo "GMAIL_EMAIL_2=${GMAIL_EMAIL_2:-me}"
+            # The script calls the API as users/me and uses the address only to pick the account
+            # folder ('kivilab' in it or not), so a placeholder that carries the slug is enough.
+            echo "GMAIL_EMAIL=${GMAIL_EMAIL:-kivilab@ci.invalid}"
+            echo "GMAIL_EMAIL_2=${GMAIL_EMAIL_2:-gkiexpert@ci.invalid}"
           } > "$envf"
           log="$RUNNER_TEMP/gmail.log"
           set +e
@@ -120,7 +136,10 @@ jobs:
           git config user.name "gmail-inbox-sync"
           git config user.email "gmail-inbox-sync@users.noreply.github.com"
           git add -A resume/drafts/gmail
-          if git diff --cached --quiet; then echo "no new mail"; exit 0; fi
-          git commit -q -m "gmail inbox sync $(date -u +%F)"
+          if git diff --cached --quiet; then
+            if [ "$(git rev-list --count origin/main..HEAD)" -gt 0 ]; then git push -q origin HEAD:main; echo "revert pushed, no new mail"; else echo "no new mail"; fi
+            exit 0
+          fi
+          git commit -q -m "gmail inbox sync $(date -u +%F) per-account"
           git push -q origin HEAD:main
           echo "sync committed: $(git diff --stat HEAD~1 | tail -n 1)"
