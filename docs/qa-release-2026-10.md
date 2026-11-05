@@ -159,4 +159,17 @@ The docs repo is found by sha256 prefix and is not named. The daily-tools job pr
 | daily-tools | windows | 41993715640 | FAIL 1/4 | calendar-list FileNotFoundError (no credential file on CI); court-pdf ModuleNotFoundError; mail-send-dry-run rc=2 (argument usage); mail-sync-help PASS. |
 | daily-tools | macos | 41993715640 | FAIL 1/4 | Identical to Windows: the failures are setup, not platform. |
 | daily-tools | both | 41990213734 | FAIL 0/4 | First run: output fully discarded and scripts called by fixed paths, so no cause was visible. |
+| daily-tools | both | 42003780494 | FAIL 1/4 | After pymupdf and the dry-run args: mail-sync-help PASS; calendar-list and mail-send-dry-run FileNotFoundError (credential files exist only on the owner PC); court-pdf rc=1 with no exception class. CI-environment limits, not platform defects. |
+
+### Gmail inbox sync twin (private-gmail-inbox-sync.yml)
+
+The docs repo's Gmail sync script hard-codes a Windows .env path and output path, so it had only run on the owner PC and the inbox folders stopped at 2026-10-16. The new SDK workflow loads the script as a module and points both paths at the runner. Account letters: A and B; addresses are never logged.
+
+| Run ID | Result | Notes |
+|---|---|---|
+| 41999934318 | PASS (misfiled) | 74 files committed, but account A landed in B's folder: the address secret lacks the slug the script tests. |
+| 42003780766 | FAIL | One-time undo step reran a revert that was already applied; step removed. |
+| 42007793451 | PASS | Per-account summary: A syncs normally; B token refresh fails with HTTP Error 400. |
+| 42009675181 | FAIL at push | Restore and correct sync done (A inbox through 20261104), push rejected non-fast-forward. |
+| 42011155457 | PASS | Restore, correct sync and push landed: 72 files. A is current through its newest mail (20261104); no mail dated 20261105 yet. B needs a new refresh token (owner-only). |
 
