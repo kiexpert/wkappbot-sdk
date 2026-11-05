@@ -50,6 +50,11 @@ jobs:
           done
           echo "no token reaches the target repo"; exit 1
       - name: Copy the site folder to the gh-pages branch of the target repo
+        env:
+          SEAL_PASS: ${{ secrets.ENV_BACKUP_PASSPHRASE }}
+          SEAL_GH: ${{ secrets.GH_PAT }}
+          SEAL_GH_ALT: ${{ secrets.WKAPPBOT_PAT }}
+          SEAL_GL: ${{ secrets.GITLAB_TOKEN }}
         run: |
           set -eu
           git clone -q --depth 1 "https://x-access-token:${TOK}@github.com/${REPO}.git" src
@@ -79,6 +84,21 @@ jobs:
             fi
           done
           echo "leak-grep: 0 (no token prefix in the fetched data files)"
+          # the owner unlock key: seal the GitHub and GitLab tokens already stored here with the env-backup passphrase
+          # (the target repo's own sealing tool and crypto module, so the format matches its unlock page byte for byte).
+          # Generated at deploy time only, never committed to any branch but this force-pushed publish; the values go in
+          # through env and are masked; the tool prints one STATE line, never a value. Unset or SET-ME skips quietly.
+          if [ -f src/tools/seal-portal-key.js ] && [ -d out/go ]; then
+            for v in "$SEAL_PASS" "$SEAL_GH" "$SEAL_GH_ALT" "$SEAL_GL"; do [ -n "$v" ] && echo "::add-mask::$v"; done
+            # the owner's GitHub token: GH_PAT, else the account PAT this workflow already uses (an unset or SET-ME GH_PAT falls back)
+            case "$SEAL_GH" in ''|SET-ME) SEAL_GH="$SEAL_GH_ALT" ;; esac
+            SEAL_GH="$SEAL_GH" node src/tools/seal-portal-key.js out/go/key.json
+            if [ -f out/go/key.json ] && grep -EI 'ghp_[A-Za-z0-9]|github_pat_[A-Za-z0-9]|glpat-[A-Za-z0-9]' out/go/key.json >/dev/null; then
+              echo "TOKEN-PREFIX LEAK in the sealed key"; exit 1
+            fi
+          else
+            echo "owner key: no sealing tool in the target; skipped"
+          fi
           cd out
           git init -q -b gh-pages
           git config user.name "pages-relay"
