@@ -115,3 +115,35 @@ Triggered `gh workflow run macos-test.yml --repo kiexpert/wkappbot-sdk` → run 
 | User-Perspective QA | build.cmd exit 255 (!-swallowing); VERSIONING.md stale v7.10.0-sdk example caused version mismatch; D:/GitHub/ in CLAUDE.md triggered hygiene scan; scan scope too broad (checked marketing pages for internal email) | ea7cf366 + 533ced71 + db87710e | 38328390676 |
 | All-Green Status (2026-10-13 02:03Z) | No failures since baseline 38328811218; all scheduled runs passing | N/A | 38335082567, 38334514246, 38332766123, 38332715710 |
 | All-Green Status (2026-10-13 02:46Z) | No failures post-baseline; SDK scheduled runs all passing; macOS test run 38291793651 green | N/A | 38338458291, 38337808969, 38337352655, 38336914732, 38291793651 (macOS) |
+
+## QA Matrix 2026-11-04 (private portal shims)
+
+The target portal repo is found by sha256 prefix in each workflow and is not named here.
+
+| Workflow | Run ID | Trigger | Result | Notes |
+|----------|--------|---------|--------|-------|
+| private-im-live | 41811614360 | push (PR #438 branch) | PASS | intelligence-e2e ran after the wkwire daemon; proof mode=live, handed over on the relay branch |
+| private-pages-relay | 41818713862 | push (#438 merge) | PASS | portal/intelligence-e2e-proof.json served with mode=live, ok=true, run=41811614360 |
+| private-pages-relay | 41924419023 | schedule | PASS | hourly republish |
+| private-portal-qa | 41811649554 | push (#436 merge) | FAIL 140/141 | case `run` timed out; fixed on the portal side |
+| private-portal-qa | 41819696879 | push (PR #440 branch) | PASS | after the portal overlay fix |
+| private-portal-qa | 41820860569 | push (#440 merge, main) | PASS | first green run on main |
+| private-portal-qa | 41918774375 | schedule 21:41 UTC | FAIL 103/112 | REGRESSION: the new owner-unlock iframe `#ownerUnlock` (`../go/unlock.html`) intercepts pointer events (selftest.js:3426); portal-side fix needed |
+| private-qa-video | 41809826085 | push (PR #437 branch) | FAIL | the script-selection overlay intercepted scene clicks |
+| private-qa-video | 41819697040 | push (PR #440 branch) | PASS | PORTAL_REC=1 hides the overlay while recording |
+
+Open items:
+- PR #437 (qa-video `src_ref` / `expect_sha` / `scheme` dispatch inputs) is still open. The audio-pad build needs an owner dispatch, because the session integration got 403 on workflow_dispatch.
+- The portal-qa live-write twin (PR #439) stays off until the portal adds its `WK_QA_LIVE_WRITE` reader.
+
+## QA Matrix 2026-11-05 (cross-platform runners)
+
+Source run: 41980395003 (harness-windows-qa, branch of PR #445, merged as ad9740b). The portal repo is found by sha256 prefix and is not named.
+
+| Job | OS | Run ID | Result | Notes |
+|---|---|---|---|---|
+| harness-qa | windows | 41980395003 | FAIL | Step 3 (Python selftests) stops on kih main. Reproduced on Linux: `wkhippo_reflex_families_selftest.py` RESULT 29/31; FAIL `dump_raw returns original lines byte-equal` and `dump_raw honours since`. Harness-repo regression. |
+| harness-qa | macos | 41980395003 | FAIL | Failed step not inspected yet; most likely the same kih main regression. |
+| portal-selftest | windows | 41980395003 | FAIL 79/83 | P72/P73: `#termToggle` label clipped by 101px at 390 wide; `run`: waitForFunction timeout at selftest.js:2144. Portal-side. |
+| portal-selftest | macos | 41980395003 | FAIL 141/152 | P120: rhythm clock 6.9 cps vs the 12 target; P137: viewport 484 wide vs 390. Portal-side. |
+| personal-docs daily tools | macos | - | NOT RUN | No tool paths or commands available to this session yet. |
