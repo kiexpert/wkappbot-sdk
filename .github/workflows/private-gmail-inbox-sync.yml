@@ -159,9 +159,9 @@ jobs:
           find resume/drafts/gmail -type f -path "*$today*" | sed -E 's#^resume/drafts/gmail/##' \
             | awk -F/ '{a=($1=="kivilab")?"A":(($1=="gkiexpert")?"B":"?"); print a" "$2}' | sort | uniq -c | sed 's/^/  /' || true
           if git diff --cached --quiet; then
-            if [ "$(git rev-list --count origin/main..HEAD)" -gt 0 ]; then git push -q origin HEAD:main; echo "restore pushed, no new mail"; else echo "no new mail"; fi
+            if [ "$(git rev-list --count origin/main..HEAD)" -gt 0 ]; then git pull -q --rebase origin main && git push -q origin HEAD:main; echo "restore pushed, no new mail"; else echo "no new mail"; fi
             exit 0
           fi
           git commit -q -m "gmail inbox sync $(date -u +%F) per-account"
-          git push -q origin HEAD:main
+          git pull -q --rebase origin main && git push -q origin HEAD:main
           echo "sync committed: $(git diff --stat HEAD~1 | tail -n 1)"
