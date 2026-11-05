@@ -18,7 +18,7 @@ PROFILE = os.path.join(HOME, "desktop-chrome")
 # machine-bound or credential stores that cannot be decrypted on another machine -> never copied
 SKIP = {"Cookies", "Cookies-journal", "Login Data", "Login Data-journal", "Login Data For Account", "Local State.bak",
         "Safe Browsing Network", "Network Persistent State", "GPUCache", "Code Cache", "Cache", "ShaderCache",
-        "GrShaderCache", "Crashpad", "SingletonLock", "SingletonSocket", "SingletonCookie"}
+        "GrShaderCache", "Crashpad", "SingletonLock", "SingletonSocket", "SingletonCookie", "RunningChromeVersion"}
 
 
 def chrome_bin():
@@ -122,8 +122,12 @@ def start(url=None):
 def copy_profile(src, dst):
     def ignore(_d, names):
         return [n for n in names if n in SKIP]
-    if os.path.isdir(src):
-        shutil.copytree(src, dst, ignore=ignore, dirs_exist_ok=True)
+    if not os.path.isdir(src):
+        return
+    try:   # Chrome is live: lock/symlink files come and go while we copy -- skip those, keep the rest
+        shutil.copytree(src, dst, ignore=ignore, dirs_exist_ok=True, symlinks=True, ignore_dangling_symlinks=True)
+    except shutil.Error as e:
+        print(f"profile copy: {len(e.args[0])} transient file(s) skipped")
 
 
 def save(stage):
@@ -138,9 +142,9 @@ def save(stage):
         print(f"chrome not reachable over CDP ({e.__class__.__name__}); profile only")
     json.dump(cookies, open(os.path.join(out, "cookies.json"), "w"))
     json.dump(tabs, open(os.path.join(out, "tabs.json"), "w"))
+    print(f"COOKIES_SAVED={len(cookies)}", flush=True)
     copy_profile(PROFILE, os.path.join(out, "profile"))
     print(f"chrome saved: {len(cookies)} cookies, {len(tabs)} tabs, profile (machine-bound stores excluded)")
-    print(f"COOKIES_SAVED={len(cookies)}")
 
 
 def normalize(c):
