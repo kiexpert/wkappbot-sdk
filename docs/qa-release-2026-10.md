@@ -135,3 +135,15 @@ The target portal repo is found by sha256 prefix in each workflow and is not nam
 Open items:
 - PR #437 (qa-video `src_ref` / `expect_sha` / `scheme` dispatch inputs) is still open. The audio-pad build needs an owner dispatch, because the session integration got 403 on workflow_dispatch.
 - The portal-qa live-write twin (PR #439) stays off until the portal adds its `WK_QA_LIVE_WRITE` reader.
+
+## QA Matrix 2026-11-05 (cross-platform runners)
+
+Source run: 41980395003 (harness-windows-qa, branch of PR #445, merged as ad9740b). The portal repo is found by sha256 prefix and is not named.
+
+| Job | OS | Run ID | Result | Notes |
+|---|---|---|---|---|
+| harness-qa | windows | 41980395003 | FAIL | Step 3 (Python selftests) stops on kih main. Reproduced on Linux: `wkhippo_reflex_families_selftest.py` RESULT 29/31; FAIL `dump_raw returns original lines byte-equal` and `dump_raw honours since`. Harness-repo regression. |
+| harness-qa | macos | 41980395003 | FAIL | Failed step not inspected yet; most likely the same kih main regression. |
+| portal-selftest | windows | 41980395003 | FAIL 79/83 | P72/P73: `#termToggle` label clipped by 101px at 390 wide; `run`: waitForFunction timeout at selftest.js:2144. Portal-side. |
+| portal-selftest | macos | 41980395003 | FAIL 141/152 | P120: rhythm clock 6.9 cps vs the 12 target; P137: viewport 484 wide vs 390. Portal-side. |
+| personal-docs daily tools | macos | - | NOT RUN | No tool paths or commands available to this session yet. |
