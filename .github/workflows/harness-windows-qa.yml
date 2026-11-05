@@ -85,16 +85,24 @@ jobs:
           err="$RUNNER_TEMP/err.txt"
           chk() {
             name=$1; base=$2; shift 2
-            p=$(find . -path ./.git -prune -o -type f -name "$base" -print | head -n 1)
-            if [ -z "$p" ]; then echo "CASE $name MISSING (script not in repo)"; return; fi
-            if python "$p" "$@" > /dev/null 2> "$err"; then pass=$((pass + 1)); echo "CASE $name PASS"
-            else rc=$?; cls=$(grep -oE '^[A-Za-z_.]*(Error|Exception|Exit)[A-Za-z]*' "$err" | tail -n 1 || true)
+            # A tool that was moved can leave a stub with the same name behind (it only prints where the tool went and
+            # exits 1), so try every copy, shallowest first, and pass when one of them passes.
+            cands=$(find . -path ./.git -prune -o -type f -name "$base" -print | awk -F/ '{print NF"\t"$0}' | sort -n | cut -f2-)
+            if [ -z "$cands" ]; then echo "CASE $name MISSING (script not in repo)"; return; fi
+            n=$(printf '%s\n' "$cands" | wc -l | tr -d ' '); ok=0
+            while IFS= read -r p; do
+              if python "$p" "$@" > /dev/null 2> "$err"; then ok=1; break; fi
+            done <<EOF_CANDS
+          $cands
+          EOF_CANDS
+            if [ "$ok" = 1 ]; then pass=$((pass + 1)); echo "CASE $name PASS (copies: $n)"
+            else rc=1; cls=$(grep -oE '^[A-Za-z_.]*(Error|Exception|Exit)[A-Za-z]*' "$err" | tail -n 1 || true)
               mod=$(grep -oE "No module named '[A-Za-z0-9_.]+'" "$err" | tail -n 1 | grep -oE "'[^']+'" || true)
               flags=$(grep -E 'error:' "$err" | grep -oE -- '--[a-z][a-z0-9-]*' | sort -u | tr '\n' ' ' || true)
               # Safe diagnostics: the BASE NAME of a missing file (never its folder), and which known tools the error names.
               miss=$(grep -oE "No such file or directory: '[^']+'" "$err" | tail -n 1 | sed -E "s/.*: '//; s/'$//; s#.*[/\\\\]##" || true)
               tools=$(grep -oiE 'chrom(e|ium)|playwright|wkhtmltopdf|weasyprint|pandoc|libreoffice|soffice|fitz|pymupdf|font|credentials|token|config|\.env' "$err" | tr 'A-Z' 'a-z' | sort -u | tr '\n' ' ' || true)
-              echo "CASE $name FAIL (rc=$rc ${cls:-no-exception-class}${mod:+ module $mod}${flags:+ flags $flags}${miss:+ missing-file $miss}${tools:+ mentions $tools})"
+              echo "CASE $name FAIL (rc=$rc copies $n ${cls:-no-exception-class}${mod:+ module $mod}${flags:+ flags $flags}${miss:+ missing-file $miss}${tools:+ mentions $tools})"
               # Only for a case fed our own synthetic input (DETAIL=1): its last error line, paths cut to base names,
               # emails, long numbers and token-like strings masked.
               if [ "${DETAIL:-0}" = 1 ]; then
@@ -105,7 +113,7 @@ jobs:
           # listing a real calendar needs the owner's Google credentials, which CI never holds: check the CLI loads
           chk calendar-help gcal.py --help
           DETAIL=1 chk court-pdf court_pdf.py "$RUNNER_TEMP/sample.md"
-          chk mail-send-dry-run naver_send.py --dry-run --to qa@example.invalid --subject qa-dry-run --body qa-dry-run
+          DETAIL=1 chk mail-send-dry-run naver_send.py --dry-run --to qa@example.invalid --subject qa-dry-run --body qa-dry-run
           chk mail-sync-help naver_mail_sync.py --help
           echo "RESULT $pass/$total"
           [ "$pass" -eq "$total" ]
