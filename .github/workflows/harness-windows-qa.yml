@@ -80,7 +80,10 @@ jobs:
             else rc=$?; cls=$(grep -oE '^[A-Za-z_.]*(Error|Exception|Exit)[A-Za-z]*' "$err" | tail -n 1 || true)
               mod=$(grep -oE "No module named '[A-Za-z0-9_.]+'" "$err" | tail -n 1 | grep -oE "'[^']+'" || true)
               flags=$(grep -E 'error:' "$err" | grep -oE -- '--[a-z][a-z0-9-]*' | sort -u | tr '\n' ' ' || true)
-              echo "CASE $name FAIL (rc=$rc ${cls:-no-exception-class}${mod:+ module $mod}${flags:+ flags $flags})"; fi
+              # Safe diagnostics: the BASE NAME of a missing file (never its folder), and which known tools the error names.
+              miss=$(grep -oE "No such file or directory: '[^']+'" "$err" | tail -n 1 | sed -E "s/.*: '//; s/'$//; s#.*[/\\\\]##" || true)
+              tools=$(grep -oiE 'chrom(e|ium)|playwright|wkhtmltopdf|weasyprint|pandoc|libreoffice|soffice|fitz|pymupdf|font|credentials|token|config|\.env' "$err" | tr 'A-Z' 'a-z' | sort -u | tr '\n' ' ' || true)
+              echo "CASE $name FAIL (rc=$rc ${cls:-no-exception-class}${mod:+ module $mod}${flags:+ flags $flags}${miss:+ missing-file $miss}${tools:+ mentions $tools})"; fi
           }
           chk calendar-list gcal.py
           chk court-pdf court_pdf.py "$RUNNER_TEMP/sample.md"
