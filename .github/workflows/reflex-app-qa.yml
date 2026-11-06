@@ -1,0 +1,77 @@
+name: Reflex App QA (Windows + macOS)
+
+# Builds the reflex app (csharp/src/WKAppBot.Reflex) of the private core repo and runs its
+# SkillAutoCommit tests on Windows and macOS. Moved here from the private repo (owner 2026-11-06:
+# cut Actions costs; macOS bills 10x on a private repo and runs at standard rates here).
+# The core source is cloned at run time with WKAPPBOT_CORE_PAT from the repo named by the secret
+# WKAPPBOT_CORE_REPO; nothing from it is committed here, its name and the token are masked, and the
+# build and test output is cut to errors and the test summary so no private path or source is logged.
+# Triggers: manual dispatch, once a day, and a push to a non-main branch that edits this file (the
+# only way to prove a change to it, since dispatch is not available to the automation).
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '41 19 * * *'
+  push:
+    branches-ignore: [main]
+    paths:
+      - .github/workflows/reflex-app-qa.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: reflex-app-qa-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  reflex-app-qa:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    env:
+      CORE_REPO: ${{ secrets.WKAPPBOT_CORE_REPO }}
+      CORE_PAT: ${{ secrets.WKAPPBOT_CORE_PAT }}
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      DOTNET_NOLOGO: '1'
+    steps:
+      - name: Check out the private core (masked)
+        shell: bash
+        run: |
+          set -eu
+          if [ -z "$CORE_REPO" ] || [ -z "$CORE_PAT" ] || [ "$CORE_PAT" = "SET-ME" ]; then
+            echo "WKAPPBOT_CORE_REPO / WKAPPBOT_CORE_PAT are not set"; exit 1
+          fi
+          echo "::add-mask::$CORE_PAT"; echo "::add-mask::$CORE_REPO"; echo "::add-mask::${CORE_REPO#*/}"
+          git -c core.autocrlf=false clone -q --depth 1 "https://x-access-token:${CORE_PAT}@github.com/${CORE_REPO}.git" core
+          git -C core log -1 --format='core commit %h (%cI)'
+          for p in csharp/src/WKAppBot.Reflex csharp/tests/WKAppBot.SkillAutoCommit.Tests; do
+            [ -d "core/$p" ] || { echo "missing in core: $p"; exit 1; }
+          done
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: ${{ hashFiles('core/global.json') != '' && 'core/global.json' || 'global.json' }}
+      - name: Build the reflex app
+        shell: bash
+        working-directory: core
+        run: |
+          set -o pipefail
+          # Windows-targeting projects build on macOS only with EnableWindowsTargeting.
+          dotnet build csharp/src/WKAppBot.Reflex -c Release -p:EnableWindowsTargeting=true \
+            -nologo -v q -clp:'ErrorsOnly;Summary' 2>&1 | sed -E 's#([A-Za-z]:)?[^ ]*[/\\]core[/\\]#<core>/#g'
+      - name: Run the SkillAutoCommit tests
+        shell: bash
+        working-directory: core
+        run: |
+          out="$RUNNER_TEMP/test.txt"
+          rc=0
+          dotnet test csharp/tests/WKAppBot.SkillAutoCommit.Tests -c Release -p:EnableWindowsTargeting=true \
+            -nologo -v q --logger 'console;verbosity=minimal' > "$out" 2>&1 || rc=$?
+          # Print only the verdict lines (paths shortened); the exit code of the test run is the verdict.
+          sed -E 's#([A-Za-z]:)?[^ ]*[/\\]core[/\\]#<core>/#g' "$out" \
+            | grep -E '^(Passed!|Failed!) |^  Failed |error [A-Z]+[0-9]+|Total tests|Test Run (Successful|Failed)' || true
+          echo "RESULT dotnet test exit=$rc"
+          exit $rc
