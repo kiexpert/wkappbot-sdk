@@ -1,29 +1,36 @@
 name: npm-publish-appbot-code
 
-# Publishes the AppBot Code CLI to the public npm registry as wk-appbot-code (owner 2026-11-06: you may publish from
-# the SDK repo, ship only what is needed). The source lives in the target repo's appbot-code/ folder; the target repo
-# is found by sha256 prefix and never named, as in webvm-x64.yml. Only the package's own "files" list is shipped, and
-# the publish is refused unless the target repo's scrub gate (SCRUB in tools/wk-harness-min-copy.sh) prints hits=0.
-# A version already on the registry is skipped, so a re-run never fails on "cannot publish over". Needs the NPM_TOKEN
-# secret (an npm automation token); without it the run stops at the publish step and says so.
+# Ships the AppBot Code CLI (wk-appbot-code) two ways (owner 2026-11-06: publish from the SDK repo with only what is
+# needed; if the web can do it, use the harness repo's web). The source lives in the target repo's appbot-code/ folder;
+# the target repo is found by sha256 prefix and never named, as in webvm-x64.yml. Only the package's own "files" list
+# is shipped, and nothing is shipped unless the target repo's scrub gate (SCRUB in tools/wk-harness-min-copy.sh)
+# prints hits=0.
+#   WEB (no token): the packed tgz goes to the target's gh-pages at appbot-code/, so anyone installs it with
+#     npm i -g https://<pages>/appbot-code/wk-appbot-code.tgz   (a versioned copy and SHA256SUMS sit beside it)
+#   REGISTRY (optional): npm i -g wk-appbot-code, published only when the NPM_TOKEN secret is set; a version already
+#     on the registry is skipped.
 on:
   workflow_dispatch:
   push:
     branches: [main]
     paths:
       - .github/workflows/npm-publish-appbot-code.yml
+  # Daily pick-up of a new appbot-code version on the target main (an unchanged tgz makes no Pages commit).
+  schedule:
+    - cron: '23 3 * * *'
 
 permissions:
   contents: read
 
+# Shares the relay's lock: webvm-x64 and the pages relay push the same gh-pages branch.
 concurrency:
-  group: npm-publish-appbot-code
+  group: harness-pages-relay
   cancel-in-progress: false
 
 jobs:
   publish:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     env:
       TARGET_HASH: 23ade98d428c8527
       T1: ${{ secrets.GH_LICENSE_TOKEN }}
@@ -41,7 +48,7 @@ jobs:
                 echo "::add-mask::$n"
                 echo "::add-mask::${n#*/}"
                 echo "::add-mask::$t"
-                { echo "REPO=$n"; echo "TOK=$t"; } >> "$GITHUB_ENV"
+                { echo "REPO=$n"; echo "TOK=$t"; echo "PAGES=https://${n%%/*}.github.io/${n#*/}"; } >> "$GITHUB_ENV"
                 echo "target found"
                 exit 0
               fi
@@ -76,33 +83,73 @@ jobs:
           npm pack -s
           mkdir -p "$RUNNER_TEMP/pkg" && tar -xzf wk-appbot-code-*.tgz -C "$RUNNER_TEMP/pkg"
           SCRUB=$(sed -n "s/^SCRUB='\\(.*\\)'$/\\1/p" ../tools/wk-harness-min-copy.sh)
-          [ -n "$SCRUB" ] || { echo "scrub pattern not found: nothing published"; exit 1; }
+          [ -n "$SCRUB" ] || { echo "scrub pattern not found: nothing shipped"; exit 1; }
           hits=$(grep -r -i -E -l -- "$SCRUB" "$RUNNER_TEMP/pkg" | wc -l)
           echo "SCRUB GATE hits=$hits"
-          [ "$hits" = 0 ] || { grep -r -i -E -l -- "$SCRUB" "$RUNNER_TEMP/pkg"; echo "scrub gate failed: nothing published"; exit 1; }
+          [ "$hits" = 0 ] || { grep -r -i -E -l -- "$SCRUB" "$RUNNER_TEMP/pkg"; echo "scrub gate failed: nothing shipped"; exit 1; }
           find "$RUNNER_TEMP/pkg" -type f | sort
           echo "VER=$(node -p 'require("./package.json").version')" >> "$GITHUB_ENV"
           echo "TGZ=$PWD/$(ls wk-appbot-code-*.tgz)" >> "$GITHUB_ENV"
 
-      - name: The packed CLI runs before it is published
+      - name: The packed CLI runs before it is shipped
         run: |
           set -eu
           npm install -g --prefix "$RUNNER_TEMP/pre" "$TGZ"
           "$RUNNER_TEMP/pre/bin/wk-appbot-code" --help
 
-      - name: Publish (skipped when the version is already on the registry)
+      - name: Ship to the harness Pages web (appbot-code/)
+        run: |
+          set -eu
+          git clone -q --depth 1 --branch gh-pages "https://x-access-token:${TOK}@github.com/${REPO}.git" pages
+          mkdir -p pages/appbot-code
+          cp "$TGZ" "pages/appbot-code/wk-appbot-code-$VER.tgz"
+          cp "$TGZ" pages/appbot-code/wk-appbot-code.tgz
+          (cd pages/appbot-code && sha256sum wk-appbot-code*.tgz > SHA256SUMS && cat SHA256SUMS)
+          printf '{"name":"wk-appbot-code","version":"%s","tgz":"wk-appbot-code.tgz","sha256":"%s"}\n' "$VER" "$(sha256sum "$TGZ" | cut -d' ' -f1)" > pages/appbot-code/version.json
+          cd pages
+          git config user.name "pages-relay"
+          git config user.email "pages-relay@users.noreply.github.com"
+          git add appbot-code
+          if git diff --cached --quiet; then echo "appbot-code on Pages unchanged"; exit 0; fi
+          git commit -q -m "appbot-code $VER $(date -u +%FT%TZ)"
+          for i in 1 2 3; do git push -q "https://x-access-token:${TOK}@github.com/${REPO}.git" gh-pages && break; [ "$i" = 3 ] && exit 1; sleep 20; done
+          echo "appbot-code $VER on Pages"
+          echo "PUSHED=1" >> "$GITHUB_ENV"
+
+      - name: Request a Pages build
+        if: env.PUSHED == '1'
+        env:
+          GH_TOKEN: ${{ env.TOK }}
+        run: |
+          set -u
+          gh api -X POST "repos/${REPO}/pages/builds" >/dev/null 2>&1 || true
+          for i in $(seq 1 40); do
+            s=$(gh api "repos/${REPO}/pages/builds/latest" -q .status 2>/dev/null || echo unknown)
+            echo "build status: $s"
+            [ "$s" = "built" ] && exit 0
+            [ "$s" = "errored" ] && exit 1
+            sleep 15
+          done
+          echo "build did not finish in 10 minutes"; exit 1
+
+      - name: Verify the web install
+        run: |
+          set -eu
+          for i in 1 2 3 4 5 6 7 8 9 10; do
+            got=$(curl -fsSL "$PAGES/appbot-code/version.json?t=$(date +%s)" | node -p 'JSON.parse(require("fs").readFileSync(0,"utf8")).version' 2>/dev/null || true)
+            [ "$got" = "$VER" ] && break; echo "Pages serves ${got:-nothing} yet"; sleep 15
+          done
+          npm install -g --prefix "$RUNNER_TEMP/web" "$PAGES/appbot-code/wk-appbot-code.tgz"
+          "$RUNNER_TEMP/web/bin/wk-appbot-code" --help
+
+      - name: Registry publish (optional; skipped without NPM_TOKEN or when the version is already published)
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           set -eu
-          if npm view "wk-appbot-code@$VER" version >/dev/null 2>&1; then echo "wk-appbot-code@$VER already published: skip"; exit 0; fi
-          [ -n "$NODE_AUTH_TOKEN" ] || { echo "NPM_TOKEN secret is not set: add an npm automation token as NPM_TOKEN in this repo's Actions secrets, then re-run"; exit 1; }
+          if npm view "wk-appbot-code@$VER" version >/dev/null 2>&1; then echo "wk-appbot-code@$VER already on the registry: skip"; exit 0; fi
+          if [ -z "$NODE_AUTH_TOKEN" ]; then echo "::notice::NPM_TOKEN not set: registry publish skipped; the web install is live"; exit 0; fi
           npm publish "$TGZ" --access public
-          echo "published wk-appbot-code@$VER"
-
-      - name: Verify the registry install
-        run: |
-          set -eu
           for i in 1 2 3 4 5 6; do npm view "wk-appbot-code@$VER" version && break; sleep 20; done
           npm install -g --prefix "$RUNNER_TEMP/reg" "wk-appbot-code@$VER"
           "$RUNNER_TEMP/reg/bin/wk-appbot-code" --help
