@@ -17,7 +17,8 @@ const LITE = process.argv.includes("--lite");
 const HOME = os.homedir();
 const CFG_DIR = path.join(process.env.XDG_CONFIG_HOME || path.join(HOME, ".config"), "opencode");
 const CFG = path.join(CFG_DIR, "opencode.json");
-const PROJ = fs.mkdtempSync(path.join(os.tmpdir(), "wkcode-e2e-"));
+// The project lives under HOME, as a user's would (OpenCode asks external_directory for a project under the OS temp dir).
+const PROJ = fs.mkdtempSync(path.join(HOME, "wkcode-e2e-"));
 const IS_WIN = process.platform === "win32";
 let pass = 0, total = 0;
 const ok = (name, cond, why) => { total++; if (cond) { pass++; console.log("PASS " + name); } else console.log("FAIL " + name + " -- " + String(why).slice(0, 400)); };
@@ -61,10 +62,16 @@ cfg.model = "mock/m";
 fs.writeFileSync(CFG, JSON.stringify(cfg, null, 2));
 
 // ---- the project ----
+// A real project: a git repo WITH a commit. OpenCode keys its project on the first commit; an empty repo is a
+// "global" project and every write in it asks the external_directory permission (auto-rejected headless).
 spawnSync("git", ["init", "-q"], { cwd: PROJ });
 fs.writeFileSync(path.join(PROJ, "a.txt"), "x\n");
+spawnSync("git", ["add", "a.txt"], { cwd: PROJ });
+spawnSync("git", ["-c", "user.email=qa@example.invalid", "-c", "user.name=qa", "commit", "-qm", "init"], { cwd: PROJ });
 
-const env = { ...process.env };
+// PWD must name the project too: OpenCode takes its project directory from PWD, not only from the process cwd, and a
+// stale PWD made every write "external_directory" (auto-rejected headless).
+const env = { ...process.env, PWD: PROJ };
 if (LITE) env.WK_APPBOT_FORCE_LITE = "1";
 const oc = IS_WIN ? "opencode.cmd" : "opencode";
 async function run(tool, args) {
@@ -73,7 +80,8 @@ async function run(tool, args) {
   const r = await new Promise((resolve) => {
     // async spawn: the mock server above lives in this same process and must keep answering
     const { spawn } = require_cp;
-    const ch = spawn(oc, ["run", "--print-logs", "-m", "mock/m", `RUN:${tool}:${b64}`], { cwd: PROJ, env, shell: IS_WIN });
+    const ch = spawn(oc, ["run", "--print-logs", "-m", "mock/m", `RUN:${tool}:${b64}`], { cwd: PROJ, env, shell: IS_WIN, stdio: ["ignore", "pipe", "pipe"] });
+    // stdin MUST be closed: `opencode run` reads piped stdin into the prompt and waits for EOF (a hung run otherwise).
     let out = ""; ch.stdout.on("data", (d) => (out += d)); ch.stderr.on("data", (d) => (out += d));
     const kill = setTimeout(() => { try { ch.kill("SIGKILL"); } catch {} }, 240000);
     ch.on("close", (code) => { clearTimeout(kill); resolve({ code, out: out.replace(/\x1b\[[0-9;]*m/g, "") }); });
