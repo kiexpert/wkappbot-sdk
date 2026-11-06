@@ -1,0 +1,70 @@
+{
+  "id": "wkcv-opencv-tools-t2-howto",
+  "app": "wkappbot",
+  "title": "wkcv OpenCV Tools — T2 Howto",
+  "title_ko": null,
+  "desc": "Implementation spec: module architecture, API contracts, Python dependencies, binary thresholds, area filtering, output formats (JSON/CSV/text).",
+  "steps": [
+    "## Module Architecture",
+    "Four independent Python modules + PowerShell launcher (wkcv.ps1).",
+    "- wkcv_gaps.py: PIL + numpy, OCR via wkappbot ocr, a11y via wkappbot a11y find.",
+    "- wkcv_findtext.py: pytesseract (Tesseract), Pillow.",
+    "- wkcv_segment.py: opencv-python (cv2), numpy. Contour detection or connected components.",
+    "- wkcv_room.py: opencv-python (cv2), camera feed analysis.",
+    "## wkcv_segment.py API",
+    "def segment_image(image_path, threshold=127, min_area=100, max_area=None, method='contour')",
+    "  Returns: List[Dict] with {id, bbox: {x,y,w,h}, area, center: {x,y}}",
+    "  threshold: binary threshold (0-255); default 127.",
+    "  min_area: skip contours smaller than this (pixels); default 100.",
+    "  max_area: skip contours larger than this; None = no limit.",
+    "  method: 'contour' (find contours) or 'component' (connected components).",
+    "## Output Formats",
+    "Text (default): Human-readable list with region info.",
+    "JSON (--json): One object per line: {id, bbox, area, center}.",
+    "CSV (--csv): Header + rows: id,x,y,w,h,area,cx,cy.",
+    "## Exit Codes",
+    "0: Success (results found).",
+    "1: Error (image not found, processing failed).",
+    "2: No results (image valid but no regions/text/detections).",
+    "3: Python module error (missing dependency, runtime error).",
+    "## Binary Threshold Strategy",
+    "Default 127 works for most images; adjust --threshold for dark/bright images.",
+    "Use lower thresholds (50-100) for bright images, higher (150-200) for dark.",
+    "## Contour Method vs Connected Components",
+    "--method contour: Find external outlines of objects (faster, outline-focused).",
+    "--method component: Label all connected pixel groups (more granular, all groups).",
+    "## Size Filtering",
+    "min_area (default 100): Skip very small noise regions.",
+    "max_area (optional): Skip large regions (e.g., background).",
+    "Example: --min-area 500 --max-area 50000 filters to mid-size objects.",
+    "Usage reference: wkappbot skill read wkcv-opencv-tools-core",
+    "Work record: wkappbot skill read wkcv-opencv-tools-ref"
+  ],
+  "requirements": [
+    {
+      "cmd": "python D:/GitHub/WKAppBot/bin/wkcv_segment.py self-test",
+      "expect": "RESULT.*PASS",
+      "prompt": null
+    },
+    {
+      "cmd": "python D:/GitHub/WKAppBot/bin/wkcv_gaps.py self-test",
+      "expect": "RESULT.*PASS",
+      "prompt": null
+    },
+    {
+      "cmd": "wkcv segment --help",
+      "expect": "image segmentation",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "wkcv opencv implementation spec t2-howto"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-10-02T12:39:11.9447022Z",
+  "updated": "2026-10-02T12:39:11.9447245Z",
+  "version": "1.0"
+}

@@ -1,0 +1,37 @@
+{
+  "id": "fat-md-growth-pre-check-before-commit-only-dispatch",
+  "app": "wkappbot-workflow",
+  "title": "Fat-md-growth pre-check before commit-only dispatch",
+  "title_ko": null,
+  "desc": "Before dispatching a mechanical commit-only sector for a growth-gated markdown letter, diff working copy vs HEAD first",
+  "steps": [
+    "Run wc -c on the working file and git show HEAD:<file> piped to wc -c BEFORE dispatching a commit-only Haiku sector for HANDOFF.md or any fat-md-growth-guarded file",
+    "If the working copy is larger than HEAD, shrink it first (archive an old section to a sidecar, or extract prose into a skill) -- do not dispatch a commit attempt that will predictably be refused",
+    "Measured 2026-09-09 in WKAppBot: a commit-only dispatch was correctly scoped and mechanically sound, but was refused by fat-md-growth because the letter had grown 8618 bytes since HEAD -- a single wc -c comparison before dispatch would have caught this"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read fat-md-growth-precheck-before-commit-dispatch",
+      "expect": "wc -c",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read fat-md-growth-precheck-before-commit-dispatch",
+      "expect": "HEAD",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read fat-md-growth-precheck-before-commit-dispatch",
+      "expect": "sidecar",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-09-08T15:37:32.2175863Z",
+  "updated": "2026-09-08T15:37:32.2175944Z",
+  "version": "1.0"
+}

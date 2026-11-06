@@ -1,0 +1,37 @@
+{
+  "id": "wkmerge",
+  "app": "wkappbot-workflow",
+  "title": "wkmerge: merge-based origin sync",
+  "title_ko": null,
+  "desc": "Repo-root wk-tool that fetches origin, merges origin/main with --no-edit (preserves both histories, safer than rebase against a hot CI-pushing origin), and pushes -- created 2026-07-20 after a rebase-based sync left the repo mid-rebase",
+  "steps": [
+    "WHAT: git fetch origin then git merge origin/main --no-edit then git push origin main, all wrapped in one .cmd so internal git calls bypass git-concurrent-guard.",
+    "USAGE: ./wkmerge.cmd from repo root. Exit 1 on fetch failure, exit 2 on merge conflict (manual resolution required, never force), exit 0 on success.",
+    "WHY MERGE NOT REBASE: origin is hot (CI pushes every few seconds), so replaying many commits via rebase risks getting stuck mid-replay; a single merge commit lands in one shot regardless of concurrent pushes. See also wkpush-git-push-race-winner for the rebase-based alternative and its known mid-rebase-abandonment bug."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read wkmerge",
+      "expect": "WHAT",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wkmerge",
+      "expect": "USAGE",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wkmerge",
+      "expect": "WHY MERGE NOT REBASE",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-07-20T03:42:20.2136578Z",
+  "updated": "2026-07-20T03:42:20.2136757Z",
+  "version": "1.0"
+}

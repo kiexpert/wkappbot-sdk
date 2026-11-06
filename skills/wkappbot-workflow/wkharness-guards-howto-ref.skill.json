@@ -1,0 +1,55 @@
+{
+  "id": "wkharness-guards-howto-ref",
+  "app": "wkappbot-workflow",
+  "title": "wkharness-guards-howto",
+  "title_ko": null,
+  "desc": "T3 ref for guards",
+  "steps": [
+    "Ref placeholder"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read wkharness-guards-howto-ref",
+      "expect": "dated incidents",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wkharness-guards-howto",
+      "expect": "per-guard unblock steps",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wkharness-guards",
+      "expect": "core guard logic",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read harness-stop-guard-howto",
+      "expect": "what the Stop hook actually checks",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read skill-edit-step-ordering-spec",
+      "expect": "the ordered-ops flag family",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "wkharness",
+    "guards",
+    "ref",
+    "t3",
+    "incidents",
+    "dated",
+    "measured",
+    "bugs",
+    "archive"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-08-22T06:45:08.2348842Z",
+  "updated": "2026-09-15T06:36:06.7112983Z",
+  "version": "1.22"
+}

@@ -1,0 +1,35 @@
+{
+  "id": "wishline-cli-write-omega-scoping-2026-09-13",
+  "app": "wkappbot-workflow",
+  "title": "Dispatch omega-locked CLI target scoping",
+  "title_ko": null,
+  "desc": "ROOT-scoping lesson: verify a locked-target CLI command from ROOT own seat before dispatching a sector to run it.",
+  "steps": [
+    "Measured 2026-09-13: an agent dispatched to run wkappbot file write against a canonical omega-locked target hit the identical block ROOT had just hit running the same command -- a ROOT scoping failure, not an agent failure. Before dispatching, run the exact command from ROOT own seat first."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read wishline-cli-write-omega-scoping-2026-09-13",
+      "expect": "Dispatch omega-locked",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill search omega dispatch scoping",
+      "expect": "lists this id",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wishline-cli-write-omega-scoping-2026-09-13",
+      "expect": "ROOT own seat",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-09-12T17:12:44.2980189Z",
+  "updated": "2026-09-12T17:12:44.2980304Z",
+  "version": "1.0"
+}

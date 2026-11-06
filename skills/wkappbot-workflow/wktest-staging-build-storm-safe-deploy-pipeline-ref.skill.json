@@ -1,0 +1,40 @@
+{
+  "id": "wktest-staging-build-storm-safe-deploy-pipeline-ref",
+  "app": "wkappbot-workflow",
+  "title": "wktest staging build storm-safe deploy pipeline ref",
+  "title_ko": null,
+  "desc": "Dated incident log for wktest-staging-build-storm-safe-deploy-pipeline: build entry cleanup, launcher deploy bugs, work24 smoke gating, GUI checks, and the 2026-07-26 atomic-deploy race fix.",
+  "steps": [
+    "2026-06-21: legit build script lives at repo ROOT only. Removed bin/wkbuild.cmd (dup), wkbuild.sh (created the FORBIDDEN .new.exe FSW marker, 2261-proc spawn storm), bin/wkbuild.sh (already built into wktest-build.sh).",
+    "2026-07-03: wktest-build.sh Launcher deploy step had a file-exists guard that silently reused a stale publish artifact even after a real source fix. Fixed: publish always runs unconditionally now (dotnet publish is internally incremental).",
+    "2026-07-14 (user directive): added work24 cert-login smoke as MANDATORY check 8 -- requires rc=0 AND a VERDICT LOGGED_IN line, hard FAIL otherwise. Real live login against work24.go.kr, flagship-critical per user.",
+    "2026-07-16: work24 cert-login smoke temporarily DISABLED, downgraded to a labeled SKIP, because the flow was mid-fix and the user wanted other real fixes unblocked. Re-enable once work24-login-smoke.sh passes live again.",
+    "2026-07-18: added checks 9 and 10 -- exec --close-after and a11y modal-broker non-regression, both opt-in GUI checks gated behind WKTEST_GUI=1, SKIP by default.",
+    "BUG FIX 2026-07-26 (suggest 1784996623.620129, production-impacting, live-confirmed): the main deploy line in wktest-build.sh was a non-atomic in-place cp -f over wkappbot-core.exe -- a concurrent session's own build/deploy overlapping this window produced a torn/mixed single-file exe missing a bundled assembly (observed live: FileNotFoundException on WKAppBot.WebBot right after a clean smoke-PASS deploy from THIS session, while a different concurrent session was also building). Recovered via wktest-promote.sh rollback to the last known-good staged binary. Fix applied: the main deploy now always copies to a temp file then atomically renames over the canonical name, mirroring the pattern the Defender-quarantine fallback already used."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read wktest-staging-build-storm-safe-deploy-pipeline-ref",
+      "expect": "shows the dated incident log",
+      "prompt": null
+    },
+    {
+      "cmd": "git log --oneline -- bin/wktest-build.sh",
+      "expect": "shows the 2026-07-26 atomic-deploy fix commit",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wktest-staging-build-storm-safe-deploy-pipeline",
+      "expect": "core cross-links this ref",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-07-25T16:27:10.0283371Z",
+  "updated": "2026-07-25T16:27:10.0283458Z",
+  "version": "1.0"
+}

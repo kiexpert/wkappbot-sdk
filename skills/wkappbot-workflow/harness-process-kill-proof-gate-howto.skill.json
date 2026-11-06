@@ -1,0 +1,49 @@
+{
+  "id": "harness-process-kill-proof-gate-howto",
+  "app": "wkappbot-workflow",
+  "title": "Process Kill Proof Gate HowTo",
+  "title_ko": null,
+  "desc": "Procedure for identifying and safely terminating one process when multiple repositories share the same executable.",
+  "steps": [
+    "PRECHECK: Run wktasklist -V and tasklist full format output; prefer the cached wktasklist view when available.",
+    "IDENTIFY: Locate the exact PID and record image name, full command line, working directory, parent PID, owner, session number, and console host.",
+    "MATCH: Compare those fields with the intended Codex session and repository. Treat absent command line or working directory as unknown, not as a match.",
+    "DRY RUN: Run the sanctioned wkappbot taskkill dry-run for the exact PID. Do not use raw Stop-Process or taskkill for a cross-repository process.",
+    "APPROVAL: If the target is outside the current working directory or ownership is uncertain, stop and obtain explicit approval before any termination.",
+    "POSTCHECK: Re-run wktasklist -V and verify only the named PID exited. Report the precheck and postcheck evidence.",
+    "REGRESSION: A test must fail when an identical codex.exe image is selected by name or PID without repository command-line proof.",
+    "NAVIGATION: Read harness-process-kill-proof-gate for the reflex and harness-process-kill-proof-gate-ref for the incident record."
+  ],
+  "requirements": [
+    {
+      "cmd": "wktasklist -V",
+      "expect": "full CommandLine and PID fields are shown",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot taskkill dry run",
+      "expect": "exact target classification is printed without termination",
+      "prompt": null
+    },
+    {
+      "cmd": "proof check",
+      "expect": "missing identity fields produce a proof-missing refusal",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "harness",
+    "process",
+    "kill",
+    "proof",
+    "tasklist",
+    "howto"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-09-16T17:42:14.4696905Z",
+  "updated": "2026-09-16T17:42:14.4696983Z",
+  "version": "1.0"
+}

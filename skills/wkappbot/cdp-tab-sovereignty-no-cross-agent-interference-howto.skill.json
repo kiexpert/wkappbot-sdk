@@ -1,0 +1,62 @@
+{
+  "id": "cdp-tab-sovereignty-no-cross-agent-interference-howto",
+  "app": "wkappbot",
+  "title": "CDP tab sovereignty: procedures (T2 howto)",
+  "title_ko": null,
+  "desc": "T2 procedure tier for the CDP tab sovereignty campaign: the owner's five acceptance requirements including per-tab full duplex and special care for the active tab, the two-repo falsifier a single-agent test cannot replace, how to test a host match by what it REFUSES, why to grep for the pattern rather than trust a survey's list of sites, and why a refusal must never land before its lookup is proven. Core: cdp-tab-sovereignty-no-cross-agent-interference. Evidence: the -ref sibling.",
+  "steps": [
+    "NAVIGATION: this is the T2 procedure tier for cdp-tab-sovereignty-no-cross-agent-interference. Decision rules live in the parent core; dated evidence and the six-target status live in the -ref sibling. Come here for what to RUN.",
+    "@@",
+    "HOWTO -- THE OWNER'S SPEC, stated once so every patch in this campaign can be checked against it. WHEN: you are designing or reviewing any change in this campaign and need the acceptance criteria. HOW: run wkappbot skill read cdp-tab-sovereignty-no-cross-agent-interference for the doctrine, then hold the change against all five of the owner's requirements, stated 2026-09-05 -- parallel-sector support, PER-TAB full duplex, no interference between tabs, SPECIAL CARE FOR THE ACTIVE TAB, and a shared locking system designed ONLY if genuinely needed. WHY THE LAST TWO ARE THE SHARP ONES: the active tab is the one the owner is personally using, so a defect there is felt rather than logged; and the locking clause is a warning, not an invitation -- a lock is what you reach for when a resource is shared, so every lock you find yourself needing is evidence that something should have been SEPARATED instead. Prefer separation, and name the resource explicitly when you conclude a lock is unavoidable.",
+    "@@",
+    "HOWTO -- PROVE INTERFERENCE WITH TWO REPOS AND ONE OBSERVATION, because a single-agent test cannot see this class at all. WHEN: verifying any fix in this campaign, or triaging a report you cannot reproduce alone. HOW: run wkappbot skill read verify-tool-or-guard-synthetic-live-static-howto, then build the falsifier as a PAIR -- open a tab from repo A and record its target id, its URL and its window geometry; run the same command from repo B; then re-check A. A's tab must still exist, still sit at the same size and position, still be on the same URL, and still be the tab A's next command reaches. Record the BEFORE numbers, because the failure is a value that changed quietly rather than an error that was raised. WHY: every defect in this family produces valid-looking output -- a command that read another agent's page returns a page, and a window that was moved is still a window -- so the only evidence is a number someone wrote down first.",
+    "@@",
+    "HOWTO -- TEST A HOST MATCH BY WHAT IT REFUSES. WHEN: you touch any code that decides whether an open tab is yours. HOW: run wkappbot skill read cdp-open-reuse-existing-chrome-tab, then check three cases and require the REFUSALS, not just the acceptance -- a tab on evil-example.com must NOT satisfy a request for example.com, a file: or about: URL must match NOTHING because it carries no host, and only an exact host match may be accepted. WHY: substring containment passes the acceptance case perfectly, which is why it survived so long; it fails only on the cases nobody thought to try. This repo fixed the same class once on 2026-09-02 across seven sites and left a file out, and the leftover survived until 2026-09-05.",
+    "@@",
+    "HOWTO -- FIND EVERY SITE BEFORE FIXING ANY, and never work from a survey's list alone. WHEN: a delegated investigation hands you file and line numbers to patch. HOW: run wkappbot skill read verify-tool-or-guard-synthetic-live-static-howto, then grep the named files yourself for the PATTERN rather than for the reported lines, and count. A survey reports what it read; what it did not read is invisible in its report and looks exactly like absence. WHY: measured 2026-09-05, a survey named two substring-match sites and the file held three, and the missed one was the drift check -- the very check meant to catch the other two failing.",
+    "@@",
+    "HOWTO -- ORDER THE WORK SO A GUARD NEVER LANDS BEFORE ITS LOOKUP. WHEN: you are about to enable a refusal, a denial or an ownership check. HOW: run wkappbot skill read cdp-open-reuse-existing-chrome-tab, then confirm by a live run that the LOOKUP actually returns the right answer before wiring anything that acts on a negative. WHY: refusal before lookup works does not fail safe -- it locks the owner out of his own running browser, which is worse than the interference being fixed. In this repo the lookup is wired and the refusal is deliberately not, and that ordering is correct rather than an oversight."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read cdp-tab-sovereignty-no-cross-agent-interference",
+      "expect": "sovereignty",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read cdp-tab-sovereignty-no-cross-agent-interference-ref",
+      "expect": "targets",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read verify-tool-or-guard-synthetic-live-static-howto",
+      "expect": "run",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "cdp",
+    "tab",
+    "concurrency",
+    "ownership",
+    "interference",
+    "multi-agent",
+    "falsifier",
+    "procedure",
+    "howto",
+    "t2",
+    "3tier",
+    "fullduplex",
+    "탭",
+    "동시성",
+    "간섭",
+    "절차"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-09-05T07:43:05.4199576Z",
+  "updated": "2026-09-05T07:43:05.4199705Z",
+  "version": "1.0"
+}

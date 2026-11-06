@@ -1,0 +1,42 @@
+{
+  "id": "wk-reflex-driver-app-howto",
+  "app": "wkappbot",
+  "title": "WK Reflex driver app (T2 howto): phase spec with acceptance lines",
+  "title_ko": null,
+  "desc": "T2 spec and TODO for wk-reflex-driver-app: phase 1 tray status board, human-only approve cards, one-line order box, each with a measurable acceptance line; tech constraints; later phases gated on owner go.",
+  "steps": [
+    "NAVIGATION: core rules in wkappbot skill read wk-reflex-driver-app ; dated work in wkappbot skill read wk-reflex-driver-app-ref . This tier is the SPEC and the TODO list; each phase item carries its acceptance line.",
+    "PHASE 1.1 TRAY STATUS BOARD. Deliverable: a tray-resident window (single instance, starts hidden, opens from the tray icon, never steals focus, never resizes or moves any other window) that lists every live ROOT across repos with repo, model, alive, inbox bytes and transcript size, plus the last 5 escalation lines per repo and the last 10 commits landed today. Data source: wkroot roots (add a machine-readable output flag to wkroot roots if the table is not parseable, rather than re-reading its state folders directly) and git log. Refresh at most every 30 s and on tray open. ACCEPTANCE: with one ROOT alive, the board shows it within 30 s; killing nothing, closing the board leaves the ROOT running; the board process uses under 150 MB and under 1 percent CPU idle, measured.",
+    "PHASE 1.2 HUMAN-ONLY APPROVE. Deliverable: when any ROOT reaches an owner-only step (identity check, certificate login, final submit, sign, pay) it writes one line APPROVAL NEEDED: <repo> <what> <evidence path> to its escalation file; the app shows it as a card with the evidence (screenshot or text) and two buttons, APPROVE and DECLINE, which write the owner answer back as a dated OWNER line in the same file. The app never performs the submit itself; the ROOT resumes by reading the OWNER line. ACCEPTANCE: a synthetic APPROVAL NEEDED line appears as a card within 30 s, APPROVE writes the OWNER line, and a grep of the app source finds no code path that clicks or posts a submit, sign or pay control.",
+    "PHASE 1.3 ONE-LINE ORDER BOX. Deliverable: a text box where the owner types one line in Korean; the app forwards it to the spokesman session (or, when none is live, to wkroot send last for the chosen repo) and shows the delivery receipt. ACCEPTANCE: a typed order reaches a live ROOT inbox (wkroot roots shows inbox bytes grow) and the receipt line is shown.",
+    "TECH CONSTRAINTS: C# on the existing WKAppBot solution (same build via wkbuild, same single-file publish), WinForms or WPF with no new heavy runtime; UTF-8; every source file under about 400 lines; every new command registered in the CLI help map; follows wkappbot skill read exec-console-binding-constitution for any child it spawns (children are launched DETACHED so a closed app or a reaped shell does not kill them).",
+    "LATER PHASES, NOT STARTED (need owner go): 2 -- skill and reflex feed (what the fleet learned today, readable by a novice); 3 -- per-user experience store on top of the shared skills (model rented, experience owned); 4 -- app-driven a11y/cdp task recorder for a novice to teach a new routine.",
+    "TODO for the ROOT, in order: (a) propose the project layout and the wkroot roots machine-readable flag in .tmp/wkreflex/plan.md and escalate it for spokesman review before writing code; (b) build 1.1 with its acceptance run; (c) 1.2; (d) 1.3; each lands as its own commit with the acceptance output in the message.",
+    "TODO: build WK Reflex driver app net8.0 library and run QA matrix on GitHub Actions (windows-latest and macos-latest) with headless --once mode roster assertion"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read wk-reflex-driver-app-howto",
+      "expect": "ACCEPTANCE",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wk-reflex-driver-app",
+      "expect": "REUSE, NEVER REBUILD",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read exec-console-binding-constitution",
+      "expect": "fated to its own console",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-09-25T06:34:05.2105782Z",
+  "updated": "2026-10-02T03:58:59.1007492Z",
+  "version": "1.1"
+}

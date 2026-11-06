@@ -1,0 +1,37 @@
+{
+  "id": "restoring-an-archived-letter-section-after-wish-erasure",
+  "app": "wkappbot-kih",
+  "title": "Restoring an archived letter section after wish-erasure",
+  "title_ko": null,
+  "desc": "when handoff-wish-verdict reports WISH ERASED after an archive-to-sidecar move, the fastest correct fix is a full verbatim restore, not a partial patch",
+  "steps": [
+    "Read the sidecar file you just wrote and paste its exact content back into HANDOFF.md at the same location, replacing the one-line pointer",
+    "Do not try to selectively keep only the answered wishes -- restore the WHOLE section verbatim, since the erasure check compares paragraph text, not summaries",
+    "Measured 2026-09-09 in WKAppBot: a full restore of the 11th letter section, done in one Edit call, cleared WISH ERASED immediately since every original paragraph reappeared byte-identical"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read restoring-an-archived-letter-section-after-wish-erasure",
+      "expect": "sidecar",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read restoring-an-archived-letter-section-after-wish-erasure",
+      "expect": "verbatim",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read restoring-an-archived-letter-section-after-wish-erasure",
+      "expect": "WISH ERASED",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-09-08T15:52:57.2208547Z",
+  "updated": "2026-09-08T15:52:57.2208797Z",
+  "version": "1.0"
+}

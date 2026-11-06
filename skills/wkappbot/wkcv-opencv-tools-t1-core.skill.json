@@ -1,0 +1,64 @@
+{
+  "id": "wkcv-opencv-tools-t1-core",
+  "app": "wkappbot",
+  "title": "wkcv OpenCV Tools — T1 Core",
+  "title_ko": null,
+  "desc": "Image/camera analysis via OpenCV: gaps (OCR masking), findtext (text detection), segment (contours/regions), room (brightness/motion)",
+  "steps": [
+    "## wkcv gaps — OCR Masking",
+    "Mask detected text and UI regions to measure and raise transparency.",
+    "wkcv gaps IMAGE.png                    # Mask OCR + a11y regions",
+    "wkcv gaps IMAGE.png --out result.png    # Save masked output",
+    "wkcv gaps IMAGE.png --ocr               # Mask only OCR, skip a11y",
+    "wkcv gaps IMAGE.png --json              # JSON output with transparency %",
+    "## wkcv findtext — Text Detection",
+    "Extract text elements with bounding boxes (Tesseract OCR).",
+    "wkcv findtext IMAGE.png                         # Human-readable output",
+    "wkcv findtext IMAGE.png --json                  # JSON output per element",
+    "wkcv findtext IMAGE.png --region 0 0 640 480    # Crop before OCR",
+    "## wkcv segment — Image Segmentation (NEW)",
+    "Find contours and extract bounding boxes for image regions.",
+    "wkcv segment IMAGE.png                                  # Contour detection",
+    "wkcv segment IMAGE.png --threshold 127                  # Binary threshold (0-255)",
+    "wkcv segment IMAGE.png --min-area 100                   # Minimum pixel area",
+    "wkcv segment IMAGE.png --method component               # Connected components method",
+    "wkcv segment IMAGE.png --json                           # JSON per region",
+    "wkcv segment IMAGE.png --csv                            # CSV output",
+    "Output: region id, bbox (x,y,w,h), area, center (x,y).",
+    "## wkcv room — Room Analysis",
+    "Analyze room brightness, motion, and clutter from camera.",
+    "wkcv room                  # Use default camera (index 0)",
+    "wkcv room 1                # Use camera index 1",
+    "## Dependencies",
+    "opencv-python, numpy, Tesseract OCR, Pillow.",
+    "Implementation spec: wkappbot skill read wkcv-opencv-tools-howto",
+    "Work record: wkappbot skill read wkcv-opencv-tools-ref"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkcv segment self-test",
+      "expect": "RESULT.*PASS",
+      "prompt": null
+    },
+    {
+      "cmd": "wkcv gaps /nonexistent.png 2>&1",
+      "expect": "ERROR",
+      "prompt": null
+    },
+    {
+      "cmd": "wkcv findtext /dev/null",
+      "expect": "exit code 1 or 2",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "wkcv opencv image-analysis ocr segmentation text-detection usage t1-core"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-10-02T12:38:42.8986739Z",
+  "updated": "2026-10-02T12:38:42.8987066Z",
+  "version": "1.0"
+}

@@ -1,0 +1,46 @@
+{
+  "id": "wkappbot-build-verify-2026-08-10-codex-incident-ref",
+  "app": "wkappbot-workflow",
+  "title": "WKAppBot Build and Entrypoint Incident 2026-08-10",
+  "title_ko": null,
+  "desc": "T3 dated incident record for the 2026-08-10 Codex session covering entrypoint split-brain fixes, Bash runtime failure, offline restore limits, and direct binary smoke evidence.",
+  "steps": [
+    "SCOPE: This T3 record preserves the 2026-08-10 Codex work and must be read with wkappbot-build-verify-workflow, skill-contribute-edit, and knowledge-ification-procedure-jisikhwa.@@INCIDENT: skill edit resolved a Project fork differently from skill read because the edit path applied an HQ higher-version override. Fix: return the Project fork directly when it exists, so read and edit share Project-first precedence.@@INCIDENT: skill install --id and suggest resolve used filename or ad hoc Project-to-HQ scans instead of loaded SkillRecord.Id and the shared resolver. Fix: match loaded record identity and route suggest resolve through FindSkill.@@VERIFIED: git commit a16146983 contains the three entrypoint fixes. Recheck with git show a16146983 and compare skill read, skill edit target resolution, skill install --id, and suggest resolve behavior.@@INCIDENT: C:\\Program Files\\Git\\bin\\bash.exe and sh.exe terminate with CreateFileMapping Win32 error 5 before the build script starts. This is a host runtime or permission failure, not a C# compile failure. Verify with bash.exe --version and a minimal bash invocation before diagnosing the build script.@@INCIDENT: dotnet restore reaches NU1301 for api.nuget.org in the restricted environment, while cached packages exist locally. Offline publish can only use existing project.assets.json files and still may fail in MSBuild project-reference target-framework expansion. Record this as an environment or toolchain limitation until a clean publish proves otherwise.@@VERIFIED: bin\\\\wktest-core-manual-v7.9.75.exe passed version, skill list, skill read, and skill search smoke commands. Direct staged-binary smoke proves the binary behavior only; it does not prove launcher publish, Bash health, or a full source rebuild.@@NEXT: repair or replace the Git Bash host runtime, then run the canonical root build and deployment smoke flow from AGENTS.md. Use wkappbot skill read wkappbot-build-verify-workflow before retrying and keep the staged binary separate until smoke passes."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read wkappbot-build-verify-workflow",
+      "expect": "workflow skill resolves",
+      "prompt": null
+    },
+    {
+      "cmd": "git show a16146983",
+      "expect": "three entrypoint fixes are present",
+      "prompt": null
+    },
+    {
+      "cmd": "bash.exe --version",
+      "expect": "Bash runtime status is explicit",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "wkappbot",
+    "build",
+    "verify",
+    "incident",
+    "ref",
+    "2026-08-10",
+    "split-brain",
+    "bash",
+    "offline",
+    "smoke"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-08-10T04:34:27.065369Z",
+  "updated": "2026-08-10T04:34:27.0653815Z",
+  "version": "1.0"
+}

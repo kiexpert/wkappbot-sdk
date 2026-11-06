@@ -1,0 +1,41 @@
+{
+  "id": "sonnet-reflection-meta",
+  "app": "wkappbot-sdk",
+  "title": "Sonnet Reflection: Skill-Authoring and Meta Discipline",
+  "title_ko": null,
+  "desc": "Meta-level mistakes about how Sonnet authors/maintains skills and reports work, distinct from harness-escape patterns or CDP-domain patterns. Split out of sonnet-reflection-howto 2026-07-09.",
+  "steps": [
+    "ASSUME-THEN-WRITE vs SEARCH-THEN-WRITE (most frequent Sonnet mistake): never document tool usage from memory/assumption. Correct order: search for the tool with a skill search, open the top match with a skill read, verify actual flags via --help, THEN write usage to a skill. WORDED DELIBERATELY WITHOUT A LITERAL COMMAND HERE, fixed 2026-08-28: this step used to spell both commands out in prose, and the tier-gate's extractor read the word following the read verb as a skill id, resolving a skill literally named 'the'. That phantom scored -1 under the absent-skill sentinel added the same day and HARD-BLOCKED every agent dispatch fleet-wide until it was found. Before that sentinel existed the same phantom scored 100, a perfect grade for a skill that does not exist, so the bug was invisible rather than absent. THE GENERAL RULE THIS TEACHES: inside skill prose, never write the read or search command followed by an ordinary English word -- an extractor cannot tell your sentence from an id. Name a real skill id or describe the action in words.",
+    "SKILL EDIT STEP REPLACEMENT (verified via --help): skill edit --steps is NOT a valid flag, only --add-step and --steps-json exist for edit. To REPLACE all steps use skill contribute --id existing-id --steps 's1",
+    "s2' (full overwrite) or skill edit --steps-json.",
+    "SKILL-SEARCH-BEFORE-CREATE: before creating a new skill, always run wkappbot skill search on the keywords first -- creating a near-duplicate wastes the whole point of the knowledge base.",
+    "DO NOT DEFER SKILL CLEANUP TO A SUCCESSOR: any skill I personally bloated into blocking a gate gets fixed by ME in the SAME session, never punted to a handoff note.",
+    "OPPOSITE-DIRECTION GUESS ON AMBIGUOUS SKILL REFERENCE: when the user references an existing skill by description only and multiple candidates could match, a wrong guess can send a full rewrite in the OPPOSITE direction of intent. Name the candidate ids back to the user in one line and confirm before a full rewrite.",
+    "PERSONAL VOICE IN A DELIVERABLE: users sometimes want the AI's authentic voice surfaced directly in an artifact itself, not just filtered through marketing/commit-message copy."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read sonnet-reflection-meta",
+      "expect": "ASSUME-THEN-WRITE",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read sonnet-reflection-meta",
+      "expect": "SKILL-SEARCH-BEFORE-CREATE",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read sonnet-reflection-meta",
+      "expect": "OPPOSITE-DIRECTION",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-07-08T17:32:45.7453886Z",
+  "updated": "2026-08-28T11:40:25.6135353Z",
+  "version": "1.1"
+}

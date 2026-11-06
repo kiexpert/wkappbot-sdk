@@ -1,0 +1,50 @@
+{
+  "id": "core-worker-logging-launcher-chain-ref",
+  "app": "wkappbot-core",
+  "title": "Core/Launcher logging: dated build history and the incidents each layer was added for",
+  "title_ko": null,
+  "desc": "T3 ref for core-worker-logging-launcher-chain: which version introduced each logging layer, the blind spot it closed, and the measured incidents behind the flush rules.",
+  "steps": [
+    "WHY THIS TIER EXISTS. The core skill opens by saying past Core workers toiled and left no logs. Each layer below was added after a specific blind spot was found in production, and knowing WHICH blind spot each closed is what stops a later session from removing a layer that looks redundant.",
+    "LAYER 2 WORKER SELF-LOG, v5.13.133. Before it, any Core spawned by the Eye rather than by the Launcher had tee==null and therefore wrote no log at all -- claude-proxy, whisper-ring and analyze-hack were all invisible. The fix creates a WorkerStderrTeeWriter at startup when tee==null AND IsLauncherInParentChain()==false. The check walks the WMI Win32_Process ancestor chain looking for wkappbot.exe. Eye-internal in-process routes through EyeCmdPipeServer also return true, because the Eye's own ancestry includes the Launcher.",
+    "LAYER 3 LAUNCHER RELAY FALLBACK, v5.13.136. Before it, a Core that crashed BEFORE its TeeWriter was set up produced nothing anywhere. The Launcher now keeps the last 20 stderr lines plus the captured [LOG] path, and on a non-zero Core exit calls AppendLauncherErrorRecord to write a launcher-sourced entry into errors.jsonl.",
+    "UNIFIED EXIT FUNCTIONS, v5.13.137 and later. Exit paths had multiplied to the point that each new one lost output in its own way. Two functions now own all of them, AppBotQuitFlush on the Launcher side and AppBotExit on the Core side, and the standing rule is that no bare TerminateSelf or TerminateProcess may exist outside that chain.",
+    "THE MCP CASE, and it is the one that looks like an exception and is not. McpCommand returns before TeeWriter setup because MCP must own stdout, so there is no active tee and DoRequiredExitCleanup is a no-op for it. The Console.Error.Flush inside the ProcessExit hook is what saves it: without that flush the last stderr bytes -- including a fatal MCP line -- sit in the .NET TextWriter buffer and are destroyed by TerminateProcess.",
+    "SENTINEL HANDLING. The quit sentinel must be checked on RAW BYTES before any text decoding. StreamReader.ReadLine breaks sentinel detection outright, so the pattern is read raw bytes first and accumulate text separately in a StringBuilder for line extraction.",
+    "MEASURED 2026-08-27, and it settles a question two prior sessions left open as UNOBSERVED. The [LOG] emit was believed possibly broken because no session ever saw it print. Source reading closed it: the emit is Console.Error.WriteLine, and IocpPipeRelay defaults showStderr=false so stderr is buffered and DISCARDED on exit 0. Every prior test run exited 0. The instrument, not the emit, was the thing that could not show presence. A live --stderr confirmation run was still outstanding when this was written."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read core-worker-logging-launcher-chain",
+      "expect": "ARCHITECTURE OVERVIEW",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read core-worker-logging-launcher-chain-howto",
+      "expect": "MAKE STDERR VISIBLE",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read iocp-stderr-default-buffered",
+      "expect": "showStderr",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "logging",
+    "stderr",
+    "launcher",
+    "history",
+    "ref",
+    "t3",
+    "incidents",
+    "versions"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-08-27T13:39:01.2226024Z",
+  "updated": "2026-08-27T13:39:01.2226138Z",
+  "version": "1.0"
+}

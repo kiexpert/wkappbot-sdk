@@ -1,0 +1,52 @@
+{
+  "id": "wkareyouready-ref",
+  "app": "wkappbot-kih",
+  "title": "wkareyouready: dated incidents (T3 ref)",
+  "title_ko": null,
+  "desc": "T3 dated archive for wkareyouready: the switch-based attribution defect and its measured fix, the unrunnable remediation line, and the three live-fire rounds that each exposed the next defect. Core: wkareyouready.",
+  "steps": [
+    "INCIDENT 2026-08-21: attribution in wkareyouready was a function of the SWITCH and never of the FACTS, and both directions were wrong. WHEN: reading or changing either verdict branch, or being tempted to add a third caller mode. HOW: run wkappbot skill read wkareyouready for the tool contract, then read the two branches TOGETHER -- the -Start branch asserted that residue came with the tree and not from you, while the else branch asserts the blocker is real and yours, and NEITHER measured anything. WHY: measured live, a bare run claimed yours over six files, one last written at 14:16:08 when the session had done nothing but its mandatory session-start skill READS, because the HQ mirror sync dirties tracked files on a read. The mirror failure is worse: at -Start on a tree you dirtied yourself it tells you to walk away from your own mess, and a predecessor is on record in HANDOFF.md as having committed a peer session drift purely to unblock delegation. A third switch cannot fix this, because by Article 13 of exec-console-binding-constitution four intelligences share this desktop and NO caller can know whose the residue is. THE FIX SHIPPED: print the AGE range and let the reader judge.",
+    "INCIDENT 2026-08-21: the tool own remediation line printed a command that does not exist. WHEN: writing any guidance line that tells a blocked reader what to run next. HOW: run wkappbot skill read wkareyouready then actually EXECUTE the string you are about to print and paste its exit code. WHY: the -Start note said to run wkareyouready with no switch for the full list. Measured, the bare name returns exit 127 command not found and only the .cmd form resolves. A remediation line is a promise the tool makes on its own behalf, so an unrunnable one becomes a dead end at exactly the moment the reader is already stuck.",
+    "INCIDENT 2026-08-21, THREE LIVE ROUNDS ON ONE SMALL FIX, each round defect invisible to the round before. WHEN: adding any logic to this file, whose ambient ErrorActionPreference is Stop at line 35. HOW: run wkappbot skill read verify-tool-or-guard-synthetic-live-static-howto for the shell-versus-answer discipline, then live-fire the REAL -Start path after every change, because a parse check passed all three rounds and proved nothing. WHY: ROUND 1 printed no dirty tracked file to age against a genuinely dirty tree, because git prints REPO-RELATIVE paths and Get-Item missed under a CWD that was not the repo root while SilentlyContinue swallowed all six misses into one plausible sentence. ROUND 2 joined the repo root and STILL reported nothing, which is what exposed the real cause: under ErrorActionPreference Stop a native git call with stderr redirected wraps that stderr in a NativeCommandError which THROWS, and the empty catch ate it. ROUND 3 dropped the preference to Continue for the duration of the git calls and printed real numbers, then leaked git CRLF chatter, so the redirect was restored, legal only because Continue makes that error non-terminating. THE DURABLE LESSON: round 1 fix would have shipped silently if the message had not been SPLIT so that git-named-files-I-could-not-open and git-named-nothing report separately. Never let a lookup that FAILED share a message with a world that is EMPTY.",
+    "INCIDENT 2026-08-21, and it is the reason this very skill had to be rewritten: the first attempt to write these three steps produced ONE step, because the --steps separator is WHITESPACE-BOUNDED and I wrote the double-at with no spaces around it. WHEN: any use of wkappbot skill add or contribute or edit with --steps. HOW: run wkappbot skill read skill-contribute-edit for the separator contract, put a SPACE on both sides of the separator, and then READ THE SKILL BACK and count the steps before believing the CLI Updated line. WHY: the identical mistake collapsed twelve carefully written steps of claude-session-handoff into one blob the same day, briefly leaving that skill worse than the damage being repaired. The CLI reports success either way, so the step COUNT read back from the file is the only evidence that the separator took."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read wkareyouready",
+      "expect": "the core tool contract, its exit codes, and the -Start forwarding rule",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read exec-console-binding-constitution",
+      "expect": "Article 13, the shared multi-tenant desktop that makes switch-based attribution unsound",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read verify-tool-or-guard-synthetic-live-static-howto",
+      "expect": "why a parse check is never proof and the live -Start path must actually be run",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "wkareyouready",
+    "ref",
+    "t3",
+    "incident",
+    "attribution",
+    "residue",
+    "live-fire",
+    "2026-08-21",
+    "하산점검",
+    "잔여블로커",
+    "귀속측정",
+    "실사격",
+    "차가운독자"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-08-14T20:11:25.6923961Z",
+  "updated": "2026-08-21T11:21:51.5783367Z",
+  "version": "1.7"
+}

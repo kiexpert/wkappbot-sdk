@@ -1,0 +1,40 @@
+{
+  "id": "skill-edit-step-ordering-spec-ref",
+  "app": "wkappbot",
+  "title": "Skill Edit Step Ordering Ref (T3)",
+  "title_ko": null,
+  "desc": "Dated incident history + original workaround-era notes for skill-edit-step-ordering-spec, migrated out to fix a FAT-skill score drop 2026-07-14.",
+  "steps": [
+    "ORIGINAL PROBLEM (pre-implementation, now historical): --add-step always appended to end, no insert-before/after flag, --step N --content intermittently dispatched as background task instead of synchronous -- misplaced steps required ugly ordering hacks.",
+    "WORKAROUND ERA (pre-implementation): append then manually reorder step 1 text, retry --step N --content once on background failure, label misplaced steps with a parenthetical, note-and-skip for delete. Superseded once --insert-before/after/--move-step/--delete-step/--swap-steps/--reorder actually shipped.",
+    "SUGGEST REF: ts=2026-05-23T06:18:21 DG-wkappbot-sdk tracked implementation status of the MUST/NICE spec items.",
+    "Verified 2026-05-23: ev-swap-steps-fix.sh (resolve ts=2026-05-23T07:31:50).",
+    "BLIND SEQUENTIAL --delete-step IS RENUMBER-UNPREDICTABLE (2026-06-28 incident): deleting a fixed step number N repeatedly does not reliably walk the intended step -- renumber plus auto step-ref-update shifts positions unpredictably, can delete a KEEPER. SAFE PROCEDURE: delete from highest step number down to lowest, or verify-read between deletes and target only the confirmed current number, always check the delete output echoed text and abort if it shows a keeper, re-add via --add-step if a keeper was wrongly deleted.",
+    "RE-CONFIRMED 2026-07-03 (agent-failure-reflection-gate slimming): same failure mode recurred -- step numbering drifted between read and delete, likely a concurrent background sync. Confirms the safe procedure is still necessary, not a one-off."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read skill-edit-step-ordering-spec-ref",
+      "expect": "RENUMBER-UNPREDICTABLE",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read skill-edit-step-ordering-spec-ref",
+      "expect": "SAFE PROCEDURE",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read skill-edit-step-ordering-spec-ref",
+      "expect": "WORKAROUND ERA",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-07-14T10:30:50.498428Z",
+  "updated": "2026-07-14T10:30:50.4984362Z",
+  "version": "1.0"
+}

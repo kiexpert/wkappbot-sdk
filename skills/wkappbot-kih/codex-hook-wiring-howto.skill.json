@@ -1,0 +1,56 @@
+{
+  "id": "codex-hook-wiring-howto",
+  "app": "wkappbot-kih",
+  "title": "Codex hook wiring howto: contracts, the fast-allow spec, and the two test recipes",
+  "title_ko": null,
+  "desc": "T2 howto for codex-hook-wiring: the exact contract a Codex hook script must satisfy, the Stop fast-allow specification and its window unit, the deadline shape, and the two paste-ready test recipes -- direct stdin and live codex CLI under a timeout. Core: codex-hook-wiring. Record: codex-hook-wiring-ref.",
+  "steps": [
+    "THE HOOK SCRIPT CONTRACT, five clauses, all mandatory. ONE, declare a string RawFile parameter defaulting to empty and read that file when it is non-empty, falling back to reading the console input stream. TWO, wrap the JSON parse in a try with an empty catch, because an unparseable payload must not throw. THREE, write EXACTLY one compact JSON line to standard out. FOUR, exit 0 unconditionally, whatever the verdict. FIVE, never let an exception escape: a Stop hook that throws gives Codex no decision at all. The shape is visible in tools/wkharness-codex-stop.ps1 and its module folder tools/wkharness-codex-stop.",
+    "THE STOP FAST-VERDICT SPECIFICATION, three outcomes and not two. Function Get-WkCodexStopFastVerdict, in tools/wkharness-codex-stop/Get-WkCodexStopFastVerdict.ps1. Inputs: TranscriptPath, StopHookActive, Window defaulting to 3, TailLines defaulting to 400. It returns ALLOW when StopHookActive is true or when any of the last Window CHAT MESSAGE records carries a stop-hook marker; the markers are the bracketed codex-stop tag, stop-hook-enter, stop-hook-exit, WISHES, and the PACE label. It returns INITERROR on every path where the transcript cannot be read as chat records at all -- empty path, missing file, unreadable file, zero-byte file, a directory, no message rows, any exception. It returns EVALUATE otherwise, and only EVALUATE reaches the expensive frame verdict. ON INITERROR THE CALLER EMITS EXACTLY ONE COMPACT JSON BLOCK VERDICT TO STDOUT AND EXITS 0, with the reason inside the JSON. The stdout stream must contain no diagnostic line before or after that object because Codex rejects any non-JSON hook output. This preserves the always-exit-zero contract in step 1 and prevents the runner from treating an init diagnostic as malformed hook JSON.",
+    "THE WINDOW UNIT IS THE WHOLE POINT OF THE SPEC. Filter the tail to rows matching a payload type of message BEFORE taking the last Window of them. Counting raw JSONL lines instead is the defect the predicate exists to fix, and it fails silently rather than loudly: the marker is present in the file, the window is simply looking at token_usage_record and function_call_output rows. The negative control that proves the filter works is a fixture whose last three RAW lines contain the marker in a non-message row and which must still return false.",
+    "THE SEAM IS A Test-Path, A DOT-SOURCE AND ONE CALL, at file scope in tools/wkharness-codex-stop/Get-WkCodexRecentStopEvidence.ps1, never inside a function. Dot-sourcing inside a per-call function re-sources the module on every invocation and breaks the sub-one-second hot-path budget the harness is held to. If the module is missing the seam must fall back to the previous expression, so a deleted module degrades to yesterday behaviour rather than to an exception.",
+    "THE DEADLINE SHAPE. hooks.json gives Stop a timeout expressed in SECONDS. The adapter carries its own child deadlines in milliseconds -- 8500 for Stop, 24000 for PreToolUse and PermissionRequest, 9000 otherwise -- and kills the child, then emits a fail-closed block. That protection only applies to events routed THROUGH the adapter, so a directly-wired Stop has no internal deadline and relies entirely on the hooks.json number. A Stop gate that can exceed it must carry its own stopwatch and answer before the outer timeout, because being killed produces no JSON and therefore no decision.",
+    "TEST RECIPE ONE, DIRECT, and run this first because it costs one second. In PowerShell: build the payload with a hashtable carrying hook_event_name, transcript_path and stop_hook_active, pipe it through ConvertTo-Json with the Compress switch, pipe THAT into powershell with NoProfile NonInteractive ExecutionPolicy Bypass and the File switch naming tools/wkharness-codex-stop.ps1, and print both the returned JSON and the elapsed milliseconds from a Stopwatch. Run it twice: once with a real rollout path, once with an empty object as the payload. The second run is the control that proves the hook answers rather than throws when it knows nothing.",
+    "TEST RECIPE TWO, LIVE CODEX CLI UNDER A TIMEOUT. Start the codex executable with a short non-interactive prompt as a background process, wait on it with a bounded WaitForExit rather than an unbounded one, and kill it when the wait returns false. The timeout is not optional decoration: a looping Stop hook never ends the turn, so an unbounded live test hangs the terminal it is run from. Read the resulting rollout afterwards and COUNT the stop-hook injections in it -- a healthy run has at most one, and a number in the hundreds is the loop.",
+    "HOW TO COUNT THE LOOP IN A ROLLOUT. Stream the JSONL with the .NET ReadLines method rather than loading it, keep only rows matching a payload type of message, and count rows carrying a stop-hook marker; also record the GAP in message records between consecutive markers. The gap distribution is what sizes the window: a gap that is almost always two says a window of three is generous, and a window that never matches the observed gap is a gate that can never fire.",
+    "WHAT TO CHECK BEFORE BELIEVING ANY CODEX HOOK CHANGE LANDED. Read the hook COMMAND STRING in hooks.json and confirm it names the file you edited -- the adapter and the direct path are different files and only one of them runs. Then grep the file the command string names for a CALL to the new function, not merely a dot-source of its module. A module suite proves the logic and says nothing at all about the wiring.",
+    "THE THIRD DEFENCE IS A CLOCK, AND ITS STAMP GOES ON THE BLOCK AND NOT ON EVERY CALL -- owner design 2026-09-11, who named it the final goalkeeper. tools/wkharness-common-stopmark holds a family-agnostic marker: Get-WkStopMarkIdentity, Get-WkStopMarkPath, Test-WkStopMarkFresh with a nine second default window, and Write-WkStopMark. The Stop hook reads the marker on entry and allows immediately when it is younger than nine seconds. IT IS DELIBERATELY COMMON TO EVERY FAMILY, because the two transcript-parsing defences depend on a per-family rollout format and therefore break once per family, while a clock has no format to get wrong. THE STAMP TIMING IS THE DESIGN, not a detail: stamping on EVERY invocation would wave through any ordinary turn that happens to end within nine seconds of the last one, so the gate would silently stop working for fast turns. Stamp ONLY on the branch that BLOCKS, and the sequence is exact -- the gate blocks and stamps, the model answers the injected reason, Stop fires seconds later, the marker is fresh, the Stop is allowed, the loop is cut, and a turn that was never blocked leaves no marker and is evaluated normally. Test-WkStopMarkFresh fails to FALSE on every error, so a swept or unreadable marker degrades to no goalkeeper rather than to a gate that allows everything, and the identity falls back to the PARENT process id when no session id is supplied so two concurrent sessions of one family cannot share a marker."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read codex-hook-wiring",
+      "expect": "the core usage tier this howto implements",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read verify-tool-or-guard-synthetic-live-static-howto",
+      "expect": "a guard is judged by what it refuses, run it never read it",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read proto-to-live-wiring",
+      "expect": "the seam and promotion discipline these contracts assume",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "codex",
+    "hook",
+    "howto",
+    "t2",
+    "stop",
+    "fast-allow",
+    "deadline",
+    "rawfile",
+    "selftest",
+    "test-recipe",
+    "harness"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-09-11T02:30:00.645826Z",
+  "updated": "2026-09-16T16:37:53.2926935Z",
+  "version": "1.3"
+}

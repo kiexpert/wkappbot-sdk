@@ -1,0 +1,51 @@
+{
+  "id": "wkextract-cs-keyword-extraction-the-first-step-of-most-delegations",
+  "app": "wkappbot",
+  "title": "wkextract-cs -- keyword extraction, the first step of most delegations",
+  "title_ko": null,
+  "desc": "Pull the units matching a keyword or function name out of a fat C# file, verbatim, with a partition-identity gate and an optional generated wired proto. Zero-token and deterministic. Use it BEFORE asking anyone to edit a 400-plus line source, because fat-source-growth refuses a seam otherwise.",
+  "steps": [
+    "START HERE, and this is the invocation to reach for FIRST when a fat file is in the way. LIST before you cut: bash bin/wkextract-cs.sh <file.cs> --keyword <name-or-regex> --list prints every unit, its line span, and which ones match, and writes NOTHING. That is the cheapest way to discover a keyword matching nothing or everything, and it costs one command. Then drop --list to write the extraction, or add --wire to also emit the wired proto. Bash entry is wkextract-cs.sh and Windows is wkextract-cs.cmd -- both call the same bin/wkextract-cs.py, and the bash one exists because the cheap fleet runs under bash where a .cmd shim does not resolve.",
+    "WHY THIS EXISTS AND WHEN IT IS THE RIGHT TOOL: fat-source-growth refuses ANY net growth on a file already past 400 lines, so a seam cannot land until something leaves the file first. That extraction is mechanical, must not change a single byte of the moved code, and is exactly the job that kept being handed to a model -- where it can silently drop lines, which this repo has measured. wksplit-cs is the WRONG tool for it: its own skill says Split by line count only, so it chops a whole file into numbered parts. Getting THIS function out of the way is a different job.",
+    "THE PROPERTY THAT MAKES IT TRUSTWORTHY is arithmetic rather than narration: PARTITION IDENTITY. Extracted units UNION remainder equals the original unit set exactly, with empty intersection, and the tool prints that assertion on every run. So a wired proto built from remainder-plus-seam is GUARANTEED to have dropped nothing -- which is the assurance a hand-written wired proto can only assert. This repo already shipped one FAKED extraction whose comment claimed delegation while the arithmetic stayed inline and duplicated; a generated diff cannot misdescribe itself.",
+    "HISTORY, because the lesson is bigger than the tool: this was BUILT by a predecessor on 2026-08-27, live-proven against the 1106-line A11yActions.Read.cs, and then left in .tmp/ unwired with no skill and no launcher. A later session hand-extracted an 86-line method by hand while the working tool sat one directory away. IT WAS FOUND ONLY BECAUSE THE OWNER SAID IT EXISTED. The lesson: a tool in .tmp/ with no skill entry is invisible, and invisible is the same as absent -- promote, wire, and document in the same session you build, or the next session rebuilds it.",
+    "KNOWN LIMITS, so nobody reports them as new. C-SHARP ONLY, and on a Python file it can SILENTLY RETURN GARBAGE that passes its own gate: run against bin/wksplit-cs.py it invented eleven units from C-sharp fixtures inside string literals and swallowed 731 lines, while the partition assertion still read True because it checks the split against its OWN parse, not against the language. A gate that validates a wrong parse is worse than no gate. Also: line-count assertion (2) prints False and reconciles header and trailer in prose underneath, --with-deps is unimplemented, and there is no --out flag.",
+    "FIXED 2026-08-28 -- the if-as-member bug. The member regex made the access modifier OPTIONAL, so any word-then-paren line read as a declaration: FileToolCommands.Edit.cs returned FIVE units named literally if, one spanning 191 lines. That is not cosmetic -- a unit named if matches any keyword containing those letters and cannot be addressed individually, so an extraction could take the wrong span. The regex now REQUIRES at least one modifier before the return type. Measured after: 29 units to 19, all real member names, partition identity still holding at 1 plus 18 equals 19."
+  ],
+  "requirements": [
+    {
+      "cmd": "bash bin/wkextract-cs.sh csharp/src/WKAppBot.CLI/Commands/FileToolCommands.Edit.cs --keyword MigrateLegacyBackups --list",
+      "expect": "PARTITION IDENTITY ASSERTION with Unit count 1 + 18 = 19 and Disjoint True, and NO unit named if",
+      "prompt": null
+    },
+    {
+      "cmd": "bash bin/wkextract-cs.sh <file.cs> --keyword <name> --wire",
+      "expect": "emits both the extraction module and a source-minus-extracted-units wired proto",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wksplit-smart-multi-language-dedup-round-trip-spec",
+      "expect": "the spec that defines extract as the sixth mode of the splitter engine, never a separate tool",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "wkextract",
+    "extract",
+    "split",
+    "keyword",
+    "fat-source",
+    "delegation",
+    "haiku",
+    "wired-proto",
+    "partition-identity",
+    "zero-token"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-08-28T13:37:03.606978Z",
+  "updated": "2026-08-28T13:37:03.6069865Z",
+  "version": "1.0"
+}

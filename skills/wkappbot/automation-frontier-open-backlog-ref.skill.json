@@ -1,0 +1,55 @@
+{
+  "id": "automation-frontier-open-backlog-ref",
+  "app": "wkappbot",
+  "title": "Automation frontier backlog: closed records and dated findings (T3 ref)",
+  "title_ko": null,
+  "desc": "T3 ref for automation-frontier-open-backlog: closed items kept as record, dated measurements, and the stale assertions a successor would otherwise re-investigate.",
+  "steps": [
+    "CLOSED, KEPT AS RECORD: Eye write-denial, suggest 1784193313, root-caused and fixed in v7.7.57, commit 9783f336d. The launcher now routes write commands -- skill edit and add, suggest, file write and edit and undo -- to a fresh Core instead of the Eye pipe, in sdk Program.cs, commit 8217f242. It needed a CLEAN launcher rebuild: the first incremental publish shipped a stale binary, which is the trap worth remembering. The full three-layer defence with self-reject plus wkdoctor heal is spec'd in wkappbot skill read always-on-ai-automation-daemon-appbot-eye-internals.",
+    "MEASURED 2026-07-14, still unresolved: 142 of 213 entries in errors.jsonl are ONE pattern -- an eye --replace-pid tick calling a11y invoke against nkrunlite or nfrunlite with cls #32770, roughly every two minutes, exit 1. Root cause unconfirmed. Decide working-as-designed versus actionable BEFORE filing anything, or you will file a ticket against a heartbeat. Detail: wkappbot skill read errors-jsonl-triage.",
+    "KNOWN-STALE TEST, do not treat its failure as a regression: wk-cdp-placement-verify carries 4 assertions that are wrong under the reuse-gate. A REUSED Chrome is deliberately NOT re-moved, so no placement lines are emitted, and the test demands output that is correctly absent. Fix the assertions, not the placement code.",
+    "WHY THIS CLUSTER EXISTS AT ALL: these items lived as a 19-line block inside the project CLAUDE.md, which every session re-reads in full. The diet-score guard blocks delegation below 60 and the score had fallen to 56, so the block was MOVED into a skill per claudemd-slim-plan, leaving a one-line pointer behind. Nothing was dropped. Edit the skill, never CLAUDE.md, and keep the pointer line intact.",
+    "MEASURED 2026-08-23 by the successor session, recorded because it cost real time: this core scored 0 out of 100 and the tier-gate therefore refused EVERY Agent dispatch in the repo -- the backlog skill the letter tells you to open was itself the thing blocking you from acting on it. Adding tags was tried FIRST and moved the score not at all, which rules tags out as the lever. The actual cause was structural: the core owned NO -howto and NO -ref sibling, so it earned nothing from the scorer's sibling loop and nothing from the nav bonus. Creating this pair and adding a NAVIGATION step to the core is the whole fix. Formula and arithmetic: wkappbot skill read harness-tier-score-guard.",
+    "NAVIGATION. Core list: wkappbot skill read automation-frontier-open-backlog. Pick-up procedure: wkappbot skill read automation-frontier-open-backlog-howto."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read automation-frontier-open-backlog-ref",
+      "expect": "CLOSED, KEPT AS RECORD",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read automation-frontier-open-backlog",
+      "expect": "STAR ITEM -- Overlap and Modal Broker",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read automation-frontier-open-backlog-howto",
+      "expect": "PICK-UP ORDER",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "automation",
+    "frontier",
+    "backlog",
+    "ref",
+    "t3",
+    "history",
+    "closed",
+    "errors-jsonl",
+    "eye",
+    "cdp",
+    "a11y",
+    "자동화",
+    "백로그",
+    "기록"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-08-23T03:45:10.8410654Z",
+  "updated": "2026-08-23T03:45:10.8410655Z",
+  "version": "1.0"
+}

@@ -1,0 +1,36 @@
+{
+  "id": "wkedit-shell-distortion-recovery-ref",
+  "app": "wkappbot",
+  "title": "wkedit shell distortion recovery: dated incidents (T3)",
+  "title_ko": null,
+  "desc": "T3 reference tier of wkedit-shell-distortion-recovery. Dated, measured distortion incidents and the exact repair sequence that worked for each. Consult when an edit landed but the file is subtly wrong. Parent: wkedit-shell-distortion-recovery.",
+  "steps": [
+    "A CP949 SOURCE FILE LOSES A NEWLINE THROUGH AN INLINE file edit, AND THE ONLY SIGN IS TWO COMMENT LINES BECOMING ONE. MEASURED 2026-09-07 on csharp/src/WKAppBot.CLI/Commands.Private/SkillCommand.Contribute.cs, saved as ks_c_5601-1987. An inline three-argument file edit landed its intended change correctly, and git diff showed 14 insertions against 4 deletions, so no whole-file re-encode happened and every heuristic said the edit was clean. But TWO separate box-drawing comment separators had their trailing newline EATEN, joining each to the line below it. Both are comments, so dotnet build reported 0 errors and 0 warnings, the smoke gate went ALL PASS, and nothing complained at all. WHY IT HIDES: the damage sits at a multibyte character the tool re-encoded, and the joined line still begins with a comment marker, so the compiler never sees a problem. A green build measures the compiler, not the bytes.@@HOW TO SEE IT, and it is the only reliable detector: read the git diff itself and look for a pair of minus lines becoming a single plus line. That is the exact shape. A diff --stat cannot show it, because the insertion and deletion counts stay entirely plausible -- 14 against 4 here -- and a whole-file re-encode, which IS what --stat detects, never happened.@@THE REPAIR THAT WORKS, AND THE TWO THAT DO NOT. The Edit tool is refused on source by root-wkedit-only. A second inline file edit cannot fix it either, because an inline replacement cannot carry a literal newline, which is the same limitation that caused the damage in the first place. What works is three commands: snapshot the working copy with wkappbot file write .tmp/<name>.txt --source-file <the source>, restore with git checkout HEAD -- <path> naming the commit rather than the bare double-dash form emergency9 E8 refuses, then re-apply the change with --old-file and --new-file anchored on a PURE ASCII line far from any multibyte character.@@THE GENERAL RULE, worth more than this instance: on a legacy-codepage source never let an edit anchor touch a non-ASCII character. Choose an anchor that is ASCII on both sides, because the tool rewrites the region it matched and the newline beside a re-encoded byte is what disappears. See also wkedit-shell-distortion-recovery for the parent concept and wkedit for the base tool.",
+    "CORRECTION TO THE STEP ABOVE, SAME DAY, AND IT REVERSES THE CAUSE. I wrote that the three-argument inline form causes the newline loss and that the --old-file form avoids it. FALSIFIED: the --old-file form damaged the file IDENTICALLY -- same two lines, same 14-against-4 stat. The edit FORM is innocent. THE REAL CAUSE, found by reading the bytes instead of the diff: the file contained a literal U+FFFD stored as its UTF-8 bytes, 3F EF BF BD, at the end of exactly two comment separator lines, pre-existing damage from an earlier session. Those bytes make the encoding detector call the whole file ks_c_5601-1987, and on the re-encode the sequence consumes the newline that follows it. So ANY write through the tool loses those two newlines, whatever form the edit took. THE COMMAND THAT SETTLED IT, and it is the one to reach for first: git show HEAD:<path>, select the offending line, and pipe it through od -c. The line ended in dash dash question-mark 357 277 275 newline, which is the whole answer in one glance. A diff can never show you this, because both sides render the same mojibake. THE PERMANENT FIX IS TO REMOVE THE NON-ASCII BYTE, NOT TO WORK AROUND THE TOOL: read the file as bytes, delete every 3F EF BF BD run, write the result to a .txt, and put it back with wkappbot file write <source> --source-file <txt>, which is byte-exact and is the sanctioned path for source. The file then holds zero bytes above 127, the detector reports utf-8, and every later edit is safe. MEASURED HERE: 20225 bytes in, 2 occurrences removed, 20217 bytes out, nonascii_remaining=0, and the very next file edit printed encoding=utf-8 and joined nothing. THE RULE THAT GENERALISES, and it is worth more than this file: when a text tool corrupts a file at a FIXED POSITION, the position is telling you about the BYTES, not about the command. Read them before blaming the form of the call."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read wkedit-shell-distortion-recovery-ref",
+      "expect": "CP949 SOURCE FILE LOSES A NEWLINE",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wkedit-shell-distortion-recovery",
+      "expect": "3rd retry",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wkedit",
+      "expect": "file edit",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-09-07T06:53:29.3683032Z",
+  "updated": "2026-09-07T06:59:19.3221412Z",
+  "version": "1.1"
+}

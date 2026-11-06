@@ -1,0 +1,37 @@
+{
+  "id": "handoff-names-requires-all-commits-since-prior-letter-named",
+  "app": "wkappbot-workflow",
+  "title": "Handoff-names requires ALL commits since prior letter named",
+  "title_ko": null,
+  "desc": "handoff-names-gate scans every commit since the previous HANDOFF.md commit, not just the current session's own work",
+  "steps": [
+    "Before committing HANDOFF.md, run git log since the prior letter commit and list every touched file",
+    "Name EVERY file in a DONE entry with its skill and a quoted fragment, even one landed by an earlier session/sector in the same day",
+    "Measured 2026-09-09 in WKAppBot: A11yActions.Blocker.cs and ChromeDialogModality.cs were committed by an earlier Opus sector the same day and had to be named in the 14th letter even though this session did not author them"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read handoff-names-requires-all-commits-since-prior-letter-named",
+      "expect": "git log",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read handoff-names-requires-all-commits-since-prior-letter-named",
+      "expect": "DONE entry",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read handoff-names-requires-all-commits-since-prior-letter-named",
+      "expect": "quoted fragment",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-09-08T15:41:25.881714Z",
+  "updated": "2026-09-08T15:41:25.8817294Z",
+  "version": "1.0"
+}

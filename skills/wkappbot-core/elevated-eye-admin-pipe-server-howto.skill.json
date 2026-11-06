@@ -1,0 +1,50 @@
+{
+  "id": "elevated-eye-admin-pipe-server-howto",
+  "app": "wkappbot-core",
+  "title": "Elevated Eye admin pipe: the operating procedures for drain, self-respawn and hot-swap deferral",
+  "title_ko": null,
+  "desc": "T2 howto for elevated-eye-admin-pipe-server: the exact sequences for accepting a client, deferring a swap while busy, draining, and respawning with the inherited elevated token.",
+  "steps": [
+    "ACCEPT AND SERVE A CLIENT. NamedPipeServerStreamAcl.Create with AuthUser=ReadWrite and Admin=FullControl, then WaitForConnectionAsync, then Task.Run HandleClient while an Interlocked _activeClients counter tracks depth. HandleClient reads an EyeProxyRequest, runs ExecuteCommand, and writes the response back. The __eye_tick__ request is special-cased to return cached Eye loop state without spawning a subprocess -- do not route it through the generic path or every tick costs a process.",
+    "DEFER A SWAP WHILE BUSY. The IsBusy guard holds hot-swap for as long as _activeClients is above zero. StopAcceptingAndWaitForDrain caps the drain at 30 seconds. A swap that fires during an active client is the failure this guard exists to prevent, so never bypass it to make a deploy faster.",
+    "SELF-RESPAWN ON BINARY UPDATE, dual watcher. Two FileSystemWatchers run at once: one for a .new.exe appearing, which starts an early drain, and one for the .exe being replaced directly, which is the fast path. The .new.exe path drains on IsBusy, waits for the .new.exe to DISAPPEAR as its proof the swap completed, then spawns the successor. The .exe path lets an in-flight drain finish naturally, or spawns immediately if none is running. A drainTriggered flag prevents a duplicate spawn when both watchers fire together, and at startup an already-present .new.exe starts a drain immediately.",
+    "RESPAWN WITHOUT UAC. Process.Start with UseShellExecute=false and the argument eye --elevated inherits the parent elevated token, so no prompt appears. This is why the admin Eye can replace itself unattended, and it is also why anything reading its own path must tolerate an elevated context.",
+    "RESOLVE THE OWN-EXECUTABLE PATH THROUGH THE SHARED RESOLVER, never through the bare property. Environment.ProcessPath returns NULL under DETACHED_PROCESS spawn and in elevated contexts -- precisely the two shapes this component runs in. Call ResolveExistingCoreExe (AppBotEyeCommands.GuardianSafety.cs line 67), which remaps a stale sdk/bin path to bin/ and falls back to canonical locations. AppBotEyeCommands.cs line 123 is the reference call site.",
+    "VERIFY A CHANGE HERE BY RUNNING IT, not by reading it. wkappbot eye tick must answer, and wkappbot file grep wkappbot_elevated csharp/src/WKAppBot.CLI must still find the pipe name. A swap-path change that only parse-checks has proven nothing, because every defect in this component so far has been a runtime-context defect rather than a syntax one."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read elevated-eye-admin-pipe-server",
+      "expect": "admin",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read always-on-ai-automation-daemon-appbot-eye-internals",
+      "expect": "Eye",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot file grep wkappbot_elevated csharp/src/WKAppBot.CLI",
+      "expect": "wkappbot_elevated",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "eye",
+    "admin",
+    "pipe",
+    "hot-swap",
+    "elevated",
+    "drain",
+    "self-respawn",
+    "howto",
+    "t2"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-08-27T15:03:01.340784Z",
+  "updated": "2026-08-27T15:03:01.3407842Z",
+  "version": "1.0"
+}

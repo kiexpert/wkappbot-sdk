@@ -1,0 +1,38 @@
+{
+  "id": "wksplit-multi-language-backend-round-trip-gate-howto",
+  "app": "wkappbot-sdk",
+  "title": "wksplit multi-language backend + round-trip gate howto",
+  "title_ko": null,
+  "desc": "Concrete per-language backend selection and the round-trip verification gate for wksplit-smart-multi-language-dedup-round-trip-spec.",
+  "steps": [
+    "MULTI-LANGUAGE BACKENDS by file extension: ps1/psm1 -> PowerShell AST FunctionDefinitionAst.Extent, verify with [Parser]::ParseFile == 0 errors. cs -> partial-class split, verify with Roslyn or dotnet build. py -> python ast module (FunctionDef/ClassDef by lineno/end_lineno), verify with python -m py_compile. sh/bash -> function-block split, verify with bash -n. js/ts -> JS AST (acorn/babel or tsc), verify with node --check or tsc --noEmit. UNKNOWN/generic -> marker-based block split + hash dedup.",
+    "ROUND-TRIP GATE (mandatory before ANY write): (a) output PARSES/COMPILES clean; (b) SYMBOL-SET IDENTITY -- function/class name set in output equals input's unique set, diff empty; (c) for dedup, canonical copy = last-definition-wins for interpreted languages. Never overwrite the original until the gate passes.",
+    "ENCODING SAFETY: read/write BOM-free UTF-8 consistently. Preserve non-ASCII byte-exact; verify round-trip hash of unchanged regions.",
+    "SAFETY PROTOCOL: timestamped backup (file.bak-ts), operate on a sandbox copy, run the round-trip gate, swap into live path only on full pass."
+  ],
+  "requirements": [
+    {
+      "cmd": "wksplit analyze big.py",
+      "expect": "prints dup ratio + dedup map without reading content into LLM",
+      "prompt": null
+    },
+    {
+      "cmd": "wksplit dedup file --verify",
+      "expect": "round-trip parse + symbol-set diff empty before swap",
+      "prompt": null
+    },
+    {
+      "cmd": "bash -n file.sh",
+      "expect": "backend verify gate per language",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-07-25T09:24:00.15116Z",
+  "updated": "2026-07-25T09:24:00.1511684Z",
+  "version": "1.0"
+}

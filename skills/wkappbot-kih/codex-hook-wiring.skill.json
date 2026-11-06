@@ -1,0 +1,58 @@
+{
+  "id": "codex-hook-wiring",
+  "app": "wkappbot-kih",
+  "title": "Codex hook wiring: the whole hook surface, and why Stop is the odd one",
+  "title_ko": null,
+  "desc": "T1 core USAGE tier for the Codex CLI hook surface: where the wiring is declared, the ten events, the one event wired direct, the payload and output contracts, and the rollout-transcript unit that every window must be counted in. Implementation in codex-hook-wiring-howto, measurements in codex-hook-wiring-ref.",
+  "steps": [
+    "NAVIGATION: this is the T1 core, the USAGE tier for the Codex hook surface. How each piece is built, and the contracts a hook script must satisfy, are in codex-hook-wiring-howto. Dated measurements and live runs are in codex-hook-wiring-ref. Siblings worth reading beside it: cross-family-harness-integration for the one-path-per-family architecture, codex-session-hotpath-stop-guard for the transcript-resolution budget, harness-stop-guard for the Claude twin of the Stop gate.",
+    "WHERE THE WIRING LIVES, AND IT IS NOT config.toml. Every Codex hook is declared in CODEX_HOME/hooks.json, which on this machine is the .codex folder under the user profile. config.toml carries only two related things: a features table with hooks set true, which switches the whole mechanism on, and a hooks.state table of trusted_hash rows. Reading config.toml tells you WHETHER hooks run. It never tells you WHAT they do.",
+    "THE TRUST HASH IS PART OF THE WIRING. config.toml records one sha256 per hook entry, keyed by the hooks.json path plus the event name plus two indices, for example a row for the stop event. Editing hooks.json changes the content that hash was taken over, so after any edit treat the entry as untrusted until Codex accepts it again. Never hand-edit hooks.json and then assume the hook still fires: confirm it by making it produce observable output.",
+    "TEN EVENTS, ONE DISPATCHER, ONE EXCEPTION. PreToolUse, PostToolUse, PreCompact, PostCompact, SessionStart, UserPromptSubmit, PermissionRequest, SubagentStart and SubagentStop all point at tools/CodexHookAdapter.ps1 with a Mode argument naming the event. Stop alone points DIRECTLY at tools/wkharness-codex-stop.ps1. The adapter ALSO contains a Stop branch, and on this machine that branch is unreachable, so everything the adapter does for Stop, including its own child deadline, does not protect the live Stop path. Ask which file the hook COMMAND STRING names before crediting any protection to the adapter.",
+    "THE PAYLOAD REACHES A HOOK TWO DIFFERENT WAYS, AND A SCRIPT MUST ACCEPT BOTH. Through the adapter the raw JSON is written to a temp file and the child is started with a RawFile argument, so the child must declare a string RawFile parameter and read that file first. Wired direct, as Stop is, there is no RawFile at all and the payload arrives on stdin only. A child that reads only stdin is empty under the adapter; a child that reads only RawFile is empty when wired direct. Read RawFile when it is given and fall back to stdin otherwise.",
+    "THE OUTPUT CONTRACT IS ONE COMPACT JSON LINE ON STDOUT AND ALWAYS EXIT 0. A Stop verdict is a decision of allow or block, plus a reason when it blocks. Build it with ConvertTo-Json and the Compress switch, never by hand: tools/wkharness-codex-stop/Get-WkCodexStopVerdict.ps1 exists for exactly this. Malformed JSON or a non-zero exit is not a stricter gate, it is an unreadable one, and Codex then has no decision to act on.",
+    "THE TRANSCRIPT IS A ROLLOUT JSONL, AND A RAW LINE IS NOT A CHAT LINE. The payload carries transcript_path pointing into CODEX_HOME/sessions under a year, month and day folder, at a file named rollout plus a timestamp plus the thread id. One assistant turn appends SEVERAL rows: response_item rows whose payload type is function_call, function_call_output or message, plus event_msg rows and a token_usage_record row. Only rows whose payload type is message are chat lines. Any window counted in raw lines is counted in the wrong unit and will silently never fire.",
+    "A STOP BLOCK COMES BACK AS A USER CHAT MESSAGE, WHICH IS EXACTLY WHY STOP CAN LOOP. Codex injects the block reason into the conversation as a message record with role user, the model answers it, the turn ends, Stop fires again and blocks again on the same state. Every Codex Stop gate therefore needs an explicit anti-loop rule, and the cheap correct one is a fast ALLOW when a stop-hook marker appears within the last few CHAT MESSAGE records. Without it the gate does not merely annoy: it prevents the session ending at all.",
+    "HOW TO TEST A CODEX HOOK, BOTH LEVELS, CHEAP ONE FIRST. DIRECT: pipe a synthetic payload JSON into the hook script with powershell NoProfile NonInteractive ExecutionPolicy Bypass File, and read the JSON it prints plus the elapsed milliseconds. LIVE: run the codex CLI itself, under a wall-clock timeout, so a looping Stop hook cannot hang the terminal you are testing from. Never conclude a hook works by reading it. A Stop gate is judged by what it REFUSES and, just as much, by what it correctly stops refusing.",
+    "TODO: when live Codex reports invalid stop-hook JSON, capture the hook's raw stdout before parsing; verify the direct hooks.json command route, require exactly one compact JSON line and exit 0, and distinguish adapter diagnostics from the live direct Stop path.",
+    "TODO: when diagnosing a live hook from another repository, resolve the active absolute command path from C:\\\\Users\\\\***\\\\.codex\\\\hooks.json before reading the current workspace; a missing local hook file is a routing fact, not proof of malformed output."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read codex-hook-wiring-howto",
+      "expect": "the hook script contract, the deadline shape, and the test recipes",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read codex-hook-wiring-ref",
+      "expect": "the dated measurements behind every number in the core",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read cross-family-harness-integration",
+      "expect": "the one-path-per-family architecture this hook surface plugs into",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "codex",
+    "hook",
+    "hooks-json",
+    "stop",
+    "adapter",
+    "rollout",
+    "transcript",
+    "jsonl",
+    "trust-hash",
+    "harness",
+    "t1",
+    "core"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-09-11T02:29:19.2866528Z",
+  "updated": "2026-09-16T03:12:57.1852893Z",
+  "version": "1.2"
+}

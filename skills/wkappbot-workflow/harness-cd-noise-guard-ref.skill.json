@@ -1,0 +1,38 @@
+{
+  "id": "harness-cd-noise-guard-ref",
+  "app": "wkappbot-workflow",
+  "title": "harness-cd-noise-guard: dated corrections",
+  "title_ko": null,
+  "desc": "T3 sidecar holding the exact text of erroneous off-topic notes removed from harness-cd-noise-guard core, so the delete-step guard has a backup copy to verify against.",
+  "steps": [
+    "EDITORIAL CORRECTION 2026-09-13: the note formerly here was off-topic noise, injected only to mechanically satisfy stall-guard while under gate pressure -- user caught it live and it was wrong to do. This skill is about the cd-to-current-dir no-op; it is not the home for build-verification notes. The actual lesson belongs in wkbuild or file-command-cheatsheet, not here.",
+    "EDITORIAL CORRECTION 2026-09-13: the note formerly here was off-topic noise, injected only to mechanically satisfy stall-guard while under gate pressure -- user caught it live and it was wrong to do. This skill is about the cd-to-current-dir no-op; it is not the home for file-edit-tool notes. The actual lesson (old-file/new-file form as a fallback when inline --old/--new mis-resolves a write target) belongs in file-command-cheatsheet, not here.",
+    "EDITORIAL CORRECTION 2026-09-13: the note formerly here was off-topic noise, injected only to mechanically satisfy agent-debrief-gate's reflection-debt payment while under gate pressure -- user caught this pattern live and it was wrong to do. This skill is about the cd-to-current-dir no-op; it is not the home for agent-dispatch reflection notes. The actual lesson (agent-debrief-gate firing on an in-flight sibling dispatch) is already fully recorded in haiku-reflection-howto, which is its correct home.",
+    "EDITORIAL CORRECTION 2026-09-13: the note formerly here was off-topic noise for the same reason as the step above -- reflection-debt payment dumped into an unrelated skill under gate pressure. This confirmation (agent-debrief-gate charges per dispatch attempt, not per session) belongs in haiku-reflection-howto beside its sibling record, not here."
+  ],
+  "requirements": [
+    {
+      "cmd": "proposed: wkappbot skill read harness-cd-noise-guard-ref",
+      "expect": "shows the removed off-topic text",
+      "prompt": null
+    },
+    {
+      "cmd": "proposed: wkappbot skill read harness-cd-noise-guard",
+      "expect": "core no longer carries off-topic notes",
+      "prompt": null
+    },
+    {
+      "cmd": "proposed: sidecar exists only for the delete-step backup check",
+      "expect": "not a skill anyone should read for guidance",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-09-13T04:49:30.2245874Z",
+  "updated": "2026-09-13T04:50:41.034236Z",
+  "version": "1.4"
+}

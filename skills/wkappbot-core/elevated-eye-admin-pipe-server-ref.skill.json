@@ -1,0 +1,49 @@
+{
+  "id": "elevated-eye-admin-pipe-server-ref",
+  "app": "wkappbot-core",
+  "title": "Elevated Eye admin pipe: dated incidents and the root cause behind each fix",
+  "title_ko": null,
+  "desc": "T3 ref for elevated-eye-admin-pipe-server: the sudo spawn-race that took fifteen commits to root-cause, and the hot-swap status blindness of 2026-08-27.",
+  "steps": [
+    "INCIDENT 2026-05-01, the sudo instability loop, commits 4af2b2bc and 4ebb597c. ROOT CAUSE, after fifteen commits of symptom patching: SudoHandler.SpawnAndAwaitAdmin and LaunchElevatedEye were TWO SEPARATE spawn paths with no shared mutex, so concurrent --sudo callers each raised their own UAC dialog, each spawned an admin Eye, and both raced to bind the wkappbot_elevated pipe. Every earlier fix -- cooldown timers, kill-on-cancel, infinite-poll -- treated a symptom. WHAT THE FIX ACTUALLY WAS, four parts: SudoHandler collapsed into a thin wrapper delegating to LaunchElevatedEye alone, deleting 220 lines of duplicate spawn logic and leaving ONE mutex-protected path; the Mutex replaced by a NAMED SEMAPHORE because Mutex is OS-thread-affine and ReleaseMutex from a different async thread-pool thread throws ApplicationException and leaves the mutex held forever; a ThreadStatic _launchInProgress re-entrancy guard so a same-thread re-entry returns immediately instead of spawning again; and proc.Kill with entireProcessTree true on the pipe-timeout path so an approved UAC that never brought the pipe up cannot orphan an admin Eye.",
+    "THE TRANSFERABLE LESSON FROM 2026-05-01: fifteen commits went into timers and retries while the defect was DUPLICATION -- two code paths doing the same privileged thing. When a race keeps coming back after each new guard, stop adding guards and count the paths. And note the second-order trap inside the fix itself: the obvious synchronisation primitive was the wrong one, because thread affinity made Mutex silently unreleasable in async code, which no amount of testing the happy path would reveal.",
+    "INCIDENT 2026-08-27, hot-swap status could not name its own executable. wkappbot eye hotswap status returned the literal string cannot determine process path instead of a verdict, so swap state was invisible -- and a separate open item, deployment of a [LOG] fix, was gated on a force-swap whose state nobody could read. ROOT CAUSE: EyeHotSwapCommand at AppBotEyeCommands.cs line 1708 used the bare Environment.ProcessPath, which returns NULL under DETACHED_PROCESS spawn and in elevated contexts, the two shapes this component always runs in. THE FIX WAS ALREADY IN THE FILE: line 123 of the same source already wrapped the call as ResolveExistingCoreExe(Environment.ProcessPath), and that resolver at GuardianSafety.cs line 67 remaps a stale sdk/bin path to bin/ and falls back to canonical locations, proven in production by EnsureEyeWatchdogTask and the guardian respawn loop.",
+    "THE TRANSFERABLE LESSON FROM 2026-08-27: the correct pattern sat eleven hundred lines above the defect, already shipping. Before writing any fix in this codebase, grep the SAME FILE for the same call -- a second resolver would have been pure duplication, which is the identical failure class as the 2026-05-01 two-spawn-path incident recorded above. Twice now this component was broken by having two ways to do one thing."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read elevated-eye-admin-pipe-server",
+      "expect": "admin",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read elevated-eye-admin-pipe-server-howto",
+      "expect": "ACCEPT AND SERVE A CLIENT",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read always-on-ai-automation-daemon-appbot-eye-internals",
+      "expect": "Eye",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "eye",
+    "admin",
+    "pipe",
+    "elevated",
+    "incident",
+    "ref",
+    "t3",
+    "sudo",
+    "race",
+    "hot-swap"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-08-27T15:03:33.595969Z",
+  "updated": "2026-08-27T15:03:33.5959691Z",
+  "version": "1.0"
+}

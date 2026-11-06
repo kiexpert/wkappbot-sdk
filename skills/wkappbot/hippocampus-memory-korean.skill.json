@@ -1,0 +1,33 @@
+{
+  "id": "hippocampus-memory-korean",
+  "app": "wkappbot",
+  "title": "Hippocampus memory (DEAD -- use wkhippo instead)",
+  "title_ko": null,
+  "desc": "DEAD ON ARRIVAL (2026-07-23): points at scripts/hippocampus_tool.py which does not exist in this repo. Superseded by the real memory organ -- use wkhippo / hippocampus-living-memory-howto instead.",
+  "steps": [
+    "wkappbot skill read suggest-workflow",
+    "python scripts/hippocampus_tool.py add   --content \"<내용>\"   --tags <태그들>",
+    "python scripts/hippocampus_tool.py query  --q \"<검색어>\"   --top 5",
+    "REDIRECT (2026-07-23 audit): do NOT follow steps 2-3 of this skill -- scripts/hippocampus_tool.py does not exist in this repository, so every command here fails and its single requirement ('python scripts/hippocampus_tool.py --help' => MANDATORY) can never pass. The working memory organ is wkhippo: read 'hippocampus-living-memory-howto' for recall/foresee/export/status usage and the wkfind four-source find organ, and 'wkrecall' for the recall path. This entry is kept only so a successor who finds the id learns it is dead rather than re-deriving the same failure."
+  ],
+  "requirements": [
+    {
+      "cmd": "python scripts/hippocampus_tool.py --help",
+      "expect": "MANDATORY",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "memory",
+    "hippocampus",
+    "korean",
+    "utility"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": null,
+  "created": "2026-07-23T02:47:59.722612Z",
+  "updated": "2026-07-23T02:48:25.616842Z",
+  "version": "1.6"
+}

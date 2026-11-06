@@ -1,0 +1,50 @@
+{
+  "id": "exec-console-binding-constitution-howto",
+  "app": "wkappbot-core",
+  "title": "Console-binding constitution (T2 howto): how to check, prove, route and rank",
+  "title_ko": null,
+  "desc": "Procedures for applying exec-console-binding-constitution: the four-question review order, how to prove an input-side fix, how to decide binding versus adoption, and how to rank candidates in any listing or kill command. Core: exec-console-binding-constitution. Incidents: exec-console-binding-constitution-ref.",
+  "steps": [
+    "PROCEDURE: HOW TO CHECK A CONSOLE-TOUCHING CHANGE AGAINST THE CONSTITUTION, in the order that catches the most for the least effort. First ask what the change WRITES to and what it READS from, because every violation so far has been on the input side and none on the output side. Second, list every call site that touches that same handle -- the defect on 2026-08-20 was five writers on one ConPTY input handle, and no single call site looked wrong on its own. Third, find the predicate that decides whether a reader starts, then grep for that same concept elsewhere, because the twin predicates that had drifted were two files apart and each was locally reasonable. Fourth, follow the failure branch: if resolution fails, does the code refuse or does it guess. WHEN: reviewing or writing any exec, injector, taskkill, or caller-resolution change. HOW: run wkappbot skill read exec-console-binding-constitution for the Articles, then walk these four questions in order. WHY: the four map onto Articles 2, 5, 5 again and 4, and in the one real investigation they were sufficient -- the cause was found in four steps with no debugger and no live repro.",
+    "PROCEDURE: HOW TO PROVE AN INPUT-SIDE FIX, since a string-presence check is not a compile and a self-test written by the author of the code checks the code against itself. Demand three artifacts from whoever builds it: a wired proto that is a BYTE COPY of canonical carrying only the seam, a unified diff against canonical, and a self-test that shows BOTH HALVES -- the hazard present without the change and absent with it. Then ROOT reads the diff itself rather than the summary, and runs a real build from the canonical path after promotion. WHEN: landing any concurrency or input-delivery fix. HOW: run wkappbot skill read proto-to-live-wiring-howto for the brief shape that produces those three artifacts, and wkappbot skill read verify-tool-or-guard-synthetic-live-static-howto for why the parse-check must be a real compile. WHY: on 2026-08-20 a delegated agent reported PARSE OK for exactly this fix, and its parse check was a grep for the strings it had just inserted -- it had never compiled anything, so the only honest verification left was ROOT reading the diff and building.",
+    "PROCEDURE: HOW TO DECIDE BINDING VERSUS ADOPTION, because they take different paths and the wrong path is how a stranger process gets touched. Ask one question: am I going to write INPUT into this thing, or only ask it to start, stop, or report. Input means BINDING and requires the console axis plus a corroborating axis, and it refuses when ambiguous. Start, stop or report means ADOPTION, which is allowed to identify a daemon by the repo it serves -- but by READING the claim that daemon published at startup, never by scanning the working directory for a match. WHEN: any command that must reach a process the caller did not spawn, the ordinary case being a repo daemon launched from a desktop shortcut. HOW: run wkappbot skill read exec-console-binding-constitution and apply Article 9, then wkappbot skill read always-on-ai-automation-daemon-appbot-eye-internals for how a long-lived daemon here already records its own lifecycle state. WHY: the owner raised the shortcut-launched daemon case directly, and it is the one place where the working folder is genuinely the right identity -- but a scan is a guess while a published claim is a contract, and the difference decides whether the wrong daemon can ever be selected.",
+    "PROCEDURE: HOW TO ORDER CANDIDATES IN ANY COMMAND THAT LISTS OR KILLS PROCESSES. Sort before you filter, and sort by ownership: processes attached to the own console first, then processes descended from the own console, then everything else, and that last group only when explicitly named. Apply the same order to READ-ONLY listings, not just to destructive verbs. WHEN: taskkill, tasklist, jobs, window enumeration, and any classification a later decision consumes. HOW: run wkappbot skill read wktasklist-intelligent-management for the ranking and sanctuary rules already in force, and wkappbot skill read wkappbot-taskkill-usage-howto for the kill-routing contract. WHY: a listing is the input to the next decision, so a listing that puts a stranger first has already aimed the kill -- and this repo has both failures on record, a summary line reporting Killed N when every kill had been guard-skipped, and a survey labelling five live daemons as orphaned zombies purely because their parent was null by design."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read exec-console-binding-constitution",
+      "expect": "the Articles these procedures apply",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read proto-to-live-wiring-howto",
+      "expect": "the three-artifact brief shape the prove-a-fix procedure depends on",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wktasklist-intelligent-management",
+      "expect": "the ranking and sanctuary rules the candidate-ordering procedure builds on",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "exec",
+    "console",
+    "constitution",
+    "howto",
+    "t2",
+    "procedure",
+    "review",
+    "adoption",
+    "taskkill",
+    "헌법",
+    "절차"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-08-20T05:05:00.2250586Z",
+  "updated": "2026-08-20T05:05:00.2250703Z",
+  "version": "1.0"
+}

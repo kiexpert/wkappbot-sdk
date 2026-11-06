@@ -1,0 +1,36 @@
+{
+  "id": "suggest-resolve-evidence-conventions-ref",
+  "app": "wkappbot-workflow",
+  "title": "suggest-resolve-evidence-conventions-ref",
+  "title_ko": null,
+  "desc": "Reference: dated evidence script verification results and resolved suggests (2026).",
+  "steps": [
+    "RESULT 2026-07-19: reused step 13 minimal git-commit-verified evidence pattern (grep the fix + git merge-base --is-ancestor + wkappbot --version for CMD guard) for suggest ts=2026-07-07T08:49:26 (input CommandHelpMap entry, commit 1200177c1) -- confirms the pattern still works for a simple source-grep-plus-live-help-text fix.",
+    "VERIFIED 2026-08-05: BackupSuggestFile (SuggestCommand.GitCommit.cs line 178) uses stable pattern suggestions.bak.{stamp}-{n}.jsonl with counter. Part3.cs violated this by using DateTime.Now inside if(ratio>0.5) condition, creating .bak-ts1.bak-ts2 chains on retry. FIX: apply counter pattern to Part3 lines 132-135 (commit in flight via codex delegation)."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read suggest-resolve-evidence-conventions",
+      "expect": "See core conventions",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot suggest list",
+      "expect": "Shows pending suggests",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read suggest-resolve-evidence-conventions-howto",
+      "expect": "See recipes",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-09-04T10:28:26.5141543Z",
+  "updated": "2026-09-04T10:29:20.412782Z",
+  "version": "1.4"
+}

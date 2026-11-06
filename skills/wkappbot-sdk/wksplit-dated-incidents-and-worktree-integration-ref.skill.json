@@ -1,0 +1,36 @@
+{
+  "id": "wksplit-dated-incidents-and-worktree-integration-ref",
+  "app": "wkappbot-sdk",
+  "title": "wksplit dated incidents and worktree integration ref",
+  "title_ko": null,
+  "desc": "Dated incident log for wksplit-smart-multi-language-dedup-round-trip-spec -- worktree integration and stall-guard escalation cases.",
+  "steps": [
+    "2026-07-08 worktree integration: A11yCommand.cs Async Actions banner (--help output) updated to add the watch verb alongside wait/eval; verified via wkappbot a11y --help after rebuild.",
+    "RESULT: 7 consecutive stall-guard blocks on the WebTabsCommand fix retry, batched and sequential pulse-then-retry both failed. WHEN: this pathology exceeds 7 attempts. HOW: wkappbot skill read claude-code-agent-tier-routing for delegating the mechanical edit to a fresh agent instead, since a new subagent starts with a clean stall-window. WHY: matches the documented near-dead-end finding for a delegated subagent but ROOT itself retrying repeatedly has the same ceiling -- switching approach."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot a11y --help",
+      "expect": "shows watch verb alongside wait/eval",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read claude-code-agent-tier-routing",
+      "expect": "delegation routing guidance for stall pathology",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wksplit-smart-multi-language-dedup-round-trip-spec",
+      "expect": "core spec, cross-links this ref",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-07-25T09:24:16.9743711Z",
+  "updated": "2026-07-25T09:24:16.9743798Z",
+  "version": "1.0"
+}

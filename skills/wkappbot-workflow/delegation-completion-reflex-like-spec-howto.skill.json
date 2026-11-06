@@ -1,0 +1,51 @@
+{
+  "id": "delegation-completion-reflex-like-spec-howto",
+  "app": "wkappbot-workflow",
+  "title": "Reflex-pulse-gate: how to pay the pulse (T2 howto)",
+  "title_ko": null,
+  "desc": "How to USE the reflex-pulse: at mission completion, record a self-reflection --like on the reflex that carried the mission, before the next delegation. Fragment selection, attribution, timing. Core: delegation-completion-reflex-like-spec.",
+  "steps": [
+    "HOW TO PAY A PULSE: at mission completion, before your next delegation, run wkappbot skill edit ACTING-MODEL-reflection --like \"UNIQUE CONTENT FRAGMENT\" where the fragment names the reflex step that ACTUALLY carried this mission. This records a real, transcript-indexed like (a pulse) that wkhippo can verify.",
+    "FRAGMENT SELECTION: pick a fragment that matches EXACTLY ONE step. 0 matches or 2-plus matches is an ERROR by design -- it forces you to name a unique phrase, which proves you actually read the step and prevents mis-liking the wrong one. Quote the fragment so the shell does not strip it. THE OPACITY IS THE FEATURE, not a bug: the error never tells you how CLOSE you got, and one session burned three retries before realising its fragments were quoted from a DIFFERENT skill entirely. A near-miss hint would let a fragment be guessed from memory, which is exactly the proof-of-reading this gate exists to demand -- so when a fragment does not match, go open the step and copy it, never refine the guess",
+    "ATTRIBUTION: the ACTING model likes its OWN reflection (haiku likes haiku-reflection, sonnet likes sonnet-reflection, opus likes opus-self-reflection). ROOT additionally likes the ROOT-model reflection for the orchestration reflex that helped. Do not like another model reflection on its behalf.",
+    "TIMING and EFFECT: pay before the next delegation -- the pre-delegation reflex-pulse-gate enforces it (an unpaid pulse blocks the next dispatch). Each delegation earns its OWN pulse: the detection is scoped to likes recorded AFTER the last delegation completed, so one stale like cannot cover many missions. EFFECT: the liked step rises in merit rank (reflex-merit-lifecycle PHASE 1) and stays alive; unpulsed reflexes sink and archive.",
+    "SPEC, owner 2026-10-02: NOISE IS ANTI-KNOWLEDGE AND IS BLOCKED, NOT MERELY UNPAID. WHEN: a delegation completed and the next call needs a pulse. HOW: the gate (tools/wkharness-reflex-pulse.ps1) pays only a like on a reflection skill whose why has 6 or more distinct words and whose why and quoted fragment share under half their words with EVERY earlier like or why of this session, history read with one ReadAllLines plus a Contains prefilter. A like whose result printed already-at-the-top or no-step-matched pays nothing and does not count as the previous one. The block message names the reason and says how to pay: pick an unquoted step, copy 5 or more words, write the concrete thing done this turn in new words. WHY: 25 near-identical one-line whys and one memorized fragment were measured in one seat. TRAPS PROVEN BY FIXTURE: the failure patterns must be concatenated in the source so the source line never matches itself in a transcript, and a rejected like must not become the previous one. VERIFY: .tmp/pulse-fixture-test.ps1, 11 cases, expect 11 of 11 with 4 blocked and 2 history cases. //why:of six or more words that share no words with ANY earlier-sonnet",
+    "PULSE GATE ROAD THAT WORKED 2026-10-02 (about thirty pulses paid in one seat): the gate fires on the next tool call after EVERY completed sector notification, so pay it once per completion with ONE call: wkappbot skill edit sonnet-reflection --like with the READY COMMAND fragment copied letter for letter from the refusal (the gate prints some fragments with an odd spelling on purpose, a corrected spelling fails with no step matched) and a --why of six or more words that share no words with ANY earlier --why of the session (a repeated word set is refused as NOISE and costs a round); a NOISE refusal on the like means the fragment repeats an earlier like, so take the new READY COMMAND it prints. Never pay with a new step, a like is enough, and pay before dispatching the next sector because the dispatch itself is what gets refused.",
+    "SPEC LIKE-TO-MD (owner 2026-10-09, approved with ga after spokesman cfff4d4f proposal): a successful wkappbot skill edit ID --like FRAGMENT --why WORDS also engraves the liked sentence into the repo md named after the intelligence process (claude CLAUDE.md, codex CODEX.md, agy AGY.md) under the heading '## Liked reflexes [ALL]'. Each line reads '- FRAGMENT -> wkappbot skill read ID --keep 'FRAGMENT''. At most 10 lines. A line whose fragment shares 70 percent or more of its content words (4+ letters, Jaccard) with the new fragment is replaced by the new line and moved up one line; a new line enters at the bottom and, past 10, the old bottom line above it is dropped. Skipped: a failed edit (no '[SKILL] Updated:' in the output), a fragment holding a single quote, and a --why sharing no 4+ letter word with the fragment (a gate-passing like). The section is created right above '## Pending' or, without one, at the end of the file. Module tools/Add-WkLikedReflexToMd.ps1 in wkappbot-kih, one seam line in tools/wkharness-claude-post.ps1 beside the like-hint seam, fail open (landed kih 0c7e5537b). CODEX AND AGY (owner 2026-10-09, they need it more): the same seam line sits in wkharness-codex-post.ps1 (Family codex) and wkharness-agy-post.ps1 (Family agy) right above the additionalContext emit comment; a missing repo CODEX.md or AGY.md is CREATED with a one-line title, because codex and agy do not auto-load those names, and each family global md carries one pointer line telling it to read that section first: codex ~/.codex/AGENTS.md, agy ~/.gemini/antigravity-cli/AGY.md. GLOBAL FOR FOREIGN SKILLS (owner 2026-10-10, fast family adaptation): when the liked skill file does not live under the current repo's skills folder, a codex or agy like is engraved into the family's GLOBAL process-name md (~/.codex/CODEX.md, ~/.gemini/antigravity-cli/AGY.md) instead of the repo md, so the family carries it into every repo; a skill of this repo stays in the repo md; CLAUDE TOO (owner 2026-10-10, second order at seat cfff4d4f descent): a claude like on a foreign skill goes into the GLOBAL CLAUDE.md of the user home claude folder (Get-WkFamilyMdPair GlobalPath) under '## Liked reflexes [ALL]' with the same 10-line rules; a new section is inserted above the first heading that starts '## Pending' or '## Spokesman mode', so the [SPOKESMAN ONLY] section stays last; a skill of this repo stays in the repo CLAUDE.md. Only the FIRST LINE of the tool command can carry the like (a shell wrapper prefix is fine), because the hook also sees Write and Edit text and a test file holding a like line once engraved a fake like (measured 2026-10-10)."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read delegation-completion-reflex-like-spec",
+      "expect": "reflex-pulse-gate",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read delegation-completion-reflex-like-spec-howto",
+      "expect": "HOW TO PAY A PULSE",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill search reflex pulse how to pay like",
+      "expect": "delegation-completion-reflex-like-spec-howto",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "reflex",
+    " pulse",
+    " gate",
+    " howto",
+    " use",
+    " like",
+    " fragment",
+    " attribution",
+    " mission-completion"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-07-14T13:40:00.7989167Z",
+  "updated": "2026-10-10T05:03:58.3905928Z",
+  "version": "1.10"
+}

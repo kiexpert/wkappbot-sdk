@@ -1,0 +1,50 @@
+{
+  "id": "raw-command-line-echo-carriers-seams-landing-order",
+  "app": "wkappbot",
+  "title": "Raw command line echo: carriers, seams, landing order",
+  "title_ko": null,
+  "desc": "How the ACT line shows the caller raw command line: env var carrier for the bypass spawn, __raw: wire prefix for the Eye pipe, MCP meta carrier for the third hop. Seam list with status, safe landing order, verification commands.",
+  "steps": [
+    "PURPOSE 2026-09-20 (owner option A): the ACT line printed at Program.Dispatch.cs must show the text the shell actually handed the launcher, not a string rebuilt from parsed args, so shell distortion (eaten backslashes, quotes, dollar expansion) is visible at a glance. The core prints raw when a carrier delivered it and otherwise the rebuilt join, byte-identical to before, so every seam is safe to land alone. Helpers live in csharp/src/WKAppBot.CLI/Program.ActLine.cs (RawArgsTail, PickActArgs, ActArgsText).",
+    "CARRIERS: (1) bypass spawn (launcher starts the core directly, including the fallback after the pipe connect fails): the launcher publishes the wide-char command line as the environment variable WKAPPBOT_RAW_CMDLINE (EncodingRecovery.cs, 16000 char cap, GetCommandLineW because the ANSI read is lossy on this machine, ACP 949 turned an emoji into a question mark); the core reads it once at type init and clears it so grandchildren never inherit it, and ignores it inside Eye and the MCP worker where it would be the daemon own start line. (2) Eye pipe: wire prefix __raw: next to __hwnd:, stripped in EyeCmdPipeServer.Pipe.cs and stored per command in the CallerRawCmd AsyncLocal. (3) a11y, windows, inspect family: Eye forwards over JSON-RPC to an MCP worker that spawns a fresh core, so the value rides in _meta under callerRawCmd and the runner sets the env var on the spawned core.",
+    "LANDING ORDER, because an OLD Eye treats an unlisted __raw: entry as the COMMAND and would break every piped command: core side first (EyeCmdPipeServer.cs const and AsyncLocal, ActLine module, Pipe.cs strip, Dispatch.cs swap), then build and restart Eye, then the launcher seams. Status 2026-09-20: core side and the bypass env carrier are LIVE (commits 49f3b55563 493024d3e0 8a7f5b6073 72a9c69e24 46fd1df535, launcher v7.9.287); the launcher __raw: prefix and the MCP third hop were still being built.",
+    "CHECK by running, not reading: staging core by path with WKAPPBOT_RAW_CMDLINE set must echo the raw tail and without it must equal the rebuilt line; live check is wkappbot with the only-core flag and a weird argument such as C:\\dir\\ then zzz then a b, expecting the ACT line to carry the raw text and the skill lookup to name C:\\dir\\ alone.",
+    "DEFECT FOUND ON THE WAY, fixed: the launcher hand-rolled command line quoting at five sites escaped only the double quote, so an argument ending in a backslash merged all later arguments and leaked the hidden exit-event pair; all five now call Program.QuoteArg (Program.ArgQuote.cs, the CommandLineToArgvW inverse, self-test 15/15 through the real shell32 parser). WHEN you see a merged argument or a stray exit-event in an ACT line, check that first.",
+    "PROMOTE TRAP: a promote right after a build can fail the launcher smoke with a 30 second version call that is machine load, not the change; re-run the launcher smoke against the staged launcher alone before blaming the diff, and note that every refused promote consumes the staged launcher so it must be rebuilt."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read raw-command-line-echo-carriers-seams-landing-order",
+      "expect": "WKAPPBOT_RAW_CMDLINE",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read raw-command-line-echo-carriers-seams-landing-order",
+      "expect": "LANDING ORDER",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read raw-command-line-echo-carriers-seams-landing-order",
+      "expect": "QuoteArg",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "wkappbot",
+    "launcher",
+    "eye",
+    "cmdline",
+    "ACT",
+    "raw",
+    "quoting",
+    "IPC",
+    "GetCommandLineW"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-09-19T19:19:20.078715Z",
+  "updated": "2026-09-19T19:54:58.5177185Z",
+  "version": "1.2"
+}

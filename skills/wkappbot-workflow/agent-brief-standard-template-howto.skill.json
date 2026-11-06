@@ -1,0 +1,43 @@
+{
+  "id": "agent-brief-standard-template-howto",
+  "app": "wkappbot-workflow",
+  "title": "Agent brief howto: exit criteria a wrong implementation cannot pass",
+  "title_ko": null,
+  "desc": "T2 procedures for agent-brief-standard-template: writing exit criteria that inaction and deletion cannot satisfy, the proof section that turned three excerpt-protos clean, and the three commands the coordinator runs before accepting delegated work. Core: agent-brief-standard-template. Incidents: agent-brief-standard-template-ref.",
+  "steps": [
+    "EXIT CRITERIA MUST BE A CONJUNCTION, NEVER A BOUND -- a bound is satisfied by doing nothing. Combine one criterion only motion can satisfy with one only restraint can: diff against canonical is NON-EMPTY, AND grep for the seam token is at least 1, AND the line count is at or below N. All three hold simultaneously only if existing lines were REPLACED. Net-zero change and no change look identical to a line count, so never let a count be the only witness.",
+    "REQUIRE A PROOF SECTION, AND PREFER IT OVER A STRONGER MODEL. Add wc -l before and after plus diff against the original as mandatory pasted output. A self-test written by the author who made the cut inherits that author blind spot -- require proof by a command whose output the author does not control.",
+    "NEVER ASK FOR SMALLER WHEN YOU MEAN REPLACED. Deletion is the cheapest way to shrink and a delegate will take it. Say: deletions confined to the block you are replacing, everything outside it byte-identical. Add the standing instruction -- IF A SIZE CONSTRAINT CAN ONLY BE MET BY REMOVING SOMETHING YOU WERE NOT SENT TO REMOVE, SAY SO AND STOP.",
+    "COUNT EACH INVARIANT SEPARATELY, NEVER AS A UNION. A control that can pass for the wrong reason is not a control. Require a PER-TOKEN TABLE, canonical against candidate, one row per invariant, each row that moved accounted for by naming the replaced line. A total is not a distribution.",
+    "THE COORDINATOR RUNS THE COMMAND. Demanding pasted output raises the cost of fabricating it and does not make fabrication impossible. The last step of accepting ANY delegated work is one command run by the coordinator whose output the delegate never touched. When the artifact is guarded from direct edit that is not a reason to skip the run -- running is not editing."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read agent-brief-standard-template-howto",
+      "expect": "output contains EXIT CRITERIA MUST BE A CONJUNCTION",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill search exit criteria conjunction bound",
+      "expect": "agent-brief-standard-template-howto appears in results",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read agent-brief-standard-template",
+      "expect": "output references the -howto sibling by name",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "delegation",
+    "briefing",
+    "verification"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-09-03T17:30:17.5647517Z",
+  "updated": "2026-09-03T17:30:17.5647597Z",
+  "version": "1.0"
+}

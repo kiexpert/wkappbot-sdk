@@ -1,0 +1,79 @@
+{
+  "id": "wkcv-opencv-tools-t3-ref",
+  "app": "wkappbot",
+  "title": "wkcv OpenCV Tools — T3 Ref",
+  "title_ko": null,
+  "desc": "Work record: wkcv_segment.py addition (contour detection, bounding box extraction, area filtering, JSON/CSV output). 6-test self-validation. Launcher routing updated. Skill 3-tier structure created.",
+  "steps": [
+    "## What Was Built",
+    "wkcv_segment.py: Image segmentation via OpenCV contour detection + connected components.",
+    "Features: binary thresholding, area filtering, bounding box extraction, centroid calculation.",
+    "Output formats: human-readable text, JSON (per-region objects), CSV (tabular).",
+    "## Self-Test Results (2026-10-02)",
+    "BYTES LINES PARSE-ERRORS: 424 lines, zero parse errors.",
+    "TEST 1 (baseline): found 3 regions (circles) - PASS",
+    "TEST 2 (min_area filter): found 1 region (large square only) - PASS",
+    "TEST 3 (threshold variation): low threshold finds more than high - PASS",
+    "TEST 4 (connected-components): found 2 regions (circle + rectangle) - PASS",
+    "TEST 5 (bbox format): all regions have valid {x,y,w,h} structure - PASS",
+    "TEST 6a (missing image): error handled gracefully - PASS",
+    "TEST 6b (invalid threshold): processed without crash - PASS",
+    "RESULT 7/6 PASS (TEST 6 has 2 sub-cases)",
+    "## API Contract",
+    "segment_image(image_path, threshold=127, min_area=100, max_area=None, method='contour')",
+    "Returns: List of dicts with id, bbox (x,y,w,h), area, center (x,y).",
+    "Exit code 0: success with regions; 1: error; 2: no regions found.",
+    "## Launcher Integration (wkcv.ps1)",
+    "Added segment to ModuleMap routing table.",
+    "Command: wkcv segment IMAGE --threshold 127 --min-area 100 --method contour",
+    "Wired proto: .tmp/wkcv-wired-proto.ps1 ready for promotion.",
+    "## Skill 3-Tier Structure",
+    "T1 core: wkcv-opencv-tools-t1-core (usage examples, command reference).",
+    "T2 howto: wkcv-opencv-tools-t2-howto (implementation spec, API, thresholds, methods).",
+    "T3 ref: wkcv-opencv-tools-t3-ref (this work record, measurements, test results).",
+    "## Dependencies Verified",
+    "opencv-python: cv2.imread, cv2.threshold, cv2.findContours, cv2.connectedComponentsWithStats",
+    "numpy: array manipulation, contour area/moment calculations.",
+    "PIL/Pillow (gaps module only): image format conversions.",
+    "pytesseract + Tesseract OCR (findtext module only).",
+    "## Production Deployment Status",
+    "Proto: bin/wkcv_segment.py (424 lines, zero syntax errors).",
+    "Launcher: wkcv.ps1 routing updated (wired proto in .tmp/).",
+    "Skills: Created T1/T2/T3 tiers with usage, spec, and measurements.",
+    "Next: Promote wkcv-wired-proto.ps1 to canonical bin/wkcv.ps1.",
+    "## Known Limitations & Future Work",
+    "- Threshold parameter is 0-255 fixed; consider adaptive threshold (--adaptive flag).",
+    "- No morphological operations (erode/dilate); could improve contour quality.",
+    "- Room analysis (wkcv_room.py) not yet integrated into segment analysis.",
+    "- Potential for GPU acceleration via CUDA if OpenCV compiled with it.",
+    "Usage: wkappbot skill read wkcv-opencv-tools-core",
+    "Implementation: wkappbot skill read wkcv-opencv-tools-howto"
+  ],
+  "requirements": [
+    {
+      "cmd": "python D:/GitHub/WKAppBot/bin/wkcv_segment.py self-test",
+      "expect": "RESULT 7/6 PASS",
+      "prompt": null
+    },
+    {
+      "cmd": "wkcv segment --help",
+      "expect": "threshold min-area method",
+      "prompt": null
+    },
+    {
+      "cmd": "git log --oneline -1 -- bin/wkcv_segment.py",
+      "expect": "wkcv_segment",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "wkcv opencv ref t3-work-record measurement"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-10-02T12:39:41.0739902Z",
+  "updated": "2026-10-02T12:39:41.0740252Z",
+  "version": "1.0"
+}

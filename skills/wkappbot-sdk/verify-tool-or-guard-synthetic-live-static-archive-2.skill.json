@@ -1,0 +1,43 @@
+{
+  "id": "verify-tool-or-guard-synthetic-live-static-archive-2",
+  "app": "wkappbot-sdk",
+  "title": "Verify tool/guard (archive 2): landing space for the unfinished restoration",
+  "title_ko": null,
+  "desc": "Second archive tier for verify-tool-or-guard-synthetic-live-static, created empty 2026-08-23 because the first archive -ref-t3 was already at 21 steps against a 20-step ceiling. Add recovered dated incidents here. Core: verify-tool-or-guard-synthetic-live-static. First archive: verify-tool-or-guard-synthetic-live-static-ref-t3.",
+  "steps": [
+    "NAVIGATION: this is the SECOND archive for verify-tool-or-guard-synthetic-live-static, created empty on 2026-08-23 so the unfinished restoration has somewhere to land. WHEN: restoring dated incidents that the 2026-08-23 migration removed from the core, or adding further recovered material once the first archive refuses an add-step. HOW: run wkappbot skill read verify-tool-or-guard-synthetic-live-static-ref-t3 to see what has already been recovered and avoid duplicating it, then add recovered steps HERE, and run wkappbot skill read verify-tool-or-guard-synthetic-live-static-howto for the run-it-do-not-read-it rule before claiming any step restored. WHY: measured 2026-08-23 by ROOT -- the first archive holds 21 steps against a 20-step ceiling and its -ref sibling holds 29, so the destination the handoff letter named was already full before the restoration began; a successor who starts restoring without a fresh tier hits the same refusal that created this mess. Verify a restored step by grepping a fragment of its BODY, never a phrase the surrounding NAVIGATION text also contains."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read verify-tool-or-guard-synthetic-live-static-archive-2",
+      "expect": "NAVIGATION",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read verify-tool-or-guard-synthetic-live-static-ref-t3",
+      "expect": "NAVIGATION",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read verify-tool-or-guard-synthetic-live-static-howto",
+      "expect": "SYNTHETIC HOWTO",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "verification",
+    "archive",
+    "recovery",
+    "restoration",
+    "migration",
+    "knowledge-loss",
+    "ceiling"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-08-23T02:39:29.0380253Z",
+  "updated": "2026-08-23T02:39:29.0380334Z",
+  "version": "1.0"
+}

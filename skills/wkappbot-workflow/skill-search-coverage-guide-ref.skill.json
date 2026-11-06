@@ -1,0 +1,46 @@
+{
+  "id": "skill-search-coverage-guide-ref",
+  "app": "wkappbot-workflow",
+  "title": "skill-search-coverage-guide dated history (T3 ref)",
+  "title_ko": null,
+  "desc": "Dated split examples, the impact-weighted knowledge-reward design, and open TODOs for skill-search-coverage-guide.",
+  "steps": [
+    "Cross-referenced 2026-07-02 during a wkharness-guards 3-tier split: a fat T1 skill (220+ steps, mostly dated incident narration) hurts BOTH search coverage (steps are OR-filter-only, invisible to score) and study-lock tax -- splitting into T1 catalog + T3 dated-incidents keeps T1 short (helps score density) while T3 still full-text-searchable via OR filter.",
+    "IMPACT-WEIGHTED KNOWLEDGE-REWARD FACTORS (owner 2026-07-09, extends the prediction-bonus in predicted-vs-actual-commando-calibration-ledger step 12). Beyond the base score>=70 reward + a PREDICT: prefix +1, weight the reward BONUS by two data-driven signals so knowledge effort is DIRECTED to high-leverage skills: (1) CROSS-LINK COUNT -- the more other-skill links the edited skill carries to REAL existing skills (dangling links do NOT count, or count less), the higher the bonus. Rewards knowledge-tree CONNECTIVITY. (2) HAIKU READ-COUNT / USAGE -- the more often the skill is actually READ by the fleet (especially Haiku, the cheapest + most-frequent worker), the higher the bonus for improving it. A skill Haiku reads 100x is LOAD-BEARING. This is a USAGE/impact weight from real telemetry and aligns with the Haiku-reliability flywheel (claude-code-agent-tier-routing step 10). ACCEPTED TRADEOFF: biases reward toward already-popular skills (rich-get-richer), but invest knowledge where it is actually used is the correct direction.",
+    "UNIFIED REWARD FORMULA (owner 2026-07-09, supersedes the two separate factors above with ONE sum): knowledge-reward bonus = k times SUM over ALL linked skills of that skills HAIKU-VIEW-COUNT -- proportional to the total Haiku read-count of everything the edited skill links to. Subsumes both earlier factors: more links = more terms (connectivity rewarded); links to heavily-read skills = bigger terms (impact rewarded). DATA SOURCE: the per-skill Haiku-view-count is served by the wkhippo hippocampus indexer (hippocampus-living-memory-howto step 21-23) -- add one per-skill-id read-count query filterable by model family. ANTI-GAMING: only REAL existing linked skills count, read-count is genuine telemetry.",
+    "TODO (owner 2026-07-09): the impact-weighted reward (k times Sum of haikuViewCount of linked skills) is DESIGN, NOT YET BUILT -- ZERO code. Build with the module-timeout reflex+reward system AFTER the hook-timeout is fixed, per wk-tool-sub-1s-response-time-mandate step 17. Do not assume the reward bonus exists in the live knowledge-reward path.",
+    "2026-07-14: observed stall-guard's knowledge-edit reset does not always take effect on the VERY NEXT tool call -- 3 consecutive skill edits (each individually confirmed 100/100 reward) were followed by an immediate Write attempt still reporting 'Solo loop stall limit hit', suggesting the reset write and the guard's read of window-state can race or the guard reads a cached/stale timestamp. Retrying the same tool call once more after a fresh reset is the practical workaround; if it recurs 3+ times in a row treat it as a guard bug worth a suggest filing, not a real 300s solo violation."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read skill-search-coverage-guide-ref",
+      "expect": "shows the 2026-07-02 wkharness-guards split cross-reference",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read skill-search-coverage-guide-ref",
+      "expect": "shows the impact-weighted knowledge-reward design (steps 2-3)",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read skill-search-coverage-guide-ref",
+      "expect": "shows the 2026-07-09 TODO marking the reward formula as design-only, zero code",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "skill",
+    "search",
+    "coverage",
+    "ref",
+    "t3",
+    "history"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-07-10T11:28:25.9662886Z",
+  "updated": "2026-10-11T15:05:11.0556958Z",
+  "version": "1.1"
+}

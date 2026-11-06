@@ -1,0 +1,36 @@
+{
+  "id": "wk-claudemd-switchover",
+  "app": "wkappbot-workflow",
+  "title": "wk-claudemd-switchover: deterministic CLAUDE.md <-> harness-manifest cutover (fail-closed)",
+  "title_ko": null,
+  "desc": "Repo-root 0-LLM tool that moves the ~55 per-file harness:skill lock blocks out of CLAUDE.md into a permanent CLAUDE-harness.md manifest, slimming CLAUDE.md (raises diet-score, Haiku-readable) with ZERO lock loss. Fail-closed: refuses to remove locks from CLAUDE.md until the study-lock reader unions the manifest.",
+  "steps": [
+    "WHAT: wk-claudemd-switchover.ps1 (repo root) is a deterministic 0-LLM cutover -- it moves the per-file ## harness:skill lock blocks from CLAUDE.md into a permanent manifest CLAUDE-harness.md, leaving CLAUDE.md as a lean human runbook + the harness:safe/block behavior gates. Result: CLAUDE.md slims (diet-score up, Haiku-readable) with ZERO lock loss because the locks are then read from the manifest by the study-lock readers $ingestList union.@@USAGE: ./wk-claudemd-switchover.ps1 -DryRun (print plan, write nothing); bare (regen manifest; remove CLAUDE.md blocks ONLY if the reader is wired); -Force (remove even if reader unverified -- DANGEROUS). Block detection = line state machine: a skill block is an optional leading ## comment line whose NEXT line is ## harness:skill, then the header, then body, up to and including the trailing blank line.@@SAFETY (fail-closed, the whole point): skill locks may ONLY be removed from CLAUDE.md AFTER the reader (wkharness-common-skilllock.ps1) unions CLAUDE-harness.md into its $ingestList. Removing before that leaves every covered source UNGUARDED (fail-open, worst harness failure). The script greps the reader for CLAUDE-harness.md and exits 2 (blocked) if absent. The manifest (re)write is ALWAYS safe -- it is additive/redundant until the union lands.@@TODO (pending harness-owner): the reader $ingestList += CLAUDE-harness.md (fail-closed) is NOT yet landed. Until then the tool only regenerates the manifest and blocks the CLAUDE.md removal. Once wired AND a covered source is verified study-lock VALID, re-run to complete the cutover, then merge the lean human runbook (CLAUDE-lean-draft.md).@@SEE ALSO: harness-diet-score-guard (why slim + score is line-count-driven), claudemd-slim-plan (the slim vision), wksplit-md (the Pending-extractor sibling tool), wkharness-guards (the reader/guards).",
+    "LIVE FAIL-OPEN INCIDENT (2026-07-06, do NOT repeat): running this script with -Force BEFORE the reader unions CLAUDE-harness.md ACTUALLY fail-opened all 55 source files. Confirmed live: after the -Force slim, reading TasklistCompatCommand.cs reported '!! UNGUARDED SOURCE !! -- has NO skill-lock' -- every moved lock was gone because the study-lock reader reads harness:skill only from (1) inline source markers and (2) the file's repo-root CLAUDE.md; the blocks were now in CLAUDE-harness.md which the reader does NOT yet ingest. Recovery: git restore --source=<pre-slim-commit> CLAUDE.md, then re-read a covered source to confirm study-lock VALID 3/3 again, then commit the restore. LESSON: the script's fail-closed block (exit 2 when the reader does not union the manifest) is CORRECT and MUST NOT be bypassed with -Force. The ONLY safe sequence is reader-first: harness-owner adds CLAUDE-harness.md to the skilllock  (fail-closed) + verifies a covered source stays VALID, THEN the slim runs (without -Force, the precheck passes on its own). -Force under 'just slim it now' pressure = 55 unguarded sources. Never again."
+  ],
+  "requirements": [
+    {
+      "cmd": "wk-claudemd-switchover -DryRun",
+      "expect": "prints plan (skill blocks -> manifest count), writes nothing",
+      "prompt": null
+    },
+    {
+      "cmd": "wk-claudemd-switchover when reader not wired",
+      "expect": "regenerates manifest + BLOCKED fail-closed on CLAUDE.md removal (exit 2)",
+      "prompt": null
+    },
+    {
+      "cmd": "proposed: wk-claudemd-switchover after reader unions CLAUDE-harness.md",
+      "expect": "slims CLAUDE.md, 55 skill blocks removed, locks still VALID via manifest",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-07-06T12:57:56.7119288Z",
+  "updated": "2026-07-06T14:12:39.622979Z",
+  "version": "1.1"
+}

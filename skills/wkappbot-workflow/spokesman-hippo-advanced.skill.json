@@ -1,0 +1,52 @@
+{
+  "id": "spokesman-hippo-advanced",
+  "app": "wkappbot-workflow",
+  "title": "Spokesman hippo advanced use",
+  "title_ko": null,
+  "desc": "Advanced wkhippo use for spokesmen: answer every session question through the indexer (roots, trace, recall, foresee, studied, pending agents), never a raw jsonl scan",
+  "steps": [
+    "ROOT STATUS: wkroot.cmd roots -json for alive and inboxBytes, then wkhippo trace SID --last 6 for what the root just did. Read the beat status md at wkappbot-kih/.tmp/wkroot-status/SID8.md before any transcript. //why:trace answers what a root just did-sonnet",
+    "SESSION FACTS: which skills a session studied and which async agents are still pending come from the studied index (schema v3 records __agent_launch__ and __agent_done__, function Get-WkAsyncPendingFromIndex in WKAppBot/bin/wkhippo-studied-agents.ps1). The smart Stop frame already uses it. //why:pending agents feed the new root live state //why:pending agents feed the new root live state-opus",
+    "PRIOR ART: before dispatching run wkhippo recall TOPIC (did a senior do this) and wkhippo foresee APPROACH (did that approach fail). Read-only and always allowed.",
+    "MIGRATION DEBT: old tail or glob scans of the claude projects folder are listed in wkappbot-kih/.tmp/hippo-migrate/survey.md (15 MIGRATE, 12 EXTEND), top target tools/wkharness-claude-pace.ps1 lines 207 and 282. An indexer that is slow or lacks a question shape is fixed through proto-to-live-wiring, never bypassed. Owner rule 2026-09-26, see hippocampus-living-memory-howto step 22.",
+    "SPEC BLOCKED-FOLD (owner 2026-10-10: many blocks mean the intelligence is flailing, so the volume is the reflex-tuning signal, not noise to read): wkhippo reflex --rows folds consecutive blocked-call rows of one session that share a refusal tag into ONE row 'blocked-folded xN: TAG first-head' (same shape as stop-folded), --summary prints blocked counts per tag, and --raw keeps every row. Measured the day it was asked: kih agy root, 48 blocked rows in 30 minutes, top tags python-edit 10, busy-fleet-guard 8, powershell-wrapper 7, stall-guard 6; the top tag per family is the next grievance to fix. NORTH STAR (owner 2026-10-10): today the blocks dominate, but the goal is that the trajectories which led to SUSTAINED SUCCESS become the most visible rows -- overcome rows, landed commits, liked reflexes -- so --summary should print the share of blocked rows per family and session, and that share falling week over week is the proof the reflex tuning works. //why:agy stopwatch resent five times per root on quota 429 //why:owner wants success trajectories to dominate reflex output //why:kih agy root forty-eight blocks in thirty minutes //why:kih agy root forty-eight blocks in thirty minutes-opus //why:owner wants success trajectories to dominate reflex output-opus //why:agy stopwatch resent five times per root on quota 429-opus",
+    "OWNER DIRECTION 2026-09-26: every session search goes through ONE indexer, the SQLite keyword cache with a scan-range table (global_indexer.py), reached by the single command wkhippo index REGEX with days or since or alltime, sessions and family options. It fills only the uncovered time range from the transcripts, caches the whole regex result set, and answers repeats without scanning. The DB is regenerated weekly, a week starts Monday 00:00 GMT, one db file per week named with that Monday date, keep 8 weeks. wkhippo chatlog (jsonl shards under .wkhippo, measured as an 82 percent mirror of its sources) and the studied json index are re-inventions and are to be reimplemented on top of this indexer, in this order: (1) range interface plus wkhippo index command landed and equivalence-checked against the old answers on real sessions, (2) chatlog entry repointed to it with the old path as fallback, (3) shards retired only after the equivalence check passes. agy history is SQLite and is read read-only. Before building any new session scanner read wkappbot skill read global-indexer-usage and wkhippo-chatlog-unified-index-howto.",
+    "REFLEX TOOLKIT ADDED 2026-10-09 (spokesman cfff4d4f, owner asked for the usage in detail). (1) OVERCOME ROWS: wkhippo reflex SID --rows prints kind overcome where 3 or more PreToolUse-blocked rows were followed by an allowed tool row, text 'overcome after N: LAST BLOCKED -> ALLOWED' (WKAppBot d372f0984, module bin/wkhippo_reflex_overcome.py, every family). Use it to see which wall a root or sector climbed and what finally worked; an overcome whose right side is only a skill read means it gave up, not overcame. Today it covers single-session --rows output; --all and --summary do not add it yet, and a claude blocked row carries no refusal tag yet, so the left side shows the blocked tokens row. (2) MD ROWS ARE HONEST NOW: a Write or Edit is reflex-edit only for the md its TARGET path names; an md merely mentioned in the content is a use row (d443b07b8). (3) GRIEVANCE RANKING: python -I WT/bin/wkhippo-reflex.py reflex --all --since 24h --rows piped into python -I D:/GitHub/WKAppBot/.tmp/grievance/rank.py prints the top refusal tags per family with one sample each; take the top tag, measure its cause on real rows, fix, rerun to show the count fall. (4) LIKED REFLEXES: a successful skill --like engraves its sentence into the repo family md (claude CLAUDE.md, codex CODEX.md, agy AGY.md) under '## Liked reflexes [ALL]' with its skill read line, max 10 lines (kih 0c7e5537b, 7d4362235, 7c8a39a17). (5) STALE LOCAL TOOL: while the WKAppBot tree lags origin, run the reader from a clean origin worktree (git worktree add --detach .tmp/wt-hippo origin/main, then python -I .tmp/wt-hippo/bin/wkhippo-reflex.py reflex ...), never the stale wkhippo on PATH. //why:overcome rows tell real wins from give ups //why:overcome rows tell real wins from give ups-opus",
+    "SPEC DELEGATION AND BACKGROUND TRACE (owner 2026-10-10: the reflex trace must show where delegation tools and background work start and end). Measured the day it was asked: spokesman dcb47781, 291 reflex rows over 3 h, zero start rows and one task-notice row while about 15 background shells and root launches ran. wkhippo reflex --rows prints (1) delegate-start for an Agent or Task tool call and for a shell call whose command starts with wkroot.cmd, Agent.cmd, wkcodex, wkclaude, wkhaiku, wksonnet, wkopus or wkagy, with the tool id, model or target and the first 60 chars; (2) bg-start for every shell call with run_in_background, keyed by the background id its result prints; (3) delegate-end and bg-end from the matching tool result or task-notification (task-id or tool-use-id), with status and elapsed minutes; (4) --summary prints started, ended and still-open counts per session, and the open list is the pending work a live-state check reads. Proof: on the dcb47781 transcript the bg-start count equals a grep count of 'running in background with ID' and bg-end equals the task-notification count. //why:relaunch shell bzzg7vxr3 ended but every root exited rc three //why:relaunch shell bzzg7vxr3 ended but every root exited rc three-opus",
+    "HOOK-SPEED RECIPE FOR TRANSCRIPT QUESTIONS (owner 2026-10-02, hippo is the spokesman life organ). WHEN: a guard or tool must ask a question about this session, such as every earlier --like or --why, which skills were read, or which roots wrote. HOW: first ask the indexer (wkhippo index REGEX, which caches the whole regex result set per file, size and mtime and answers repeats without scanning); where the indexer lacks the question shape and the call sits on a hook, use the cheap form the pulse gate uses: one ReadAllLines, a Contains prefilter on a literal such as the flag name, regex only on the few surviving lines, never ConvertFrom-Json per line, and profile the function with _wkPerf marks. WHY: the study-lock checker cost 50 seconds over 18 calls by re-reading whole sources, while a prefiltered scan reads the same session in one pass. Cross: wkappbot skill read wk-tool-sub-1s-response-time-mandate --keep 'FIX CLASSES' ; wkappbot skill read wkgrdb.",
+    "TODO: Implement bin/wkhippo_reflex_delegation.py and selftest for spokesman order 2026-10-10"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read spokesman-hippo-advanced",
+      "expect": "ROOT STATUS",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read hippocampus-living-memory-howto",
+      "expect": "step 22",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read spokesman-root-command-constitution",
+      "expect": "spokesman",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "spokesman",
+    "hippo",
+    "indexer",
+    "wkhippo",
+    "recall",
+    "foresee",
+    "trace"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-09-26T12:59:14.9518483Z",
+  "updated": "2026-10-10T14:42:27.1245522Z",
+  "version": "1.22"
+}

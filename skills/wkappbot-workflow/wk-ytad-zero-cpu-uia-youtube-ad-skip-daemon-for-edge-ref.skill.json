@@ -1,0 +1,47 @@
+{
+  "id": "wk-ytad-zero-cpu-uia-youtube-ad-skip-daemon-for-edge-ref",
+  "app": "wkappbot-workflow",
+  "title": "wk-ytad ref: precise detection, gate fix, mute-then-skip, wait",
+  "title_ko": null,
+  "desc": "T3 ref for wk-ytad: the 2026-07-08 precise-detection findings (static-skip miss + scan-on-activation, OS-foreground gate regression removal, structural gate), the mute-button-as-a11y-test smoke pattern, and the TODO ad-mute-then-skip flow using existing a11y wait/watch. Read the core wk-ytad-zero-cpu-uia-youtube-ad-skip-daemon-for-edge first.",
+  "steps": [
+    "STATIC-SKIP MISS plus SCAN-ON-ACTIVATION (2026-07-08). Event-driven monitoring reacts to a CHANGE so it catches the skip button at the MOMENT it appears, but an already-present static skip button (paused, no new event) fires nothing, and Chromium throttles background-tab UIA so a button that appeared while backgrounded is missed. FIX on foreground-gain or watch-start do an IMMEDIATE one-shot scan of current state BEFORE blocking on events, plus a low-frequency safety poll (-Fallback) as backstop. GENERAL LESSON for the core a11y watch too event-driven must be paired with a scan-on-activation to catch already-existing state not just transitions.",
+    "OS-FOREGROUND GATE WAS AN OVER-STRICT REGRESSION (fixed 2026-07-08). PROOF a manual a11y invoke movie_player//But_skip skipped an ad live while a TERMINAL not Edge was OS-foreground, yet the GATE required fg equals EdgeHwnd, idling the daemon whenever the user looked away. FIX removed the OS-foreground check, the active-tab gate is now purely STRUCTURAL (sigHits at least 2 signature names plus an ENABLED skip button via a shared Get-ButtonSignals helper) because Chromium only exposes that signature on the selected tab regardless of OS focus. RETRACK also changed to structural via Test-ActiveYouTube scanning all top-level Edge windows. TRADE-OFF without the early-return the 2s scan runs full FindAll every tick even when Edge is backgrounded (detectMs 150-700, 8-10 percent CPU while scanning). A movie_player-scoped detection would restore near-zero CPU (see the precise-detection TODO).",
+    "SMOKE-TEST PATTERN mute button doubles as an a11y test (user insight). The YouTube mute button in movie_player is a compact a11y test AND silences noisy ad audio. FIND plus CLICK it is a find-and-invoke speed test, READ its accessible NAME toggling mute vs unmute is an on-off state-detection test, re-read after invoke VERIFIES the toggle. So one live test mutes the browser and measures find plus click plus state-read at once. Scope the grap to movie_player per the grap rule root 2 bare plus slash-star-star middle plus terminal bare, no asterisk-spam. Mute first in any media smoke test so tests stay silent.",
+    "TODO ad-mute-then-skip enhancement (user insight). YouTube ads are unskippable for the first seconds, the skip button appears only after a delay. So the daemon should the moment it detects an ad (ad module under movie_player, or the skip container exists but But_skip not yet enabled) MUTE immediately, stay quiet, WAIT event-driven for But_skip enabled, then click it. STATE MANAGEMENT track whether IT muted versus the user manual mute and UNMUTE only its own mute after skip so real video audio is restored and it never fights a user mute.",
+    "TODO wait uses EXISTING shipped features only (user). Wait for But_skip enabled via a11y wait (A11yCommand.Wait.cs, --enabled --visible --eval-js, event-driven not poll) or a11y watch (A11yCommand.Watch.cs, FlaUI event, zero-CPU SemaphoreSlim). Fastest reaction with current features, no new optimization. Full flow detect ad, mute, a11y wait But_skip enabled, invoke But_skip, unmute own mute."
+  ],
+  "requirements": [
+    {
+      "cmd": "wk-ytad.cmd -Status",
+      "expect": "RUNNING",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wk-ytad-zero-cpu-uia-youtube-ad-skip-daemon-for-edge",
+      "expect": "core design",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wk-ytad-zero-cpu-uia-youtube-ad-skip-daemon-for-edge-ref",
+      "expect": "scan-on-activation",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "wk-ytad",
+    "youtube",
+    "a11y",
+    "ref",
+    "mute",
+    "skip",
+    "scan-on-activation"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-07-08T07:32:08.24689Z",
+  "updated": "2026-07-08T07:32:08.246902Z",
+  "version": "1.0"
+}

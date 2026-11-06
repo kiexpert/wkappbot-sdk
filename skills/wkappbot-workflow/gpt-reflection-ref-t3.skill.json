@@ -1,0 +1,46 @@
+{
+  "id": "gpt-reflection-ref-t3",
+  "app": "wkappbot-workflow",
+  "title": "GPT Reflection Ref (T3 - archived 2026-10-03)",
+  "title_ko": null,
+  "desc": "T3 reference: dated GPT-family incident history (harness, hook, delegation, identity, transport lessons). See gpt-reflection for the T1 core.",
+  "steps": [
+    "SUPERSEDED 2026-10-03 by gpt-reflection-ref. BATCH MIGRATION FROM T1 2026-07-14, STEPS 8-18 (condensed, nothing lost): step 8 (2026-06-14) GPT-family delegation and Codex hook repair were delayed by identity confusion between mini, GPT, and Haiku reflection -- keep gpt-reflection and gpt-mini-reflection separate, verify active family before satisfying on-load.",
+    "Step 9: FAILURE WARNING -- treating model identity as interchangeable (using GPT-mini or Haiku reflection as a GPT substitute) makes future agents inherit the wrong reflex; stop and create model-specific reflection instead.",
+    "Step 10: ELDER REVIEW DUTY -- GPT must review smaller sibling models' mistakes, extract durable failure patterns into recurrence prevention, not merely blame the smaller model.",
+    "Step 11 (2026-06-17): do not add user-set env-var identity backdoors to agent-name -- infer identity from process lineage and session evidence only, never from WKHARNESS_AGENT_MODEL or similar spoofable env vars.",
+    "Step 12 (2026-06-25): wkharness-agent-name trusts CODEX_THREAD_ID session JSONL before parent Claude lineage so git-hook model detection preserves live Codex GPT sessions instead of collapsing to sonnet.",
+    "Step 13 (2026-06-25 incident): three GPT-family recurrence risks -- do not trust latest session file without cwd match, do not dot-source standalone scripts that print raw model ids, do not patch installed runtime files with unescaped PowerShell replacement strings; fix by matching turn_context.cwd to live process cwd, invoking standalone helpers not dot-sourcing them, and using parse/test after every installed-file bridge edit.",
+    "Step 14 (2026-06-30 personal-docs startup failure): when AGENTS.md delegates shared policy to CLAUDE.md, read CLAUDE.md before interpreting bare shortcuts -- exact gg/ggg or repeated Korean giyeok starts the documented workflow immediately.",
+    "Step 15 (2026-06-30 execution failures): GPT stopped on gg failures instead of diagnosing/retrying, read a local SKILL.md directly bypassing AppBot skill commands, invented a chrome profile path hiding established cookies, used global CDP paths instead of the repo wk-cdp.cmd tool, and treated status reporting as task completion -- fix: load skills only via wkappbot skill read, use repo launchers first, never invent profile paths, on failure follow stabilize/root-cause/retry/verify/persist/commit, stop only at a genuine human gate.",
+    "Step 16: KNOWLEDGE-IFICATION REFLEX -- after any confirmed GPT operational mistake, immediately encode symptom/root-cause/fix/proof into the relevant AppBot skill rather than ending with apology or status.",
+    "Step 17: ANTI-KNOWLEDGE RULE -- a PermissionRequest or adapter must not make an autonomous default-deny decision before the user's harness evaluates the action; preserve the requested operation and evidence, enter the harness, let harness rules classify allow/warn/block/approval.",
+    "Step 18 (2026-06-30 implementation checkpoint): Codex PermissionRequest must never re-run CodexPreToolPolicy and emit an autonomous deny after PreToolUse; PreToolUse delegates unmatched operations to wkharness-codex-main, PermissionRequest may consume an exact prior harness allow once, otherwise stays silent so normal user approval proceeds.",
+    "2026-09-15 RESULT: The fleet learned a verified fast-rollout reflex. Direct staging-core smoke passed with zero functional failures under the temporary 9000ms slow budget, and wktest-promote exited 0 with the canonical .new hot-swap marker. Keep MCP and harness out of the core smoke path, verify the artifact and exit code, and record the real process-count result."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read gpt-reflection-ref",
+      "expect": "dated GPT incident archive",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read gpt-reflection-ref",
+      "expect": "identity and delegation lessons",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read gpt-reflection-ref",
+      "expect": "harness and hook recurrence fixes",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-07-14T05:47:47.629584Z",
+  "updated": "2026-09-15T13:37:24.1460412Z",
+  "version": "1.2"
+}

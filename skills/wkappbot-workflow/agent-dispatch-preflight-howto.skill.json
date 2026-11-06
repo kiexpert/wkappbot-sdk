@@ -1,0 +1,41 @@
+{
+  "id": "agent-dispatch-preflight-howto",
+  "app": "wkappbot-workflow",
+  "title": "Agent dispatch preflight: procedures and incident lessons",
+  "title_ko": null,
+  "desc": "How-to procedures for satisfying each of the 4 dispatch guards, plus 18 incident lessons from live delegation sessions. T2 howto tier of agent-dispatch-preflight.",
+  "steps": [
+    "TODO: Guard 1 prevention (claude-md-sync-guard). WHEN: Guard fires if no Pending edit in last 30 turns. HOW: wkappbot skill read harness-agent-brief-guard, then Read CLAUDE.md, add Pending TODO, Edit, retry Agent(). WHY: blocks untracked AI work accumulation.",
+    "TODO: Guard 2 prevention (delegation guard). WHEN: your Agent() call is foreground. HOW: wkappbot skill read harness-agent-brief-guard to confirm run_in_background must be true. Then set run_in_background: true in the Agent tool call. WHY: Foreground Agent() blocks orchestrator output while invisible agent runs.",
+    "TODO: Guard 3 prevention (brief-guard). WHEN: brief lacks 3+ wkappbot skill reads or agent-on-load by name. HOW: wkappbot skill read harness-agent-brief-guard then prepend: wkappbot skill read agent-on-load, wkappbot skill read <model>-reflection, wkappbot skill read <domain-skill> before task description. WHY: serial rejections waste tokens; pre-load all requirements first attempt.",
+    "TODO: Guard 4 prevention (pace guard). WHEN: 5+ consecutive Edit/Bash calls. HOW: wkappbot skill read harness-pace-guard then stop direct tool calls, switch to Agent() with full task spec. WHY: pace prevents one actor monopolizing time; delegation resets counter.",
+    "DECISION: PRE-FLIGHT SEQUENCE. WHEN: before every Agent call. HOW: wkappbot skill read agent-dispatch-preflight then execute: (0) Read CLAUDE.md (1) Edit to add Pending (2) Confirm run_in_background true (3) Confirm prompt has 3+ skill reads+agent-on-load (4) Confirm prompt has Goal/Files/Approach/Constraints/Exit labels then fire. WHY: one careful brief beats three blocked retries.",
+    "DECISION: SPEC-GATE FORMAT for Opus Agent. WHEN: Opus-model Agent() dispatches. HOW: wkappbot skill read harness-tier-gate then format prompt as SPEC: description on own line, followed by numbered 1. Goal: 2. Files: 3. Approach: 4. Constraints: 5. Exit:. WHY: non-Opus skips this; Opus spec-gate gates it separately.",
+    "NAVIGATION: incident lessons and best practices from delegation. WHEN: after understanding the 4 guards above. HOW: wkappbot skill read agent-dispatch-preflight-ref for full failure-pattern story and PROVE-THE-ARTIFACT confabulation incident, then read agent-dispatch-preflight core for decision rules before any new delegation. WHY: layered three-tier reading prevents repeated gate refusals on fresh dispatches."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read agent-dispatch-preflight",
+      "expect": "GUARD",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read agent-dispatch-preflight-howto",
+      "expect": "WHEN YOU HIT GUARD",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read agent-dispatch-preflight-ref",
+      "expect": "FAILURE PATTERN",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-08-24T09:01:17.1476123Z",
+  "updated": "2026-08-24T09:07:33.9226471Z",
+  "version": "1.7"
+}

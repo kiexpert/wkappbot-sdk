@@ -1,0 +1,58 @@
+{
+  "id": "reflex-nervous-system-model",
+  "app": "wkappbot-workflow",
+  "title": "The living reflex nervous system: the unified concept behind the AI house-rules",
+  "title_ko": null,
+  "desc": "Concept home tying the fleet's reflex system into one nervous-system model: anatomy (3-tier core/howto/ref), heartbeat (reflex-pulse-gate), circulation (reflex-merit-lifecycle), metabolism (tier-score), growth (knowledge-ification), immune-check (delegation-verify-scorecard). Read this to see how the scattered pieces form one living system. Opus concept-owner consolidation 2026-07-14.",
+  "steps": [
+    "THE MODEL: the KI harness is a LIVING REFLEX NERVOUS SYSTEM for the AI fleet -- the house rules (CLAUDE.md + the skill catalog) are its nervous tissue. Each skill is a reflex; the harness fires the right reflex just-in-time (study-locks, on-load, nudges, gates). The whole session-2026-07-14 design is one system, not scattered features -- read the six cross-linked pieces below as organs of one body.",
+    "ANATOMY (the 3 tiers, by ROLE not depth -- see skill-3tier-lazy-arch): T1 CORE = the LIVE REFLEX tissue (guhyeon/impl) -- the living nerve (proven static reflexes that fire) fused with the recent risen work (the dynamic frontier). T2 -howto = USE (sayong) -- the usage manual. T3 -ref = WORK-RECORD (jageop) -- the memory: reflections, incidents, build-status, wiring history, and reflexes that sank or graduated out.",
+    "HEARTBEAT (reflex-pulse-gate, see delegation-completion-reflex-like-spec): on mission completion the acting model must LIKE the reflex that carried it -- a pulse, a life-sign sent back to that reflex. No pulse blocks the next delegation (the like-debt). Pulses are what keep a reflex ALIVE; an un-pulsed reflex flatlines and sinks.",
+    "CIRCULATION (reflex-merit-lifecycle): like = RISE, dislike or neglect = SINK, over-a-week at the bottom = ARCHIVE to -ref, independent re-discovery = RESURRECTION that validates a reflex as genuinely needed, and the === divider plus [PIN] mark the STATIC tier that never sinks. Darwinian selection: proven reflexes rise and persist, noise sinks and is archived.",
+    "METABOLISM / HEALTH (the tier-score, see harness-tier-score-guard for the verified formula): Get-WkSkillBaseScore rates each reflex -- at most 10 steps scores 100, past 10 needs a 3-tier split (siblings), past 20 steps an oversize division decay, all decayed by age (0.99 to the day). A low score is the harness demanding curation -- the pressure that forces a fat reflex to be trimmed, tiered, and refreshed.",
+    "GROWTH (knowledge-ification / jisikhwa): lived experience becomes a new reflex the moment it is knowledge-ified into a 3-tier skill; and while IMPLEMENTING, maintain a build-status in the -ref or the knowledge goes missing (this session's root failure: the score formula lived only in code, un-linked, so two sessions re-derived it WRONG).",
+    "IMMUNE CHECK (delegation-verify-scorecard): a delegate's work is verified against ground-truth (actual diff plus live run, never the report) before ROOT wires it -- failure routes a reflection edit (agent-failure-reflection-gate), success earns a pulse. This keeps bad knowledge from entering the nervous system.",
+    "GOVERNING PRINCIPLE -- CONNECTION IS SURVIVAL: an un-linked reflex is a forgotten reflex. The system stays alive and LEAN only because the heartbeat (pulse), circulation (merit lifecycle), and metabolism (score) all run together, and because every reflex is CONNECTED (cross-linked and required) into the flows that surface it. Knowledge-ify AND connect -- capturing without linking is how the fleet forgets. Opus is the concept-owner that keeps this model coherent.",
+    "SUCCESS METRIC = THE WORKHORSE'S SUCCESS (user 2026-07-15). The harness's success is measured by how much it INCREASES the successful work of the cheap workhorse tiers -- especially Haiku, the model that actually EXECUTES and hits the real guards -- NOT by Opus's cleverness. COROLLARY (the real gold): a --like FROM the executing tier (Haiku) on a step is the HIGHEST-signal merit in the whole tree -- the model doing the real work, hitting real friction, endorsing what actually helped it get through. So execution-tier pulses should weigh heavily, and the entire reflex system (clear signpost block messages, SLIM governing skills, crisp reflexes) exists to raise the workhorse's throughput and success rate. A gate is a signpost precisely so the workhorse does not flail. Design test for any harness change: does it make Haiku SUCCEED more, or just make Opus feel clever? Cross: haiku-reflection (the workhorse's self-knowledge), reflex-merit-lifecycle (likes = merit), harness-busy-fleet-guard (delegate to the workhorse)."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read reflex-merit-lifecycle",
+      "expect": "RESURRECTION",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read delegation-completion-reflex-like-spec",
+      "expect": "reflex-pulse-gate",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read harness-tier-score-guard",
+      "expect": "CANONICAL SCORE FORMULA",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "reflex",
+    " nervous-system",
+    " concept",
+    " model",
+    " living",
+    " merit",
+    " pulse",
+    " tier",
+    " score",
+    " knowledge-ification",
+    " house-rules",
+    " index",
+    " opus",
+    " unified"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-07-14T13:28:28.1893709Z",
+  "updated": "2026-09-06T12:08:25.36239Z",
+  "version": "1.4"
+}

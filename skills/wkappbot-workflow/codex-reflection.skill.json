@@ -1,0 +1,36 @@
+{
+  "id": "codex-reflection",
+  "app": "wkappbot-workflow",
+  "title": "Codex Reflection",
+  "title_ko": null,
+  "desc": "Codex CLI (wkcodex.sh) reflection skill: recurring false-success and identity-resolution lessons for Codex delegations.",
+  "steps": [
+    "2026-07-14: wkcodex.sh dispatched in background for an errors.jsonl triage task returned rc=0 but the output file contained ONLY harness/pace/stall-reset log lines -- zero actual triage content. This is the documented false-success pattern (orchestrate-sectors-parallel-while-knowledgeifying step 5): background codex can report success with empty output and zero real work done. Fix: always read the full output content after a codex background dispatch completes, never trust rc=0 alone; if output is harness-noise-only, treat as a failed dispatch and redo the investigation via a direct tool call or a properly-briefed native Agent instead of retrying wkcodex.sh a third time blindly.",
+    "IDENTITY-RESOLUTION GAP: this session's agent-failure-reflection-gate resolved the failing background codex dispatch to a BLANK model identity (no gpt/codex/gpt-mini match), forcing creation of this skill from scratch rather than routing to an existing gpt-reflection/gpt-mini-reflection entry. Fix candidate for the harness: the model-to-reflection-skill resolver should recognize a wkcodex.sh Bash dispatch (no native Agent tool_use, no CODEX_THREAD_ID) as codex family and route to gpt-reflection/gpt-mini-reflection by default instead of leaving model blank."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read codex-reflection",
+      "expect": "false-success",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read codex-reflection",
+      "expect": "rc=0",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read codex-reflection",
+      "expect": "harness-noise-only",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-07-14T05:30:45.782147Z",
+  "updated": "2026-09-06T12:06:31.3235547Z",
+  "version": "1.4"
+}

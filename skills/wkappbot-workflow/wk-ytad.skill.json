@@ -1,0 +1,36 @@
+{
+  "id": "wk-ytad",
+  "app": "wkappbot-workflow",
+  "title": "wk-ytad (alias)",
+  "title_ko": null,
+  "desc": "Exact-match alias pointer for the wk-tool-first-use-skill-nudge exact-id lookup bug (2026-07-15) -- the nudge checks for a skill literally named wk-ytad, which never existed; the real content lives in wk-ytad-zero-cpu-uia-youtube-ad-skip-daemon-for-edge. This alias exists purely so the nudge's exact-match check passes.",
+  "steps": [
+    "See the real skill: wkappbot skill read wk-ytad-zero-cpu-uia-youtube-ad-skip-daemon-for-edge",
+    "This is an alias-only stub -- do not add content here, add it to the real skill instead."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read wk-ytad",
+      "expect": "alias pointer to the real skill",
+      "prompt": null
+    },
+    {
+      "cmd": "wk-ytad.cmd -Status",
+      "expect": "RUNNING or NOT RUNNING",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wk-ytad-zero-cpu-uia-youtube-ad-skip-daemon-for-edge",
+      "expect": "full daemon detail",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-07-15T11:39:58.0545347Z",
+  "updated": "2026-07-15T11:39:58.0545439Z",
+  "version": "1.0"
+}

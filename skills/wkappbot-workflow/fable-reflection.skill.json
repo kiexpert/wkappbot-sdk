@@ -1,0 +1,47 @@
+{
+  "id": "fable-reflection",
+  "app": "wkappbot-workflow",
+  "title": "Fable Reflection: Independent Second-Opinion Strengths",
+  "title_ko": null,
+  "desc": "Reflection skill for Claude Fable 5 -- observed strengths and lessons when used as an independent second-opinion reviewer on work another model (Sonnet/Opus) already believed complete.",
+  "steps": [
+    "STRENGTH CONFIRMED 2026-07-14: dispatched as a skeptical second-opinion reviewer after Sonnet (ROOT) had already concluded wkpace/wkagent-name perf optimization was done (2.6-2.7s, remaining cost attributed to the PS-process-cold-start architectural floor). Fable was explicitly briefed to challenge that conclusion rather than confirm it, and found a genuine, previously-missed bug: wkwrap.ps1 line 67 spawned a wasted extra powershell.exe subprocess (the sibling-script fallback already runs inside PowerShell, so spawning a new one via -File was pure overhead), plus wkpace.ps1's primary model-detect path routed through an extra cmd.exe+PS hop instead of the already-available in-process dot-source fallback -- concretely citing file:line for every claim.",
+    "VERIFICATION DISCIPLINE HELD: ROOT independently re-read the exact cited lines (wkwrap.ps1:67) before acting on the finding, confirming it verbatim, then proto-verified the proposed fix's exit-code-propagation safety before wiring it into shared cross-repo infrastructure -- Fable's finding was trusted as a LEAD to investigate, not accepted as ground truth outright, per standing user policy (even a good delegate's work gets ROOT-verified). //why:v7 overflow root cause was lnSpc and mixed lang leftovers in 193 cells, found by stripping and re-rendering, not by trusting the estimator",
+    "VALUE OF THE BRIEF PATTERN: asking Fable to independently verify/challenge a conclusion ROOT already believed (rather than asking it to do fresh unscoped work) surfaced a real architectural gap ROOT's own investigation had missed after 4 rounds of fixes on the SAME code path -- a genuinely different lens caught what repeated within-lens digging did not.",
+    "RESULT: the wkwrap.ps1 fix (in-process sibling invocation instead of a subprocess spawn) landed, live-fire verified across 6+ different wk-tools with no regression, further reducing wkpace/wkagent-name latency below what ROOT alone had concluded was the floor.",
+    "See also: knowledge-ification-procedure-jisikhwa (the general knowledge-ification protocol -- 3-tier split discipline, mandatory >=3 inbound cross-links, and reflex-ification -- governs how ANY reflection skill, including this one, should be authored and connected). See also: haiku-reflection step 6 (AUTHORSHIP MODEL: a reflection is self-authored by the LOWEST tier that can honestly self-assess; this same framing applies across the model family -- Fable, like Sonnet, is above the confabulation floor and can genuinely self-assess, so future fable-reflection entries should be self-authored by Fable itself when possible, with ROOT review as backstop, not purely written FOR it by another model.",
+    "See also: agent-failure-reflection-gate (the counterpart gate that forces a model-reflection update on a CLEAR delegation failure -- this fable-reflection skill is the positive/strength mirror of that same discipline: record confirmed successes per model tier, not only failures, so the reflection corpus stays balanced and future dispatchers know both what to avoid AND what a given model is genuinely good at)."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read fable-reflection",
+      "expect": "STRENGTH CONFIRMED",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill search fable second opinion",
+      "expect": "fable-reflection",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read fable-reflection",
+      "expect": "wkwrap.ps1",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "fable",
+    "reflection",
+    "second-opinion",
+    "independent-review",
+    "strengths",
+    "2026"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-07-14T07:29:16.3576356Z",
+  "updated": "2026-10-02T11:58:33.0801966Z",
+  "version": "1.5"
+}

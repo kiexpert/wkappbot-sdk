@@ -1,0 +1,51 @@
+{
+  "id": "grok-cli-agent-backend",
+  "app": "wkappbot-workflow",
+  "title": "Grok CLI Agent Backend",
+  "title_ko": null,
+  "desc": "Spec and verification contract for connecting the official xAI Grok CLI to Agent.cmd and wkhippo.",
+  "steps": [
+    "CLI: The official headless form is grok -p PROMPT. Authenticate from XAI_API_KEY in D:/GitHub/.env, prove grok -p reply PONG, and preserve the exact reply as test evidence without exposing credentials. //why:install sector dispatched to prove grok headless today //why:install sector dispatched to prove grok headless today-opus",
+    "SPEC: Connect the official xAI grok CLI to WKAppBot in three increments: install and prove a headless call, add an Agent.cmd --model grok backend with fake and live tests, then read ~/.grok/sessions into wkhippo rows for user, token usage, model changes, and skill reads. Keep the API key sourced only from D:/GitHub/.env and never print it.",
+    "BACKEND: Add bin/AgentBackend.grok.ps1 and a --model grok route beside the muse-code route in the existing model map. Support WK_GROK_CMD for a fake binary inversion test, then run one live call through the real CLI.",
+    "READER: Add a wkhippo Grok session reader for ~/.grok/sessions. Emit rows for user turns, token usage, model changes, and skill reads, and test an inversion fixture that must reject unrelated session files. //why:grok updates jsonl shapes measured and reader sector dispatched //why:grok updates jsonl shapes measured and reader sector dispatched-opus",
+    "MEASURED 2026-10-10 (spokesman dcb47781): grok 1.0.50 installs by downloading https://x.ai/cli/install.ps1 to .tmp and running it by path (an irm pipe to iex is refused), binary ~/.grok/bin/grok.exe, key from XAI_API_KEY. Grok AUTO-LOADS CLAUDE.md as project rules and its README names vendor-compat hooks, but an empty-folder probe (sector 2026-10-10) found NO hook execution in ~/.grok/logs/unified.jsonl and no harness stop log, so the hook theory is UNPROVEN; what is proven: grok kept going for minutes after printing PONG and wrote a FABRICATED report in the CLAUDE.md reply form (Reflex-healing paragraph, evidence lines), i.e. it imitates the project rules it loads (claimed it fixed and pushed Get-WkDescentPassState.ps1; origin and the working tree were unchanged). SPEC: the grok identity signal is the env var GROK_SESSION_ID (also GROK_AGENT), set by grok in every tool shell and absent from claude (measured 2026-10-10; fallback parent process grok.exe); the harness family detector maps it to family grok, and Agent.cmd --model grok prefixes the brief with one line telling grok to answer the task only, with no Reflex-healing or evidence paragraphs, because grok loads CLAUDE.md and AGENTS.md as rules (README lines 1554-1566) and copies their reply form, and Agent.cmd --model grok must treat any claim of a commit as unverified until git show origin proves it; never disable the hooks to get a clean reply, because they are the only guard on its file writes. //why:measured env signal chosen for grok family detection //why:grok vendor hooks found, identity probe sector running //why:grok vendor hooks found, identity probe sector running-opus //why:measured env signal chosen for grok family detection-opus",
+    "ACCEPTANCE: Each increment has a proto and self-test under .tmp, passes its inversion case, is landed separately, and reports the commit hash plus canonical-path rerun.",
+    "TODO: (open 2026-10-10) (1) DONE kih a69515738: Agent.cmd --model grok answers PONG through the real front door after a live call; (2) HOOKS FIRE (measured 2026-10-11 by the spokesman in ~/.grok/sessions/D%3A%5CGitHub%5CWKAppBot/01a1253c-46d7-7e30-bc8f-f1b65e6c35f7/updates.jsonl: hook_execution records show global/settings:stop[0] BLOCKED a stop with the descent frame and global/settings:pre_tool_use[0..1] ran with success, so grok runs the Claude-compatible global settings hooks); what stays open is proving one REFUSED grok tool call (git checkout -- .) and the family=grok mapping in the guard chain. Earlier note: build the grok harness handlers -- register [[hooks.PreToolUse]], [[hooks.PostToolUse]] and [[hooks.Stop]] tables in ~/.grok/config.toml (README Hooks in config files, absolute command path, timeout) pointing at a wkharness-grok-main.ps1 adapter in wkappbot-kih tools that maps the grok hook payload to the shared guard chain with family grok, proven by one grok call whose refused command (git checkout -- .) is blocked and one allowed call passes; until then Agent.cmd --model grok is for answers only, never file edits; the family detector maps GROK_SESSION_ID to family grok; (3) wkhippo reflex reader for ~/.grok/sessions/<cwd>/<sid>/updates.jsonl; (4) wkroot grok adapter plus GROK.md process-name md. Verify each with its self-test plus one live grok call.",
+    "Learned: Pre-requisite skill reads completed for grok harness task.",
+    "Learned: Python file write via python -c is guarded by python-edit; use separate python script or unblock via skill edit.",
+    "Learned: python file write requires unblock or dedicated wrapper."
+  ],
+  "requirements": [
+    {
+      "cmd": "grok -p reply PONG",
+      "expect": "prints PONG without credentials",
+      "prompt": null
+    },
+    {
+      "cmd": "Agent.cmd --model grok --file .tmp/brief.md",
+      "expect": "routes to the Grok backend and honors WK_GROK_CMD",
+      "prompt": null
+    },
+    {
+      "cmd": "wkhippo Grok session reader on ~/.grok/sessions",
+      "expect": "emits user token model-change and skill-read rows and rejects unrelated fixtures",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "grok",
+    "xai",
+    "agent-cmd",
+    "wkhippo",
+    "cli",
+    "backend"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-10-10T08:45:24.9176932Z",
+  "updated": "2026-10-11T00:39:59.5897915Z",
+  "version": "1.19"
+}

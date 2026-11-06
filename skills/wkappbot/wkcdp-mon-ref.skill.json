@@ -1,0 +1,43 @@
+{
+  "id": "wkcdp-mon-ref",
+  "app": "wkappbot",
+  "title": "wkcdp-mon: dated incidents and corrections",
+  "title_ko": null,
+  "desc": "T3 dated-incident tier for wkcdp-mon, including erroneous off-topic notes removed from core so the delete-step guard can verify no knowledge was lost.",
+  "steps": [
+    "FLAGS UPDATE (2026-05-26): -KillIdle = kill CURRENT CWD Chrome sessions (own project cleanup). -KillForeign = kill OTHER CWD Chrome sessions (protects current CWD, old behavior). -DryRun works with both flags to preview victims. Fixed: logic was inverted before this date.",
+    "CWD INVERSION FIX (2026-05-26): -KillIdle kills SAME-CWD Chrome (own project), -KillForeign kills OTHER-CWD Chrome (foreign projects). Previous logic was inverted. Committed to WKAppBot repo as 92e2380d2.",
+    "KILL-EXECUTE BUG FIXED (2026-05-26): wkcdp-mon.ps1 line ~468 gated the actual-kill behind if (-not KillIdle), which made -KillForeign (and any non-KillIdle invocation) fall into the [DRY-RUN] would kill branch and return WITHOUT killing. Fixed to: if (DryRun -or (-not KillIdle -and -not KillForeign)) then dry-run and return, so -KillForeign without -DryRun now actually Stop-Process the victims. .ps1 runs from file so the fix is live immediately (no build). If a kill prints [DRY-RUN] unexpectedly, check this gate. Force-kill fallback that always works: wkappbot taskkill --force PID,PID,... on the Chrome browser PIDs from the monitor list.",
+    "CDP 1-SECOND QA RULE (2026-05-29): Any CDP operation over 1 second is a BUG. CDP is browser IPC -- response must be under 100ms normally, under 1s max. If cdp open takes over 1s: Chrome already running but port registry not checked (spawn-when-should-reuse bug). If cdp eval over 1s: wrong tab selected or DOM not ready detection failure. If LAT avg=0 for long time: dead channel not detected. If REPLY takes over 1s after injection: JS eval response listener not triggering. Track any over-1s CDP op as a QA issue. Use wkcdp-mon LAT column to spot slow sessions (DEAD=-1, over 1000 = bug).",
+    "CDP ask QA (2026-05-29): wkask.sh backslash-n bug fixed (Edit tool). cdp open 60s timeout = Chrome reuse logic bug (Core). Haiku scanning for all user-visible bugs in wkask pipeline.",
+    "Renderer tab crash investigation (2026-05-29): checking if ChromeLauncher/CdpClient does graceful close (Target.closeTarget) before force-kill. If not = dirty Chrome profile = renderer crash on next open. wkask BUG-1/2/3/5/6/7/8 fixed in 57a1b8809.",
+    "GRACEFUL CLOSE PATTERN (for Core devs fixing renderer crash, 2026-05-29): ChromeLauncher.Kill.cs proc.Kill must be preceded by Browser.close CDP command. Pattern from TryCloseAnonymousTabAsync: (1) await cdpClient.SendAsync Browser.close timeoutMs 3000 catch (2) then proc.Kill entireProcessTree true. Without graceful close: Chrome profile left dirty and renderer crash on next cdp open. Suggest filed: ts=2026-05-29T14:39:57 DG-WKAppBot.",
+    "2026-07-06: unrelated file touch (CommandHelp.Entries.Misc.cs tasklist help entry) triggered this skill's study-lock, satisfying the gate only, no wkcdp-mon-relevant change.",
+    "EDITORIAL CORRECTION 2026-09-13: the note formerly here was off-topic noise (a stall-guard payment about file-edit tool behavior, unrelated to CDP Chrome session monitoring) -- user caught this pattern live and it was wrong to inject it here. That lesson belongs in file-command-cheatsheet, not this skill."
+  ],
+  "requirements": [
+    {
+      "cmd": "proposed: wkappbot skill read wkcdp-mon-ref",
+      "expect": "shows dated incidents plus removed off-topic text",
+      "prompt": null
+    },
+    {
+      "cmd": "proposed: wkappbot skill read wkcdp-mon",
+      "expect": "core stays on-topic",
+      "prompt": null
+    },
+    {
+      "cmd": "proposed: sidecar satisfies the delete-step backup check",
+      "expect": "not primary reading",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-07-14T15:24:56.303196Z",
+  "updated": "2026-09-13T04:52:19.025094Z",
+  "version": "1.2"
+}

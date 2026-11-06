@@ -1,0 +1,35 @@
+{
+  "id": "wkharness-guards-howto-howto",
+  "app": "wkappbot-workflow",
+  "title": "wkharness-guards-howto (archived 2026-10-03)",
+  "title_ko": null,
+  "desc": "T2 howto for guards",
+  "steps": [
+    "SUPERSEDED 2026-10-03 by wkharness-guards-howto. Howto placeholder"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read wkharness-guards-howto-howto",
+      "expect": "howto content shown",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill search guards",
+      "expect": "search results",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill list",
+      "expect": "skill list shown",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-09-15T06:36:21.0205073Z",
+  "updated": "2026-09-15T06:36:36.5076628Z",
+  "version": "1.1"
+}

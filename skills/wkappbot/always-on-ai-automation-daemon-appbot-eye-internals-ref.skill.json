@@ -1,0 +1,43 @@
+{
+  "id": "always-on-ai-automation-daemon-appbot-eye-internals-ref",
+  "app": "wkappbot",
+  "title": "AppBot Eye Internals T3 Reference",
+  "title_ko": null,
+  "desc": "T3 ref. OOM Guardian, spawn-storm circuit breaker, hot-swap stamp, MCP worker isolation details.",
+  "steps": [
+    "OOM GUARDIAN (v7.3.189): 4GB kill+respawn. Circuit breaker: _consecutiveHealFails counter, after 5 = circuitOpen. 50MB log cap. Commit d9d00420d.",
+    "SPAWN-STORM CIRCUIT BREAKER: count>50 consecutive spawns triggers abort. Prevents zombie cascade from FSW loop. Commit 43d289e90.",
+    "HOT-SWAP STAMP EXPIRY: Eye detects core.new.exe FileInfo stamp. Same failed stamp skipped until newer one appears. Defers if admin pipe busy. Guardian refreshes TryFindEyeHwnd after hot-swap (df3c519b3).",
+    "MCP WORKER ISOLATION: DETACHED_PROCESS flag prevents ConPTY LPC deadlock. Workers isolated so UIA/a11y crash doesn't kill Eye. Each worker communicates back via named pipe. Admin proxy: wkappbot_elevated (amber border). NEVER mix with wkappbot_eye_ipc.",
+    "T2 HOWTO CONTENT (until T2 created): 1-FIND: a11y find does NOT work (WindowStyle=None hides from UIA). Use eye tick to confirm alive, inspect {proc:wkappbot-core} --list --force for hwnd list. 2-POSITION: rightEdge=X+W+20, proposedLeft=rightEdge-330. Fallback primaryScreenW-330,10. Fix: cdp open https://chatgpt.com. 3-OPACITY: starts 0, fades 0.85 on ContentRendered. No CDP data = stays transparent. 4-SCREENSAVER LINK: spawned idle>=10s, must auto-close on user input (9-layer kill), alive at negative = BUG. 5-ADMIN vs NORMAL: eye_ipc=blue/normal, wkappbot_elevated=amber/admin, never mix.",
+    "DATED INVESTIGATIONS (moved from core T1, 2026-07-04 3-tier split): (a) 2026-06-04 Eye window = AppBotEyeOverlay WPF 320x220, WindowStyle=None hides from a11y find; position rightEdge=X+W+20,proposedLeft=rightEdge-330, fallback primaryScreenW-330,10; fix via cdp open https://chatgpt.com or eye restart. (b) 2026-06-26 Dispatch.cs L242 shell-external allowlist: history,recent,health,gh,spawn,ps,log,tasklist,wktasklist,task,python,python3 -- must not trigger BUG-AUTO. (c) 2026-07-02 mojibake ts=2026-06-18T07:57:36 investigation: NOT AppBotEyeJsonlParser (all its paths use UTF8Encoding no-BOM via ToolOutputStore.AppBotAppendFile) -- real corrupted field is PromptCommand.cs nameQuery, root candidate is Launcher console/pipe transcoding (Program.MainEncoding.cs, EyeCmdPipeClient.cs:39, IocpPipeRelay.cs:242-243, CoreRunner.cs) using DecoderFallback.ReplacementFallback -- NOT YET FIXED, separate riskier subsystem. (d) 2026-07-04 CONFIRMED: plain wkbuild.cmd deploy does NOT hot-swap a running Eye (no .new.exe marker by design) -- must use wktest-promote.sh to observe a C# change live via the bare wkappbot command; wkappbot-core <args> bypasses Eye for fast dev iteration.",
+    "STDERR-ROUTING INVESTIGATION 2026-07-04 (Opus review follow-up, moved from core T1): applied Console.SetError(new ThreadRoutingWriter(Console.Error)) to AppBotEyeGlobalMode.cs mirroring the working stdout pattern. First isolation-probe test was methodologically INVALID (marker placed before the using(Route(tee)) scope even starts, at RunInEye's top -- _local.Value is null there regardless of the fix). Correct test location: EyeCmdPipeServer.Dispatch.cs line 225 already has a pre-existing Console.Error.WriteLine('[CMD] name=...') correctly inside the Route(tee) scope -- checking whether THIS line appears via the bare wkappbot launcher is the valid test, not a newly added top-of-function marker. Root cause of the original banner-invisibility bug is still not confirmed either way pending this corrected test. Fix code itself was left in place (harmless if ineffective, symmetric with existing stdout pattern).",
+    "DEFINITIVE TEST 2026-07-04: corrected the invalid-placement test (step 7) by checking the PRE-EXISTING Console.Error.WriteLine('[CMD] name=...') at EyeCmdPipeServer.Dispatch.cs line 225, which IS correctly inside using(ThreadRoutingWriter.Route(tee)). Ran 'timeout 20 wkappbot cdp url {proc:chrome,domain:example.com}' against a confirmed-fresh Eye (post wktest-promote) with the stderr ThreadRoutingWriter fix applied -- the [CMD] line still does NOT appear via the bare wkappbot launcher. This is a methodologically sound negative result (not the earlier invalid-placement false negative): the stderr routing fix genuinely does not resolve the visibility gap, even for a correctly-scoped existing line. Opus's diagnosis (stdout thread-routed, stderr not) was a real and valid asymmetry to fix, but is NOT the complete root cause of why Eye-dispatched command diagnostics are invisible via the bare launcher. Needs live debugger attach (breakpoint/trace at the tee.Write call itself, or comparing byte-for-byte what actually crosses the named pipe) in a dedicated future session -- do not re-attempt via more instrument-rebuild-repromote-test cycles without a live debugger, that approach has now been tried twice and both times consumed hours without finding the actual cause.",
+    "ESTABLISHED WORKAROUND FOUND 2026-07-05 (wksplit-cs-utility step 8, 2026-07-03 precedent): a predecessor hit the EXACT same stderr-invisible-via-bare-launcher symptom in FileWriteCommand and fixed it by simply moving the confirmation message from Console.Error to Console.WriteLine (stdout) -- 'the Eye pipe relay only forwards stdout'. This CONFIRMS the stdout-only routing constraint is a known, accepted limitation (not something to architecturally fix), and the sanctioned workaround is: for any diagnostic that MUST be visible via the bare wkappbot launcher, print it to Console.Out, not Console.Error. This is simpler and lower-risk than extending Eye's ThreadRoutingWriter to also cover stderr (which this session's stderr-fix attempt did not even manage to verify working). RECOMMENDATION for the tab-info banner (PrintSharedTabInfo) and the CDP-STATE-BUG connect-phase instrumentation: move both to Console.Out instead of Console.Error to actually be visible where it matters."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read always-on-ai-automation-daemon-appbot-eye-internals-ref",
+      "expect": "T3",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read always-on-ai-automation-daemon-appbot-eye-internals",
+      "expect": "T1",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wkappbot-ask-gpt-zombie-process-4-5-gb-memory-leak-detection-and-fix",
+      "expect": "OOM detection",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-05-31T13:03:45.7444333Z",
+  "updated": "2026-07-04T16:19:20.9724114Z",
+  "version": "1.10"
+}

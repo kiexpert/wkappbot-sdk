@@ -1,0 +1,51 @@
+{
+  "id": "reflex-writing-guide",
+  "app": "wkappbot-workflow",
+  "title": "How to write a good reflex (short, positive, checkable)",
+  "title_ko": null,
+  "desc": "Rules for writing any reflex in an md or skill so cheap models follow it: say what to DO, in short numbered steps, each with a command that proves it.",
+  "steps": [
+    "WRITE THE ACT, NOT THE BAN. A list of forbidden things makes the model think of them and copy them. State the right action first. Example: a root exits, so run wkhippo trace SID. Do not write a list of banned phrases.",
+    "ONE SENTENCE, ONE ACTION. Cap a step at about 20 words. Number the steps. A cheap model follows three short steps and loses a long paragraph.",
+    "NAME THE TRIGGER AND THE CHECK. Start with the event that fires it, such as a root exits or a gate refuses. End with a command whose output proves it was done, such as lastWrite newer than the launch, or git ls-remote showing the hash.",
+    "PROVE IT BEFORE IT STAYS. A reflex or device that was not shown to stop the real failure is noise, so drop it. Proof: reproduce the failure, show it fixed with the device, show normal calls unchanged. A rule with no check is only a hope, so add the check or keep the rule short. //why:Citation gate refused ids glued to Korean particles, found in Test-WkStopGates.ps1 lines 68-73 //why:Citation gate refused ids glued to Korean particles, found in Test-WkStopGates.ps1 lines 68-73-sonnet",
+    "KEEP A HARD BAN ONLY WHEN IT CANNOT BE UNDONE, such as live orders or deleting data, and pair it with the safe road. Example: leave the lock file alone and commit through a separate index.",
+    "CORRECT, DO NOT ADD. When a reflex fails, rewrite the same reflex shorter and more exact. Do not stack a second reflex beside it. Record what worked, not the story of the failure.",
+    "DETAILED BANS GO INTO CODE, NOT PROSE. When a ban needs detail, write it as a harness:block pattern in the md or the guard, whose message names the safe road. Example: a block on rm and git clean in the shared tree, message: commit by pathspec and use a clean clone. The reflex text then carries only the positive action. A pattern blocks without teaching the model the banned act. //why:Placement: repo-specific block lines go in the repo REFLEX.md, shared ones in the global md.",
+    "GOOD EXAMPLE. A ROOT STOPS, TRACE FIRST. Step 1: run wkhippo trace SID --last 12 and read it. Step 2: lastWrite newer than the launch means it runs. Step 3: older means it never ran, so send the order again with wkroot.cmd send or start a fresh root. step 5: report what you saw and did, in past tense.",
+    "See also: emergency-reflex-polish-standard (the emergency first-aid standard for the spokesman, roots and grievance squad: search first, code first, prove it live both ways)",
+    "TODO: REFLEX CHECKER, a wkhippo reflexcheck mode (owner 2026-10-03, his reflex system is degrading from noise). CONTRACT: wkhippo reflexcheck SKILL_ID_OR_MD_PATH prints per step a verdict and a signal ratio. Checks, each a pure function with a fixture: (1) LONG: more than 25 words in one sentence (2) BAN-LIST: more lines starting with never or do not than lines starting with a verb (3) NO-TRIGGER-NO-CHECK: no leading event word and no command ending the step (4) NO-ARTIFACT: no commit hash, file:line or function name, the DONE-TEST of reflex-integrity-guard step 6 (5) NOISE-MARKER: //why:, Stall reset, MISREAD, Measured 20, a pasted failing command line (6) STORY: a past-tense sentence naming a session or a model that failed. (7) CONFESSION SCAN, a second mode wkhippo reflexcheck --confessions: implemented as ONE FIXED REGEX CONSTANT CONFESSION_RX in the module (Korean and English alternations in one place, prefilter by a cheap lowercase substring test before the regex because a lazy pattern on long lines is quadratic), searched through the hippocampus indexer, never a private grep, then FILTERED: assistant role only, one hit per distinct sentence, drop text quoted inside tool output or code blocks, and keep the session, time and sentence around it; list the assistant replies that contain a self-admission such as did not follow, missed, did not know, never saw, 따르지 않았, 놓쳤, 몰랐, 안 따랐, and print each with its session, time and the sentence around it; every hit is a REVIEW CANDIDATE: name the reflex that was broken, where it lives, and why it was missed (too deep, too long, no trigger, no example, hidden under a skipped tag), then repair that reflex by the absolute rules of skill-readability-optimization-and-healing. Count the hits per reflex: a reflex with two or more confessions is the first to heal. (8) BEHAVIOR PROFILE, mode wkhippo reflexcheck --profile SID, from the same indexer: per session list (a) the skills it read, in order and how far into the session, (b) its reaction right after each read, meaning the next tool call or the next sentence, (c) every guard block it met, with the guard tag and whether the next call obeyed the printed remedy or changed channel, (d) WHY DILIGENCE: the share of its skill edits that carry a real why with six or more new words and cite a durable artifact, versus empty or copied why text. Print the four numbers per session and per model, so a reflex that is read but not followed, or a block that is met again and again, shows as a behavior indicator beside the confessions. (9) COMPILE MODE, the reflex compiler (owner 2026-10-03): wkhippo reflexcheck --compile PATH_OR_SKILL_ID follows every reference the root md mentions, like a compiler follows includes, and prints diagnostics in the form FILE:LINE SEVERITY CODE message. Resolve: every wkappbot skill read ID (ERROR E001 when the skill does not exist), every --keep quote or step number (ERROR E002 when the quote or step is absent), every file path and command named (ERROR E003 when missing), every section header audience tag ALL, ROOT or SPOKESMAN ONLY (ERROR E004 when a header has no tag). Warn: WARN W001 over 20 steps, W002 noise ratio over 0.3 from the shared noise module, W003 a step of more than 80 words in a core, W004 a core with no howto or ref sibling, W005 a pointer chain deeper than 3 hops, W006 a reflex with no trigger or no check command, W007 a failure-story sentence. Walk the graph from the root md depth first with a visited set, print a summary of errors and warnings per file, exit 1 on any ERROR. Deterministic, no model call; IMPLEMENTED IN PYTHON (tools/reflex_compiler.py beside the hippocampus tools, standard library only, one call per hook, cache by size and modification time), with the shared rule table rules.json and the shared noise_engine.py reused, never a second marker list. A compile of the global CLAUDE.md, the repo CLAUDE.md and agent-on-load runs at session start and before every handoff. Output: ratio of clean steps, the delete-candidate list with counts, and exit code 1 when the ratio is under 0.7. VERIFY: a fixture of 5 good steps (short, trigger, check, artifact) scores 1.0, a fixture of 5 steps with 3 stories scores 0.4, and haiku-reflection scores below skill-readability-optimization-and-healing. SEAM: reuse Get-WkSkillNoiseRatio from the noise score proto, never a second marker list. Update to RESULT when landed.",
+    "TODO: ANTI-KNOWLEDGE NOISE GUARD, a write-path check on the existing anti-knowledge blocker (owner 2026-10-03). CONTRACT: at PreToolUse for skill edit --add-step, --replace, contribute and md edits, test ONLY the incoming new text. A sentence is a FAILURE STORY when it carries two of: an incident date (Measured 2026-.. or 2026-09-..), a session or case id (ESC-001, an 8 hex session id), past-tense narration of a failure, a pasted failing command line, or MISREAD, scolded, stall reset. Reuse the marker list of Get-WkSkillNoiseRatio in kih tools/noise-ratio-module.ps1, never a second list. A deletion or a pure move to a ref tier is never blocked. REFUSAL TEXT names the remedy: rewrite as the working move plus one example, one clause for what to skip (skill-readability-optimization-and-healing). STAGED: first WARN mode that only logs the hit and the sentence, measure the false positive rate over one week of real edits, then BLOCK when under 5 percent. VERIFY: fixture of a clean working-move step passes, a fixture with a dated incident sentence is refused, a move to -ref is allowed, WK_NOISE_GUARD=0 switches it off for A/B. Update to RESULT when landed."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read reflex-writing-guide",
+      "expect": "WRITE THE ACT",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read reflex-writing-guide",
+      "expect": "PROVE IT BEFORE IT STAYS",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read reflex-writing-guide",
+      "expect": "GOOD EXAMPLE",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "reflex",
+    "reflex-writing",
+    "positive instruction",
+    "short rules",
+    "good reflex"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-10-01T12:33:55.5062045Z",
+  "updated": "2026-10-03T14:28:35.852203Z",
+  "version": "1.14"
+}

@@ -1,0 +1,49 @@
+{
+  "id": "core-worker-logging-launcher-chain-howto",
+  "app": "wkappbot-core",
+  "title": "Core/Launcher logging: how to make output visible, flush it, and read it back",
+  "title_ko": null,
+  "desc": "T2 howto for core-worker-logging-launcher-chain: procedures for making Core/Launcher output actually visible, flushing it on every exit path, and reading it back after the fact.",
+  "steps": [
+    "MAKE STDERR VISIBLE BEFORE YOU CONCLUDE ANYTHING IS MISSING. Launcher/IocpPipeRelay.cs defaults showStderr=false (lines 22 and 88; line 254 gates the passthrough writer on it). Buffered stderr is printed ONLY on non-zero exit, and an exit code of 0 DROPS the buffer. So any Console.Error.WriteLine from Core is invisible on a successful run. HOW: re-run with the --stderr pre-flag, or --sudo which implies it. WHY THIS IS THE FIRST STEP: a session that reads the source, sees the emit, runs the command, sees nothing, and concludes the emit is broken has measured the relay default and not the emit. Pair the absence with a --stderr run before believing it.",
+    "THE [LOG] LINE SPECIFICALLY. TeeTextWriter.LogAnnounce.cs line 37 writes exactly the [LOG] prefix plus the path via Console.Error.WriteLine -- strictly stderr, never stdout -- and CoreRunner.cs line 300 reads it back with a StartsWith to populate capturedLogPath for the errors.jsonl fallback. Both halves are real; whether a human ever SEES the line is a separate question answered entirely by the showStderr default above.",
+    "RELAY FLUSH PROCEDURE on any change to the piped-relay path: save stderrRelayTask = Task.Run(...), then after WaitForExit call stderrRelayTask.Wait(2000) and only THEN TerminateSelf. Core's pipe closes on exit so the relay task ends naturally; the 2s is a safety fallback, not the mechanism. Skipping the Wait truncates the tail of every relayed run.",
+    "EXIT PATHS GO THROUGH THE TWO FUNCTIONS, never a bare TerminateSelf or TerminateProcess. Launcher: AppBotQuitFlush(exitCode, stderrRelayTask) then Wait(2000) then AppBotExit(code) then stderr dump then Console.Out and Console.Error Flush then TerminateSelf. Core: AppBotExit(exitCode) returns int, then the ProcessExit hook fires Console.Out.Flush plus Console.Error.Flush plus DoRequiredExitCleanup. Adding a new early-exit that bypasses these loses whatever was still in the .NET TextWriter buffer.",
+    "READING IT BACK AFTER THE FACT: errors.jsonl entries carry a source field, core from TeeTextWriter (with TAG field analysis) or launcher from the relay fallback (with a raw stderr snippet). Both may exist for the same crash and that is correct, not duplication. When a run produced no console output at all, the log file named by the [LOG] line is where the output actually went.",
+    "SILENT-SWALLOW DETECTION, and do not soften it: code==0 AND errorDetected AND StdoutIsBlank sets silentSwallow=true, which forces an error log and auto-registers a BUG-AUTO entry. NEVER change the exit code to make this go away -- downstream callers depend on the 0."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read iocp-stderr-default-buffered",
+      "expect": "showStderr",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read core-worker-logging-launcher-chain",
+      "expect": "ARCHITECTURE OVERVIEW",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot file grep showStderr csharp/src/WKAppBot.Launcher/IocpPipeRelay.cs",
+      "expect": "showStderr",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "logging",
+    "stderr",
+    "launcher",
+    "flush",
+    "howto",
+    "t2",
+    "debugging",
+    "visibility"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-08-27T13:38:14.9338081Z",
+  "updated": "2026-08-27T13:38:14.9338214Z",
+  "version": "1.0"
+}

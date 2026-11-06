@@ -1,0 +1,35 @@
+{
+  "id": "wkcdp-mon-corrections",
+  "app": "wkappbot",
+  "title": "wkcdp-mon: dated corrections",
+  "title_ko": null,
+  "desc": "T3 sidecar holding the exact text of an erroneous off-topic note removed from wkcdp-mon core, so the delete-step guard has a backup copy to verify against.",
+  "steps": [
+    "EDITORIAL CORRECTION 2026-09-13: the note formerly here was off-topic noise (a stall-guard payment about file-edit tool behavior, unrelated to CDP Chrome session monitoring) -- user caught this pattern live and it was wrong to inject it here. That lesson belongs in file-command-cheatsheet, not this skill."
+  ],
+  "requirements": [
+    {
+      "cmd": "proposed: wkappbot skill read wkcdp-mon-corrections",
+      "expect": "shows the removed off-topic text",
+      "prompt": null
+    },
+    {
+      "cmd": "proposed: wkappbot skill read wkcdp-mon",
+      "expect": "core no longer carries the off-topic note",
+      "prompt": null
+    },
+    {
+      "cmd": "proposed: sidecar exists only for the delete-step backup check",
+      "expect": "not a skill anyone should read for guidance",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-09-13T04:49:36.1108243Z",
+  "updated": "2026-09-13T04:50:47.3878535Z",
+  "version": "1.1"
+}

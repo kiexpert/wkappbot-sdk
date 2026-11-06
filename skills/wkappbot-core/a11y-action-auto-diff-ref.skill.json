@@ -1,0 +1,46 @@
+{
+  "id": "a11y-action-auto-diff-ref",
+  "app": "wkappbot-core",
+  "title": "a11y Action Auto-Diff -- ref (T3)",
+  "title_ko": null,
+  "desc": "T3 reference for a11y-action-auto-diff: the full exec settle-diff + universal-exec (GUI/PTY/pipe) design archive, the screen-reader/dimension-interpreter north-star, and shipped-status history. Read when you need the deep design behind the T1 core.",
+  "steps": [
+    "EXEC SETTLE-DIFF ENGINE (design archive, moved from T1 core 2026-07-17; TIER-1 SHIPPED commit 3eefe8c2a, cuts 1/2/3 in RunCommand.SettleDiff.cs). exec launches an app and emits a continuous DIFF stream of its UIA state -- a diff each time the state STABILIZES, silent while mid-transition, so a script sees only settled states not transition noise. Compose EXISTING primitives, no new engine: (1) a11y watch (A11yCommand.Watch.cs) zero-CPU UIA StructureChanged/PropertyChanged events = the change signal; (2) a settle-debounce (single timer re-armed on each event, fires at settle-ms quiet = near-zero CPU, 400ms default, MaxTransitionMs=5000 ceiling); (3) ActionDiff parent-node before/after = the diff. DEFAULT-ON, opt-out only via --no-diff (accessibility principle: helpful behavior is the default, never make the user pass a flag). TWO OUTPUT CHANNELS: TRANSITIONING -> compact \\r-overwritten transient (changed-region count + rect-delta, TTY-gated, ~6-8Hz) that never scrolls; SETTLE -> full node/rect diff terminated by \\n (permanent log). NOISE CUTS (shipped): (1) first settle = compact 'window ready (N nodes)' not a whole-tree [ADDED] dump; (2) summarize-first 'X added Y removed Z changed' before detail; (3) suppress empty/identical settles.",
+    "FRAME-STABILITY (TIER-2, deferred): classify each changing region -- identical rect+content for 3 consecutive frames = STABLE (fold into settle); never-holds-3 = LIVE (video/spinner, reported as a marker, does NOT block window settle). At the pure UIA-event level a playing video does NOT fire events (wk-ytad proved movie_player subtree is stable except controls) so the zero-CPU path is already video-immune; the 3-frame classifier only earns its keep for UIA-OPAQUE regions (canvas/terminal-cell-grid/custom-drawn).",
+    "NORTH-STAR (dimension-interpreter / screen-reader): the a11y/exec settle-diff layer is a SCREEN READER serving two blind users equally -- a low-vision HUMAN and the AI ITSELF (any model is blind to pixels; it perceives the GUI only through the UIA tree + our tools, so the settle-diff stream IS the AI's eyes). AppBot = a DIMENSION INTERPRETER translating the WINDOW/visual dimension (windows, pixels, terminal cells) into the TEXT dimension in real time. Judge every observe/read/exec feature by one test: does it faithfully, kindly project the window-dimension onto text for a reader with NO other access, WITHOUT them asking or passing a flag? That single test derives every rule: default-on opt-out, narrate meaningful settled states not churn, MARK live regions rather than hide them, keep it CPU-light/responsive. A mode that is opt-in, noisy, drops a channel, or dumps an unreadable full tree is LOSSY and fails the reader.",
+    "CONVERGENCE: a11y watch, exec, and inspect --watch are the SAME settle-diff engine at three entry points -- build it ONCE. watch WINDOW = observe an existing window (engine alone); exec APP = launch then run the engine (launch+watch); inspect WINDOW --watch = render tree + stream the settle-diff. Put the engine in ONE shared class; the others delegate. Never fork the event loop or diff logic per command. (Today watch is still a one-shot event-wait with different output -- the convergence needs the shared-engine extraction; keep watch's --until one-shot mode as-is.)",
+    "UNIVERSAL EXEC (GUI/Console/pipe, one front door): detect the target class via PE subsystem + does-a-window-appear, then route. (A) GUI -> UIA settle-diff streamer. (B) CONSOLE/PTY CLI -> attach ConPTY and stream terminal output, REUSING WKAppBot.Shared.PseudoConsoleRunner (csharp/src/Shared/PseudoConsoleRunner.cs, the proven wkstdpty engine: Run(exe,args,cwd,onOutput,onLineReady,mirrorToTerminal,startupProbe,...), IsSupported gate, merged stdout+stderr so NO stderr-drop, onOutput = the tee hook for capture or a cell-grid TUI diff); PTY branch SHIPPED commit 27fe7495c (RunCommand.Pty.cs: IsConsoleSubsystemExe PE-header classify + RunExecPtyBranch + plain-redirect fallback + onRegisterStdin). (C) STANDARD I/O PIPING -- forward stdin (inject) and stream stdout+stderr faithfully; do NOT repeat the IocpPipeRelay stderr-drop-on-exit0 bug (fixed for skill install commit 1ea4c0460).",
+    "STDIN-INJECT (interactive driver, hwaryongjeomjeong): exec forwards stdin INTO the PTY so the caller DRIVES a console app -- PseudoConsoleRunner already injects (inputWrite pipe + WriteFile, proven by startupProbe + onLineReady); exec exposes it via onRegisterStdin(Action<byte[]> inject) and, when exec's own stdin is redirected, thread-copies exec-stdin -> inject.",
+    "FOCUSLESS GUI INPUT (symmetric frontier): drive a GUI window's input WITHOUT stealing keyboard focus -- Console class = read VT + write stdin; GUI class = read UIA settle-diff + write focusless input (a11y invoke InvokePattern / a11y type ValuePattern-SetValue or WM_CHAR PostMessage / win-click PostMessage; NEVER SendInput -- it steals focus; governed by a11y-focus-tier-chain). The one genuine gap = arbitrary focusless Korean text via the not-yet-built WH_IME hook (CLAUDE.md Pending). Cross: a11y watch, wk-ytad-zero-cpu-uia-youtube-ad-skip-daemon-for-edge, wkstdpty-shared-pty-bridge, a11y-focus-tier-chain, RunCommand.SettleDiff.cs, RunCommand.Pty.cs."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read a11y-action-auto-diff-ref",
+      "expect": "EXEC SETTLE-DIFF ENGINE",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read a11y-action-auto-diff",
+      "expect": "a11y",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill search a11y diff",
+      "expect": "a11y-action-auto-diff",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "a11y",
+    "diff",
+    "history",
+    "incident"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-07-15T08:57:44.9420595Z",
+  "updated": "2026-07-17T14:01:08.3140283Z",
+  "version": "1.1"
+}

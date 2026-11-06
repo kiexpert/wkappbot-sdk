@@ -1,0 +1,49 @@
+{
+  "id": "log-filename-launcher-pid-spec-ref",
+  "app": "wkappbot-core",
+  "title": "Log filename launcher-pid spec: dated measurements, the incident, and what is already ruled out",
+  "title_ko": null,
+  "desc": "T3 ref for log-filename-launcher-pid-spec. The revision bisect that dated the dead RotateOldLogs caller, the daemon-pid collision measurement, the eight tracked files a gc sweep destroyed, and the three approaches already eliminated so no successor re-derives them. Parent: log-filename-launcher-pid-spec.",
+  "steps": [
+    "DATED MEASUREMENTS behind the parent spec, 2026-09-03, so nobody re-derives them. The dead caller, by revision: 2026-05-06 had TWO files containing RotateOldLogs(, 2026-05-08 had ONE, and today still one. The commit that dropped it is fa4a0f911b, refactor(program) split Program.cs into partial classes for 400-line cap, Co-Authored-By Claude Sonnet 4.6, and its own message says Build clean 0 warnings 0 errors. The daemon-pid collision: an out-log named wkappbot-core.exe.out-20260902_052158.noargs.pid=10788.log sat beside a LIVE eye.diag.pid=10788.log, which is why IsProcessAlive answers true forever. The folder explosion: 1240 subfolders and 62479 files below the log dir top level, names like old_suggest_bug-cdp-slow--cdp-tabs-took- and old_speak_ followed by a whole Korean sentence, because cmdTag embeds the command ARGUMENTS.",
+    "THE INCIDENT THAT STARTED THIS, and the reason the parent spec exists at all. The owner asked whether the launcher pid was stamped into the log filename. It is not, and the investigation into why found the rotation dead rather than the naming wrong. Along the way a single wkappbot gc --days 7 --sweep recycled EIGHT tracked repo files that are configuration and not garbage -- two live auth cookies under wkappbot.hq/cookies, config/ai-news-channels.jsonl, two files under data/, two evidence shell scripts, and hotkeys/nfstarter.hotkeys.json. All eight were restorable ONLY because git tracked them. That defect is fixed in commit 52b2fcf6a7 and the file now carries its own study lock.",
+    "RULED OUT, so the next session does not spend a round on it. IsLauncherInParentChain() is NOT the mechanism to build on: the skill core-worker-logging-launcher-chain-ref step 2 presents it as the v5.13.133 layer-2 check, but a case-insensitive grep for IsLauncher or LauncherInParent across csharp/src returns ZERO hits. The name is not in the tree. Also ruled out: appending .lpid= as a second field. It parses safely, because the literal .pid= needs a dot then p while .lpid= has a dot then l, but it leaves the rotation gate reading a daemon pid, so it buys readability and fixes nothing. And do NOT read the errors.jsonl log field as a way back to the launcher -- it points FORWARD at the core log, and the record carries no pid of its own.",
+    "HOW THE PARENT SPEC WAS VERIFIED, and the shape any successor should copy. The GC half was proved by a live dry-run against a real HQ rather than by reading the diff: chrome-profiles, profiles, runtime and skills all printed SKIPPED while logs was the only folder processed. That is a REFUSAL, and refusal is the only evidence that means anything here, because the failure mode is silent deletion rather than a crash. The rotation half is still unproven and its test is the file MOVING: place a backdated wkappbot-core.exe.out-20260101_010101.smoketag.pid=<dead pid>.log under a throwaway directory and assert it lands inside old_smoketag/. A build that returns zero errors says nothing at all about either half."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read log-filename-launcher-pid-spec-ref",
+      "expect": "RULED OUT",
+      "prompt": null
+    },
+    {
+      "cmd": "proposed: git grep -c RotateOldLogs -- csharp/src",
+      "expect": "1 file, the definition only",
+      "prompt": null
+    },
+    {
+      "cmd": "proposed: a live gc dry-run against a real HQ",
+      "expect": "cookies and config appear as SKIPPED, never on a recycle line",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "log",
+    "filename",
+    "pid",
+    "launcher",
+    "rotation",
+    "gc",
+    "ref",
+    "t3",
+    "incidents",
+    "measurements"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-09-03T07:59:35.6725969Z",
+  "updated": "2026-09-03T07:59:35.6726058Z",
+  "version": "1.0"
+}

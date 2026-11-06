@@ -1,0 +1,48 @@
+{
+  "id": "harness-process-kill-proof-gate-ref",
+  "app": "wkappbot-workflow",
+  "title": "Process Kill Proof Gate Reference",
+  "title_ko": null,
+  "desc": "Dated incident record for cross-repository Codex process termination without identity proof.",
+  "steps": [
+    "INCIDENT 2026-09-17: Three codex.exe PIDs were force-terminated after only image name and start time were observed. No command line, parent, working directory, or owner proof was collected.",
+    "IMPACT: The same machine had Codex sessions in three different repositories, so process-name enumeration could not identify the intended session and may have terminated unrelated work.",
+    "ROOT CLASS: Identity collapse. A shared executable name was incorrectly treated as session ownership.",
+    "CORRECTION: Never claim a PID belongs to the current job without command-line and repository evidence. If the evidence cannot be read, classify as unknown and do not kill.",
+    "VERIFICATION: The failure is prevented only when the harness rejects raw termination before proof and requires a classified dry-run plus post-kill inventory.",
+    "NAVIGATION: Read harness-process-kill-proof-gate for the reflex and harness-process-kill-proof-gate-howto for the procedure."
+  ],
+  "requirements": [
+    {
+      "cmd": "incident record",
+      "expect": "exact PID and missing proof fields are preserved",
+      "prompt": null
+    },
+    {
+      "cmd": "wktasklist -V",
+      "expect": "command line evidence is available",
+      "prompt": null
+    },
+    {
+      "cmd": "unknown ownership",
+      "expect": "termination is refused",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "harness",
+    "process",
+    "kill",
+    "proof",
+    "tasklist",
+    "reference",
+    "incident"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-09-16T17:42:28.3618762Z",
+  "updated": "2026-09-16T17:42:28.3618843Z",
+  "version": "1.0"
+}

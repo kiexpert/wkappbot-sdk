@@ -1,0 +1,57 @@
+{
+  "id": "harness-approval-ledger-callee-side-enforcement",
+  "app": "wkappbot-kih",
+  "title": "Harness approval ledger: callee-side enforcement so an unwired family cannot run ungated",
+  "title_ko": null,
+  "desc": "Owner design 2026-08-23. The harness governs a family only where that family wired the hook, so an uninstalled, deleted or switched-off hook silently ungates everything. Move enforcement into the tool being CALLED: the launcher blocks synchronously when no approval is on record, and the resident Eye daemon joins executed commands against an append-only approval ledger to catch what never reached the launcher. One net for both a deliberate bypass and a broken wiring, because both present as the hook did not run.",
+  "steps": [
+    "DECISION: enforce at the CALLEE, because the harness is authoritative over a family only where that family chose to wire it. WHEN: designing how a guard reaches a family, or when any family is found running ungated. HOW: run wkappbot skill read cross-family-harness-integration for the one-path-per-family architecture this inverts, then put the check in the tool being CALLED rather than in each caller's hook config. WHY: measured 2026-08-23 -- the agy hooks.json has NO OWNER, since the installer never writes it and it was hand-created during an investigation with nothing to restore it, so agy runs ungated while every config still reads healthy. A guard that depends on the guarded party installing it is not a guard.",
+    "DECISION: ONE NET CATCHES BOTH INTENTS, because a deliberate bypass and a broken wiring have the same symptom. WHEN: you are tempted to build separate detection for a cheating session and for a misconfigured one. HOW: run wkappbot skill read harness-source-edit-requires-skill-lock for the default-deny principle, then key the check on the OBSERVABLE fact -- no approval on record for this invocation -- and never on the inferred intent behind it. WHY: owner framing 2026-08-23, that this blocks an intelligence's bypass ATTEMPT and a connection FAULT together. The callee cannot tell the two apart and does not need to; from where it stands both read as the hook did not run, and that single fact is sufficient to refuse.",
+    "DECISION: the record is an APPROVAL, not a presence flag, which makes the check a JOIN rather than an existence test. WHEN: specifying what the harness writes and what the watcher reads. HOW: run wkappbot skill read harness-gate-log-data-integrity for the ledger-integrity rules, then have the harness write one record per ADMITTED command carrying command text, timestamp, resolved session, resolved family and verdict, and have the watcher match every EXECUTED command against it. WHY: an execution with no matching approval is the ungated call and is detectable no matter which door it came through, whereas a bare it-ran marker proves only that something ran.",
+    "DECISION: split the job -- the launcher BLOCKS, the resident Eye daemon WATCHES. WHEN: weighing enforcement against this repo's sub-1s response-time mandate. HOW: run wkappbot skill read always-on-ai-automation-daemon-appbot-eye-internals for the daemon lifecycle, then keep only the synchronous refusal in wkappbot.exe and move detection into Eye, which is already resident and costs the caller nothing. WHY: owner refinement 2026-08-23. This dissolves the latency objection instead of working around it, and the two are complementary rather than alternatives -- the launcher is the only thing that can stop an act BEFORE it happens, while Eye catches what never reached the launcher at all, such as a core binary invoked directly or a family whose front door is not wkappbot.exe.",
+    "DECISION: the join key is command text plus session plus a BOUNDED time window, never command text alone. WHEN: specifying how an executed command is matched against its approval record. HOW: run wkappbot skill read harness-active-model-scoping for how session and family identity are resolved from process lineage, then require all three fields to match and expire an approval after seconds rather than minutes. WHY: with command text alone, one approved read is reusable as cover for a later unapproved write of the same shape, so a loose key turns the ledger from a control into a laundering channel. The window must be short enough that an approval cannot be banked and spent later, which is the same reasoning that makes a nonce single-use."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read harness-approval-ledger-callee-side-enforcement",
+      "expect": "APPROVAL, not a presence flag",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read cross-family-harness-integration",
+      "expect": "one-path-per-family",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read always-on-ai-automation-daemon-appbot-eye-internals",
+      "expect": "Eye daemon lifecycle",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "harness",
+    "approval",
+    "ledger",
+    "enforcement",
+    "callee-side",
+    "launcher",
+    "eye",
+    "bypass",
+    "wiring",
+    "fail-closed",
+    "lineage",
+    "cross-family",
+    "하네스",
+    "승인",
+    "우회차단",
+    "배선불량",
+    "자가차단"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-08-22T17:38:36.4870387Z",
+  "updated": "2026-08-22T17:39:26.2517047Z",
+  "version": "1.1"
+}

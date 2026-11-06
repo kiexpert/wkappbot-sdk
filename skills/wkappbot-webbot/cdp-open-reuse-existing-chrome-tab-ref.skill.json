@@ -1,0 +1,40 @@
+{
+  "id": "cdp-open-reuse-existing-chrome-tab-ref",
+  "app": "wkappbot-webbot",
+  "title": "cdp open reuse-existing-tab: dated incidents",
+  "title_ko": null,
+  "desc": "T3 dated-incident archive for cdp-open-reuse-existing-chrome-tab: WMI/port-scan bug fixes, tab-hijack investigation history. Core: cdp-open-reuse-existing-chrome-tab.",
+  "steps": [
+    "MIGRATED 2026-09-13 verbatim from cdp-open-reuse-existing-chrome-tab core (was oversize, blocking edits to TabIdentity.cs and other CDP-tab files repo-wide): JOBKOREA NAVER LOGIN TEST (2026-06-05): Naver button structure = Social.naver('#btnNvLogin', '/Naver/Callback'). cdp eval direct call produced no stdout -- cdp eval executes but does not return value to caller. Correct approach: (1) intercept window.open BEFORE clicking: override window.open=function(u){captured=u; return origOpen(u,...)}; then click; then read captured. (2) After click, poll cdp tabs --port N for naver.com/oauth URL. (3) Or user manual click then verify cdp url. Haiku exit 1 = Agent.cmd PATH missing wkappbot, NOT Haiku capability issue. Fix: pass wkappbot full path in Agent.cmd prompt or use bash -c with PATH export.",
+    "MIGRATED: BUG FOUND+FIXED 2026-07-06: FindRunningChromePortCore (ChromeLauncher.ProcessDiscovery.cs) ran TWO full sequential WMI scans over every chrome.exe process -- the fastPort check and the strategy-1 check -- both comparing the exact same normalized userDataDir, so they were 100% redundant. Merged into one scan pass; halves the per-process WMI query count on every cdp open call.",
+    "MIGRATED: BUG FOUND+FIXED 2026-07-06 (2/2): GetCommandLineWithStatus (ChromeLauncher.SingletonGuard.cs) shells out to wmic.exe per chrome process to read its command line. CONFIRMED LIVE: wmic.exe is REMOVED on this Windows 11 build (where wmic => file not found). Every call was failing (Win32Exception), forcing WMI-uncertain fallback on ALL ~20 chrome processes, every single cdp open. Fixed: cache the absence in a static bool (s_wmicAvailable) after the first Win32Exception, so subsequent calls in the same process lifetime short-circuit instantly instead of retrying a permanently-dead tool.",
+    "MIGRATED: 2026-07-06 CONFIRMED BUG + FIX: cdp open --new-window's pre-kill sequence (WebCommands.Part3.cs, sync-over-async .GetAwaiter().GetResult() on KillChromeOnPortAsync, which awaits a CDP Browser.close + Task.Delay(1500)) was losing the already-resolved CallerHwndForPlacement (an AsyncLocal<IntPtr>) across that blocking call -- LatchLaunchCallerWindow saw it as zero afterward and skipped placement, contributing to a >1s stall. FIX: capture the value into a local before the kill, explicitly restore it in a finally block if found zero afterward. Live-verified: the '[CHROME:POS] caller window is not usable (caller hwnd is zero)' message is now GONE from --new-window runs. Independent Haiku analysis (long-lived Eye daemon + ConfigureAwait(false) context fragmentation across concurrent Task.Run dispatches) converged on the same capture-and-restore fix. NOTE: --new-window can still hit the 3s timeout ceiling for a SEPARATE reason after this fix (observed: CDP connects fine, then a ~2.2s gap after the LICENSE check before timeout) -- not yet root-caused, may be genuine Chrome/CDP round-trip cost under heavy session process load.",
+    "MIGRATED: TODO 2026-07-06: ask tab-reuse's host-match fallback investigated for possible cross-domain tab hijack -- RESOLVED 2026-07-06, see next step.",
+    "MIGRATED: RESOLVED 2026-07-06: ask tab-hijack complaint investigated -- audited GetOrCreateSandboxedTabAsync + EnsureCorrectWindowAsync (both in CdpClient.TabManagement3.cs / AskCommands.Entry.Cdp.cs), both correctly domain-scope tab reuse (matchesHost / host-fragment checks before ever touching an existing tab). LIVE TEST (ask gemini) confirmed correct behavior: '[SANDBOX] Miss but host-match found -> gemini.google.com/app', no cross-domain reuse. CONCLUSION: the 'ask steals tabs' symptom was very likely the SAME root cause as the cross-repo Chrome hijack bug already fixed in MyCdpContext.Placement.cs (wkappbot-sdk) -- when the WRONG Chrome window gets grabbed at the launcher placement layer, every tab inside it looks 'stolen' even though ask's own tab-selection logic was never the actual bug. LIVE TEST confirmed correct behavior. CONCLUSION: the 'ask steals tabs' symptom was very likely the same root cause as a cross-repo Chrome hijack bug already fixed elsewhere -- when the WRONG Chrome window gets grabbed at the launcher placement layer, every tab inside it looks stolen even though ask's own tab-selection logic was never the actual bug."
+  ],
+  "requirements": [
+    {
+      "cmd": "proposed: wkappbot skill read cdp-open-reuse-existing-chrome-tab-ref",
+      "expect": "shows dated 2026-07-06 WMI/tab-hijack incident history",
+      "prompt": null
+    },
+    {
+      "cmd": "proposed: wkappbot skill read cdp-open-reuse-existing-chrome-tab",
+      "expect": "core stays under the 20-step cap after this migration",
+      "prompt": null
+    },
+    {
+      "cmd": "proposed: grep for FindRunningChromePortCore in this skill",
+      "expect": "WMI double-scan fix is documented here, not lost",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-09-13T04:40:44.2290475Z",
+  "updated": "2026-09-13T04:42:49.2060795Z",
+  "version": "1.4"
+}

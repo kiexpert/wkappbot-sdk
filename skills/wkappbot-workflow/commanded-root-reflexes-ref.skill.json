@@ -1,0 +1,46 @@
+{
+  "id": "commanded-root-reflexes-ref",
+  "app": "wkappbot-workflow",
+  "title": "Commanded ROOT reflexes: dated record and parked TODOs (T3 ref)",
+  "title_ko": null,
+  "desc": "T3 ref of commanded-root-reflexes: dated incidents and parked TODOs moved out of the T1 core so the core stays a short reflex list. Core: commanded-root-reflexes.",
+  "steps": [
+    "NAVIGATION: this is the T3 ref of commanded-root-reflexes. The reflexes live in the core; this tier holds dated incidents and parked TODOs moved out of it. Read the core first: wkappbot skill read commanded-root-reflexes",
+    "TODO: Launch light ROOTs via wkroot.cmd, promote wkharness-agy-main-proto.ps1 with disabled agy-sandbox, and patch wkhippo-studied-index.ps1 with AGY JSONL support.",
+    "RANDOM ROOT MODEL (owner 2026-10-02): a root's start model is a lottery and -model on a launch is not honored; codex-luna and agy-flash roots run one turn and exit. A continued session (-resume or upgrade) can only use a model of the SAME family as the session (claude session: haiku, sonnet, opus; codex: codex-luna; agy: agy-flash). Order one item per lottery root, read the Spawning line in the launch output, and relaunch when it exits. Another family exiting at once is a harness bug: trace its grievance in the chat log and send a grievance-squad sector.",
+    "ROOT LAUNCH MEASUREMENTS 2026-10-02: a NEW wkroot launch with a CLAUDE model (haiku, sonnet) is overridden by the launcher, a temporary measure because the other families were not tested enough (owner 2026-10-02): a launch asked for haiku became a codex-luna loop, while a non-Claude model IS honored (agy-flash really started agy and died at once on a 429 quota error), so state the model you actually got from the launcher process command line (Get-CimInstance Win32_Process, look for wkroot-codex.ps1 -run ... -model X) before reporting a root; a codex root re-spawns one codex exec per turn about every 9 seconds when each turn ends at once, which wastes the codex quota (189 rollouts in 10 minutes), so stop such a loop with wkappbot a11y kill and the loop pid; a persistent root needs -resume of a session that already has a transcript under 5 MB; the launcher shell finishing means the root loop exited. Spokesman copy: wkappbot skill read spokesman-root-command-constitution with keep AGY IRON AGE. //why:codex root ran one turn then quit"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read commanded-root-reflexes-ref",
+      "expect": "NAVIGATION",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read commanded-root-reflexes",
+      "expect": "HARNESS MESSAGE DECODER",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill search commanded-root-reflexes",
+      "expect": "commanded-root-reflexes-ref",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "root",
+    "wkroot",
+    "spokesman",
+    "reflex",
+    "ref",
+    "t3",
+    "commanded-root"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-09-27T21:45:06.4476153Z",
+  "updated": "2026-10-10T11:51:13.2189941Z",
+  "version": "1.3"
+}

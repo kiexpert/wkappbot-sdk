@@ -1,0 +1,42 @@
+{
+  "id": "caller-window-rect-dpi-piping-ipc-extension-for-precise-chrome-placement-ref",
+  "app": "wkappbot",
+  "title": "Caller RECT+DPI IPC extension -- dated impl detail",
+  "title_ko": null,
+  "desc": "T3 ref tier for caller-window-rect-dpi-piping-ipc-extension-for-precise-chrome-placement: implementation detail (wire format variants, LAUNCHER receiver, fallback chain, validation, backward-compat) and dated history (2026-07-07 per-PID cache; 2026-07-08 ExperienceDb-backed shared cache in CallerPlacementResolver.Cache.cs).",
+  "steps": [
+    "WIRE FORMAT (3 variants, pick one): Variant A (multiline): __hwnd:0xABC / __hwnd_rect:100,50,900,700 / __hwnd_dpi:96,96 / rest of args. Variant B (single-field): __hwnd:0xABC;rect=100,50,900,700;dpi=96,96 (semicolon-delimited). Variant C (named JSON fields if moving to richer IPC format): {hwnd:'0xABC', rect:{l:100,t:50,r:900,b:700}, dpi:{x:96,y:96}, ...}.",
+    "LAUNCHER RECEIVER (MyCdpContext.Placement.cs CallerPlacementResolver): (1) Parse __hwnd_rect and __hwnd_dpi from args before dropping them from array. (2) TryGetCallerRect: if __hwnd_rect provided, use it directly (trust caller measurement). Skip EnumWindows, skip ancestor walk. (3) DPI-aware SetWindowBounds: scale Chrome size by (targetDpi / 96) to match caller monitor's DPI. Position Chrome relative to caller window RECT.",
+    "FALLBACK CHAIN (if piping absent): If __hwnd_rect not found: try GetWindowRect(hwnd) directly (Launcher fallback, no ancestor chain). If GetWindowRect fails: use zero-rect (placement skip). NEVER fall back to foreground or Z-order EnumWindows.",
+    "VALIDATION: (1) RECT bounds check: ensure right > left, bottom > top, within reasonable screen bounds. (2) DPI range: 96 (1x) to 576 (6x). Out-of-range = skip placement. (3) __hwnd_root (if provided): match hwnd value to verify integrity (optional, for diagnostics only).",
+    "BENEFITS: (1) Eliminates ResolveCallerTerminalHwnd complexity + failures. (2) No more GA_ROOTOWNER ancestor walk, no foreground fallback. (3) DPI already measured by caller (more accurate than launcher's remote MonitorFromPoint). (4) Caller window RECT already computed (no need for Launcher to query it again). (5) Exact pixel-perfect placement because all inputs are ground truth from caller's process context.",
+    "BACKWARD COMPAT: Launcher continues to support old __hwnd-only path (no piping extension). If __hwnd_rect absent, falls back to GetWindowRect(hwnd) locally or zero (skip). Existing Eye/Launcher binaries work unmodified during rollout. New behavior activated only when both sides send+receive extended fields.",
+    "2026-07-07: CallerPlacementResolver.cs now caches the resolved caller hwnd per pipe-client PID (10s TTL, _pidHwndCache) since ResolveHwndFromPidChain's per-level EnumWindows walk was the dominant contributor to the 6-8s wkappbot CLI per-call overhead for a short-lived client PID issuing several commands in quick succession.",
+    "2026-07-08: superseded/extended by CallerPlacementResolver.Cache.cs -- an ExperienceDb-backed CROSS-PROCESS shared cache (kind-tagged keys anywin/bigvis, 15s TTL, keyed by resolving pid's stable parent-pid) that persists across separate short-lived wkappbot CLI invocations, unlike the in-process _pidHwndCache above which only helps the long-lived Eye daemon."
+  ],
+  "requirements": [
+    {
+      "cmd": "grep -n TryGetCachedHwnd csharp/src/WKAppBot.WebBot/CallerPlacementResolver.PidChain.cs",
+      "expect": "cache check before EnumWindows walk",
+      "prompt": null
+    },
+    {
+      "cmd": "grep -n _pidHwndCache csharp/src/WKAppBot.WebBot/CallerPlacementResolver.cs",
+      "expect": "in-process per-PID cache present",
+      "prompt": null
+    },
+    {
+      "cmd": "grep -n CacheFormId csharp/src/WKAppBot.WebBot/CallerPlacementResolver.Cache.cs",
+      "expect": "ExperienceDb-backed shared cache present",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-07-07T18:12:42.6296467Z",
+  "updated": "2026-10-11T20:27:42.4880707Z",
+  "version": "1.1"
+}

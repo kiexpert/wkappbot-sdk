@@ -1,0 +1,37 @@
+{
+  "id": "wkcv-opencv-tools",
+  "app": "wkappbot",
+  "title": "wkcv OpenCV tool family launcher",
+  "title_ko": null,
+  "desc": "T1: wkcv launcher router for image/camera analysis (gaps/OCR masking, findtext/text detection, room/brightness-motion analysis)",
+  "steps": [
+    "wkcv gaps <image> invokes OCR masking module",
+    "wkcv room [camera_idx] analyzes brightness and motion //why:launcher router tested all three subcommand paths //why:launcher router tested all three subcommand paths-haiku",
+    "wkcv findtext <image> extracts text with bboxes"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkcv --help",
+      "expect": "usage",
+      "prompt": null
+    },
+    {
+      "cmd": "wkcv gaps",
+      "expect": "missing required args",
+      "prompt": null
+    },
+    {
+      "cmd": "wkcv room 0",
+      "expect": "success or error code",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-10-02T10:13:21.7099847Z",
+  "updated": "2026-10-02T10:13:45.785692Z",
+  "version": "1.2"
+}

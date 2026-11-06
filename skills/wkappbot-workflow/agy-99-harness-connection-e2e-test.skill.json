@@ -1,0 +1,44 @@
+{
+  "id": "agy-99-harness-connection-e2e-test",
+  "app": "wkappbot-workflow",
+  "title": "AGY 99: agy-harness connection end-to-end test (and the wkappbot exec route)",
+  "title_ko": null,
+  "desc": "The agy.exe + Hongik harness integration smoke test: what it proves (C1-C5 scorecard), where it lives, the NOT-GATED verdict, the 2026-07-23 port onto wkappbot exec --keystrokes-file, and what exec can and cannot drive.",
+  "steps": [
+    "WHAT IT PROVES: agy.exe ships its OWN native C++ permission engine that raises an IDE approval popup on every tool call. The goal is that the Hongik harness (wkharness-agy-main.ps1 PreToolUse / wkharness-agy-post.ps1) is the SOLE judge -- allow, warn or block -- with ZERO popups reaching the user. The test launches agy, injects a prompt that FORCES a tool call, and scores five criteria: C1 Popup Zero, C2 Harness Coverage (hook fires must be >= tool calls -- a call that runs UNGUARDED is a FAILURE even with no popup), C3 No Quota/Limit, C4 Model Response, C5 Clean Exit.",
+    "WHERE IT LIVES: D:/GitHub/personal-docs/wkagy_99_test.ps1 plus wk-99-dev.ps1 (dev helper that patches its timing vars). Both are study-locked via per-file harness:skill rules in the GLOBAL CLAUDE.md. They are NOT in the WKAppBot repo, so searching from there finds nothing -- which is why this skill exists.",
+    "CURRENT VERDICT = NOT-GATED (2026-07-23, unchanged by the port): the run reaches the premise (the model issues a real Bash ping tool call) and scores FAIL C1 popup detected, FAIL C2 zero hook fires against the tool calls, PASS C3, PASS C4, FAIL/WARN C5; hook marker file absent, HOOK_FIRED count 0. MEANING: agy tool calls currently BYPASS the harness and reach the native C++ engine directly. Do NOT treat agy as harness-governed until C1 and C2 both pass. This verdict lived only in .tmp/agy99-final-findings.md (scratch, which dies) until recorded here.",
+    "PORT LANDED 2026-07-23 -- exec is now the DEFAULT transport. The test gained a -Transport parameter: exec (default, runs wkappbot exec <agy> --keystrokes-file <file>) and wkstdpty (the old bespoke bridge, KEPT as a working fallback so a bad exec run never costs the ability to test). The C1-C5 scorecard logic and output format were NOT touched -- transport swap only, same downstream parsers. This also removed the header comment that had falsely claimed exec was already in use.",
+    "EXEC CAN DRIVE AGY -- PROVEN, WITH ONE LIMIT. Raw transcript evidence from a live exec run: the injected prompt reached the model (Thought for 14s, 378 tokens), the model issued the tool call (Bash ping -n 1 8.8.8.8), and the full ANSI TUI including the native permission prompt was captured. So keystroke injection and output capture both work through wkappbot exec. THE LIMIT: once the native permission prompt is up it accepts ONLY its numeric options (1-4), so the /quit in the keystrokes file is ignored and the child hangs until KillAfterMs. Do NOT paper over this by raising KillAfterMs. The clean-exit path, not yet implemented, is to answer the prompt numerically AFTER C1 has already recorded that the popup appeared, then send /quit -- that is a termination fix, not a whitelist, and it does not weaken the test.",
+    "PROCESS CLEANUP = PID MARKER FILE, never a name or path match. The test appends every PID it spawns to .tmp/agy99-last-pids.txt and, on the next run, kills only those PIDs after verifying the process NAME is agy/powershell/pwsh. Two earlier designs were rejected in review: Get-WmiObject Win32_Process (forbidden -- WmiPrvSE storm source) and Get-Process -Name agy filtered by Path -like *WKAppBot* (agy.exe really does live in WKAppBot/bin, so that filter can kill a PARENT agy session). Also beware: the loop variable must NOT be named pid -- PID is a READ-ONLY automatic variable, and assigning it throws inside the try/catch, silently disabling the whole cleanup block while still passing a parse check.",
+    "NEVER WHITELIST THE COMMAND UNDER TEST: provoke the popup with a command deliberately NOT in settings.json permissions.allow (ping is the established choice, and it is harmless if it does execute). An entry in permissions.allow is auto-granted, and an auto-granted tool SKIPS the PreToolUse hook entirely -- so whitelisting to suppress a popup makes the harness never see the call under test. The wildcard command(*) form of this mistake is documented in agy-harness-popup-deadlock-ref.",
+    "TIMING: three variables at the top of the test -- WaitBeforeMs 75000, WaitAfterMs 15000, KillAfterMs 120000 (raised from 30000/5000/40000 because the model needs time to answer; a full run takes about 122s). wk-99-dev.ps1 patches these by name and self-tests the patch, so do not rename them. If C5 reports a timeout, check the permission-prompt limit above before assuming a real hang.",
+    "VERIFY LIVE, NEVER PARSE-ONLY: a PTY transcript assertion is only as good as its ANSI decoder -- the popup detector was once fooled by escape sequences and had to be rewritten, and a cleanup bug survived a green parse check because it only failed at runtime. Prove a change by RUNNING the test against a real agy session and reading the scorecard. See verify-tool-or-guard-synthetic-live-static, wkexec-conpty-keystrokes-ladder, and agy-cli-usage-and-survival.",
+    "Numeric-first exit sequence fix: when agy shows permission prompt, send a numeric menu option (1-4) BEFORE /quit. The prompt rejects bare /quit or ESC while active. Test sequence candidate: ESC,WAIT:500,2 (answer option 2),WAIT:400,/quit,ENTER to terminate cleanly. (2026-07-24 investigation start)"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read agy-99-harness-connection-e2e-test",
+      "expect": "shows 9 steps, not 1",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read agy-99-harness-connection-e2e-test",
+      "expect": "step 5 states exec CAN drive agy but /quit is ignored while the numeric permission prompt is up",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wkexec-conpty-keystrokes-ladder",
+      "expect": "documents exec --keystrokes-file, the supported route this test now uses",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-07-23T03:10:40.772805Z",
+  "updated": "2026-07-23T15:58:05.0446205Z",
+  "version": "1.2"
+}

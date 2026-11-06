@@ -1,0 +1,36 @@
+{
+  "id": "delegation-verify-scorecard-ref",
+  "app": "wkappbot-workflow",
+  "title": "delegation-verify-scorecard ref: dated verification cases",
+  "title_ko": null,
+  "desc": "T3 dated archive for delegation-verify-scorecard: the re-brief-beats-re-blame proof case, and the 2026-07-24 session where three commando reports carried correct artifacts with wrong narratives -- including an adversarial audit whose headline accusation was itself false. Rubric and criteria live in delegation-verify-scorecard.",
+  "steps": [
+    "RE-BRIEF BEATS RE-BLAME -- the proof case (2026-07-20, WKAppBot find-and-replace suggest). A delegate first pass on a mechanical CLI task was incomplete and a resolve gate kept rejecting it. Rather than ROOT finishing it by hand, the retry brief was rewritten with FULL AUTONOMY, EXPLICIT SELF-VERIFICATION steps (run the script standalone before submitting) and explicit permission to iterate five or more times. The re-brief produced a fully passing resolve including both required error paths, with zero further ROOT intervention. WHY IT GENERALISES: ROOT own turn costs more than a delegate turn, so a delegate iterating several times is cheaper than ROOT hand-fixing a partial result -- which is the ATTRIBUTION GATE rule (re-brief, do not re-blame) with a measured outcome behind it.",
+    "ARTIFACT CORRECT, NARRATIVE WRONG -- three instances in ONE session (2026-07-24), the evidence behind the verify-the-accusations criterion. (1) A parse-verification commando reported three files PARSE OK (correct, matched ROOT own run) but gave one file as 522 lines; ROOT counted 548, which matched the git stat of the only commit touching it (+9/-1 on a 540-line file). The wrong number briefly looked like a 27-line truncation of a LIVE harness file. (2) A logic-replica test commando reported case F as exempt=false while labelling it EXEMPT; ROOT re-ran the same self-test and got exempt=true -- the test was correct, only the summary line was mis-transcribed. (3) The sharpest one: an ADVERSARIAL audit commando, briefed to return PROVES or DOES-NOT-PROVE per case, led with a false positive accusation -- that a self-test passed on a commit sha which did not exist, therefore invalidating all passing-case coverage. ROOT ran git cat-file -t on that sha and got commit. The sha was real; the accusation was the single most confident sentence in the report. THE PATTERN: in all three the delegate ARTIFACT was sound and its PROSE was not, and each was settled by one command. THE ASYMMETRY WORTH REMEMBERING: a false pass costs an undetected defect, a false accusation costs a real fix plus the hunt for a bug that never existed -- and the adversarial brief that produces the genuinely good findings is the same brief that raises the false-accusation rate. In that same report two OTHER findings (a path regex that cannot match a drive-letter-with-forward-slashes input, and a fail-open branch no case exercises) were structural, checkable by reading the code, and appear sound -- so adversarial auditing earns its keep; it just has to be audited back."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read delegation-verify-scorecard-ref",
+      "expect": "ARTIFACT CORRECT NARRATIVE WRONG",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read delegation-verify-scorecard",
+      "expect": "the criteria this archive supports",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill search delegation verify dated cases",
+      "expect": "returns delegation-verify-scorecard-ref",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-07-24T03:36:04.8728789Z",
+  "updated": "2026-07-24T03:36:04.8728895Z",
+  "version": "1.0"
+}

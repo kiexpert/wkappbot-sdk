@@ -1,0 +1,56 @@
+{
+  "id": "codex-hook-wiring-ref",
+  "app": "wkappbot-kih",
+  "title": "Codex hook wiring ref: the measurements behind the Stop loop",
+  "title_ko": null,
+  "desc": "T3 work record for codex-hook-wiring: the dated measurements that sized the Stop fast-verdict window, the direct-run timings, and the wiring facts that a read of the adapter alone would get wrong. Core: codex-hook-wiring. Procedures: codex-hook-wiring-howto.",
+  "steps": [
+    "MEASURED 2026-09-11, the Stop loop, in one real rollout. File rollout-2026-09-10T22-29-21 under the 2026/09/10 sessions folder: 14611 raw JSONL lines, 4075 records whose payload type is message, and 2003 stop-hook injections. Every injection is the previous block reason arriving back as a role user message record, so the count IS the loop. The session ended only when the five-hour token budget was exhausted. That is the certain present harm any Codex Stop gate is weighed against.",
+    "MEASURED 2026-09-11, the gap distribution that SIZED the window. Counting in CHAT MESSAGE records, the gap between consecutive injections was 2 in 1978 cases, 3 in 13, 4 in 5, 5 in 2, and one case each of 6, 8, 11 and 14. So a window of 3 message records catches the previous injection in 1991 of 2002 cases, about 99.5 percent, and the residue simply blocks once more before catching. Counting the same window in RAW lines catches none of them, because between two injections the file gains roughly seven non-chat rows for every chat row.",
+    "MEASURED 2026-09-11, the direct-run timings and verdicts, taken by piping a synthetic payload into tools/wkharness-codex-stop.ps1. With a real transcript path the hook answered in 1174 ms with a block carrying the full PACE and WISHES frame. With an empty JSON object as the payload it answered in 514 ms with a block reading no prior stop evidence in last 3 transcript lines. Both are correct answers from the old code and both are the loop: the fast-allow branch existed and could not fire.",
+    "THE ADAPTER STOP BRANCH IS DEAD ON THIS MACHINE, and reading the adapter alone gets this exactly backwards. tools/CodexHookAdapter.ps1 contains a Stop branch that starts the hook as a child with an 8500 ms deadline, kills it on overrun and emits a fail-closed block. hooks.json does not route Stop through the adapter at all: the Stop command string names tools/wkharness-codex-stop.ps1 directly. So the live Stop path has NO internal deadline and receives no RawFile argument. Read the hook command string before crediting the adapter with anything.",
+    "THE ADAPTER DEADLINES, recorded because they are easy to misremember as one number. Stop 8500 ms, PreToolUse 24000 ms, PermissionRequest 24000 ms, everything else 9000 ms, with a drain window of 250 ms for Stop and 1000 ms otherwise. On overrun the adapter emits a block for Stop and a deny for PreToolUse and PermissionRequest. These are in milliseconds; the hooks.json timeout beside them is in SECONDS, and the Stop entry there is 10.",
+    "OWNER DIRECTIVE 2026-09-16, the verified fail direction for the Codex Stop hook after the live invalid-JSON probe. When the hook cannot process its own session file, it emits exactly one compact JSON block verdict with the reason inside the JSON and exits 0. It must not print a separate diagnostic line because the Codex runner rejects any non-JSON stdout. This keeps the hook recoverable without violating the always-exit-zero contract.",
+    "THE THREE OUTCOMES this produced, in tools/wkharness-codex-stop/Get-WkCodexStopFastVerdict.ps1: allow when the stop-hook-active flag is set or a marker sits in the last 3 chat records, initerror on every path where the transcript cannot be read as chat records at all -- empty path, missing file, unreadable file, zero-byte file, a directory, no message rows -- and evaluate otherwise. Only evaluate reaches the expensive frame verdict, which is also why the common case got cheaper.",
+    "WHAT A SUCCESSOR SHOULD RE-MEASURE RATHER THAN INHERIT. The injection gap distribution is a property of how the current model answers a block, so if the block message changes length or the model changes, re-run the count before trusting the window of 3. The counting recipe is in codex-hook-wiring-howto: stream the rollout with the .NET ReadLines method, keep rows whose payload type is message, and record the gap in message records between consecutive marker rows.",
+    "MEASURED 2026-09-11 BY GREP, and it is the finding that explains WHY the loop was unopposed: the Codex Stop path ONCE HAD a repeat-block escalation and no longer does. cross-family-harness-integration step 17 records that Get-WkStopEscalatedReason and Test-WkStopRepeatBlockExceeded were wired to Codex ALONE, through a seam inside a function called Invoke-WkCodexSharedStopGuard in tools/wkharness-codex-stop.ps1. A tree-wide grep for both names today returns that function ONLY in tools/wkharness-codex-stop.ps1.disabled and in a wkharness-codex-stop.ps1-syntax-err.txt residue file. The live tools/wkharness-codex-stop.ps1 is a seventeen-line shim that delegates to its module folder and contains neither name. So when the hook was rewritten to the thin shim, the one defence built specifically to break a repeating Stop block went with it, silently, and nothing announced the loss. THE REUSABLE RULE: when a fat guard is replaced by a thin shim plus modules, enumerate the FUNCTION NAMES the old file called and prove each one still has a call site, because a rewrite drops behaviour in exactly the way a diff review does not show -- there is no deleted line to read, only a file that no longer mentions something. THE CHEAP CHECK: grep the tree for the old function name and look at which files answer; when every hit is a .disabled or a -syntax-err.txt residue, the capability is gone from production no matter how healthy the new modules look.",
+    "MEASURED 2026-09-11 BY READING THE SHARED FUNCTION, and it reframes the whole fix: the last-three-lines anti-loop the owner asked for ALREADY EXISTS, built 2026-09-06 as Test-WkStopConsecutive in tools/wkharness-common-stopconsec/Get-WkStopConsecutive.ps1, with a WindowSize of exactly 3 and an 8000 byte bounded tail read. The Codex Stop hook REACHES it: Get-WkStopFrameVerdict dot-sources it at line 28 and calls it at line 34, returning allow when it answers true. It answers false for every Codex session, for THREE independent reasons and each alone is enough. ONE, ITS MARKERS ARE CLAUDE-SHAPED: it looks for a hookName field equal to Stop, or the words stop_hook or Stop hook outside a tool_use entry. A Codex rollout carries none of those -- the block arrives back as an ordinary user message whose CONTENT is the block text, with no hook field anywhere. TWO, ITS NOISE FILTER IS CLAUDE-SHAPED: Test-WkStopEntryIsNoise drops attachment, queue-operation, summary, system and total_tokens_reminder entries, while Codex noise is token_usage_record, event_msg and response_items of type function_call and function_call_output, none of which it recognises, so the three-line window fills with rows that can never match. THREE, ITS FAIL DIRECTION IS FALSE MEANING BLOCK, by explicit design stated in its own header, which the owner overruled for this case on 2026-09-11. THE ARCHITECTURAL CONSEQUENCE, and it outranks the codex-only patch: this is one shared function that is correct for one family and silently inert for the others, so the fix belongs INSIDE it -- family-aware noise types and a family-aware marker set -- rather than in a second parallel copy living under the codex folder. A second copy is the bandaid the repo rules forbid, and it would leave agy carrying the same defect unfixed. ALSO NOTE line 31 of Get-WkStopFrameVerdict: it derives the session id from the transcript FILENAME, which for a Codex rollout yields the string rollout plus a timestamp plus a thread id rather than any real session id, so anything keyed on that value downstream is keyed on a bogus one.",
+    "THE 2026-09-11 SESSION'S OPEN ITEMS, in the order ROOT would take them, recorded HERE because the letter cannot carry them: the size gate refuses any growth past 32768 measured bytes and its remedy is exactly this, put the passage where a session retrieves it when relevant instead of carrying it always. ONE, THE EMERGENCY DOOR IS BUILT AND NOT WIRED -- tools/wkharness-common-emergencyedit/Test-WkEmergencyEditAllow.ps1, verified 16 of 16 from the canonical path with nine negative controls, grant measured at 34 ms end to end. It belongs at the TOP of tools/wkharness-claude-main.ps1, which the live PreToolUse chain reaches second after tools/audit-log.ps1; the seam is a Test-Path, a dot-source, one call and an early exit zero. TWO, THE ENTRY TRACER IS LIVE AND UNWIRED -- tools/wkharness-common-entertrace/Write-WkEnter.ps1 plus its reader. A full call-stack capture costs 0.03 ms over a 0.1345 ms baseline, so it buffers and flushes once at process exit, and a span over one second auto-registers its own source on the emergency list, verified end to end. It belongs in the COMMON LOADER so every family gets it without a per-file seam. THREE, WHERE THE HOOK TIME GOES, measured over 4000 calls: wkharness-claude-main.ps1 at 445,565 ms and wkharness-guards-infra.ps1 at 128,766 ms, worst checkpoints after-cmd-extract 126 s, start 120 s, g-before-guards 112 s, g-after-stall-guard-block 66 s, g-bf-cheap-check 45 s. FOUR, THE CLAUDE STOP DECISION LOG DIED 2026-09-06 -- stop-twice still fills, 27 entries that day, which is why the Stop message appears less often than not, but no stop-block or stop-approve file has been written since the sixth, so the record of what the gate decided is gone. FIVE, Get-wkharnessCommandText THROWS IN THE POST HOOK, five entries in the hook error log, one per Bash call, while a synthetic replay of the same hook was CLEAN -- so the trigger is in the real payload, it is not root-caused, and an init error is precisely what fires the harness rollback. THE TRAP THAT COST THIS SESSION MOST: an UNCOMMITTED harness source change CANNOT BE TESTED, because tools/wkharness-common-postinitrollback.ps1 restores harness source with git checkout HEAD the moment the post hook sees an init error. Two promotions were reverted between the write and the test. Write, COMMIT, then test."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read codex-hook-wiring",
+      "expect": "the usage tier these measurements support",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read codex-hook-wiring-howto",
+      "expect": "the counting recipe and the test recipes",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read harness-stop-guard",
+      "expect": "the Claude-side Stop gate this one mirrors",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "codex",
+    "hook",
+    "ref",
+    "t3",
+    "stop",
+    "loop",
+    "measurement",
+    "rollout",
+    "record",
+    "harness"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-09-11T02:34:09.1982966Z",
+  "updated": "2026-09-16T16:38:14.5186709Z",
+  "version": "1.4"
+}

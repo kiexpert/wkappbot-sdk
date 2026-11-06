@@ -1,0 +1,52 @@
+{
+  "id": "wkinject-focusless-console-keystroke-injector-exe",
+  "app": "wkappbot-kih",
+  "title": "wkinject: focusless console keystroke injector (exe)",
+  "title_ko": null,
+  "desc": "Reusable native exe that injects keystrokes into a target console by PID via CONIN WriteConsoleInput, focuslessly (no foreground steal). Auto-parent default, popup-dismiss for agy, text with codex enter-delay. Replaces agy per-session reinvention.",
+  "steps": [
+    "WHAT: wkinject.exe is a WillKim USER-tier tool (WKAppBot/bin, on PATH, ZERO harness dependency, pure Win32) that injects keystrokes into a target process CONSOLE INPUT BUFFER focuslessly, never stealing foreground. Use it to dismiss an agy y/N approval popup (1 then Backspace) or to type an arbitrary prompt plus Enter into any AI-CLI console. Replaces the per-session reinvention agy kept doing until token-exhaustion.",
+    "USAGE (all in --help): with no --pid it auto-resolves an AI-CLI partner but ACCEPTS it only when GetConsoleProcessList of wkinject OWN console lists it (WkOwn.ProveOwn in wkinject-own.cs), otherwise exit 2 with one Article line and nothing typed (fixed 2026-09-20; --resolve-only prints the verdict without injecting; an explicit --pid or --pname outside the own console still works but prints one confession line to stderr; several --pname matches are refused unless exactly one sits in the own console); a caller that means the launching AI session passes --pid from Get-WkAiAncestorPid in wkappbot-kih tools, which returns 0 and skips the injection when no AI-CLI ancestor is proven. --text types a string where a trailing backslash-r submits the line. --popup-dismiss does one 1+Backspace burst; --loop N --interval-ms M repeat it (agy uses --popup-dismiss --loop 30). --enter-delay-ms holds a trailing Enter (default 500ms) because codex-style TUIs DROP an all-in-one text+Enter batch, so the submit only registers if Enter arrives after the body is buffered. --no-auto-parent requires explicit --pid. Exit 0 ok, 2 no target, 10 attach, 11 conin, 12 write, 13 short write.",
+    "MECHANISM and THE ONE TRAP: FreeConsole, then AttachConsole(pid), then open the console input buffer by its CONIN name via CreateFileW, then WriteConsoleInput. After AttachConsole the process standard handles are NOT refreshed, so GetStdHandle returns the DEAD old-console handle and every write fails err=6 ERROR_INVALID_HANDLE. Opening CONIN by name gets the live buffer. This is why the old agy-1-backspace-helper wrote zero bytes for years. Proven live on conhost 2026-07-30: WriteConsoleInput ok=True written=N, and a text plus Enter injection submitted a real turn.",
+    "WHY AN EXE not Add-Type: Add-Type recompiles the C# via csc EVERY run (measured 798ms), fatal for a hook firing on every tool call. Compiled once with Framework64 csc to a native exe = 70ms (11x faster). The sibling .cmd and .ps1 are THIN shims forwarding to the exe, one implementation no drift.",
+    "SURFACE SCOPE: this is the CONSOLE backend (classic conhost). A caller surface can also be a ConPTY/Windows-Terminal, a VSCode integrated terminal, or a Chrome/Electron widget, which need their OWN delivery backends (a11y-type or CDP) behind a surface classifier. See wkexec-conpty-keystrokes-ladder and a11y-focus-tier-chain. Wired into the agy PreToolUse hook at wkharness-agy-main.ps1.",
+    "PNAME GENERALIZATION (2026-07-30): --pname <name> flag added to target ANY process by name (not just hardcoded agy). Generalizes ResolveAgyByName() into ResolveByName(string name); --watch uses --pname if given, else defaults to agy for backward compatibility. Precedence: explicit --pid always wins; else --pname; else auto-parent.",
+    "VERIFIED: --enter-delay-ms does NOT supply the submit for you -- the text must carry a literal backslash-r or the line lands in the prompt and just sits there. WHEN: wiring any wkinject call whose purpose is to ASK something, rather than to dismiss a popup. HOW: run wkappbot skill read wkareyouready for the readiness-gate call site that proved this, then pass the two LITERAL characters inside a SINGLE-quoted string so wkinject unescapes them itself, since a real carriage return placed in argv by the shell is a different and worse path; then fire it once at a live console and confirm a turn actually arrives, because a text that merely appears in the prompt looks identical to one that submitted. AND KEEP IT SHORT AND LOWERCASE -- owner rule 2026-08-23: a long injected paragraph does not read as a person typing, so the readiness gate injects three lowercase words and leaves the formal wording to the banner printed above it. WHY: measured 2026-08-23. I read this skill's own line about --enter-delay-ms holding a trailing Enter and concluded the injector would submit for me, so the first wired version omitted the escape entirely; the owner caught it by asking whether I had put an Enter after the text. Reading a help string is not running the command."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkinject --self-test",
+      "expect": "4 PASS, 0 FAIL",
+      "prompt": null
+    },
+    {
+      "cmd": "wkinject --help",
+      "expect": "lists --pid, the auto-parent default, --text, --popup-dismiss, --loop, --enter-delay-ms",
+      "prompt": null
+    },
+    {
+      "cmd": "wkinject.cmd --self-test",
+      "expect": "thin shim forwards to wkinject.exe, prints 4 PASS 0 FAIL",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "wkinject",
+    "injector",
+    "console",
+    "conin",
+    "keystroke",
+    "focusless",
+    "agy",
+    "popup",
+    "exe",
+    "willkim-tool"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-07-30T07:22:04.6128054Z",
+  "updated": "2026-09-20T09:51:45.5100516Z",
+  "version": "1.3"
+}

@@ -1,0 +1,37 @@
+{
+  "id": "archiving-a-predecessor-letter-section-counts-as-wish-erasure",
+  "app": "wkappbot-kih",
+  "title": "Archiving a predecessor letter section counts as wish erasure",
+  "title_ko": null,
+  "desc": "handoff-wish-verdict.sh treats moving a predecessor's wish paragraphs to a sidecar file as WISH ERASED, not as a legitimate fat-md-growth remedy, unless every named wish is separately re-answered with a real manifest row",
+  "steps": [
+    "Moving an old letter section wholesale to a sidecar deletes its wish paragraphs from the tracked letter, which the wish-erasure check reads as work still owed unless a manifest row answers each one individually",
+    "The safe fat-md-growth remedy is to shrink the CURRENT session's own new prose, or fold genuinely resolved rule-type content into a skill -- never archive an inherited section wholesale unless every wish inside it already has a real row",
+    "Measured 2026-09-09 in WKAppBot: archiving the 11th letter's full body relieved fat-md-growth but triggered WISH ERASED for 3 paragraphs whose wishes were not individually re-proven, forcing a full restore"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read archiving-a-predecessor-letter-section-counts-as-wish-erasure",
+      "expect": "sidecar",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read archiving-a-predecessor-letter-section-counts-as-wish-erasure",
+      "expect": "manifest row",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read archiving-a-predecessor-letter-section-counts-as-wish-erasure",
+      "expect": "WISH ERASED",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-09-08T15:51:18.7307128Z",
+  "updated": "2026-09-08T15:51:18.7307328Z",
+  "version": "1.0"
+}

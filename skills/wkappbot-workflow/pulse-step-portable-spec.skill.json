@@ -1,0 +1,87 @@
+{
+  "id": "pulse-step-portable-spec",
+  "app": "wkappbot-workflow",
+  "title": "Pulse-step: endorsement-gated knowledge integrity, language-agnostic spec",
+  "title_ko": null,
+  "desc": "Portable specification of the pulse-step mechanism: after a unit of work an actor must ENDORSE one existing lesson by quoting a verbatim fragment of it, and the endorsement both clears the work-debt and reorders the corpus. Implementation-neutral -- data model, algorithm, anti-gaming rules, porting notes and the production failure modes. Written so it can be built in any language or harness, not only in wkappbot.",
+  "steps": [
+    "PROBLEM: an agent that merely READS its lessons does not apply them, and every harness that tries to fix this by mandating a read gets exactly that -- the file is opened, the counter advances, the behaviour does not change. A READ IS A COUNT; AN ENDORSEMENT IS A CLAIM. The pulse-step mechanism replaces the read requirement with an ENDORSEMENT requirement: after finishing a unit of work, the actor must point at ONE specific existing lesson and assert that THIS lesson carried THIS work. That assertion is checkable in a way a read never is, because it names a target and the target has content the actor must have understood in order to pick it correctly. Nothing in the design depends on a particular language or runtime.",
+    "@@",
+    "THE ONE INVARIANT, and everything else is derived from it: THE PAYMENT MUST BE IMPOSSIBLE TO MAKE WITHOUT HAVING READ THE CONTENT. A payment that can be produced from the gate's own error message is not a payment, it is a form to fill in. Concretely, the endorsement is keyed by a VERBATIM FRAGMENT of the target step's text -- not an index, not a title, not an id. An index is guessable (1, 2, 3); a title is printed in every listing; a fragment of step BODY can only be produced by someone who opened it. Measured in the origin system: while index-addressing was permitted, actors paid with a bare number and the gate was satisfied though nothing had been read. The fix was to DELETE the index form, not to warn about it.",
+    "@@",
+    "DATA MODEL, portable to any language. Three entities. (1) LESSON -- an ordered collection of STEPS, each step free text whose identity comes from its CONTENT, never its position, because endorsement REORDERS the collection. (2) LEDGER -- append-only records {actor, lesson_id, step_fingerprint, timestamp, rationale}; the rationale is one sentence on why this lesson applied HERE, and it is what makes a hollow payment visible. (3) DEBT -- a per-actor flag, set when a unit of work completes, cleared only by a ledger record whose timestamp is AFTER the debt was set. That ordering requirement is load-bearing: a payment made before the work would turn the mechanism into a warm-up ritual.",
+    "@@",
+    "THE ALGORITHM, pseudocode, no language-specific constructs. on WORK_COMPLETED(actor): debt[actor] = true. on NEXT_WORK_REQUESTED(actor): if debt[actor] then REFUSE, naming the payment form. on ENDORSE(actor, lesson_id, fragment, rationale): resolve the lesson; find the step whose text CONTAINS fragment; if zero matches REFUSE as no-match, if two or more REFUSE as ambiguous; append the ledger record; move that step toward the FRONT of its collection; debt[actor] = false. THE REORDERING IS NOT DECORATION -- it is how the corpus learns. A step endorsed often rises to where the next reader meets it first; one never endorsed sinks. The collection acquires a relevance gradient with nobody curating it.",
+    "@@",
+    "ANTI-GAMING, each rule bought with a measured failure. (a) REFUSE A BARE INDEX, per the invariant. (b) REFUSE A PAYMENT AGAINST A LESSON THE ACTOR JUST WROTE -- otherwise the actor authors a step and endorses it, a closed loop certifying nothing. (c) REQUIRE THE FRAGMENT TO MATCH EXACTLY ONE STEP; an ambiguous fragment lets the actor aim at nothing in particular. (d) THE REFUSAL MESSAGE MUST NOT CONTAIN A USABLE FRAGMENT -- a gate that quotes the step it wants has handed over the answer. (e) TREAT A DUPLICATED RATIONALE AS UNPAID: the same sentence twice for the same step is a copy, not a thought.",
+    "@@",
+    "PORTING NOTES. The mechanism needs three primitives every mainstream language has: a keyed store for lesson collections, an append-only log, and a hook that fires on work completion. In a shell harness the hook is a pre-command and post-command trap; in an agent framework it is tool-call middleware; in CI it is a post-job step. STORAGE: anything with stable per-step text -- JSON, YAML, or a directory of markdown files one step per file. Do NOT persist the step index as identity; persist the text and fingerprint it, so reordering never invalidates history. CONCURRENCY: the ledger is append-only so concurrent actors need no lock, but DEBT is mutable per-actor state and does -- one writer per actor, a file or a row, is enough. FAILURE POSTURE: if the ledger cannot be read, REFUSE rather than allow. A gate that fails open is not a gate.",
+    "@@",
+    "FAILURE MODES SEEN IN PRODUCTION, design against them from day one. THE SELF-SEALING LESSON: if the gate ALSO requires the endorsed lesson to clear a quality score, a lesson that decays below the floor becomes unendorsable, and when it is the only lesson covering that work the actor is locked out with no legal move. Remedy: let the actor name a DIFFERENT healthy lesson; never lower the floor; and never let the only escape be editing the very thing the gate protects. THE FORMAT RATCHET: if steps must match a rigid shape, every step written before the shape existed becomes unpayable, silently shrinking the payable surface until the gate is unsatisfiable -- so validate shape on WRITE, never on ENDORSE. THE RITUAL DRIFT: actors converge on the cheapest valid endorsement rather than the truest one; the rationale field is the only defence, so sample rationales periodically, and if they read interchangeably the gate has already become a form.",
+    "@@",
+    "WHY THE MECHANISM IS WORTH THE FRICTION, stated plainly so a porter can judge it. It costs the actor one extra call per unit of work and it buys three things nothing else in a harness buys. FIRST, it converts a corpus from storage into a ranked working set at zero curation cost, because endorsement is the only signal that correlates with a lesson having actually been used. SECOND, it produces an audit trail that answers WHICH lesson governed a piece of work, which no read-log can answer. THIRD, and this is the one that justifies it, the act of choosing a fragment forces the actor to re-read at the moment of maximum relevance -- immediately after doing the work -- rather than at session start when nothing is concrete yet. If you port only one property, port that timing: the payment must fall AFTER the work, never before."
+  ],
+  "requirements": [
+    {
+      "cmd": "endorse with a verbatim fragment of an existing step",
+      "expect": "accepted, step moves toward the front, debt cleared",
+      "prompt": null
+    },
+    {
+      "cmd": "endorse with a bare numeric index",
+      "expect": "refused, an index is guessable without reading",
+      "prompt": null
+    },
+    {
+      "cmd": "request new work while debt is set",
+      "expect": "refused, and the refusal must NOT quote a usable fragment",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read delegation-completion-reflex-like-spec",
+      "expect": "the wkappbot IMPLEMENTATION this spec was abstracted from -- read it for the concrete flag surface, read this one for the portable design",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read reflex-nervous-system-model",
+      "expect": "the concept home that places the pulse inside the whole living system (anatomy, circulation, metabolism); this spec is its HEARTBEAT extracted and made implementation-neutral",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read reflex-merit-lifecycle",
+      "expect": "what happens AFTER the endorsement: like-rise, sink, archive-to-ref, and re-discovery -- the lifecycle this spec's reordering rule feeds",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read reflex-integrity-guard",
+      "expect": "the anti-gaming rules in force, and the reason payments must never pollute the shared corpus they are paid against",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "pulse-step",
+    "endorsement",
+    "reflex",
+    "knowledge-integrity",
+    "portable",
+    "spec",
+    "language-agnostic",
+    "gate",
+    "harness",
+    "ranking",
+    "audit",
+    "developer",
+    "project",
+    "펄스스텝",
+    "보증",
+    "이식",
+    "설계"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-09-06T11:54:17.5542238Z",
+  "updated": "2026-09-06T12:00:22.5391278Z",
+  "version": "1.5"
+}

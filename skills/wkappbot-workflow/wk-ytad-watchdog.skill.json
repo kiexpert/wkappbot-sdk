@@ -1,0 +1,38 @@
+{
+  "id": "wk-ytad-watchdog",
+  "app": "wkappbot-workflow",
+  "title": "wk-ytad-watchdog: external log-staleness auto-restart for wk-ytad",
+  "title_ko": null,
+  "desc": "Repo-root pace-exempt sibling of wk-ytad.cmd. Detects the alive-but-hung death (process alive, log heartbeat stopped, step 12 of the daemon own skill) via .tmp/wk-ytad/wk-ytad.pid plus wk-ytad.log LastWriteTime staleness, then restarts the daemon via its own -Stop verb plus a detached relaunch.",
+  "steps": [
+    "WHAT: reads wk-ytad.pid plus wk-ytad.log LastWriteTime every -IntervalSec (default 60s); a log untouched beyond -StaleSec (default 180s, about 90x the normal ~2s write cadence) while the pid is still alive is the alive-but-hung signature",
+    "USAGE: wk-ytad-watchdog.cmd loop mode foreground; -Once single check for a Scheduled Task repeat trigger; -Status read-only report exit 0 healthy exit 1 otherwise; -NoAutoStart skip relaunch when simply not running",
+    "LAUNCH: must be started the same way as wk-ytad.cmd itself, a user-opened terminal or a Windows Scheduled Task repeat trigger, never an AI harness shell tool call, since AI-session-parented processes get reaped when the session process tree is torn down",
+    "SEE ALSO: wk-ytad-zero-cpu-uia-youtube-ad-skip-daemon-for-edge step 12 is the root cause this tool fixes"
+  ],
+  "requirements": [
+    {
+      "cmd": "wk-ytad-watchdog.cmd -Status",
+      "expect": "wk-ytad-watchdog: verdict=",
+      "prompt": null
+    },
+    {
+      "cmd": "wk-ytad-watchdog.cmd -Status -StaleSec 0",
+      "expect": "verdict=STALE-HUNG",
+      "prompt": null
+    },
+    {
+      "cmd": "wk-ytad-watchdog.cmd -Once",
+      "expect": "CHECK",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-07-17T06:19:06.092552Z",
+  "updated": "2026-07-17T06:19:06.0925602Z",
+  "version": "1.0"
+}

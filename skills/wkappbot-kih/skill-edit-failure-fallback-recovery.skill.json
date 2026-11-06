@@ -1,0 +1,57 @@
+{
+  "id": "skill-edit-failure-fallback-recovery",
+  "app": "wkappbot-kih",
+  "title": "Skill-edit failure fallback recovery",
+  "title_ko": null,
+  "desc": "Spec for recovering a wkappbot skill edit that reported success but did not land, hung, or wrote to a divergent root copy. Capture-before-retry spool, four failure classes with distinct correct moves, verify-by-file, idempotent replay. The lesson is the asset; losing it is the only unacceptable outcome.",
+  "steps": [
+    "PURPOSE: a wkappbot skill edit can report success while nothing reached disk, can hang past any sane timeout, and can land on a divergent root copy that no gate reads. All three were measured live on 2026-07-26. The lesson being written is the asset; the command is only its delivery. So the ONE unacceptable outcome is a lost lesson, and every rule below exists to make loss impossible rather than to make the command succeed.",
+    "CAPTURE BEFORE RETRY -- the first and non-negotiable step. BEFORE any retry, append the full intent to a durable spool: skill id, verb (add-step / find-replace / like), the COMPLETE text, the session id, and a UTC timestamp, as one JSON line under .tmp/wkharness/skilledit-spool.jsonl. Retrying first and capturing second is the wrong order: a hang can take the process down mid-retry, and then the text exists nowhere but a dead command line.",
+    "CLASSIFY, DO NOT GUESS. Four failure classes, each with a different correct move, and the wrong move on the wrong class makes things worse. NEVER-LANDED: the file mtime is older than the command. NO-CONTENT-DELTA: the file was rewritten and the version bumped but the content hashes identical. WRONG-COPY: the write landed, but on a copy that is not the newest across roots. ROOT CAUSE PINNED 2026-08-09: SkillCommand.Edit.cs's ResolveEditableSkill searches ProjectSkillsDir (local fork) FIRST and returns it unconditionally even when HQ has moved strictly ahead -- confirmed by reading the source. This runs ONCE before any verb branch, so it hits --add-step/--delete-step/--title/--desc too, not just --like/--find -- those just fail loudly (no step matched), while the others apply silently on stale content and overwrite HQ's newer version with no error at all. Fix staged in SkillCommand.Edit-sonnet-probe.cs, pending pro-tier promotion. Cross: suggest ts=2026-08-08T15:24:17. HANG: no output past the timeout, outcome unknown. The audit checks in tools/wkharness-post-skilledit-audit-proto.ps1 already distinguish all four -- they were built for exactly this.",
+    "PER-CLASS ACTION. NEVER-LANDED: re-run the identical bare command ONCE, then confirm by grepping the resolved newest copy, never by re-reading the CLI success line. NO-CONTENT-DELTA: do NOT retry, it can never help -- the content is already present or the edit was a no-op; to change an existing step use --find with --replace. WRONG-COPY: re-issue against the newest-mtime copy and then force a sync, because a gate reading the other root still sees the old text. HANG: do NOT blindly re-issue -- grep the file FIRST to learn whether it landed, since a blind retry on a completed hang produces a duplicate step.",
+    "VERIFY BY THE FILE, NEVER BY THE CLI LINE. The two disagreed in BOTH directions on 2026-07-26: the CLI printed knowledge-reward 94/100 for a --like that moved nothing, and separately printed Updated with a fresh version for an edit whose bytes never changed. The file is the only witness. A recovery step that ends by reading command output has verified nothing.",
+    "NEVER HAND-EDIT THE .skill.json. It is harness-blocked for good reason -- a raw write bypasses catalog registration, version bump and encoding normalisation, so the edit becomes invisible to skill search and skill read while looking perfect on disk. A failed edit is recovered by re-issuing a proper skill command, never by reaching around it.",
+    "ESCALATE AFTER TWO. If two recovery attempts fail, STOP retrying and make the loss visible: print the spool path and record a Pending line naming the skill id and the spool entry. Three or more identical retries is also read as a gaming signal by the reflex gates, so persistence past two is both useless and suspicious.",
+    "REPLAY MUST BE IDEMPOTENT. A spool is only worth keeping if it can be drained safely, so the replay subcommand must dedupe by content fingerprint before applying, mark each entry done in place, and be safe to run twice. Without that guarantee nobody dares run it, and an undrainable spool is just a log.",
+    "BUILD ORDER: the audit module already exists and does the classification, so what remains is the spool writer, the replay subcommand, and wiring the classifier into the PostToolUse path that already computes whether the write landed. Build the spool writer FIRST -- it is the half that prevents loss, and it is worth having even if replay is never built.",
+    "NAVIGATION: the write-landed detector and its two distinct verdict labels are in wkharness-guards-howto; the copy-divergence root cause behind the WRONG-COPY class is in harness-gate-log-data-integrity; the discipline of proving a fix by running it rather than reading it is verify-tool-or-guard-synthetic-live-static.",
+    "SCOPE (user directive 2026-07-26, and it changes who acts): this is HARNESS-ONLY logic, not a procedure a model follows. It exists to raise the harness's own reliability -- a skill-edit guarantee layer. So the harness must land the content ITSELF when the appbot command fails, autonomously, inside the PostToolUse path, without asking the model to do anything. The model's only obligation is to not lose the text; landing it is the harness's job. Read every rule below with that division in mind: a step that ends by telling the model to re-run something has NOT satisfied this spec.",
+    "THE GUARANTEE ITSELF: on a NEVER-LANDED or HANG verdict the harness re-applies the captured intent on its own, by re-invoking the proper skill command from the PostToolUse path, and only then reports. If every re-invocation fails, the last resort is a harness-owned write that MUST be followed by the catalog install/sync step -- writing the json alone produces exactly the invisible, unregistered copy that this repo blocks models from creating, so an unsynced rescue write trades a lost lesson for a silently divergent one. That is not a fix, it is the same bug wearing a rescue label.",
+    "SCOPE THE GUARANTEE NARROWLY (user 2026-07-26): only edits the HARNESS itself depends on need this protection -- the skills that gates read, meaning study-lock targets, the model reflections the pulse and debrief gates score, and the on-load reflex set. An edit to a skill no gate consults can fail without the harness caring, and covering it anyway buys nothing while paying a spool write, a re-invocation and a sync on every knowledge-op in the fleet. The test for inclusion is not how valuable the lesson is; it is whether a gate will read that skill and make a decision from it."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read skill-edit-failure-fallback-recovery",
+      "expect": "CAPTURE BEFORE RETRY",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wkharness-guards-howto",
+      "expect": "NO-CONTENT-DELTA",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read verify-tool-or-guard-synthetic-live-static",
+      "expect": "parse-clean is NOT proof",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "skill-edit",
+    "recovery",
+    "fallback",
+    "spool",
+    "replay",
+    "split-brain",
+    "write-landed",
+    "harness",
+    "spec"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-07-26T07:36:03.2972586Z",
+  "updated": "2026-08-09T05:36:21.5867841Z",
+  "version": "1.4"
+}

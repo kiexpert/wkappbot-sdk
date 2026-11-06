@@ -1,0 +1,36 @@
+{
+  "id": "suggest-resolve-evidence-conventions-howto",
+  "app": "wkappbot-workflow",
+  "title": "suggest-resolve-evidence-conventions-howto",
+  "title_ko": null,
+  "desc": "Recipes and procedures for evidence scripts.",
+  "steps": [
+    "CROSS-REPO BUG-AUTO CWD TRAP (2026-06-30): A BUG-AUTO that fired while CWD was a DIFFERENT repo becomes a cross-author 2-of-2 co-resolve. TWO traps: (1) 'suggest resolve --i-completed-...-script' SKIPS with 'already waiting' and does NOT attach evidence -- use 'suggest check <ts> --script <relpath>' to attach evidence to the existing HALF instead. (2) 'suggest check --script' runs the regression FROM THE SUGGESTER'S CWD, NOT the resolver's -- so a 'git merge-base --is-ancestor' check FAILS because fix commit lives in the other repo. FIX: make evidence REPO-AGNOSTIC -- 'git -C D:/GitHub/WKAppBot merge-base --is-ancestor <commit> HEAD' (forward slashes; bash eats backslashes in --script paths too) OR assert the deployed binary via 'wkappbot --version'.",
+    "CROSS-REPO CO-RESOLVE DEADLOCK (2026-06-30 cont): After attaching repo-agnostic evidence via check --script, a plain suggest check shows Regression PASSED BUT still cannot auto-pass because (a) NO requirement is stored and (b) final 2-of-2 confirm needs --confirm which is harness-blocked. Eye hourly auto-confirm was removed 2026-05-08. Maximal WKAppBot-side state is WAD note plus half_resolved_by DG-WKAppBot plus stored repo-agnostic evidence that PASSES. Do NOT grind --confirm past the guard. Optionally add-requirement with a wkappbot --version check to green the requirement gate too."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read suggest-resolve-evidence-conventions",
+      "expect": "See core conventions",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot suggest list",
+      "expect": "Shows pending suggests",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill edit suggest-resolve-evidence-conventions --add-step test",
+      "expect": "Can extend core",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-09-04T10:28:13.8135443Z",
+  "updated": "2026-09-04T10:30:20.0362689Z",
+  "version": "1.4"
+}

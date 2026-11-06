@@ -1,0 +1,50 @@
+{
+  "id": "like-why-impression-per-model-spec",
+  "app": "wkappbot-workflow",
+  "title": "Like --why per-model impression spec",
+  "title_ko": null,
+  "desc": "Spec: extend wkappbot skill edit --like with an optional --why to append up to 3 per-model impressions on any liked step (unbuilt feature idea)",
+  "steps": [
+    "WHAT: extend the currently-unused --why option so that  wkappbot skill edit ID --like FRAGMENT --why IMPRESSION  appends IMPRESSION as a MODEL-TAGGED note on the liked step, rendered on skill read beneath that step as  why: //TEXT-opus //TEXT-haiku , accumulating up to 3 distinct models. Works on ALL skills since --like works on every skill, not only reflections.",
+    "WHY: a bare --like records THAT a step helped but not HOW; the per-model --why impression captures each model takeaway inline, so one step accumulates cross-tier lived wisdom (opus plus sonnet plus haiku angles), a lightweight per-model review turning a like into durable multi-perspective knowledge.",
+    "DESIGN: (a) store the impression on the liked step keyed by the ACTING model; (b) resolve the model tag from process lineage or session evidence, never a spoofable env var per the gpt-reflection env-backdoor rule; (c) cap 3 distinct models rendered, a newer impression from the SAME model replaces that model prior one, a per-model slot not FIFO; (d) render beneath the step like skill-comment does; (e) an empty or whitespace --why is ignored, no note written.",
+    "ANTI-GAMING and ENCODING: --like already demands a verbatim unique step fragment per delegation-completion-reflex-like-spec, so --why inherits that proof-of-read, add NO separate gate. The impression VALUE, field name, and model tags ALL stay ENGLISH/ASCII -- an impression is AI-to-AI reading material (models read each other takeaways on a step), so it follows the same English-only rule as all AI-facing skill content, to save tokens (user 2026-07-20). Only user-facing final responses stay Korean; the impressions are not user-facing.",
+    "IMPLEMENTABLE NOW without the core team, via the EXISTING --find/--replace (the same content-anchored path that replaced --step N --content): to append a per-model impression to any step, run  wkappbot skill edit ID --find LAST_UNIQUE_WORDS_OF_THE_STEP --replace SAME_WORDS //IMPRESSION-MODEL . It appends the model-tagged note to the step tail, rendered inline on skill read. CAP 3 BY CONVENTION: read the step first; if three //<text>-<model> tags already exist, --find/--replace YOUR OWN model tag in place instead of adding a 4th. The core-native --why flag stays a future nicety that would auto-resolve the model tag (from lineage, not env) and enforce the cap, but the --find/--replace CONVENTION works on every skill TODAY. SUPERSEDED 2026-08-01 by owner directive (see this skill's MIGRATE step): the body-injection convention described above is now the OBSOLETE form and must NOT be taught, cited, or used. It was a sound do-not-wait-for-core shortcut in 2026-07, and it shipped -- but its cost is that every payment permanently REWRITES the canonical step text it is endorsing, splicing a model-tagged note into the middle of the step's own sentence. Measured damage 2026-08-01 across the 254-skill catalog: 16 injected tags in 6 files, including SIX sonnet-tagged impressions spliced into haiku-reflection's top six steps (the cheapest model's highest-priority reflexes, now unreadable mid-sentence) and one sonnet tag inside opus-self-reflection -- cross-model writes that sonnet-reflection's own REFLEX-NOISE-INJECTION step and reflex-integrity-guard R5 both explicitly forbid. THE CANONICAL FORM is the single skill-edit call carrying the like flag with a verbatim fragment and the why flag with the impression, parsed by the HARNESS, which stores the impression as step metadata and leaves the step text byte-identical. //why:parser keeps step text byte identical",
+    "STATUS: UNSPEC feature idea raised by the user 2026-07-20, This is a HARNESS-POLICY convention, NOT a core-team dependency -- RETIRED 2026-08-01: the body-injection convention this step once called usable TODAY is now the OBSOLETE form -- see the SUPERSEDED and MIGRATE steps for the measured damage. The harness-side handler for the parsed why argument is the ONLY sanctioned path and is the single remaining unbuilt piece; wkappbot already ACCEPTS that argument and silently ignores it, so no core-team change is required to land it. A prior Sonnet had NOT written this spec, verified skill-comment is a separate existing sidecar-note feature and delegation-completion-reflex-like-spec-ref has no --why mention. Cross: delegation-completion-reflex-like-spec, skill-comment, reflex-merit-lifecycle.",
+    "TODO: MIGRATE THE WHOLE CATALOG OFF BODY-INJECTION ONTO THE HARNESS-PARSED FLAG PAIR (user directive 2026-08-01). CONTRACT: the ONE canonical way to attach a per-model impression is a single skill-edit call carrying BOTH the like flag with a verbatim unique step fragment AND the why flag with the impression text, where the HARNESS parses both arguments at PreToolUse and performs the append itself. The channel already exists: wkappbot ACCEPTS the why argument and silently ignores it (measured 2026-07-23), so what is missing is only the harness-side handler, never a core-team change. OBSOLETE, to be purged from every skill body and every guard message: (a) the find-and-replace convention that rewrites a step's own tail so it carries a model-tagged note inline, which mutates canonical step TEXT and is the measured source of the body pollution now visible in sonnet-reflection step 52 and opus-self-reflection steps 9 and 13 to 16; (b) any reference to a SEPARATE launcher as the payment path -- one such tool is documented and cited by the gate's own refusal message. It exists at exactly ONE repository's root -- measured 2026-08-01, a glob across every repo under the GitHub tree returned a single copy -- while the gate that advertises it belongs to the SHARED harness and therefore fires in ALL of them. So from any other repo that instruction names a file which is not there, and no leading dot-slash can fix that. THAT is the decisive reason to REMOVE it rather than merely stop teaching it: repo-local guidance embedded in a cross-repo gate is broken for the majority of its readers, and it fails silently, because the reader simply cannot pay and has no way to tell whether the command or their own invocation is at fault. An earlier framing of this as a naming preference understated the defect. Naming a third tool beside the flag pair is itself the defect: it forces every reader to guess which path is real. There is ONE form and no alternative to mention. INVARIANTS the handler must hold: resolve the model tag from process lineage, never from an environment variable, per the model-stamp spoof rule; cap at 3 distinct model slots where a repeat from the SAME model replaces that model's own slot rather than appending a fourth; an empty or whitespace impression is a silent no-op; and the impression is stored as step METADATA rendered BENEATH the step, never spliced into the middle of the step's own sentence, which is exactly the damage the old convention caused. WHAT WOULD PROVE IT: one live run of the canonical form against a scratch skill shows the impression rendered under the target step while that step's own text is BYTE-IDENTICAL before and after, and a catalog-wide search for the two obsolete forms returns zero hits inside skill step bodies. WHY: the old convention was adopted as a do-not-wait-for-core shortcut and it worked, but its cost is that every payment permanently edits the knowledge it is endorsing, so the gate's payment currency and the knowledge asset are the same object -- the exact structural defect reflex-integrity-guard names as the root class."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill edit on-load --like FRAGMENT --why note",
+      "expect": "appends a model-tagged impression rendered on read as why: //impression-MODEL:note",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read on-load",
+      "expect": "shows accumulated why impressions capped at 3 distinct models beneath the liked step",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill edit on-load --like FRAGMENT --why EMPTY",
+      "expect": "empty or whitespace impression ignored, no note written",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "like",
+    "why",
+    "impression",
+    "spec",
+    "skill-edit",
+    "per-model",
+    "unbuilt",
+    "reflex"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-07-19T18:06:04.3091675Z",
+  "updated": "2026-10-05T14:25:50.2509155Z",
+  "version": "1.14"
+}

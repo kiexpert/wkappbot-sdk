@@ -1,0 +1,35 @@
+{
+  "id": "emergency9-guard",
+  "app": "wkappbot-kih",
+  "title": "emergency9-guard",
+  "title_ko": null,
+  "desc": "T1 core reflex for the emergency9 guard (tools/wkharness-guards-emergency9.ps1, E1-E9 destructive-command classes). Spec and exemption scope: emergency9-guard-howto.",
+  "steps": [
+    "TRIGGER: E3-harness-self-destruct blocks a delete/move/rename of a harness-critical path (tools/wkharness*.ps1, tools/Agent.*, a family config, .githooks/*, CLAUDE.md, HANDOFF.md). ACTION: do not fight it and do not rename around it -- edit the file instead (editing is always allowed, only destroying is blocked), or read emergency9-guard-howto for the quarantine tool.;TRIGGER: you need to delete a spent -proto or -probe sandbox file, of ANY extension, or anything under .tmp/. ACTION: just delete it -- both classes are exempt from E3 as of 2026-09-15, checked before the protected-path match. If the delete still gets blocked, the target is not actually under .tmp/ and does not actually end in -proto/-probe before its extension; re-check the exact filename rather than assuming the exemption is broken.;TRIGGER: you are about to change E3's exemption scope, or wire something into this guard. ACTION: read emergency9-guard-howto FIRST for the full spec (why the core protected list never gets a rename escape, the module location, the self-test contract) -- this core is reflexes only, not the spec. //why:letter and global md edited by file edit with backups only-sonnet //why:stale index lock bypassed by a separate index, not deleted-sonnet //why:check target before blaming the exemption-sonnet"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read emergency9-guard",
+      "expect": "shows the two TRIGGER/ACTION reflexes plus the howto pointer",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read emergency9-guard-howto",
+      "expect": "shows GUARD IDENTITY, SPEC, EXEMPTION SCOPE",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill search emergency9 guard",
+      "expect": "lists both emergency9-guard and emergency9-guard-howto",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-09-14T17:02:17.2303385Z",
+  "updated": "2026-10-05T08:51:11.1136218Z",
+  "version": "1.12"
+}

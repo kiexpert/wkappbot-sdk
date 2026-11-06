@@ -1,0 +1,43 @@
+{
+  "id": "haiku-root-first-line",
+  "app": "wkappbot-workflow",
+  "title": "Haiku ROOT first-line imperatives (8 short rules)",
+  "title_ko": null,
+  "desc": "The 8 short rules a small-model ROOT or sector must open with. Each step is under 300 chars so the reader never truncates it. Heal and tune with reflection-heal.",
+  "steps": [],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read haiku-root-first-line",
+      "expect": "TOKENS-LEFT IS A CONTEXT METER",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read haiku-root-first-line",
+      "expect": "LANDED MEANS ONE ORIGIN COMMIT HASH",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read haiku-root-first-line",
+      "expect": "YOUR OWN REPO ONLY",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "haiku",
+    "reflex",
+    "root",
+    "sector",
+    "first-line",
+    "하이쿠",
+    "반사신경",
+    "첫줄",
+    "토큰주머니"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-10-03T05:05:17.3158367Z",
+  "updated": "2026-10-03T05:11:08.1042473Z",
+  "version": "1.9"
+}

@@ -1,0 +1,44 @@
+{
+  "id": "agy-gemini-pro-reflection-harness-wiring-redos-shim-logger-permission-unification",
+  "app": "wkappbot",
+  "title": "Agy Gemini Pro Reflection: harness wiring, ReDoS shim logger, permission unification",
+  "title_ko": null,
+  "desc": "Agy Gemini Pro reflection: harness wiring, the shim-logger ReDoS trigger, permission unification, and doctor safety measures -- lessons learned plus recurrence prevention.",
+  "steps": [
+    "T1 CORE: Never use dynamic PowerShell commands (like ConvertFrom-Json | Add-Member | ConvertTo-Json) to modify critical configuration files such as settings.json. These dynamic operations are extremely unstable. Always use 'wkedit' for precise, safe modifications. wkedit provides built-in safety mechanisms and backups.",
+    "CONTEXT RECOVERY REFLEX: When using wkhippo recent to understand a user's abrupt joke or previous agent's failure (e.g., 'suicide' or 'kill'), do not rely solely on keyword matching. Always read the immediate preceding session's context chronologically, as keyword searches might surface older irrelevant skills instead of the actual recent event.",
+    "HARNESS EMERGENCY REFLEX: If the user declares the AGY harness is 'broken' and demands an emergency fix, DO NOT try to dynamically rewrite settings.json or wkharness*.ps1 files via python or echo. The codebase likely already contains the correct logic (Fail-Closed, 0-index cache, Deny list). Immediately run the canonical installer (wkharness-agy-install.ps1) to restore the wiring and settings.json lock.",
+    "POPUP EXTINCTION BUG (2026-07-23): Never add wildcard command(*) to the permissions.allow array in settings.json or wkharness-agy-install.ps1 to bypass a GUI popup deadlock. Allowing a wildcard disables the AGY C++ engine's native IDE approval popup entirely, rendering popup interception tests and zero-popup verification useless (Popup Extinction). To properly test if the harness blocks an unauthorized command, use an explicitly non-whitelisted command like ping. Always ensure recovery tools are explicitly named in the allow list, but NEVER use a wildcard."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read agy-gemini-pro-reflection",
+      "expect": "skill content loads",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read agy-gemini-pro-reflection --keep 'wkedit'",
+      "expect": "step contains wkedit guidance",
+      "prompt": null
+    },
+    {
+      "cmd": "wkhippo recent agy",
+      "expect": "reflection skill appears in hippocampus search results",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "agy",
+    "gemini-pro",
+    "harness",
+    "reflection",
+    "autonomy"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-10-02T18:45:14.6381686Z",
+  "updated": "2026-10-02T18:45:14.6381773Z",
+  "version": "1.0"
+}

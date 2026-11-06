@@ -1,0 +1,38 @@
+{
+  "id": "skill-sync-split-brain-cleanup-ref",
+  "app": "wkappbot-workflow",
+  "title": "Skill Sync Split-Brain — Dated History (T3 ref)",
+  "title_ko": null,
+  "desc": "Dated incident archive for skill-sync-split-brain-cleanup: audit findings, the confirmed sync/install false-success bug, and the prototype build/delete history, split out to keep the T1 core score above the delegation-gate threshold.",
+  "steps": [
+    "AUDIT 2026-05-30/2026-06-03: skills/wkappbot-workflow/skill-sync-{split-brain-cleanup,warning-triage}.skill.json self-references and peer refs went stale/broken after skills became catalog-only (not file-tracked).",
+    "BUG (confirmed 2026-07-09, Opus ROOT, suggest ts=2026-07-08T18:49:41): wkappbot skill sync --resolve <id> and skill install <path> both report SUCCESS but do not actually propagate fork content into the HQ install copy -- sync --resolve prints resolved split-brain while HQ stays unchanged, install prints nothing and HQ is untouched. Root cause of the persistent 300-400+ CONFLICTS count that never shrinks. This is the reason the read-time lazy dedup design exists -- it routes around this broken propagation path instead of depending on it.",
+    "CONFIRMED 2026-07-09 (Sonnet follow-up): a full build's skill-install step only handles brand-new skills, does not overwrite an existing HQ skill whose version is already >= the fork's -- the build-flush path is a separate, still-partially-broken problem from the per-edit propagation gap.",
+    "PROTOTYPE HISTORY 2026-07-25: first prototype (SkillReadDedup-haiku-proto.cs) built by Haiku, ROOT-verified (byte-for-byte write-verify-before-delete, real captured stdout-stderr separation test, real fabricated fixtures), then deleted per proto-cleanup-discipline once its logic was captured here -- design later simplified by the user to drop the HQ-write branch entirely (see core skill's DESIGN FINALIZED step), so a second solid implementation was commissioned against the simpler 3-branch (no-op / identical-delete / stale-delete / newer-warn-only) spec."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read skill-sync-split-brain-cleanup-ref",
+      "expect": "shows dated history",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read skill-sync-split-brain-cleanup",
+      "expect": "T2/T3 navigation pointer",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill sync",
+      "expect": "shows current CONFLICTS count",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-07-25T04:53:28.3587336Z",
+  "updated": "2026-07-25T04:53:28.3587419Z",
+  "version": "1.0"
+}

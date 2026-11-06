@@ -1,0 +1,47 @@
+{
+  "id": "harness-skill-delete-guard-ref",
+  "app": "wkappbot-workflow",
+  "title": "Skill delete guard: dated incidents",
+  "title_ko": null,
+  "desc": "T3 dated archive for harness-skill-delete-guard: the measured refusals, the head-match hazard, the truncated echo, and the E16-versus-score-gate contradiction. Core: harness-skill-delete-guard. Procedures: harness-skill-delete-guard-howto.",
+  "steps": [
+    "INCIDENT: E16 and the score gate contradict each other in writing, so the cheapest lossless remedy is unusable. WHEN: a score gate tells you to merge steps sharing a HOW and delete the absorbed one, and E16 then refuses that delete. HOW: run wkappbot skill read harness-skill-delete-guard-howto for the archive-first procedure, then expect this refusal and do not retry -- until E16 searches the skill ITSELF as well as its siblings, merge-then-delete cannot complete. WHY: measured 2026-09-05 on claude-session-handoff. The skill-currency block states verbatim that nothing leaves the skill so no sibling-verification pass is needed; E16 refused anyway, because it searches only howto, ref, ref-t3, ref-t4-archive and ref-t5-archive and never the skill's own remaining steps. The cost is not the refusal but where it pushes you: migration to a sibling becomes the only route, and that RELOCATES the lock rather than clearing it, since the archive absorbs step count and pays in score point for point."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read harness-skill-delete-guard-ref",
+      "expect": "E16 and the score gate contradict",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read harness-skill-delete-guard",
+      "expect": "archived, never removed",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read harness-skill-delete-guard-howto",
+      "expect": "archive VERBATIM",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "delete",
+    "guard",
+    "incident",
+    "ref",
+    "t3",
+    "e16",
+    "merge",
+    "contradiction",
+    "삭제",
+    "사고기록",
+    "모순"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-09-05T08:26:26.7453731Z",
+  "updated": "2026-10-05T14:06:08.90192Z",
+  "version": "1.2"
+}

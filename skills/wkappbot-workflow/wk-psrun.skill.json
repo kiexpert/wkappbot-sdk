@@ -1,0 +1,37 @@
+{
+  "id": "wk-psrun",
+  "app": "wkappbot-workflow",
+  "title": "wk-psrun generic PowerShell runner",
+  "title_ko": null,
+  "desc": "Repo-root pace-exempt launcher: runs any PowerShell script file directly (powershell -File PATH ARGS), unlike wk-parsecheck which only AST-parses. Created 2026-07-09 to execute a self-test whose file lives in a different repo, when raw powershell -File was pace-95-blocked.",
+  "steps": [
+    "WHAT: wk-psrun.cmd wraps powershell -NoProfile -ExecutionPolicy Bypass -File %1 %2 %3 %4 %5 -- a bare pass-through script runner, pace-exempt because its command name starts with wk-.",
+    "USAGE: ./wk-psrun.cmd <path-to-ps1> [args...] -- works for scripts in ANY repo, not just this one, since it just forwards the path to powershell -File. Use the bare/relative form (./wk-psrun.cmd), never an absolute D:/... path prefix -- the pace-95/wk-only-gate exemption matches on the literal command-string PREFIX, so only a bare or ./-prefixed wk- invocation passes; an absolute path does not.",
+    "SEE ALSO: wk-parsecheck (AST-parse-only, does not execute/run the script -- use wk-psrun when you need the script to actually RUN, e.g. a self-test block guarded by MyInvocation.InvocationName), pace-deadlock-escapes-harness-editable-and-jisikhwa-free (the R3 wk-tool-stays-pace-exempt reflex this tool exists to exercise)."
+  ],
+  "requirements": [
+    {
+      "cmd": "wk-psrun.cmd D:/some/script.ps1",
+      "expect": "runs the script and prints its real output, not just a parse result",
+      "prompt": null
+    },
+    {
+      "cmd": "wk-psrun.cmd (absolute path form)",
+      "expect": "still pace-95-blocked, must use bare/./ form",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wk-psrun",
+      "expect": "shows WHAT/USAGE/SEE ALSO",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-07-08T17:29:01.348375Z",
+  "updated": "2026-07-08T17:29:01.3483857Z",
+  "version": "1.0"
+}

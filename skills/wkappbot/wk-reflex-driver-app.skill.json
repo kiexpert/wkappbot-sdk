@@ -1,0 +1,40 @@
+{
+  "id": "wk-reflex-driver-app",
+  "app": "wkappbot",
+  "title": "WK Reflex driver app (T1 core): one tray app a novice uses to run the harness and WKAppBot",
+  "title_ko": null,
+  "desc": "T1 core. Owner 2026-09-25: build WK Reflex, the AI reflex driver app -- a Windows tray app that manages every harness and WKAppBot function for a computer novice, human-only submit/sign/pay floor, thin face over wkroot and the CLI. Spec in wk-reflex-driver-app-howto, record in wk-reflex-driver-app-ref.",
+  "steps": [
+    "WHAT (owner 2026-09-25): WK Reflex is the AI reflex DRIVER APP -- one Windows tray app that lets a non-programmer (the owner calls the target user a computer novice) run the whole harness and every WKAppBot capability without a terminal. It is the product form of the AI controller (tongjesa) idea named in the contest entry section 7 (resume/applications/20260917_national_ai_contest). The owner earlier 594-line plan lives in WKAppBot docs/reflex-app.md (0ecf66d5fd, 2026-09-22): READ IT FIRST and reconcile, the phase plan here narrows it to what can run first. Spec and phases: wkappbot skill read wk-reflex-driver-app-howto ; work record: wkappbot skill read wk-reflex-driver-app-ref . //why:reading before editing for topicfit Reflex.csproj already cross-platform-sonnet",
+    "THE FLOOR IS THE PRODUCT (owner, contest entry): submit, sign and pay are never reachable by an AI through this app -- the app shows a human-only APPROVE button at that step and the AI side has no verb for it. Any feature that would let an AI press it is refused at design time, not guarded later.",
+    "REUSE, NEVER REBUILD: the app is a thin face over mechanisms that already run -- wkroot (launch, send, roots), the per-repo .tmp/sonnet-root-escalation.md files, the harness hooks, the skill catalog, wkhippo, a11y/cdp. If a panel needs data no CLI prints, add a subcommand to the existing CLI first and have the app call it; the app never grows a second copy of harness logic.",
+    "BUILT BY THE WKAppBot codex ROOT, JUDGED BY THE SPOKESMAN (owner 2026-09-25): the codex-luna ROOT implements phase by phase in the WKAppBot repo; the spokesman owns this spec, reviews each phase against the acceptance lines in the howto, and only a phase that passes its acceptance lines on a real run is called done.",
+    "PHASE 1 FIRST, NOTHING ELSE UNTIL IT RUNS: tray status board, human-only approve button, one-line order box (howto steps 2-4). Features beyond phase 1 wait until the harness runs a full day without human repair, because a novice sees every harness defect as the app being broken.",
+    "TODO: Fix reflex-app-qa.yml: (1) build WKAppBot.Reflex -f net8.0 on macOS and run --once against sample-roster.json, (2) assert printed row count equals roster count on both OSes, (3) add Windows tray liveness check (start WinExe, sleep 10, assert alive). The roster JSON lives at csharp/src/WKAppBot.Reflex/test-data/sample-roster.json with 3 entries. Done when: gh workflow run reflex-app-qa.yml dispatched, both jobs green, row count PASS in summary."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read wk-reflex-driver-app",
+      "expect": "THE FLOOR IS THE PRODUCT",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wk-reflex-driver-app-howto",
+      "expect": "PHASE 1.1 TRAY STATUS BOARD",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wkroot",
+      "expect": "prints the wkroot usage core",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-09-25T06:33:54.103979Z",
+  "updated": "2026-10-11T16:50:03.6702527Z",
+  "version": "1.4"
+}

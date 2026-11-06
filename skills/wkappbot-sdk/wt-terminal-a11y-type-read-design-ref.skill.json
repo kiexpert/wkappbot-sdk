@@ -1,0 +1,59 @@
+{
+  "id": "wt-terminal-a11y-type-read-design-ref",
+  "app": "wkappbot-sdk",
+  "title": "WT terminal a11y type/read: dated incidents (T3 ref)",
+  "title_ko": null,
+  "desc": "T3 dated-incident archive for wt-terminal-a11y-type-read-design: the 2026-07-24 SendKeys design-vs-impl divergence, the 2026-07-30 never-live read hook, the 2026-08-27 scrollback ship, and the 2026-09-05 elision bypass where the goalkeeper masked a dead aiming layer. Core: wt-terminal-a11y-type-read-design. Procedures: wt-terminal-a11y-type-read-design-howto.",
+  "steps": [
+    "NAVIGATION: this is the T3 dated-incident tier for wt-terminal-a11y-type-read-design. Decision rules live in the parent core; repeatable procedures live in wt-terminal-a11y-type-read-design-howto. Nothing here is a rule -- each entry is a measurement, kept so the next session reuses the DETECTION rather than rediscovering the failure.",
+    "@@",
+    "INCIDENT 2026-07-24 -- THE SENDKEYS FALLBACK, a design-versus-implementation divergence. WHAT WAS OBSERVED: a11y type on a CASCADIA_HOSTING_WINDOW_CLASS window emitted \"[A11Y] type -- focusless failed, falling back to SendKeys (focus required)\" and the keystroke landed in the FOCUSED window rather than the target hwnd. WHAT THE PARENT SKILL CLAIMED: type on a WT host uses TypeToTerminal = PostMessage(FindInputSite(hwnd), WM_CHAR) per character, focusless, no SetForegroundWindow. WHAT WAS ACTUALLY THERE: no FindInputSite and no WM_CHAR-to-InputSite code existed at all. For a ConPTY terminal the implementation tried a CLIPBOARD Ctrl+V paste, and when that threw it fell through to a branch that SKIPS every focusless tier for a ConPTY window and drops straight to SendKeys, which calls SmartSetForegroundWindow -- the focus steal that was observed. THE LESSON WORTH KEEPING: a skill that documents a DESIGN reads exactly like a skill that documents an IMPLEMENTATION, and only a live run tells them apart.",
+    "@@",
+    "INCIDENT 2026-07-30 -- THE READ HOOK WAS NEVER LIVE, verified twice. WHAT WAS OBSERVED: a11y read on a WindowsTerminal Text element that reports patterns=Text returned ONLY the element Name plus the UIA parent chain and the resolved grap path; the actual terminal body text never came back. WHY THE PARENT'S WORDING MISLED: it said TextPattern.DocumentRange.GetText was \"already implemented, just not called\", which is too generous -- it was not called at all for a terminal Text element in the shipped build, and the read fell straight through to the Name+Value concatenation the skill was created to remove. HOW IT WAS CAUGHT: a background agent ran five a11y commands, then ROOT reproduced it directly rather than accepting the report. THE LESSON: reproduce before believing an absence report, and pair it with a positive control that shows the same method detecting presence somewhere.",
+    "@@",
+    "RESULT 2026-08-27 -- SHIPPED. a11y read now returns the terminal buffer INCLUDING SCROLLBACK, closing the founding gap of the parent skill. Bare gives the last 500 lines, --tail N bounds it, --content returns the whole buffer. Terminal targets fire automatically with no flag, because a structural node-list of a terminal window enumerates chrome and no content, so making a caller discover a flag to reach the only useful answer would have been a trap.",
+    "@@",
+    "INCIDENT 2026-09-05 -- SHIPPING THAT READ SILENTLY CREATED AN ELISION BYPASS, AND THE SAFETY NET HID IT FOR OVER A WEEK. MEASURED on staging bin/wktest-core-manual-v7.9.178.exe, direct-core with no launcher, against a live WindowsTerminal grap: --budget 100 returned 21508 bytes, --budget 1000 returned 22237, --budget 30000 returned 21508. Completely budget-insensitive across a 300x spread, and the SMALLEST budget produced the LARGEST output -- the signature of a budget that never reaches the allocator. WHY IT LOOKED HEALTHY: the output carried a genuine \"[Elided: 500 truncated, 0 dropped, of 505]\" marker, so every check that greps for elision passed. That marker belonged to the GOALKEEPER, not to this command: the footer read \"See full output in the log file on disk\", a string built at TeeTextWriter.Goalkeeper.cs:110, and the result landed under the net's 30000 ceiling and therefore read as green. THE CAUSE: A11yActions.Read.TerminalText.cs printed the whole tail-bounded buffer with a single raw Console.WriteLine and never collected it into units, so A11yCommand.ReadDispatch.cs returned true before PrintA11yReadNodeListElided was ever reached, leaving the 4000-byte A11yReadComprehensionBudgetBytes dead in practice. TWO EARLIER REPORTS WERE CORRECTED BY THIS: an investigation that called a11y read UNWIRED was wrong, because the seam does exist at A11yActions.Read.cs:436; and a filed suggest that blamed \"an earlier branch that returns before the seam\" was right about the bypass but incomplete, because what was actually bounding the output was the net, which is precisely why the number looked safe.",
+    "@@",
+    "THE GENERALISABLE FINDING FROM THE 2026-09-05 INCIDENT, worth more than the bug itself: A WORKING SAFETY NET MAKES A DEAD AIMING LAYER INDISTINGUISHABLE FROM A HEALTHY ONE. Both produce output under the ceiling, both carry an elision marker, and both satisfy any check written as \"is it under budget\". The two things that DO distinguish them are the FOOTER, since only the module knows a retrieval command that actually runs, and BUDGET SENSITIVITY, since only the module was handed the caller's number. So never accept \"it fits\" as evidence that a caller is wired -- ask which layer produced the marker. The same trap applies to any layered defence: whenever a fallback is healthy, the primary can fail silently and every aggregate metric stays green.",
+    "@@",
+    "WHERE THE SWEEP WAS BLIND, measured the same day: bin/wktest-smoke-elision.sh runs its ceiling sweep over exactly THREE callers -- skill read, file read and skill search. a11y read is not in it. A predecessor letter described the sweep as covering \"four callers\", and a version bump was gated on \"the a11y read sweep finishing with zero over-ceiling\" -- a condition that could never have been measured by the gate that was supposed to measure it, and which would have reported zero anyway because the goalkeeper kept the output under 30000. A zero from a check that never ran the case is not evidence of absence."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read wt-terminal-a11y-type-read-design-howto",
+      "expect": "the procedure tier loads",
+      "prompt": null
+    },
+    {
+      "cmd": "grep -c a11y bin/wktest-smoke-elision.sh",
+      "expect": "0 until the sweep gains an a11y read case",
+      "prompt": null
+    },
+    {
+      "cmd": "grep -c 'See full output in the log file on disk' csharp/src/WKAppBot.CLI/TeeTextWriter.Goalkeeper.cs",
+      "expect": "1, the goalkeeper footer that identifies which layer elided",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "a11y",
+    "terminal",
+    "windows-terminal",
+    "cascadia",
+    "incident",
+    "elision",
+    "goalkeeper",
+    "budget",
+    "ref",
+    "t3",
+    "3tier"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-09-05T05:55:28.4001035Z",
+  "updated": "2026-09-05T05:55:28.4001119Z",
+  "version": "1.0"
+}

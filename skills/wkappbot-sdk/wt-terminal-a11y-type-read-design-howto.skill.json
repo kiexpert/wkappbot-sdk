@@ -1,0 +1,57 @@
+{
+  "id": "wt-terminal-a11y-type-read-design-howto",
+  "app": "wkappbot-sdk",
+  "title": "WT terminal a11y type/read: procedures (T2 howto)",
+  "title_ko": null,
+  "desc": "T2 procedure tier for wt-terminal-a11y-type-read-design: how to read a terminal buffer with scrollback, resolve the real host hwnd via GA_ROOT, avoid the first-4000-characters trap, prove the byte budget is actually alive at three budgets, and tell whether the module or the goalkeeper elided your output. Core: wt-terminal-a11y-type-read-design. Incidents: wt-terminal-a11y-type-read-design-ref.",
+  "steps": [
+    "NAVIGATION: this is the T2 procedure tier for wt-terminal-a11y-type-read-design. Core decision rules live in the parent; dated incidents live in wt-terminal-a11y-type-read-design-ref. Read the parent first, come here for the exact command sequences.",
+    "@@",
+    "HOWTO -- READ A TERMINAL BUFFER INCLUDING SCROLLBACK. WHEN: you need console output that has already scrolled off the visible viewport -- a long build, a wkdoctor run, or verifying that a keystroke actually landed. HOW: run wkappbot a11y read against the terminal window's grap; bare returns the LAST 500 lines, --tail N bounds it to the last N, --content returns the whole buffer unbounded, and --raw bypasses elision entirely for a machine consumer that needs whole units. Terminal targets fire automatically with no flag at all. WHY: a screenshot or OCR can only ever show the viewport, while the Windows Terminal DocumentRange spans the full text buffer including history rows, so this is the ONLY path to output that has already scrolled away.",
+    "@@",
+    "HOWTO -- RESOLVE THE RIGHT HWND, WHICH IS NEVER THE ONE YOUR GRAP LANDS ON. WHEN: IsTerminalWindow returns false and the whole path silently yields an empty string, which is indistinguishable from \"this is not a terminal\". HOW: walk GetAncestor(GA_ROOT) from the element handle BEFORE the class test -- the element a grap resolves to is typically a child of Windows.UI.Input.InputSite.WindowClass, not the CASCADIA_HOSTING_WINDOW_CLASS host itself. WHY: this is the same shape as the Chrome render-widget-versus-frame trap, and testing the first handle you find is the single most common cause of a silent empty read on this path.",
+    "@@",
+    "HOWTO -- ASK FOR THE WHOLE BUFFER, NOT THE FIRST 4000 CHARACTERS. WHEN: calling TerminalWindowHelper.ReadTerminalText. HOW: pass maxChars -1 and bound from the END; the default of 4000 makes GetText return the FIRST 4000 characters of the range, which is the OLDEST text and almost never what a reader wants. WHY: the two mistakes look identical in a passing test -- both return non-empty text -- so a smoke check that only asserts \"not empty\" cannot tell them apart. Assert on content you know is RECENT, or the check will pass on the wrong end of the buffer forever.",
+    "@@",
+    "HOWTO -- PROVE THE BUDGET IS ALIVE BEFORE BELIEVING ANY SWEEP. WHEN: any check, smoke or sweep reports a11y read as fitting its ceiling. HOW: run the same read at three budgets against the STAGING binary, never the wkappbot wrapper, since the wrapper routes into a running core still holding the previous image -- bin/wktest-core-manual-vX.Y.Z.exe a11y read the-grap --budget 100, then 1000, then 30000, each piped to wc -c. Three DIFFERENT byte counts is the pass; three near-identical counts mean the budget never reaches the allocator at all. WHY: measured 2026-09-05 the three runs returned 21508, 22237 and 21508 bytes, and the SMALLEST budget produced the LARGEST output. The output still carried a valid [Elided:] marker, so every surface check passed while the aiming layer was dead. Full account in wt-terminal-a11y-type-read-design-ref.",
+    "@@",
+    "HOWTO -- TELL WHICH LAYER ELIDED YOUR OUTPUT, because two of them can. WHEN: you see an [Elided:] marker and want to know whether the command is genuinely wired to the formatter. HOW: read the FOOTER, not the marker. A module-wired command prints a retrieval command that RUNS and echoes your own grap back at you. The goalkeeper prints \"See full output in the log file on disk\", a string built at TeeTextWriter.Goalkeeper.cs:110, because a net that catches any command cannot know which command it caught or what would retrieve the rest. WHY: the two are LAYERS and not alternatives -- the module aims, the net catches -- so a healthy net makes a dead module look exactly like a working one, and the footer is the only thing in the output that distinguishes them."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read wt-terminal-a11y-type-read-design",
+      "expect": "the parent core tier loads",
+      "prompt": null
+    },
+    {
+      "cmd": "grep -c GA_ROOT csharp/src/WKAppBot.CLI/Commands/A11yActions.Read.TerminalText.cs",
+      "expect": "at least 1, the ancestor walk that must run before the class test",
+      "prompt": null
+    },
+    {
+      "cmd": "grep -c maxChars csharp/src/WKAppBot.CLI/Commands/A11yActions.Read.TerminalText.cs",
+      "expect": "at least 1, and the value must be -1 rather than the 4000 default",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "a11y",
+    "terminal",
+    "windows-terminal",
+    "cascadia",
+    "read",
+    "scrollback",
+    "elision",
+    "budget",
+    "howto",
+    "t2",
+    "3tier"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-09-05T05:54:38.046229Z",
+  "updated": "2026-09-05T05:54:38.0462378Z",
+  "version": "1.0"
+}

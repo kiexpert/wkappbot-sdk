@@ -1,0 +1,52 @@
+{
+  "id": "ask-health-check-ref",
+  "app": "wkappbot-workflow",
+  "title": "Ask health check REF: dated incidents and root causes (T3)",
+  "title_ko": null,
+  "desc": "T3 dated-incident archive for ask-health-check (wkask CDP ask pipeline). Holds the wkask install-master corruption root cause and the verification traps. Core decision rules stay in ask-health-check.",
+  "steps": [
+    "NAVIGATION: this is the T3 dated-incident archive of the ask-health-check cluster. Core decision rules and the pass/fail PONG baselines live in ask-health-check. WHEN: you need the history behind a wkask behaviour rather than the current rule. HOW: run wkappbot skill read ask-health-check for the live checklist, and stay here only for dated evidence. WHY: a T1 core that accumulates dated incidents stops being readable as a checklist, which is exactly what happened to ask-health-check on 2026-08-27 when its score fell to 0 and the tier-gate then blocked every agent dispatch in the fleet.",
+    "INCIDENT 2026-08-27, THE ROOT CAUSE OF THE THREE-MONTH wkask OUTAGE: bin/wkask.sh was never being corrupted by a writer -- the corrupted file IS the install MASTER, and a deploy keeps copying it over every repair. WHEN: wkask returns nothing and git diff bin/wkask.sh shows a literal backslash n spliced into the exec line with the trailing newline gone. HOW: run wkappbot skill read file-command-cheatsheet-ref for the full measurement, then do NOT repair bin/wkask.sh again -- measure the MTIME first and fix whichever copy is the SOURCE. WHY: measured 2026-08-27 -- after a repair verified by an EMPTY git diff, the file reverted within thirty minutes carrying mtime 2026-08-12 16:02:25.7845442000, not today, so nothing had written it. Three files share that timestamp to the sub-second at 272 bytes each: WKAppBot/bin/wkask.sh, wkappbot-kih/tools/wrappers/wkask.sh and personal-docs/tools/wrappers/wkask.sh, and both wrappers masters carry the damage. Identical sub-second mtimes across three repos mean one timestamp-preserving copy. Confirmed twice: a git stash push of the file brought the corruption back within seconds. Filed as suggest 1787823383.576539. The two masters live in OTHER repos, so the fix is a report, not an edit.",
+    "INCIDENT: bash -n is NOT a valid check for this damage, and every session that used it verified nothing. WHEN: you are about to confirm a repair to a one-line shell relay shim. HOW: run wkappbot skill read verify-tool-or-guard-synthetic-live-static-howto for the live-versus-static rule, then verify with an EMPTY git diff or a byte read of the exec line, never a syntax check alone. WHY: a literal backslash n is a perfectly valid ARGUMENT to bash, so the corrupt wkask.sh passes bash -n with rc=0. Ten prior sessions repaired this file and verified it that way, which is textbook absence-shaped proof -- it passes just as happily when the thing is still broken.",
+    "INCIDENT 2026-08-27, the cost of writing a long incident into a flat T1: appending the root-cause step to ask-health-check dropped that skill to score 0, and the tier-gate then refused EVERY agent dispatch until this -ref sibling existed. WHEN: you are about to add a dated incident to a skill that has no -howto or -ref sibling and already carries more than fifteen steps. HOW: run wkappbot skill read knowledge-ification-procedure-jisikhwa and create the -ref sibling FIRST, then write the incident into it. WHY: measured the same session -- the knowledge was right and the destination was wrong, and the punishment landed on unrelated work, blocking a build-and-deploy delegation that had nothing to do with wkask. A T1 core is a router, not a logbook."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read ask-health-check-ref",
+      "expect": "the wkask install-master root cause and the mtime evidence are readable",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read ask-health-check",
+      "expect": "the T1 core still carries the runnable PONG baselines",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill search wkask install master",
+      "expect": "this ref is findable by its root-cause keywords",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "ask",
+    "wkask",
+    "health",
+    "cdp",
+    "incident",
+    "ref",
+    "t3",
+    "3tier",
+    "archive",
+    "gpt",
+    "gemini",
+    "triad",
+    "root-cause"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-08-27T09:39:57.0991191Z",
+  "updated": "2026-08-27T09:39:57.0991331Z",
+  "version": "1.0"
+}

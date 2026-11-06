@@ -1,0 +1,50 @@
+{
+  "id": "harness-process-kill-proof-gate",
+  "app": "wkappbot-workflow",
+  "title": "Process Kill Proof Gate",
+  "title_ko": null,
+  "desc": "Harness reflex that blocks OS process termination until command line working directory parent and owner are verified.",
+  "steps": [
+    "TRIGGER: Before any Stop-Process, taskkill, kill, or process termination command. ACTION: Stop and run wktasklist -V or tasklist with full command lines, then verify PID, image, command line, working directory, parent PID, and owner against the intended session.",
+    "BLOCK: If any identity field is missing, inaccessible, or mismatched, do not terminate. Return a named proof-missing refusal and ask for owner approval.",
+    "SCOPE: Never infer repository ownership from process name, PID, start time, CPU, or memory alone. Different repositories can run identical Codex image names.",
+    "SAFE ROUTE: Prefer a dry-run classified wkappbot taskkill path. Force termination is allowed only after the dry-run names the exact target and the proof matches.",
+    "EVIDENCE: After termination, re-run the process inventory and record the exact PID, command line, working directory, and exit result.",
+    "NAVIGATION: Read harness-process-kill-proof-gate-howto for the procedure and harness-process-kill-proof-gate-ref for the incident record.",
+    "TODO: locate the canonical PreToolUse termination guard and wire a proof gate that rejects raw process kills until PID command line working directory parent and owner match the intended session.",
+    "2026-09-17: Read-only inventory confirmed the canonical guard allows literal PID actions for non-protected images without repository command-line proof; prior proto reports were unsupported because the artifacts were absent. Next action is one bounded coder sector producing independently verifiable module, wired, and self-test artifacts before any canonical edit."
+  ],
+  "requirements": [
+    {
+      "cmd": "probe",
+      "expect": "pass",
+      "prompt": null
+    },
+    {
+      "cmd": "check",
+      "expect": "pass",
+      "prompt": null
+    },
+    {
+      "cmd": "gate",
+      "expect": "block",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "harness",
+    "process",
+    "kill",
+    "proof",
+    "tasklist",
+    "codex",
+    "safety"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-09-16T17:41:39.1078862Z",
+  "updated": "2026-09-16T19:49:39.1010383Z",
+  "version": "1.2"
+}

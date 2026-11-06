@@ -1,0 +1,36 @@
+{
+  "id": "work-fast-anti-defer-decisive-execution",
+  "app": "wkappbot-workflow",
+  "title": "Work fast, do not defer: the decisive-execution / anti-procrastination reflex (Opus and Sonnet are champion deferrers)",
+  "title_ko": null,
+  "desc": "Action-first reflex against the deferral pattern the user named: Opus/Sonnet reflexively procrastinate -- defer to another owner, over-engineer the means, hand-code slowly, fight gates in circles, plan instead of act. The rules for finding the real task and taking the direct path fast.",
+  "steps": [
+    "THE PATTERN TO KILL (user 2026-07-06): Opus and Sonnet are CHAMPIONS at DEFERRING. Both reflexively procrastinate -- push work to another owner, gold-plate the means, hand-type code slowly, retry gates in circles, plan instead of act. This skill is the anti-defer / work-fast reflex: read it when you catch yourself NOT moving.@@RULE 1 -- FIND THE REAL TASK FIRST. Before building ANYTHING, confirm the user ACTUAL goal. Case: the real goal was reviewing wkappbot I/O during the work24 login smoke, but hours went to tangents (tasklist port, CLAUDE.md diet, a switchover tool) before the user finally had to state it outright. Confirm the goal early; never build infrastructure for an unconfirmed task.@@RULE 2 -- DIRECT BEATS CLEVER; a MEANS is minimum-viable. When a tool/step only EXISTS to unblock your real work, use the smallest form that works and MOVE. Do NOT productize scaffolding. Case: a 1-minute CLAUDE.md slim (to unblock a delegation) got gold-plated into a fail-closed general tool + a dedicated skill + a manifest + a suggest = the opposite of fast.@@RULE 3 -- DELEGATE EXECUTION, NEVER HAND-CODE. Fresh scripts/protos -> Haiku (fast, cheap, strong at greenfield). Source builds/refactors -> Sonnet or codex. Judgment/verify/orchestrate -> Opus. Opus or Sonnet HAND-TYPING code IS the slow-hand anti-pattern the user names. If you catch yourself writing 100+ lines by hand, STOP and delegate.@@RULE 4 -- DO NOT DEFER TO ANOTHER OWNER when a self-serve path exists. Idling while you wait on someone else change is procrastination wearing a not-my-job mask. Case: 90 minutes idled waiting on a harness-owner reader change when a self-serve escape existed the whole time. If you can unblock yourself, do it now.@@RULE 5 -- ONE decisive move, not N gate-fights. When a guard blocks, READ its remedy line and do EXACTLY that ONCE. Do not grind variations. If two guards deadlock, take the free path (knowledge-op) or the documented escape. Repeated blind retries are the slowest possible path.@@RULE 6 -- FIX ON DISCOVERY, do not note-and-defer. The instant a bug / broken lock / failure surfaces, fix it in the SAME turn. Deferring a fresh finding to next session is abdication-via-cost-excuse.@@RULE 7 -- the user rapid corrections ARE the oracle. Re-sync FAST on each redirect; do not barrel ahead on a stale read (mis-reading do-not-wire-Fable as kill-the-running-Fable wasted a launch). Read the intent, confirm only if genuinely ambiguous, then move.@@SELF-CHECK before any multi-step plan: ask is this the DIRECT path to the user REAL goal, or am I deferring / over-building / hand-doing what a delegate should do? If deferring, stop and do the direct thing. Cross: foundation-is-roots-charge-not-a-chore (abdication-via-cost-excuse), opus-self-reflection-ref (means-vs-deliverable), claude-code-agent-tier-routing (delegate execution).",
+    "ANTI-BACKDOOR + INVERT-WHEN-STUCK (2026-07-07, user, sharp -- two failures in one): (1) BACKDOOR TEMPTATION: when the diet gate blocked the fleet I recommended the user flip WKHARNESS_MD_DIET_OK=1 -- an env-override BYPASS = a BACKDOOR, forbidden even when the user could technically set it. The user: no, I will BLOCK that backdoor. RULE: when a guard blocks, FIX THE ROOT (do the real work it demands); NEVER recommend or reach for an override / bypass / env-spoof. Suggesting the user flip a bypass is the same forbidden move wearing a polite mask. (2) RIGIDITY / FAILURE TO INVERT: I got stuck trying to classify which CLAUDE.md items were OLD enough to extract. The flexible move (user): when you cannot cleanly classify what to REMOVE, INVERT -- split out EVERYTHING except the must-keep (the harness skill-locks), then move BACK only the truly-essential. Whitelist-what-you-keep beats blacklist-what-to-cut when the boundary is fuzzy. Insisting on the hard direction instead of the easy inverse is a lack of flexibility. REFLEX when blocked AND can't classify: (a) NEVER a backdoor, (b) INVERT to keep-only-essential."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read work-fast-anti-defer-decisive-execution",
+      "expect": "RULE 3 DELEGATE EXECUTION NEVER HAND-CODE",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill search efficiency fast defer decisive",
+      "expect": "work-fast-anti-defer-decisive-execution in results",
+      "prompt": null
+    },
+    {
+      "cmd": "proposed: catch yourself hand-typing 100+ lines OR idling on another owner",
+      "expect": "stop, delegate or self-unblock (anti-defer reflex fires)",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-07-06T14:42:59.9680703Z",
+  "updated": "2026-07-06T15:18:33.3295044Z",
+  "version": "1.2"
+}

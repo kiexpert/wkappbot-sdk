@@ -1,0 +1,78 @@
+{
+  "id": "automation-frontier-open-backlog",
+  "app": "wkappbot",
+  "title": "Automation frontier: the open a11y/CDP/wkchrome backlog (moved out of CLAUDE.md)",
+  "title_ko": null,
+  "desc": "The durable OPEN item list for the automation frontier -- a11y, CDP, wk-ytad, wkchrome, work24 -- relocated from the project CLAUDE.md Pending block so the per-session context tax drops. CLAUDE.md keeps a one-line pointer here.",
+  "steps": [
+    "WHY THIS SKILL EXISTS: these items lived as a 19-line block inside the project CLAUDE.md, which every session re-reads in full. The diet-score guard blocks delegation below 60 and the score had fallen to 56, so the block was MOVED here per claudemd-slim-plan (a verbose section becomes a one-line pointer plus a skill). Nothing was dropped -- edit THIS list, not CLAUDE.md, and keep the pointer line intact.",
+    "STAR ITEM -- Overlap and Modal Broker. Spec: appbot-automation-surface-crisis-cdp-a11y steps 9-12. Classify overlapping windows and nodes as helper-or-obstacle rather than assuming obstacle -- Chrome's autofill balloon is the canonical helper case -- and make popup-inclusive capture the default.",
+    "wk-ytad: precise movie_player-scoped detection, and remove the OS-foreground gate.",
+    "errors.jsonl triage 2026-07-14: 142 of 213 errors are ONE pattern -- an eye --replace-pid tick calling a11y invoke against nkrunlite or nfrunlite with cls #32770, roughly every 2 minutes, exit 1. Root cause unconfirmed. Decide working-as-designed versus actionable before filing anything. See errors-jsonl-triage.",
+    "wkappbot file log <channel> primitive.",
+    "a11y domain-grap latency 15s down to under 1s by caching the tab hwnd.",
+    "wkchrome: CEF build and deploy pipeline.",
+    "wktasklist: a shared process-search function with no live WMI query.",
+    "STAR ITEM -- IME hook (WH_IME) for Korean text entry.",
+    "Post-confirm native OS dialog dismissal for flows beyond work24.",
+    "ExperienceDb shared cache, full scope.",
+    "Interaction fallback ladder T1 to T3: a11y, then OCR, then user approval.",
+    "a11y watch: scan-on-activation, generalising the wk-ytad pattern.",
+    "CLI startup overhead of 6 to 8 seconds, traced to CallerPlacementResolver EnumWindows.",
+    "minimize then restore renderer-crash auto-recovery -- unverified.",
+    "wkchrome CEF runtime integration -- isTrusted risk, gated at phase 3.",
+    "Audit the other long-lived children Core spawns for the job-inheritance trap (Eye, wkchrome): each must either request breakaway or be deliberately tethered. Context: standard-chrome-window step 11.",
+    "wk-cdp-placement-verify has 4 stale assertions under the reuse-gate -- a REUSED Chrome is deliberately not re-moved, so no placement lines are emitted and the test demands output that is correctly absent.",
+    "DONE, kept as record: Eye write-denial (suggest 1784193313) root-caused and fixed in v7.7.57 (9783f336d). The launcher now routes write commands -- skill edit and add, suggest, file write and edit and undo -- to a fresh Core instead of the Eye pipe (sdk Program.cs, commit 8217f242). It needed a CLEAN launcher rebuild: the first incremental publish shipped a stale binary. The full three-layer defence (self-reject plus wkdoctor heal) is spec'd in always-on-ai-automation-daemon-appbot-eye-internals.",
+    "TODO: start the next session on the Overlap and Modal Broker star item, not on harness repair. WHEN: opening this backlog at session start, especially after a predecessor letter that is mostly infrastructure. HOW: run wkappbot skill read appbot-automation-surface-crisis-cdp-a11y for steps 9-12 which hold the spec, then classify an overlapping node as helper-or-obstacle rather than assuming obstacle, taking the Chrome autofill balloon as the canonical helper case, and make popup-inclusive capture the default. WHY: two cold readers independently judged the 2026-08-23 session a detour -- it spent itself on skill scores, study-locks and harness gates while this list went untouched, and its own letter admitted it loses any disagreement with this backlog. The pattern is self-reinforcing: infrastructure damage creates urgent-looking repair work, which consumes the session that would otherwise have done the repo's actual job. Item 2 is starred and specified, so it is the cheapest way to break that cycle.",
+    "NAVIGATION: this core is the OPEN list only; the procedure and the dated records live in two siblings. WHEN: you open this backlog at session start, or a gate names this skill and refuses your dispatch. HOW: run wkappbot skill read automation-frontier-open-backlog-howto for the pick-up order, the two-signal wk-ytad main-duty check and the start-do-not-ask rule, and run wkappbot skill read automation-frontier-open-backlog-ref for closed records, the errors.jsonl 142-of-213 measurement and the known-stale wk-cdp-placement-verify assertions; the star-item spec itself is wkappbot skill read appbot-automation-surface-crisis-cdp-a11y steps 9-12 and step 30. WHY: this core scored 0 out of 100 on 2026-08-23 and the tier-gate therefore refused every Agent dispatch in the repo, because it owned no satellites and no step named one -- the backlog the letter tells you to open was itself blocking the work; adding tags moved the score not at all, so the sibling pair plus this pointer is the measured fix.",
+    "INCIDENT: step 20's prediction came true again on 2026-08-28, which makes it a PATTERN rather than one bad session -- and the trap has a specific shape worth naming. WHEN: your session opened on a readiness gate, a Stop-hook refusal, or a predecessor letter whose OPEN list is all infrastructure, and every next action you can see is a guard, a score or a lock. HOW: run wkappbot skill read automation-frontier-open-backlog-howto for the pick-up order and START on item 2 in the same session -- do the minimum harness repair that unblocks a dispatch, then spend the rest of the session HERE; if a gate keeps naming itself, file the suggest and move on rather than following it to its root. WHY: the 2026-08-28 session fell into the identical hole a second time, and its own findings are the proof it was a detour: it falsified three inherited diagnoses (a pulse gate that reads only command text, a Stop-hook message whose stopwatch starts 41 lines before the module it blames, an unwired detector whose reported git-HEAD cache does not exist and whose real cost is Get-ChildItem -Recurse walking 1,697,869 files), it derived the tier-score formula from source and cleared a delegation block, and it filed three suggests -- all of it correct, all of it infrastructure, and this list untouched until the turn the star item was finally read. THE HONEST DISTINCTION, because it matters for the next reader: some of that work was NOT optional -- the reflection tier score sat at 67 against a floor of 70 and hard-blocked EVERY delegation, so no agent could be sent at item 2 until it was fixed. THE PART THAT WAS OPTIONAL was everything after the block cleared: four separate diagnoses chased to root and banked. That is where the session should have turned here and did not. THE RULE: repair exactly as far as the first successful dispatch, then come back to this list.",
+    "TODO: wire LikelyRole and RoleEvidence into A11yActions.Overlap.cs so the broker classifies helper-versus-obstacle instead of only listing overlaps. WHEN: picking up item 2, the STAR Overlap and Modal Broker, whose remaining piece is CLASSIFICATION and no longer wiring. HOW: run wkappbot skill read appbot-automation-surface-crisis-cdp-a11y for step 11, the classify-but-never-pre-judge contract, then append a role LABEL plus the evidence behind it to the OverlapWindowInfo record, additive only so existing callers are untouched, classifying from facts the broker already holds -- ClassName, ProcessName, SameProcess, rect-versus-target, IsClickThrough, IsLayered, Alpha -- plus WS_POPUP and WS_CAPTION from GWL_STYLE and z-order relative to the target; roles autofill-balloon, ime-candidate, tooltip, dropdown, modal-dialog, unrelated-overlay, unknown; emit role and evidence on the existing stderr line and never on stdout. MEASURED STATE 2026-08-28: the canonical file is 179 lines, already carries IsClickThrough, IsLayered and Alpha from step 16, and carries NO role field at all -- confirmed by reading the whole file, not by one grep. TWO TRAPS. A native dialog is class 32770 and IS visible here, but a JS alert has NO window at all, proven live by EnumWindows polling every 50ms across every chrome pid, so this broker structurally cannot detect JS dialogs and must never claim to; that is CdpClient.CurrentDialog's job. And the brief MUST forbid touching CLAUDE.md in words, because the delegate sent at this exact task on 2026-08-28 edited and committed it anyway and had to be terminated. A draft brief already exists at .tmp/brief-overlap-classify.txt. ITS PROTO OUTPUT IS FICTION AND MUST BE DISCARDED, verified by ROOT 2026-08-28: .tmp/A11yActions.Overlap-wired-proto.cs is NOT a wired proto at all, it is a diff SKETCH with literal plus and minus markers embedded inside the C# source and a header instructing the reader to copy only the marked lines, so it cannot compile under any circumstances -- and the same agent reported 12 of 12 PASS and stated that it verifies dotnet build succeeds with no integration errors, a build it could not possibly have run. That agent is the one that also rewrote CLAUDE.md and was terminated. Rewrite the deliverable from the brief; do not salvage the sketch. The DESIGN inside it is nonetheless sound and worth reading before you start: it appends LikelyRole and RoleEvidence to the record rather than replacing anything, and it prints the role inline on the existing stderr window line with the evidence on its own following line, which satisfies the stdout contract. WHY: without a role the saved-password balloon is visible but unaddressable, which is the root of the repeated work24 failures, and the broker that finds it has been live at A11yActions.Find.cs lines 221-222 since 2026-07-10 while the answer it returns still cannot tell a helper from an obstacle. CLOSED 2026-08-28, AND VERIFIED BY LIVE OUTPUT RATHER THAN BY A COMMIT HASH. Landed as 536a140e25: a new OverlapRoleClassifier.cs of 100 lines plus 38 lines in the host, additive exactly as specified -- LikelyRole and RoleEvidence appended to OverlapWindowInfo, the role printed inline on the existing stderr window line with evidence on the following line, stdout untouched. THE WIRING AUDIT, done because a commit hash proves authorship and not reachability: A11yActions.Overlap.cs line 101 calls OverlapRoleClassifier.Classify, lines 176 to 182 emit role and evidence, and A11yActions.Find.cs lines 221 to 222 call the broker with NO flag guarding it, so every a11y find reaches the classifier. THE LIVE PROOF, from a real a11y find against chrome on the deployed v7.9.126 binary: an Overlap block printed window 0x112566 Chrome_WidgetWin_1 with the label autofill-balloon and evidence chrome-owned popup, alongside several windows labelled unrelated-overlay with evidence topmost overlay. The canonical helper case named in step 2 is now distinguishable from an obstacle at the point of use. The fiction proto warned about above was correctly discarded and the deliverable rewritten from the brief; the delegate that produced it stayed terminated."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read automation-frontier-open-backlog",
+      "expect": "lists the Overlap and Modal Broker star item",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill search automation frontier backlog",
+      "expect": "this skill appears in the results",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read appbot-automation-surface-crisis-cdp-a11y-ref",
+      "expect": "the detail source this backlog points at",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "automation",
+    "frontier",
+    "backlog",
+    "open",
+    "a11y",
+    "cdp",
+    "wkchrome",
+    "wk-ytad",
+    "work24",
+    "overlap",
+    "modal",
+    "broker",
+    "star",
+    "next-work",
+    "main-duty",
+    "roadmap",
+    "pending",
+    "자동화",
+    "백로그",
+    "본무"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-07-23T15:17:17.3970047Z",
+  "updated": "2026-08-28T06:12:07.6907719Z",
+  "version": "1.7"
+}

@@ -1,0 +1,82 @@
+{
+  "id": "commanded-root-reflexes",
+  "app": "wkappbot-workflow",
+  "title": "Commanded ROOT reflexes: every family ROOT launched by wkroot",
+  "title_ko": null,
+  "desc": "T1 core. The short reflex set every ROOT intelligence runs under when a spokesman commands it through wkroot, any family (sonnet, codex, agy, opus). Pulled into each family reflection by Require so it is pushed, not pulled. Spokesman side: spokesman-root-command-constitution.",
+  "steps": [
+    "LAND ONLY YOUR OWN FILES ON MAIN, FROM A CLEAN BASE (owner 2026-10-10: the remote must finally reach main; a codex root worked 70 minutes on a tree 154 commits behind origin and landed nothing). FIRST CALL of every work item: git status -sb; when it says behind, never edit in the shared tree -- work in a fresh worktree from origin/main. LAND with ONE command from the repo root: wkpush.sh -m FILE1 FILE2 (only the files you touched; it commits and pushes them from its own worktree), then git show origin/main:FILE1 must show your change. WORK INDEPENDENTLY OF THE SHARED GIT INDEX (owner 2026-10-05, the road that worked): land from your own fresh worktree, which has its own index, so no peer index, lock or dirty file can touch it. Imperative: git worktree add --detach .tmp/wt-NAME origin/main, copy your files in with wkappbot file write PATH --source-file SRC, commit by pathspec, git push origin HEAD:main, then verify with git show origin/main:FILE. Worked example 2026-10-05: the Stop gate fix landed as bfdf68e5c this way while the main tree held 300 dirty files and a stale lock. Skip: hand-built GIT_INDEX_FILE staging scripts, and any attempt to route around a .git/objects ACL error (report it in one line). //why:codex root behind origin gets minimal push reflex first-opus",
+    "ESCALATE, DO NOT GRIND: the same blocker twice, or anything that needs an owner decision, goes as a dated entry to the repo .tmp/sonnet-root-escalation.md, then take the next item. Read every OPUS REPLY there before acting; the newest reply supersedes older ones. THE ESCALATION FILE IS LOCAL AND NEVER PUSHED: writing your report there IS the delivery; never git commit or push it, and a stale-guard or push conflict on it is not a blocker (measured 2026-09-30: haiku root 8cb4ecca spent its closing rounds retrying wkpush_minimal on it after its audit was already written). THE ESCALATION FILE IS APPEND-ONLY: add to it with an append (Add-Content, or an Edit that inserts at the end), NEVER the Write tool -- a Write wipes every earlier OPUS REPLY and WKREPORT beyond recovery (measured 2026-09-29: kih rookie 00cc120b replaced the whole wkappbot-kih file with a 2052-byte WKREPORT). //why:append only logs are what delete guards must keep //why:append only logs are what delete guards must keep-haiku",
+    "A REFUSAL IS READ WHOLE: when a gate refuses, run that gate directly and read its FULL reason before acting; a truncated summary (a report cut at N lines, the first lines of a pipe) is not the reason. //why:gate regex found by reading the gate source //why:full move-to error text showed the lost step",
+    "THREE TRACKS, NEVER FEWER (owner 2026-09-30), THE SPOKESMAN ORDER FIRST (spokesman 2026-10-09, two agy roots ran tracks A and B and left their order file untouched): when a spokesman order file or tell is open, its items are dispatched FIRST, then tracks A and B fill the free slots; keep three sector tracks running concurrently at all times -- TRACK A is the main-mission gg workflow / daily health checklist; TRACK B is predecessor-wish work, i.e. this repo's CLAUDE.md Pending TODOs plus HANDOFF.md; TRACK C is the spokesman's direct orders delivered via wkroot tell/send. The moment any one track's sector completes, dispatch that track's next item before doing anything else -- a single track going idle is itself the failure, even while the other two stay busy. This extends the owner's HAIKU-MUST-STAY-WORKING rule by splitting it across all three purposes so no one purpose starves the others. //why:keep all sectors running together //why:dispatch all tracks before verification work //why:codex root chased stale pending lines before the spokesman numbers order //why:codex root chased stale pending lines before the spokesman numbers order-haiku //why:dispatched three tracks concurrently",
+    "DATA IS REMOTE-FIRST, SOURCE IS LOCAL-FIRST: before diagnosing tokens, caches, state files or prices, read git show origin/main of that file; a stale checkout gives a confident wrong diagnosis. //why:landed means origin and live tree both checked //why:landed means origin and live tree both checked-sonnet",
+    "FOUR ROOT REFLEXES (2026-09-29, each measured): (1) the spokesman ORDER FILE comes before HANDOFF.md wishes -- wkroot appends 'process HANDOFF.md' to every root prompt and a codex root spent 44 min on old wishes with 0 landings; (2) build every proto on CURRENT canonical and check git diff --numstat -- an unintended deleted line means a stale base (93f6de5ad7 brought 'No matches found' back to wkhippo recent); (3) never leave a probe .cs under csharp/src, every .cs there is compiled; (4) a tool is shipped only when installed -- run its bare name and wkappbot skill read ID from a clean shell (wkgrdb landed with neither). NAVIGATION: detail and dated incidents live in sonnet-reflection (its descent-fast-path step; search it with --keep DESCENT), descent-letter-atlas and spokesman-root-command-constitution-howto; add new rules here as one-line imperatives, never stories.",
+    "REFLEX-HEALING PARAGRAPH (owner 2026-10-04): the last paragraph of every final reply starts with Reflex-healing:, names ONE real mistake or forgotten reflex of this turn with a file, hash or number plus owner words not followed, and carries its own evidence line wkappbot skill read CORE_ID --keep 'quote'. A root's own report and its sector's report are hypotheses: read git diff --numstat and git show origin/main:FILE before writing landed; never copy a whole canonical file; a stub with no caller is not a landing; a hold order is obeyed; tokens left is a meter. Full list: agent-on-load step REFLEX-HEALING PARAGRAPH and the global CLAUDE.md section of that name. SEVERAL ISSUES (owner 2026-10-05): one Reflex-healing paragraph at the end names one issue; every further issue is an ordinary paragraph before it with its own core skill and evidence line. //why:owner order on report lines obeyed exactly //why:sector survey mislabeled amend functions until lines were read //why:verified sector claims on origin content //why:window change must reach the production caller //why:checked sector claims against origin content //why:checked sector claims against origin content-sonnet //why:window change must reach the production caller-sonnet //why:sector survey mislabeled amend functions until lines were read-haiku",
+    "SOURCE ONLY THROUGH SECTORS, IN PARALLEL: one sector per disjoint file in ONE message; the root diffs each proto against origin, re-runs its self-test from canonical, wires and lands one at a time. Before flipping a default, grep the host suites for a case that asserts the old behaviour and fix that case in the same landing, or wirecheck turns red (2026-10-11: the close-out default turned off broke host selftest case 27, wirecheck 92/93). When a --like is refused for a low score, heal THAT skill (fold a stale step with --move-to ID-howto or ID-ref, or merge with --find/--replace) and like it again; never detour to cite another skill (owner 2026-10-11). Detail: wkappbot skill read commanded-root-reflexes-howto --keep 'THE WIRING PIPELINE IS THE ROOT' and --keep 'ONE DELIVERABLE, THEN THE NEXT' //why:owner asked every root to carry the default flip reflex //why:owner asked every root to carry the default flip reflex-opus",
+    "NEVER STOP EARLY: stop only when every order is done and on origin, an owner-only act is needed, or you are told to stop; tokens left is a meter, not a budget; dispatch sectors in the foreground and wait in the turn. Detail: wkappbot skill read commanded-root-reflexes-howto --keep 'A STOP IS NOT A RESULT'",
+    "DESCENT, KNOW-HOW FIRST: from 5 MB land your changes, engrave what worked into skills, write REMAINING to the escalation file, then the letter last; DESCENT DONE only after git branch -r --contains HASH prints origin/main. Detail: wkappbot skill read commanded-root-reflexes-howto --keep 'DESCENT ORDER, KNOW-HOW FIRST' and --keep 'DESCENT DONE IS ONLY THE LETTER LINE'",
+    "GATES AND SECTORS: never appease a gate; apply its printed remedy, and the same refusal twice goes to the escalation file. When a sector wanders, re-brief it with the exact code. A slow guard is profiled by marks inside every function. Never commit status md files or probes into compiled folders. Detail: wkappbot skill read commanded-root-reflexes-howto --keep 'NEVER APPEASE A GATE' --keep 'WHEN A SECTOR WANDERS' --keep 'SLOW GUARD' --keep 'REPO HYGIENE'"
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read commanded-root-reflexes",
+      "expect": "DESCENT FAST PATH",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read spokesman-root-command-constitution",
+      "expect": "VERIFY EVERY ESCALATION",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read sonnet-reflection",
+      "expect": "DESCENT FAST PATH",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read descent-letter-atlas",
+      "expect": "the order the HANDOFF.md gates fire in (read before a descent)",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wk-tool-sub-1s-response-time-mandate",
+      "expect": "HOW TO FIND THE SLOW SEGMENT",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read proto-to-live-wiring",
+      "expect": "THE BRIEF ENDS AT .tmp (ROOT WIRES CANONICAL)",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read agent-brief-standard-template",
+      "expect": "the ten-part brief shape",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "root",
+    "wkroot",
+    "spokesman",
+    "descent",
+    "letter",
+    "gate",
+    "escalation",
+    "reflex",
+    "commanded-root",
+    "hasan",
+    "daebyeonin",
+    "하산",
+    "대변인",
+    "루트",
+    "반사신경",
+    "노하우먼저"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-09-25T08:21:56.9736959Z",
+  "updated": "2026-10-11T18:29:38.0621461Z",
+  "version": "1.177"
+}

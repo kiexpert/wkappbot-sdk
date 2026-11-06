@@ -1,0 +1,46 @@
+{
+  "id": "cdp-latency-over-1s-is-a-state-detection-bug-not-a-cdp-block-ref",
+  "app": "wkappbot-webbot",
+  "title": "CDP latency over 1s: dated incidents and fixes",
+  "title_ko": null,
+  "desc": "Dated incident log for the CDP-latency-is-a-state-detection-bug mandate: Gemini login-wall root cause, WebOpenCommand timeout fix, security-module census item, CDP-STATE-BUG-TIMEOUT instrumentation ship, and the reversed-processing-order generalized fix pattern. Read cdp-latency-over-1s-is-a-state-detection-bug-not-a-cdp-block first for the core principle.",
+  "steps": [
+    "PROVEN END-TO-END RECIPE 2026-06-23: instrument SendAsync/EvalAsync to log method+ms+url+expression when a round-trip exceeds 1s, deploy it, exercise the path with real traffic, then read cdp-errors.jsonl to name the culprit. RESULT: the chronic ~3000ms Runtime.evaluate was the Gemini ask editor-locator eval running against a login-wall page (session expired) -- fix is to detect the login-wall before the eval and fail fast, never extend the timeout.",
+    "LIVE CASE 2026-07-06: WebOpenCommand had a hardcoded 2500ms task-timeout tighter than a legitimate cold Chrome launch -- raised to 15000ms. FindRunningChromePortCore also ran a duplicate WMI scan retrying a removed wmic.exe dependency -- both fixed. Even after both fixes cdp open still timed out beyond 15s under heavy concurrent-session load -- a deeper hang remained downstream, not yet root-caused. Verify live before declaring done.",
+    "ANOMALY CENSUS 2026-07-07 (the mandatory response to a 1s CDP timeout, not mere retry): sweep for -- native modal/JS dialog freezing JS; a real blocker window on top; occluding nodes in z-order; frozen/unresponsive JS; CDP targeting the wrong tab; zero-size/invisible element; focus lost/window not frontmost; page still loading or navigated away; tab closed/crashed. Report which cause applied, never hang silently.",
+    "CENSUS ITEM (security-module loading) 2026-07-07: on a stall, check whether a Korean gov/finance security module (nProtect, TouchEn nxKey, AhnLab-type) is loading -- it engages on cert-password-field touch, can suppress Chrome autofill, and hangs the whole flow if it stalls mid-load. Wait bounded for it to clear; do not click/thrash during loading.",
+    "IMPLEMENTATION FIX 2026-07-13: TryReportChromeNativeDialogViaUia in A11yCommand.Cdp.cs was hardcoded to a Korean+English button-name list (locale-blind) -- rewrote to enumerate Button-type descendants by control type, using the name list only as a soft preference. Also fixed emitted grap from wildcard to exact since the element was already resolved.",
+    "SHIPPED 2026-07-14: added CDP-STATE-BUG-TIMEOUT logging to the true-timeout catch(TaskCanceledException) path in CdpClient.Core.cs SendAsyncCore -- the existing >1s instrumentation only fired for a completed-but-slow round-trip, so a genuine no-response timeout previously left zero trace in cdp-errors.jsonl. Now logs method/ms/budgetMs/target/url identically, closing the blind spot for true hangs.",
+    "RE-VERIFIED 2026-09-10 (Sonnet 5): AppBotSleep.cs's global-using wiring to CdpClient.Actions.cs/ReconnectHeal.cs still holds, no drift. RE-VERIFIED 2026-09-11 (Sonnet 5, 15th letter): AppBotSleep.cs, CdpClient.Core.cs and CdpClient.Sleep.cs all re-checked this session, still hold, no drift -- comments updated in-source to record the fresh timestamp. FIXED 2026-09-08: the a11y-click-70s-ladder was exactly this class of bug -- ConnectAsync's Runtime.enable retry ladder against an already-dialog-blocked tab paid 65-129s before failing, in THREE separate call sites (CdpClient.Actions.cs ThrowIfDialogBlocking, A11yCommand.Cdp.cs TryWebViewCdpAction, A11yCommand.cs JS-first-tier eval-js path). Fix: check the Win32 window-disabled signal (ChromeDialogModality.ThrowIfWindowDisabled) BEFORE attempting the CDP connect at all -- and note the wish is now fully committed and pushed (fa8aa953c5), positive case measured at ~4ms end-to-end via PROF:PROBE, versus the prior 65-129s hang, so a known-blocked tab fails in under a second instead of paying the full retry ladder -- the same state-detection-first principle this skill's step 6 already names for the native-modal-freezing-JS census item."
+  ],
+  "requirements": [
+    {
+      "cmd": "grep -n CDP-STATE-BUG-TIMEOUT csharp/src/WKAppBot.WebBot/CdpClient.Core.cs",
+      "expect": "match",
+      "prompt": null
+    },
+    {
+      "cmd": "test -f D:/GitHub/WKAppBot/csharp/src/WKAppBot.CLI/Commands/A11yCommand.Cdp.cs",
+      "expect": "exists",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read cdp-latency-over-1s-is-a-state-detection-bug-not-a-cdp-block-ref",
+      "expect": "Runtime.evaluate",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "cdp",
+    "state-detection",
+    "history",
+    "incident"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-07-15T05:15:23.0788844Z",
+  "updated": "2026-10-12T02:19:16.4565016Z",
+  "version": "1.1"
+}

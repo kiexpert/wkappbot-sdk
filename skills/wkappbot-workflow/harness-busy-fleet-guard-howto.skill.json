@@ -1,0 +1,52 @@
+{
+  "id": "harness-busy-fleet-guard-howto",
+  "app": "wkappbot-workflow",
+  "title": "Busy-fleet guard: how to satisfy it (T2 howto)",
+  "title_ko": null,
+  "desc": "T2 domain tier of harness-busy-fleet-guard: the three-minute dispatch window, the real-work escalation on the second dispatch, the exempt wk/knowledge surface, the companion gate sequence and its separate payments, and the two live-observed misfires. Read when the ROOT-must-delegate block fires.",
+  "steps": [
+    "DECISION: THE WINDOW IS THREE MINUTES AND IT IS FED BY A DELEGATION, NOT BY TIME PASSING. The guard blocks a ROOT session from running a direct non-wk, non-git, non-skill command whenever no delegation was dispatched or completed in the last three minutes. It is not a cooldown that expires on its own; something must actually be sent to the fleet. WHEN: a Bash, PowerShell, Edit, Write, Update, MultiEdit, NotebookEdit, Artifact or worktree tool call is refused with the ROOT-must-delegate message. HOW: dispatch one real agent, then immediately run the blocked command while the window is open; the escalation rules and dated failure cases are in wkappbot skill read harness-busy-fleet-guard-ref. WHY: the guard exists so ROOT conducts and agents execute, and a window fed only by real dispatches is the one signal that cannot be satisfied by simply waiting.",
+    "DECISION: THE SECOND DISPATCH OF A SESSION MUST BE REAL WORK, NOT ANOTHER SURVEY. Once any vanguard has run, the guard escalates its demand: it explicitly refuses to count another read-this-file-and-report-back dispatch and requires an agent that builds a PROTOTYPE together with its OWN self-test. WHEN: the block text changes from must send a vanguard first to must delegate REAL work this time. HOW: brief an agent to create a proto file plus a selftest file under the repo .tmp folder, make it run the selftest and paste the verbatim output, and shape the brief with wkappbot skill read delegation-verify-scorecard. WHY: the fleet exists to produce verified work rather than to unlock ROOT typing, so a token dispatch is treated as no dispatch at all.",
+    "DECISION: WK-PREFIXED AND KNOWLEDGE COMMANDS ARE EXEMPT, SO KNOWLEDGE WORK IS ALWAYS AVAILABLE. A command whose first token is a wk-prefixed tool, a git command, or a wkappbot skill or suggest command does not trip the guard, so reading skills, editing skills, recalling memory and committing stay reachable while direct execution is blocked. WHEN: blocked with no delegation ready to send yet. HOW: use the exempt surface to make progress instead of retrying the blocked call, and see wkappbot skill read harness-pace-guard for the neighbouring exemption ladder that follows the same shape. WHY: a guard leaving no productive path would push the session into fighting it, so the exempt surface is the intended pressure valve.",
+    "BUG: A DELEGATION THAT IS STILL RUNNING DOES NOT RELIABLY HOLD THE WINDOW OPEN. Observed live 2026-07-23: an agent launched roughly two minutes earlier and still executing did not prevent the next block, because the window keys on dispatch and completion timestamps rather than on liveness. WHEN: a long agent is in flight and ROOT tries to keep working alongside it. HOW: treat the window as expiring during a long delegation and plan the next dispatch before it lapses, or spend the wait on exempt knowledge work as described in wkappbot skill read orchestrate-sectors-parallel-while-knowledgeifying. WHY: knowing the window is dispatch-keyed rather than liveness-keyed prevents the false conclusion that the guard is misfiring.",
+    "DECISION: THE COMPANION GATES FIRE IN SEQUENCE AND EACH CARRIES ITS OWN SEPARATE PAYMENT. One dispatch attempt commonly walks several gates in turn: clean-baseline demands a committed tree before delegating to a non-pro model, the agent-brief-guard demands the dispatched model own reflection skill named in the brief, the debrief gate demands a reflection entry when the previous agent looked unfinished, and the reflex pulse gate demands a like on a step that carried the last mission. WHEN: a dispatch is refused several times running with a different reason each time. HOW: pay each in turn instead of rewriting the brief blindly, and read wkappbot skill read agent-cmd for the dispatcher-side requirements the brief must satisfy. WHY: these are separate gates with separate ledgers, so satisfying one never satisfies another and the sequence is expected rather than a malfunction.",
+    "BUG: THE DEBRIEF GATE MISREADS SUCCESS TEXT CONTAINING FAILURE VOCABULARY. A completed agent whose passing output included the words failed to, inside a regression-proof assertion, was classified as having failed its mission and blocked the next dispatch. WHEN: the delegated task is to PROVE a defect exists, so failure words legitimately appear in a passing report. HOW: instruct the agent to phrase regression assertions positively, for example that the old expression raises as expected, and record the lesson through wkappbot skill read agent-debrief-gate when the gate fires anyway. WHY: the classifier reads the final message text, so vocabulary alone can invert the verdict on genuinely successful work.",
+    "DECISION: SUBAGENTS AND AGY SESSIONS ARE EXEMPT AND THE DETECTION IS FILE-BASED BY DESIGN. A subagent is recognised through its own session transcript path rather than an environment flag, so the exemption cannot be spoofed by setting a variable. WHEN: reasoning about why a delegate never trips this guard while ROOT does. HOW: keep any future exemption stateless and derived from session files, following wkappbot skill read harness-stateless-no-marker-files. WHY: an environment flag or marker file would be a deletable backdoor, and the guard deliberately refuses that class of signal.",
+    "NAVIGATION: THE KILL SWITCH EXISTS BUT USING IT IS AN ADMISSION RATHER THAN A FIX. Setting the busy-fleet environment switch to zero disables the guard for the session. WHEN: the guard is demonstrably misfiring and the work genuinely cannot be delegated. HOW: prefer paying the guard with a real dispatch, and if you believe it is wrong record the evidence via wkappbot skill read harness-busy-fleet-guard-ref instead of silently disabling it. WHY: this guard is the mechanism keeping ROOT in the conductor seat, so switching it off removes the only structural pressure toward delegation.",
+    "BUSY-FLEET RHYTHM (user 2026-07-24, tsk-tsk lesson): do ALL knowledge-ops FIRST, BEFORE any dispatch -- skill edits, TODO specs, study-lock reads are guard-exempt and free, so front-load them while the busy-fleet window is still closed. THEN commit to clean the tree (clean-baseline needs it for a non-pro dispatch). THEN dispatch ONE real commando -- a dispatch (or a completion) opens a roughly 3-minute window in which direct ROOT source edits are allowed. Use that window for a TIGHT verify-plus-wire BURST: run the staged self-test, merge the staged block, land the wiring line -- all before it re-closes. The ANTI-PATTERN I kept doing: try to wire FIRST, hit busy-fleet, then scramble to knowledge-ify and re-dispatch, burning the whole turn on gate ceremony. Wiring is the LAST mile done inside the unlock window, never the opening move. Sequence to internalize: front-load knowledge, commit clean, dispatch, then instantly verify and wire in the window.",
+    "WINDOW MECHANICS + THE BOUNDARY THAT SAVES A SUCCESSOR (proven live 2026-07-24). (1) The SEND-THREE count is NOT actually enforced yet -- ONE real dispatch opens the window (user confirmed); a real commando roughly every 3 minutes keeps it continuously open, which is near-unbounded direct-edit time. (2) CRITICAL BOUNDARY, the thing that will trip you if you do not know it: the window lifts ONLY busy-fleet. It does NOT lift study-lock. A source file locked by a fat or low-score skill STILL blocks inside a wide-open window -- that needs the skill READS front-loaded, or a 3-tier split of the offending skill, never a window. So BEFORE dispatching, classify every pending source edit into two piles: busy-fleet-only (do it in-window) versus study-lock-blocked (read or split first, the window will not help). (3) BATTLE-PROOF: a single dispatch this session let a clean-baseline self-test (8 of 8) AND a stop-guard block-merge (parse-clean) both land in one window; the two edits that stayed blocked were study-lock, not busy-fleet -- exactly this boundary. The full drill: front-load all knowledge-ops, commit to clean the tree, dispatch ONE real commando, then burst only the busy-fleet-only edits inside the window. Cross: harness-source-edit-requires-skill-lock (study-lock is the OTHER gate), harness-tier-score-guard (why a fat skill hard-locks a file)."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read harness-busy-fleet-guard-howto",
+      "expect": "THREE MINUTES",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read harness-busy-fleet-guard",
+      "expect": "ROOT conducts",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read harness-busy-fleet-guard-ref",
+      "expect": "busy-fleet",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "harness",
+    "guard",
+    "delegation",
+    "fleet",
+    "busy-fleet",
+    "howto",
+    "t2"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-07-22T18:59:02.4901696Z",
+  "updated": "2026-07-23T21:27:12.6542201Z",
+  "version": "1.3"
+}

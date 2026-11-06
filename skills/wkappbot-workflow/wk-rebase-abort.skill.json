@@ -1,0 +1,37 @@
+{
+  "id": "wk-rebase-abort",
+  "app": "wkappbot-workflow",
+  "title": "wk-rebase-abort",
+  "title_ko": null,
+  "desc": "Guard-exempt WillKim recovery tool that safely aborts an in-progress git rebase, for recovering a repo left stuck mid-rebase by a lost-race wkpush",
+  "steps": [
+    "WHAT: Safely aborts an in-progress git rebase from an AI session. It wraps git rebase --abort -- which the concurrent-guard blocks with no override -- inside a guard-exempt WillKim tool, to recover a repo left stuck mid-rebase by a lost-race wkpush.",
+    "USAGE: Run bare wk-rebase-abort with optional -Repo path. It detects rebase-merge or rebase-apply state and aborts if present, restoring ORIG_HEAD plus autostash, and is a no-op otherwise. Commits made DURING the rebase become dangling and must be re-committed afterward from a clean tree.",
+    "SEE ALSO: wkpush-git-push-race-winner step 10 is the mid-rebase bug this recovers from. wkharness-guards documents the concurrent-guard this tool legitimately encapsulates."
+  ],
+  "requirements": [
+    {
+      "cmd": "test -f D:/GitHub/WKAppBot/wk-rebase-abort.ps1",
+      "expect": "exit 0 tool present",
+      "prompt": null
+    },
+    {
+      "cmd": "grep -c abort D:/GitHub/WKAppBot/wk-rebase-abort.ps1",
+      "expect": "at least 3 abort references",
+      "prompt": null
+    },
+    {
+      "cmd": "grep -c absolute-git-dir D:/GitHub/WKAppBot/wk-rebase-abort.ps1",
+      "expect": "1 guard-safe dir detection",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-07-24T13:19:53.5998254Z",
+  "updated": "2026-07-24T13:19:53.5998349Z",
+  "version": "1.0"
+}

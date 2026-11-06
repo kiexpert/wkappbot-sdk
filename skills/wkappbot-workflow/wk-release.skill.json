@@ -1,0 +1,40 @@
+{
+  "id": "wk-release",
+  "app": "wkappbot-workflow",
+  "title": "wk-release",
+  "title_ko": null,
+  "desc": "Repo-specific WillKim release tool: pace-exempt sync+build+github-release for WKAppBot v-bumps",
+  "steps": [
+    "WHAT: wk-release.cmd is a repo-specific WillKim release tool that runs the full release under pace-95 -- it wraps the concurrent-guard-blocked git rebase (via wk-gitsync.ps1), then wkappbot-pub/build.cmd (build and deploy), then gh release create with wk-release-notes.md as the release body. Being wk-prefixed makes the command pace-exempt, so it runs where a raw git rebase or a direct PowerShell call is blocked at pace-95.",
+    "USAGE: run the bare wk-release (or ./wk-release.cmd) from repo root. It executes four steps in order -- sync, build, version-check, github release -- and aborts on the first failure. Edit wk-release-notes.md for the release body and bump the version in csharp/Directory.Build.props first.",
+    "SEE ALSO: wk-gitsync (the rebase and push it wraps), wkappbot-build-verify-workflow (the build step), verify-tool-or-guard-synthetic-live-static (run-verify the release live).",
+    "KNOWN MINOR (2026-07-08 live run): git autocrlf can convert wk-release.cmd from CRLF to LF on checkout, and cmd.exe then intermittently mis-parses the batch line right after a call to an external program -- observed as the if-errorlevel-goto-fail line printing a rrorlevel-is-not-recognized error (leading e eaten). HARMLESS when that step already succeeded (the script just continues), but it makes the errorlevel abort unreliable on a real mid-step failure. FIX: add a .gitattributes rule setting *.cmd to text eol=crlf so the tool stays CRLF, or treat the errorlevel checks as best-effort. The v7.7 run completed all four steps -- sync, build, version, github release -- successfully despite the glitch.",
+    "RELEASE-NOTES POLISH + FLEET-CREDIT (2026-07-18, user directive): wk-release cuts the release with the CURRENT wk-release-notes.md, but a first-cut note usually only credits THIS session diff. To make a proper credited changelog: (1) gh release edit <tag> --title <t> --notes-file wk-release-notes.md -- gh runs DIRECTLY for ROOT (NOT pace-walled this session; unlike wkappbot exec), so no wk-tool wrapper needed for gh; you can re-edit a published release notes any number of times. (2) Build the changelog from the git log, not memory: git log --grep=feat( --oneline (and fix() ) shows the whole arc since the previous release with each commit's Model: tag (claude-sonnet/opus/haiku/codex) -- CREDIT the predecessors, group by THEME (a11y modal-broker unification, exec managed-lifetime, CDP dialogs, work24 focusless login, diagnostics, knowledge system), not by author. (3) VERIFY rendering with gh release view <tag> -- confirm draft:false + markdown intact before calling it done. (4) wk-release-notes.md content goes through wkappbot file write (busy-fleet-gated; a holding vanguard opens the window) since it is not CLAUDE.md; keep it apostrophe-free for the single-quoted --text. Cross: wkpushsdk (the sdk-repo push that walls git -C -> needs a wk-tool), wk-gitsync.",
+    "DECISION: MEASURE THE VERSION BEFORE YOU RELEASE -- the number is DERIVED, not stored, and a branch can compute LOWER than what is already live, in which case the release tool ships a DOWNGRADE without warning you. WHEN: before any wk-release run, any minor bump, or any build at all, since bin/wktest-build.sh AUTO-DEPLOYS on smoke pass -- an ordinary build here does not stage a release, it publishes one. HOW: run wkappbot skill read wkappbot-build-verify-workflow for the build path, then compute the version by hand before touching the tool. It is BASE.PATCH. BASE comes from the WKAppBotBaseVersion element in csharp/Directory.Build.props. PATCH is git rev-list --count BUMP..HEAD limited to '*.cs' '*.csproj' '*.props' '*.yaml', where BUMP is the commit that introduced the current BASE string, found with git log -1 --format=%H -S with that same element text against Directory.Build.props. Compare that number against the LIVE binary from wkappbot doctor. Compute it for main and origin/main too, not just your branch. WHY: measured 2026-08-21 -- HEAD computed 81, main 80, origin/main 75, while the installed binary reported 7.9.104. NO ref in the repository reached 104, so the live exe was built from source commits that are not present here, and any build from this tree ships a binary that is numerically older AND missing that work. A MINOR BUMP FIXES ONLY THE NUMBER: raising BASE to the next minor resets PATCH near zero, so 7.10.0 outranks 7.9.104 and the downgrade guard stops complaining -- but the missing commits are still missing, and now the higher version hides that rather than revealing it. So bump only AFTER accounting for the gap. Cross: wk-sdkrelease for the sdk-repo half, wk-gitsync for the rebase, verify-tool-or-guard-synthetic-live-static for proving the built artifact by running it rather than by reading the log."
+  ],
+  "requirements": [
+    {
+      "cmd": "wk-release",
+      "expect": "runs sync build and github release in order",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read wk-release",
+      "expect": "shows the tool contract",
+      "prompt": null
+    },
+    {
+      "cmd": "ls wk-release.cmd",
+      "expect": "the tool file exists at repo root",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-07-08T12:45:53.5109751Z",
+  "updated": "2026-08-21T15:42:55.5697302Z",
+  "version": "1.7"
+}
