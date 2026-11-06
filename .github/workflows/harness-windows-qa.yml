@@ -597,11 +597,11 @@ jobs:
           else
             out=$(node tools/wkjs/parity.js --all --against-ps1 --ps-host "${{ matrix.ps }}" 2>&1); rc=$?
           fi
-          printf '%s\n' "$out" | grep -E '^(RESULT|MISMATCH|FAIL)' > "$out_f"
+          printf '%s\n' "$out" | grep -E '^(RESULT|MISMATCH|FAIL|PSHOST)' > "$out_f"
           cat "$out_f"
           { echo "### wkjs parity ${{ runner.os }} / ${{ matrix.ps }} (rc=$rc)"; echo '```'; cat "$out_f"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
           [ -s "$out_f" ] || { echo "no RESULT lines"; printf '%s\n' "$out" | grep -E 'rror|nknown|sage' | head -10; exit 1; }
-          grep -qE '^(MISMATCH|FAIL)' "$out_f" && rc=1
+          grep -qE '^(MISMATCH|FAIL|PSHOST)' "$out_f" && [ "$rc" = 0 ] && rc=1
           exit $rc
       - name: Upload RESULT table
         if: always()
