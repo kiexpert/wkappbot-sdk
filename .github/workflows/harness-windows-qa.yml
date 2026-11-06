@@ -12,6 +12,11 @@ on:
         description: 'Harness branch, tag or commit to test'
         required: false
         default: 'main'
+      break_guard:
+        description: 'Parity proof: corrupt one JS guard in the runner copy so the parity job must go RED'
+        type: boolean
+        required: false
+        default: false
   push:
     branches-ignore: [main]
     paths:
@@ -458,3 +463,144 @@ jobs:
           printf '%s\n' "$out" | grep -E '^FAIL|^RESULT'
           r=$(printf '%s\n' "$out" | grep '^RESULT' | tail -1); set -- $r
           [ "$rc" = 0 ] && [ -n "$r" ] && [ "${2%%/*}" = "${2##*/}" ] || { printf '%s\n' "$out" | tail -25; exit 1; }
+
+  # kih wkappbot-code: the OpenCode end-to-end driver on the owner's two desktop platforms with PowerShell removed
+  # from PATH (the "nopwsh" road a stock Mac or Linux box takes). macOS also runs it under /bin/bash 3.2.
+  # Only PASS/FAIL/RESULT lines are printed.
+  wkappbot-code-opencode-e2e:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout harness repo
+        uses: actions/checkout@v5
+        with:
+          repository: ${{ github.repository_owner }}/wkappbot-kih
+          ref: ${{ inputs.harness_ref || 'main' }}
+          token: ${{ secrets.WKAPPBOT_CORE_PAT }}
+          path: kih
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6
+        with:
+          python-version: '3.12'
+      - name: python3 alias (Windows)
+        if: runner.os == 'Windows'
+        run: command -v python3 >/dev/null || cp "$(command -v python)" "$(dirname "$(command -v python)")/python3.exe"
+      - name: Remove pwsh from PATH
+        run: |
+          np=""; IFS=:; for d in $PATH; do { [ -e "$d/pwsh" ] || [ -e "$d/pwsh.exe" ]; } && continue; np="$np${np:+:}$d"; done; unset IFS
+          echo "NOPWSH_PATH=$np" >> "$GITHUB_ENV"
+          PATH="$np" bash -c 'echo "pwsh on PATH: $(command -v pwsh || echo none)"'
+      - name: selftest-opencode-e2e.sh nopwsh
+        working-directory: kih
+        run: |
+          set +e
+          shells="bash"; [ "$RUNNER_OS" = macOS ] && shells="bash /bin/bash"
+          fail=0
+          for sh in $shells; do
+            out=$(PATH="$NOPWSH_PATH" $sh wkappbot-code/selftest-opencode-e2e.sh nopwsh 2>&1); rc=$?
+            echo "== $sh ($($sh -c 'echo $BASH_VERSION')) rc=$rc"
+            printf '%s\n' "$out" | grep -E '^(PASS|FAIL|SKIP|CASE|RESULT)' | head -80
+            r=$(printf '%s\n' "$out" | grep '^RESULT' | tail -1); set -- $r
+            [ "$rc" = 0 ] && [ -n "$r" ] && [ "${2%%/*}" = "${2##*/}" ] || { fail=1; printf '%s\n' "$out" | grep -E 'rror|not found|No such' | head -15; }
+          done
+          exit $fail
+
+  # PS1 -> JS port parity proof (owner order 2026-11-06). A guard flips from shadow to authoritative JS only when its
+  # corpus passes 100% here against the real ps1 on BOTH desktop platforms. ps1 runs under pwsh, and on Windows also
+  # under Windows PowerShell 5.1; the "none" leg removes pwsh from PATH and proves the JS road alone still gives verdicts.
+  # Prints only per-guard RESULT lines; the RESULT table is uploaded as an artifact.
+  wkjs-parity:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: windows-latest, ps: pwsh }
+          - { os: windows-latest, ps: powershell }
+          - { os: windows-latest, ps: none }
+          - { os: macos-latest, ps: pwsh }
+          - { os: macos-latest, ps: none }
+    name: wkjs-parity (${{ matrix.os }}, ${{ matrix.ps }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout harness repo
+        uses: actions/checkout@v5
+        with:
+          repository: ${{ github.repository_owner }}/wkappbot-kih
+          ref: ${{ inputs.harness_ref || 'main' }}
+          token: ${{ secrets.WKAPPBOT_CORE_PAT }}
+          path: kih
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Harness commit and hosts
+        working-directory: kih
+        run: |
+          echo "HARNESS $(git log -1 --format='%h %cs')"
+          echo "NODE $(node --version)"
+          echo "PWSH $(pwsh -NoProfile -Command '$PSVersionTable.PSVersion.ToString()' 2>/dev/null || echo none)"
+          [ "$RUNNER_OS" = Windows ] && echo "WINPS $(powershell -NoProfile -Command '$PSVersionTable.PSVersion.ToString()')"
+          for f in tools/wkjs/parity.js tools/wkjs/registry.json tools/wkjs/contract.js tools/wkjs/hub.js; do
+            [ -f "$f" ] && echo "HAS $f" || echo "MISSING $f"
+          done
+          [ -f tools/wkjs/parity.js ] && for flag in --all --against-ps1 --ps-host --json; do
+            echo "FLAG $flag $(grep -c -- "$flag" tools/wkjs/parity.js)"; done
+          true
+      - name: Remove pwsh from PATH (none leg)
+        if: matrix.ps == 'none'
+        run: |
+          np=""; IFS=:; for d in $PATH; do { [ -e "$d/pwsh" ] || [ -e "$d/pwsh.exe" ]; } && continue; np="$np${np:+:}$d"; done; unset IFS
+          # Kept as a bash-side PATH: on Windows GITHUB_ENV wants a Windows-style PATH, so the run step applies it inline.
+          echo "NOPWSH_PATH=$np" >> "$GITHUB_ENV"
+      - name: Break one JS guard in the runner copy (negative proof, dispatch input)
+        if: inputs.break_guard
+        working-directory: kih
+        run: |
+          g=$(node -e '
+            const fs=require("fs"),p=require("path");const r=JSON.parse(fs.readFileSync("tools/wkjs/registry.json","utf8"));
+            const out=[];(function w(v){if(typeof v==="string"&&/\.js$/.test(v))out.push(v);else if(v&&typeof v==="object")Object.values(v).forEach(w)})(r);
+            const f=out.map(x=>[x,p.join("tools/wkjs",x)]).flat().find(x=>fs.existsSync(x));console.log(f||"")')
+          [ -n "$g" ] || { echo "no guard file found in registry.json"; exit 1; }
+          # Invert every verdict: any "allow" becomes "deny" and the reverse, so the corpus cannot stay green.
+          node -e 'const fs=require("fs"),f=process.argv[1];let s=fs.readFileSync(f,"utf8");
+            s=s.replace(/(["\x27])(allow|deny|block)\1/g,(m,q,v)=>q+(v==="allow"?"deny":"allow")+q);fs.writeFileSync(f,s)' "$g"
+          echo "BROKEN $(basename "$g")"
+      - name: Parity run
+        working-directory: kih
+        env:
+          WKJS_PS_HOST: ${{ matrix.ps }}
+        run: |
+          set +e
+          out_f="$RUNNER_TEMP/parity-${{ runner.os }}-${{ matrix.ps }}.txt"
+          if [ "${{ matrix.ps }}" = none ]; then
+            export PATH="$NOPWSH_PATH"
+            echo "pwsh on PATH: $(command -v pwsh || echo none)"
+            out=$(node tools/wkjs/parity.js --all 2>&1); rc=$?
+          else
+            out=$(node tools/wkjs/parity.js --all --against-ps1 --ps-host "${{ matrix.ps }}" 2>&1); rc=$?
+          fi
+          printf '%s\n' "$out" | grep -E '^(RESULT|MISMATCH|FAIL)' > "$out_f"
+          cat "$out_f"
+          { echo "### wkjs parity ${{ runner.os }} / ${{ matrix.ps }} (rc=$rc)"; echo '```'; cat "$out_f"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          [ -s "$out_f" ] || { echo "no RESULT lines"; printf '%s\n' "$out" | grep -E 'rror|nknown|sage' | head -10; exit 1; }
+          grep -qE '^(MISMATCH|FAIL)' "$out_f" && rc=1
+          exit $rc
+      - name: Upload RESULT table
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wkjs-parity-${{ runner.os }}-${{ matrix.ps }}
+          path: ${{ runner.temp }}/parity-*.txt
+          if-no-files-found: ignore
