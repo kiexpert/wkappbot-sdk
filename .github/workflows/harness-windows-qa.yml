@@ -1,5 +1,5 @@
 name: Harness QA (Windows + macOS)
-# rerun: full matrix on kih main 0b016c1 (classifier-denial USERPROFILE fix)
+# rerun: full matrix on kih main 104ed54 (stop guards flipped to js)
 
 # Runs the harness repo's own self-tests on Windows and macOS runners, so a harness change made on a
 # Linux cloud VM is proven on the owner's two desktop platforms too. On macOS the Bash self-tests run a
