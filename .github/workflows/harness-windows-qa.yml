@@ -1,4 +1,5 @@
 name: Harness QA (Windows + macOS)
+# rerun: kih main (ca667cd+) with driver case blocks
 
 # Runs the harness repo's own self-tests on Windows and macOS runners, so a harness change made on a
 # Linux cloud VM is proven on the owner's two desktop platforms too. On macOS the Bash self-tests run a
@@ -517,6 +518,9 @@ jobs:
             printf '%s\n' "$out" | grep -E '^(PASS|FAIL|SKIP|CASE|RESULT)' | head -80
             r=$(printf '%s\n' "$out" | grep '^RESULT' | tail -1); set -- $r
             [ "$rc" = 0 ] && [ -n "$r" ] && [ "${2%%/*}" = "${2##*/}" ] || { fail=1; echo "-- last lines:"; printf '%s\n' "$out" | grep -v 'DROP ' | tail -20; }
+            # Driver case blocks ("--- case <name>" + up to 8 lines: MOCK-DONE / guard refusal text) for diagnosis.
+            # They hold only e2e scratch paths; raw DROP lines stay filtered.
+            printf '%s\n' "$out" | grep -v 'DROP ' | awk '/^--- case /{n=9} n>0{print "CASEBLK " $0; n--}' | head -120
             # Bake drop report. Dropped names can be private, so each name except the lite harness prints only as an
             # 8-hex sha256 of the name; kih can match it against its own file list.
             printf '%s\n' "$out" | grep -E 'DROP|MISSING' | while IFS= read -r l; do
