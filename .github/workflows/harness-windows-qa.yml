@@ -447,3 +447,14 @@ jobs:
             [ -n "$r" ] && [ "${2%%/*}" = "${2##*/}" ] || fail=1
           done
           exit $fail
+
+      - name: 8. wkappbot-code selftest (synthetic; real-hook cases b1/c1/f2 skipped)
+        shell: bash
+        working-directory: kih
+        run: |
+          # Needs node, npm and python3 (aliased above). Drives the OpenCode plugin the way OpenCode does, plus the
+          # installer, doctor, update and config parts with every network part mocked.
+          out=$(bash wkappbot-code/selftest.sh --synthetic-only 2>&1); rc=$?
+          printf '%s\n' "$out" | grep -E '^FAIL|^RESULT'
+          r=$(printf '%s\n' "$out" | grep '^RESULT' | tail -1); set -- $r
+          [ "$rc" = 0 ] && [ -n "$r" ] && [ "${2%%/*}" = "${2##*/}" ] || { printf '%s\n' "$out" | tail -25; exit 1; }
