@@ -5,7 +5,9 @@ name: wkappbot-code-os-qa
 #   npm i -g wkappbot-code -> wkappbot-code install -> wkappbot-code doctor
 #   -> scripts/qa/wkappbot-code-e2e.mjs: REAL OpenCode + the installed plugin against a scripted mock model.
 # The guards are judged by what they refuse (git commit --no-verify, rm -rf ~) and by what they let change on disk
-# (write, edit). A second Linux job hides PowerShell to prove the bash lite fallback (intent lock) still refuses.
+# (write, edit), by every model request carrying the reflex rules, and by uninstall restoring the pre-install state.
+# The cases mirror the kih driver wkappbot-code/selftest-opencode-e2e.sh. A second Linux job REMOVES PowerShell, so
+# the bash lite harness alone must refuse the same risky set.
 on:
   workflow_dispatch:
   push:
@@ -60,9 +62,18 @@ jobs:
           echo "$H/.local/bin" >> "$GITHUB_PATH"
           git config --global user.email qa@example.invalid; git config --global user.name qa
 
-      - name: Hide PowerShell (lite mode)
+      - name: Remove PowerShell (lite mode, as on a stock Linux box)
         if: matrix.mode == 'lite'
-        run: echo "WK_APPBOT_FORCE_LITE=1" >> "$GITHUB_ENV"
+        run: |
+          while p=$(command -v pwsh); do sudo rm -f "$p" "$(readlink -f "$p")"; done
+          echo "pwsh on PATH: $(command -v pwsh || echo none)"
+
+      - name: A user's own settings, then the pre-install snapshot (uninstall must restore it)
+        run: |
+          set -eu
+          mkdir -p "$HOME/.claude"
+          printf '%s\n' '{"permissions":{"allow":["Bash(ls)"]},"hooks":{"PreToolUse":[{"hooks":[{"type":"command","command":"/usr/local/bin/my-own-linter.sh"}]}]}}' > "$HOME/.claude/settings.json"
+          node scripts/qa/wkappbot-code-e2e.mjs --snapshot "$RUNNER_TEMP/before.txt"
 
       - name: npm i -g wkappbot-code (registry)
         run: |
@@ -98,7 +109,8 @@ jobs:
       - name: Hooks end-to-end in real OpenCode
         run: |
           set -u
-          if [ "${{ matrix.mode }}" = lite ]; then node scripts/qa/wkappbot-code-e2e.mjs --lite; else node scripts/qa/wkappbot-code-e2e.mjs; fi
+          echo "mode ${{ matrix.mode }}, pwsh on PATH: $(command -v pwsh || echo none)"
+          node scripts/qa/wkappbot-code-e2e.mjs --uninstall "$RUNNER_TEMP/before.txt"
 
       - name: Summary
         if: always()
