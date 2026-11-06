@@ -475,7 +475,7 @@ jobs:
       matrix:
         os: [windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
+    timeout-minutes: 50
     defaults:
       run:
         shell: bash
@@ -549,6 +549,14 @@ jobs:
           echo "== GNU-only constructs in the driver (line numbers + token only)"
           grep -noE '(^|[^g])timeout |date \+%N|stat -c|sed -i[^.]|readlink -f|grep -P|mktemp --|xargs -r|head -c -|sort -V|base64 -w' wkappbot-code/selftest-opencode-e2e.sh | head -20
           echo "== tools on this runner: timeout=$(command -v timeout || echo none) gtimeout=$(command -v gtimeout || echo none) base64=$(command -v base64)"
+          # SIGTRAP (rc 133) reproduction in the driver's own PATH: which bash runs min-copy there, and does it trap?
+          echo "== bash on NOPWSH_PATH: $(PATH="$NOPWSH_PATH" command -v bash) $(PATH="$NOPWSH_PATH" bash -c 'echo $BASH_VERSION')"
+          T=$RUNNER_TEMP/mc2; mkdir -p "$T"
+          for i in 1 2 3 4 5 6 7 8; do
+            PATH="$NOPWSH_PATH" GIT_CONFIG_GLOBAL=/dev/null PS4='+L${LINENO}d${#FUNCNAME[@]} ' bash -x tools/wk-harness-min-copy.sh "$PWD" "$T/x$i" tools/wk-harness-min-manifest.txt >/dev/null 2>"$T/tr$i"; rc=$?
+            echo "DRIVERPATH-XTRACE $i rc=$rc lines=$(wc -l < "$T/tr$i" | tr -d ' ')"
+            [ "$rc" = 0 ] || echo "  last frames: $(grep -oE '^\++L[0-9]+d[0-9]+' "$T/tr$i" | tail -25 | tr '\n' ' ')"
+          done
 
   # PS1 -> JS port parity proof (owner order 2026-11-06). A guard flips from shadow to authoritative JS only when its
   # corpus passes 100% here against the real ps1 on BOTH desktop platforms. ps1 runs under pwsh, and on Windows also
