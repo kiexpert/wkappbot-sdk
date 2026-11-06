@@ -608,7 +608,12 @@ jobs:
           cat "$out_f"
           { echo "### wkjs parity ${{ runner.os }} / ${{ matrix.ps }} (rc=$rc)"; echo '```'; cat "$out_f"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
           [ -s "$out_f" ] || { echo "no RESULT lines"; printf '%s\n' "$out" | grep -E 'rror|nknown|sage' | head -10; exit 1; }
-          grep -qE '^(MISMATCH|FAIL|PSHOST)' "$out_f" && [ "$rc" = 0 ] && rc=1
+          grep -qE '^(MISMATCH|FAIL|PSHOST|SKIP)' "$out_f" && [ "$rc" = 0 ] && rc=1
+          # Every registered guard must print its own RESULT line, so none can drop out of the proof unseen.
+          want=$(node -e 'const r=require("./tools/wkjs/registry.json");let n=0;for(const v of Object.values(r.events||{}))if(Array.isArray(v))n+=v.length;console.log(n)' 2>/dev/null || echo "?")
+          got=$(grep -E '^RESULT ' "$out_f" | grep -vc '^RESULT ALL ' || true)
+          echo "GUARDS registered=$want reported=$got" | tee -a "$out_f"
+          [ "$want" = "$got" ] || { echo "GUARD COUNT MISMATCH"; [ "$rc" = 0 ] && rc=1; }
           exit $rc
       - name: Upload RESULT table
         if: always()
