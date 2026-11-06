@@ -511,8 +511,13 @@ jobs:
           # macOS: /bin/bash is the stock 3.2 a Mac starts hooks with; Windows: Git Bash.
           shells="bash"; [ "$RUNNER_OS" = macOS ] && shells="/bin/bash"
           fail=0
+          # Every driver line printed here goes through mask: a repo-relative path (no leading /, holds a /) or a
+          # bare .ps1/.psm1 name can be a private kih file, so it prints only as an 8-hex sha256 of the name.
+          # The lite harness and the e2e driver itself stay readable; absolute scratch paths are not repo names.
+          mask() { perl -MDigest::SHA=sha256_hex -pe 's{(?<![\w/.~:-])((?:[\w.-]+/)+[\w.-]+|[\w.-]+\.psm?1)\b}{my $n=$1; ($n=~m{(^|/)wkharness-lite\.sh$|^wkappbot-code/selftest[\w.-]*\.sh$}) ? $n : "<name sha256:".substr(sha256_hex($n),0,8).">"}ge'; }
           for sh in $shells; do
             out=$(PATH="$NOPWSH_PATH" $sh wkappbot-code/selftest-opencode-e2e.sh nopwsh 2>&1); rc=$?
+            out=$(printf '%s\n' "$out" | mask)
             echo "== $sh ($($sh -c 'echo $BASH_VERSION')) rc=$rc"
             printf '%s\n' "$out" | grep -E '^(PASS|FAIL|SKIP|CASE|RESULT)' | head -80
             r=$(printf '%s\n' "$out" | grep '^RESULT' | tail -1); set -- $r
@@ -520,13 +525,8 @@ jobs:
             # Driver case blocks ("--- case <name>" + up to 8 lines: MOCK-DONE / guard refusal text) for diagnosis.
             # They hold only e2e scratch paths; raw DROP lines stay filtered.
             printf '%s\n' "$out" | grep -v 'DROP ' | awk '/^--- case /{n=9} n>0{print "CASEBLK " $0; n--}' | head -120
-            # Bake drop report. Dropped names can be private, so each name except the lite harness prints only as an
-            # 8-hex sha256 of the name; kih can match it against its own file list.
-            printf '%s\n' "$out" | grep -E 'DROP|MISSING' | while IFS= read -r l; do
-              n=$(printf '%s\n' "$l" | grep -oE '[^ ]+$')
-              case "$n" in *wkharness-lite.sh) echo "BAKE $l";;
-                *) h=$(printf %s "$n" | { sha256sum 2>/dev/null || shasum -a 256; } | cut -c1-8); echo "BAKE $(printf '%s\n' "$l" | sed -E 's/[^ ]+$//')<name sha256:$h>";; esac
-            done
+            # Bake drop report; names are already masked above.
+            printf '%s\n' "$out" | grep -E 'DROP|MISSING' | sed 's/^/BAKE /'
           done
           exit $fail
 
