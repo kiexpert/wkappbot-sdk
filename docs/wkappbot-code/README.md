@@ -101,6 +101,15 @@ wkappbot-code --version
 
 **Pick a model:** `opencode run -m provider/model "prompt"` for one headless turn, or `/models` inside the TUI. Keys stay in your environment; nothing is stored in git.
 
+### Known issues in 0.3.0 (measured end-to-end with OpenCode 1.19.5, 2026-11-06)
+
+- **The reflex plugin does not load in OpenCode 0.3.0:** OpenCode logs `failed to load plugin ... error="Plugin export is not a function"`, because the plugin file also exports helper constants. Tool calls then run **unguarded**. Fix in the next release: the plugin file exports only the plugin.
+- With that fixed, the three wired arms fire on every call: **pre** (`tool.execute.before`), **post** (`tool.execute.after`) and **stop-archive** (`session.idle`). Dangerous shell calls are refused (`git commit --no-verify`, `rm -rf ~`), and `read` passes. But `write` and `edit` of an ordinary project file are refused by a harness error (a script missing from the web harness bundle), so the agent cannot write files until the bundle is fixed.
+- **Not wired yet:** the prompt arm (UserPromptSubmit, which drives the intent lock) and the session-start arm have no OpenCode mapping.
+- Each hook arm takes about 2–5 s with the full PowerShell harness.
+
+Until a fixed release ships, treat the guards in OpenCode as **not active**.
+
 ## (e) What gets installed
 
 | Part | What | Verified by |
