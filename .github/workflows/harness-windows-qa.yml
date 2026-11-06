@@ -622,3 +622,35 @@ jobs:
           name: wkjs-parity-${{ runner.os }}-${{ matrix.ps }}
           path: ${{ runner.temp }}/parity-*.txt
           if-no-files-found: ignore
+
+  # DIAGNOSTIC BRANCH ONLY: reproduce the intermittent bash 3.2 SIGTRAP (rc 133) in kih tools/wk-harness-min-copy.sh.
+  # Prints only rc, line numbers and function depth from the xtrace prefix -- never expanded values or file names.
+  macos-bash32-sigtrap:
+    runs-on: macos-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout harness repo
+        uses: actions/checkout@v5
+        with:
+          repository: ${{ github.repository_owner }}/wkappbot-kih
+          ref: ${{ inputs.harness_ref || 'main' }}
+          token: ${{ secrets.WKAPPBOT_CORE_PAT }}
+          path: kih
+      - name: min-copy under stock /bin/bash, 12 tries (6 plain, 6 xtrace)
+        working-directory: kih
+        shell: bash
+        run: |
+          set +e
+          echo "HARNESS $(git log -1 --format=%h) BASH $(/bin/bash -c 'echo $BASH_VERSION') stack=$(ulimit -s)"
+          T=$RUNNER_TEMP/mc; mkdir -p $T
+          for i in 1 2 3 4 5 6; do
+            GIT_CONFIG_GLOBAL=/dev/null /bin/bash tools/wk-harness-min-copy.sh "$PWD" "$T/p$i" tools/wk-harness-min-manifest.txt >/dev/null 2>&1; echo "PLAIN $i rc=$?"
+          done
+          for i in 1 2 3 4 5 6; do
+            GIT_CONFIG_GLOBAL=/dev/null PS4='+L${LINENO}d${#FUNCNAME[@]} ' /bin/bash -x tools/wk-harness-min-copy.sh "$PWD" "$T/x$i" tools/wk-harness-min-manifest.txt >/dev/null 2>"$T/tr$i"; rc=$?
+            maxd=$(grep -oE '^\++L[0-9]+d[0-9]+' "$T/tr$i" | sed -E 's/.*d//' | sort -n | tail -1)
+            echo "XTRACE $i rc=$rc lines=$(wc -l < "$T/tr$i" | tr -d ' ') max-func-depth=$maxd"
+            if [ "$rc" != 0 ]; then echo "  last frames: $(grep -oE '^\++L[0-9]+d[0-9]+' "$T/tr$i" | tail -25 | tr '\n' ' ')"; fi
+          done
+          echo "RECURSION: dot_closure calls itself? $(grep -cE 'dot_closure' tools/wk-harness-min-copy.sh) mentions"
+          true
