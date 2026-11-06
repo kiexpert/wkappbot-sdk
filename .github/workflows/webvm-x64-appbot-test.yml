@@ -1,0 +1,129 @@
+name: webvm-x64-appbot-test
+
+# Live AppBot Code test against the published x64 WebVM page (owner 2026-11-06). Runs the target repo's
+# webvm/selftest/x64-appbot-test.js in headless Chromium against the page that webvm-x64.yml publishes, with
+# --install webvm/x64-build/wk-ai.sh so the a3 cases run ("!ls /" refused by [intent-lock] before the skill
+# search, allowed after it). The script has no timeout of its own around page.evaluate, so a --require preload
+# races every page.evaluate against a 1.5 s timer (a stalled wasm VM then yields null to the 100 ms poll loop
+# instead of hanging the run). The target repo is found by sha256 prefix and never named; its name, the page URL
+# and every token are masked. Only the script's own case lines and RESULT line are printed.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '27 20 * * *'
+  push:
+    branches-ignore: [main]
+    paths:
+      - .github/workflows/webvm-x64-appbot-test.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: webvm-x64-appbot-test
+  cancel-in-progress: false
+
+jobs:
+  appbot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      TARGET_HASH: 23ade98d428c8527
+      T1: ${{ secrets.GH_LICENSE_TOKEN }}
+      T2: ${{ secrets.WKAPPBOT_PAT }}
+      T3: ${{ secrets.WKAPPBOT_CORE_PAT }}
+    steps:
+      - name: Find the target repo and a token that can reach it
+        run: |
+          set -u
+          for t in "$T1" "$T2" "$T3"; do
+            [ -n "$t" ] && [ "$t" != "SET-ME" ] || continue
+            echo "::add-mask::$t"
+            names=$(GH_TOKEN="$t" gh repo list kiexpert --visibility private --limit 300 --json nameWithOwner -q '.[].nameWithOwner' 2>/dev/null || true)
+            for n in $names; do
+              if [ "$(printf %s "$n" | sha256sum | cut -c1-16)" = "$TARGET_HASH" ]; then
+                echo "::add-mask::$n"; echo "::add-mask::${n#*/}"
+                page="https://${n%%/*}.github.io/${n#*/}/webvm/x64/"
+                echo "::add-mask::$page"
+                { echo "REPO=$n"; echo "TOK=$t"; echo "PAGE_URL=$page"; } >> "$GITHUB_ENV"
+                echo "target found"; exit 0
+              fi
+            done
+          done
+          echo "no token reaches the target repo"; exit 1
+      - name: Fetch the selftest and wk-ai.sh, and record what is published
+        run: |
+          set -eu
+          git clone -q --depth 1 --filter=blob:none --sparse "https://x-access-token:${TOK}@github.com/${REPO}.git" src
+          git -C src sparse-checkout set webvm/selftest webvm/x64-build
+          test -f src/webvm/selftest/x64-appbot-test.js
+          test -f src/webvm/x64-build/wk-ai.sh
+          echo "target main $(git -C src rev-parse --short=12 HEAD); wk-ai.sh sha256 $(sha256sum src/webvm/x64-build/wk-ai.sh | cut -c1-16)"
+          pages=$(git ls-remote "https://x-access-token:${TOK}@github.com/${REPO}.git" refs/heads/gh-pages | cut -c1-40)
+          img=$(curl -fsSL "${PAGE_URL}manifest.json?t=$(date +%s)" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("imageHash",""))')
+          page_sha=$(curl -fsSL "${PAGE_URL}index.html?t=$(date +%s)" | sha256sum | cut -c1-16)
+          echo "published: gh-pages commit $pages, imageHash $img, index.html sha256 $page_sha"
+          { echo "PAGES_SHA=$pages"; echo "IMAGE_HASH=$img"; } >> "$GITHUB_ENV"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install Playwright and Chromium
+        run: |
+          npm i -g -s playwright@1.48.2 >/dev/null
+          npx -y playwright@1.48.2 install --with-deps chromium >/dev/null
+      - name: Write the 1.5 s page.evaluate race guard
+        run: |
+          cat > "$RUNNER_TEMP/evaluate-guard.cjs" <<'EOF'
+          // Races every page.evaluate against a 1.5 s timer; on timeout it resolves null (the selftest polls every
+          // 100 ms, so a null sample is just a missed poll). Counts timeouts and prints them at exit.
+          const Module = require('module');
+          const origRequire = Module.prototype.require;
+          let timeouts = 0, patched = false;
+          function guardPage(page) {
+            if (!page || page.__wkGuard) return page;
+            const orig = page.evaluate.bind(page);
+            page.evaluate = (...a) => {
+              let t;
+              const timer = new Promise((r) => { t = setTimeout(() => { timeouts++; r(null); }, 1500); });
+              return Promise.race([orig(...a).finally(() => clearTimeout(t)), timer]);
+            };
+            page.__wkGuard = true;
+            return page;
+          }
+          function wrapNewPage(owner) {
+            const orig = owner.newPage.bind(owner);
+            owner.newPage = async (...a) => guardPage(await orig(...a));
+          }
+          function wrapBrowser(b) {
+            wrapNewPage(b);
+            const nc = b.newContext.bind(b);
+            b.newContext = async (...a) => { const c = await nc(...a); wrapNewPage(c); c.on('page', guardPage); return c; };
+            return b;
+          }
+          Module.prototype.require = function (id) {
+            const m = origRequire.apply(this, arguments);
+            if (!patched && (id === 'playwright' || id === 'playwright-core') && m && m.chromium) {
+              patched = true;
+              const launch = m.chromium.launch.bind(m.chromium);
+              m.chromium.launch = async (...a) => wrapBrowser(await launch(...a));
+              const lpc = m.chromium.launchPersistentContext.bind(m.chromium);
+              m.chromium.launchPersistentContext = async (...a) => { const c = await lpc(...a); wrapNewPage(c); c.on('page', guardPage); c.pages().forEach(guardPage); return c; };
+            }
+            return m;
+          };
+          process.on('exit', () => console.log(`GUARD page.evaluate 1.5s race: ${patched ? 'active' : 'NOT ACTIVE'}, timeouts=${timeouts}`));
+          EOF
+      - name: Run x64-appbot-test.js against the published page
+        working-directory: src/webvm/selftest
+        run: |
+          set -o pipefail
+          export NODE_PATH="$(npm root -g)"
+          NODE_OPTIONS="--require $RUNNER_TEMP/evaluate-guard.cjs" \
+            node x64-appbot-test.js "$PAGE_URL" --install "$GITHUB_WORKSPACE/src/webvm/x64-build/wk-ai.sh" 2>&1 | tee "$RUNNER_TEMP/out.txt"
+          rc=${PIPESTATUS[0]}
+          {
+            echo "### webvm-x64 AppBot Code live test"
+            echo "gh-pages commit \`$PAGES_SHA\`, imageHash \`$IMAGE_HASH\`"
+            echo '```'; grep -E '^(PASS|FAIL|SKIP|RESULT|GUARD) ' "$RUNNER_TEMP/out.txt" || true; echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit $rc
