@@ -1,4 +1,5 @@
 name: Harness QA (Windows + macOS)
+# rerun: kih main be02421 (registry filled) + 97210716 (e2e driver verdict)
 
 # Runs the harness repo's own self-tests on Windows and macOS runners, so a harness change made on a
 # Linux cloud VM is proven on the owner's two desktop platforms too. On macOS the Bash self-tests run a
