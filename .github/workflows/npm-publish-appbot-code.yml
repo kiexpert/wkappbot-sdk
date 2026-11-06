@@ -15,9 +15,10 @@ on:
     branches: [main]
     paths:
       - .github/workflows/npm-publish-appbot-code.yml
-  # Daily pick-up of a new appbot-code version on the target main (an unchanged tgz makes no Pages commit).
+  # Hourly pick-up of a new appbot-code version on the target main (public repo, Linux runner: no minutes billed;
+  # an unchanged tgz makes no Pages commit). The automation cannot dispatch or re-run (403), so the schedule is the road.
   schedule:
-    - cron: '23 3 * * *'
+    - cron: '23 * * * *'
 
 permissions:
   contents: read
