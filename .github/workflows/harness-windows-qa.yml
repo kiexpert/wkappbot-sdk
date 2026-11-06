@@ -458,3 +458,4 @@ jobs:
           printf '%s\n' "$out" | grep -E '^FAIL|^RESULT'
           r=$(printf '%s\n' "$out" | grep '^RESULT' | tail -1); set -- $r
           [ "$rc" = 0 ] && [ -n "$r" ] && [ "${2%%/*}" = "${2##*/}" ] || { printf '%s\n' "$out" | tail -25; exit 1; }
+# qa trigger: wkappbot-code 0.3.2 selftest step 8 (2026-11-06)
