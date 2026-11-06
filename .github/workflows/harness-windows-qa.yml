@@ -461,3 +461,4 @@ jobs:
           [ "$rc" = 0 ] && [ -n "$r" ] && [ "${2%%/*}" = "${2##*/}" ] || { printf '%s\n' "$out" | tail -25; exit 1; }
 # qa trigger: wkappbot-code 0.3.2 selftest step 8 (2026-11-06)
 # rerun 2026-11-06T10:16:09Z
+# rerun 2026-11-06T10:31:55Z (kih 7cc5366)
