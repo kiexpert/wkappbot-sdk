@@ -1,0 +1,105 @@
+name: Release portable assets
+
+# Attaches the portable core binaries to an SDK release so `wk-appbot-code install` can fetch
+#   releases/latest/download/wkappbot-<platform>   (wkappbot-linux-x64, wkappbot-osx-arm64, wkappbot-osx-x64)
+# and verify them against releases/latest/download/SHA256SUMS ("<sha256>  <name>", exactly those three names).
+# The binaries come from the private core's portable release (its wkappbot-portable-release.yml builds these three
+# assets plus SHA256SUMS on a v* tag); each one is checked against the core's own SHA256SUMS before upload.
+# The core repo is read with WKAPPBOT_CORE_PAT from the repo named by WKAPPBOT_CORE_REPO (both masked); no core
+# source is involved, only its released binaries, as with wkappbot-core.exe in release.yml. Linux runner only.
+# Triggers: called by release.yml for each new tag, manual dispatch, and a push to a non-main branch that edits
+# this file (attaches to the current latest release; dispatch is not available to the automation).
+on:
+  workflow_call:
+    inputs:
+      tag:
+        description: 'SDK release tag to attach the assets to'
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'SDK release tag (empty = the latest release)'
+        required: false
+  push:
+    branches-ignore: [main]
+    paths:
+      - .github/workflows/release-portable-assets.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-portable-assets
+  cancel-in-progress: false
+
+jobs:
+  attach:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CORE_REPO: ${{ secrets.WKAPPBOT_CORE_REPO }}
+      CORE_PAT: ${{ secrets.WKAPPBOT_CORE_PAT }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      NAMES: wkappbot-linux-x64 wkappbot-osx-arm64 wkappbot-osx-x64
+    steps:
+      - name: Resolve the SDK release
+        env:
+          IN_TAG: ${{ inputs.tag }}
+        run: |
+          set -eu
+          tag="${IN_TAG:-}"
+          [ -n "$tag" ] || tag=$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName -q .tagName)
+          gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json tagName,isDraft,isPrerelease -q '"SDK release \(.tagName) draft=\(.isDraft) prerelease=\(.isPrerelease)"'
+          echo "SDK_TAG=$tag" >> "$GITHUB_ENV"
+      - name: Fetch the portable binaries from the core release and verify them
+        run: |
+          set -eu
+          if [ -z "$CORE_REPO" ] || [ -z "$CORE_PAT" ] || [ "$CORE_PAT" = "SET-ME" ]; then
+            echo "WKAPPBOT_CORE_REPO / WKAPPBOT_CORE_PAT are not set"; exit 1
+          fi
+          echo "::add-mask::$CORE_PAT"; echo "::add-mask::$CORE_REPO"; echo "::add-mask::${CORE_REPO#*/}"
+          # newest core release that carries all three portable assets and SHA256SUMS
+          core_tag=""
+          for t in $(GH_TOKEN="$CORE_PAT" gh release list --repo "$CORE_REPO" --limit 40 --json tagName -q '.[].tagName'); do
+            have=$(GH_TOKEN="$CORE_PAT" gh release view "$t" --repo "$CORE_REPO" --json assets -q '.assets[].name')
+            ok=1; for n in $NAMES SHA256SUMS; do printf '%s\n' "$have" | grep -qx "$n" || ok=0; done
+            if [ "$ok" = 1 ]; then core_tag=$t; break; fi
+          done
+          [ -n "$core_tag" ] || { echo "no core release carries $NAMES + SHA256SUMS"; exit 1; }
+          echo "core portable release: $core_tag"
+          mkdir -p dist core-sums
+          GH_TOKEN="$CORE_PAT" gh release download "$core_tag" --repo "$CORE_REPO" -D core-sums -p SHA256SUMS
+          for n in $NAMES; do GH_TOKEN="$CORE_PAT" gh release download "$core_tag" --repo "$CORE_REPO" -D dist -p "$n"; done
+          # each binary must match the core's own checksum line for that name
+          for n in $NAMES; do
+            want=$(awk -v n="$n" '{f=$2; sub(/^\*/,"",f)} f==n {print $1}' core-sums/SHA256SUMS)
+            got=$(sha256sum "dist/$n" | cut -d' ' -f1)
+            [ -n "$want" ] && [ "$want" = "$got" ] || { echo "checksum mismatch for $n"; exit 1; }
+            echo "verified $n $got"
+          done
+          (cd dist && sha256sum $NAMES > SHA256SUMS && cat SHA256SUMS)
+          echo "CORE_TAG=$core_tag" >> "$GITHUB_ENV"
+      - name: Attach to the SDK release
+        run: |
+          set -eu
+          gh release upload "$SDK_TAG" --repo "$GITHUB_REPOSITORY" --clobber dist/wkappbot-linux-x64 dist/wkappbot-osx-arm64 dist/wkappbot-osx-x64 dist/SHA256SUMS
+          echo "attached to $SDK_TAG (from core $CORE_TAG)"
+      - name: Prove the public download path
+        run: |
+          set -eu
+          base="https://github.com/${GITHUB_REPOSITORY}/releases/download/${SDK_TAG}"
+          mkdir -p proof && cd proof
+          for i in 1 2 3 4 5 6; do curl -fsSL -o SHA256SUMS "$base/SHA256SUMS" && break; sleep 5; done
+          curl -fsSL -o wkappbot-linux-x64 "$base/wkappbot-linux-x64"
+          echo "--- $base/SHA256SUMS"; cat SHA256SUMS
+          grep ' wkappbot-linux-x64$' SHA256SUMS | sha256sum -c -
+          latest=$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName -q .tagName)
+          if [ "$latest" = "$SDK_TAG" ]; then
+            curl -fsSL -o latest-sums "https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/SHA256SUMS"
+            cmp latest-sums SHA256SUMS && echo "releases/latest/download/SHA256SUMS serves the same file"
+          fi
+          {
+            echo "### Portable assets on $SDK_TAG"
+            echo '```'; cat SHA256SUMS; echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
