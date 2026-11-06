@@ -11,6 +11,8 @@ name: npm-publish-wkappbot-code
 #     npm i -g https://<pages>/wkappbot-code/wkappbot-code.tgz   (a versioned copy, SHA256SUMS and version.json beside it)
 #   OLD URL, KEPT ON PURPOSE: the same bytes are also written to appbot-code/wk-appbot-code.tgz (+ version.json,
 #     SHA256SUMS), because that install command was already handed out. Do not remove it.
+#   QA: every completed run here triggers wkappbot-code-os-qa.yml (Linux full + lite, macOS, Windows) on the registry
+#     package, so each release is installed and hook-tested on every OS from a fresh HOME.
 #   REGISTRY: npm i -g wkappbot-code, published with provenance only when the NPM_TOKEN secret is set and the
 #     package is named wkappbot-code; a version already on the registry is skipped; a dry-run checks every run.
 on:

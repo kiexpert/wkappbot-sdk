@@ -1,0 +1,101 @@
+name: wkappbot-code-os-qa
+
+# All-OS install + hook QA of the published wkappbot-code package (owner 2026-11-06: "QA every OS from the SDK").
+# Each OS starts from a fresh HOME and the npm registry, exactly as a new user would:
+#   npm i -g wkappbot-code -> wkappbot-code install -> wkappbot-code doctor
+#   -> scripts/qa/wkappbot-code-e2e.mjs: REAL OpenCode + the installed plugin against a scripted mock model.
+# The guards are judged by what they refuse (git commit --no-verify, rm -rf ~) and by what they let change on disk
+# (write, edit). A second Linux job hides PowerShell to prove the bash lite fallback (intent lock) still refuses.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/wkappbot-code-os-qa.yml
+      - scripts/qa/wkappbot-code-e2e.mjs
+  # Re-run after every publish of the package, and daily, so a registry release is QA'd on every OS.
+  workflow_run:
+    workflows: [npm-publish-wkappbot-code]
+    types: [completed]
+  schedule:
+    - cron: '41 5 * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wkappbot-code-os-qa
+  cancel-in-progress: false
+
+jobs:
+  qa:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest, mode: full }
+          - { os: ubuntu-latest, mode: lite }
+          - { os: macos-latest, mode: full }
+          - { os: windows-latest, mode: full }
+    runs-on: ${{ matrix.os }}
+    name: ${{ matrix.os }} (${{ matrix.mode }})
+    timeout-minutes: 40
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: scripts/qa
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Fresh HOME and npm prefix
+        run: |
+          set -eu
+          H="$RUNNER_TEMP/home"; P="$RUNNER_TEMP/prefix"; mkdir -p "$H" "$P"
+          { echo "HOME=$H"; echo "USERPROFILE=$H"; echo "XDG_CONFIG_HOME=$H/.config"; echo "npm_config_prefix=$P"; } >> "$GITHUB_ENV"
+          if [ "$RUNNER_OS" = Windows ]; then echo "$P" >> "$GITHUB_PATH"; else echo "$P/bin" >> "$GITHUB_PATH"; fi
+          echo "$H/.local/bin" >> "$GITHUB_PATH"
+          git config --global user.email qa@example.invalid; git config --global user.name qa
+
+      - name: Hide PowerShell (lite mode)
+        if: matrix.mode == 'lite'
+        run: echo "WK_APPBOT_FORCE_LITE=1" >> "$GITHUB_ENV"
+
+      - name: npm i -g wkappbot-code (registry)
+        run: |
+          set -eu
+          npm i -g wkappbot-code
+          wkappbot-code --version
+          npm view wkappbot-code version
+
+      - name: wkappbot-code install
+        run: |
+          set -u
+          # win-x64 has no single core asset yet (the SDK installer ships it), so Windows installs without the core.
+          EXTRA=""; [ "$RUNNER_OS" = Windows ] && EXTRA="--no-bin"
+          wkappbot-code install $EXTRA 2>&1 | tee "$RUNNER_TEMP/install.log"; rc=${PIPESTATUS[0]}
+          echo "install rc=$rc"; exit $rc
+
+      - name: wkappbot-code doctor
+        run: |
+          set -u
+          wkappbot-code doctor 2>&1 | tee "$RUNNER_TEMP/doctor.log"; rc=${PIPESTATUS[0]}
+          echo "doctor rc=$rc"; exit $rc
+
+      - name: Hooks end-to-end in real OpenCode
+        run: |
+          set -u
+          if [ "${{ matrix.mode }}" = lite ]; then node scripts/qa/wkappbot-code-e2e.mjs --lite; else node scripts/qa/wkappbot-code-e2e.mjs; fi
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### ${{ matrix.os }} (${{ matrix.mode }})"
+            echo '```'
+            grep -E '^(PASS|WARN|FAIL|SKIP) ' "$RUNNER_TEMP/doctor.log" 2>/dev/null || echo "no doctor log"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
