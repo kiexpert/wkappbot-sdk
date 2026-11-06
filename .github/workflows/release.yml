@@ -14,6 +14,8 @@ jobs:
     runs-on: windows-latest
     permissions:
       contents: write
+    outputs:
+      tag: ${{ steps.ver.outputs.tag }}
 
     steps:
     - name: Restrict manual dispatch to admin
@@ -172,3 +174,14 @@ jobs:
         Write-Host "Uploading assets for $tag : $($assets -join ', ')"
         gh release upload $tag @assets --clobber
         Write-Host "Assets uploaded: https://github.com/${{ github.repository }}/releases/tag/$tag"
+
+  # Portable core binaries (linux-x64, osx-arm64, osx-x64) + SHA256SUMS for `wk-appbot-code install`.
+  # A release created with GITHUB_TOKEN triggers no other workflow, so it is called from here.
+  portable-assets:
+    needs: release
+    permissions:
+      contents: write
+    uses: ./.github/workflows/release-portable-assets.yml
+    with:
+      tag: ${{ needs.release.outputs.tag }}
+    secrets: inherit
