@@ -656,3 +656,58 @@ jobs:
           name: wkjs-parity-${{ runner.os }}-${{ matrix.ps }}
           path: ${{ runner.temp }}/parity-*.txt
           if-no-files-found: ignore
+
+  # Per-file selftests of new kih harness tools on each desktop shell (spokesman 2026-11-06 for kih ROOT I).
+  # Prints only RESULT/FAIL lines; a leg fails unless its RESULT reads p/p.
+  kih-tool-selftests:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout harness repo
+        uses: actions/checkout@v5
+        with:
+          repository: ${{ github.repository_owner }}/wkappbot-kih
+          ref: ${{ inputs.harness_ref || 'main' }}
+          token: ${{ secrets.WKAPPBOT_CORE_PAT }}
+          path: kih
+      - name: Selftests per shell
+        working-directory: kih
+        run: |
+          set +e
+          echo "HARNESS $(git log -1 --format='%h %cs')"
+          fail=0
+          leg() {  # leg <label> <command...>
+            label=$1; shift
+            out=$("$@" 2>&1); rc=$?
+            r=$(printf '%s\n' "$out" | grep -E '^RESULT' | tail -1)
+            printf '%s\n' "$out" | grep -E '^(FAIL|RESULT)' | sed "s/^/  [$label] /" | head -20
+            set -- $r
+            if [ "$rc" = 0 ] && [ -n "$r" ] && [ "${2%%/*}" = "${2##*/}" ]; then echo "LEG $label PASS ($r)"
+            else echo "LEG $label FAIL (rc=$rc, ${r:-no RESULT line})"; printf '%s\n' "$out" | grep -v '^RESULT' | tail -8 | sed "s/^/    /"; fail=1; fi
+          }
+          PS1T=tools/Get-WkRootDefaultModel-selftest.ps1
+          SHT=tools/wkharness-lite-createsession-selftest.sh
+          for f in "$PS1T" "$SHT"; do [ -f "$f" ] || { echo "MISSING $f"; fail=1; }; done
+          if [ -f "$PS1T" ]; then
+            leg "pwsh $(pwsh -NoProfile -Command '$PSVersionTable.PSVersion.ToString()')" pwsh -NoProfile -File "$PS1T"
+            if [ "$RUNNER_OS" = Windows ]; then
+              leg "PS5.1 parse" powershell -NoProfile -Command "\$e=\$null; [void][System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path '$PS1T'),[ref]\$null,[ref]\$e); if(\$e){\$e|%{'FAIL parse: '+\$_.Message}; 'RESULT 0/1'; exit 1}; 'RESULT 1/1'"
+              leg "PS5.1 run" powershell -NoProfile -ExecutionPolicy Bypass -File "$PS1T"
+            fi
+          fi
+          if [ -f "$SHT" ]; then
+            if [ "$RUNNER_OS" = macOS ]; then
+              leg "/bin/bash $(/bin/bash -c 'echo $BASH_VERSION')" /bin/bash "$SHT"
+              leg "sh (macOS)" sh "$SHT"
+            else
+              leg "Git Bash sh $(sh -c 'echo $BASH_VERSION')" sh "$SHT"
+            fi
+          fi
+          exit $fail
