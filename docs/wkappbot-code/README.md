@@ -111,11 +111,19 @@ wkappbot-code --version
 | **harness** | the scrubbed web harness to `~/.wk-harness` (only when no local harness checkout is found) | sha256 of the bundle |
 | **skills** | the latest public skills, into the core's `wkappbot.hq/skills` (read-only copy); your own edits go to `~/.wkappbot/private-skills`, a local git repo with no remote | sha256 of the bundle |
 
+**Also changed on your machine** (know these before you install on a shared box):
+
+- your **global git** `core.hooksPath` is pointed at the harness hooks dir (a push-owner gate);
+- `~/.claude/settings.json` gets the harness lite hooks (PreToolUse, SessionStart, Stop, UserPromptSubmit), so Claude Code on this machine is guarded too;
+- about 20 `wk*` helper shims land in your npm global `bin` and `~/.local/bin`.
+
+**Full reflex guards need PowerShell 7 (`pwsh`) on Linux and macOS.** With `pwsh` on PATH, the OpenCode plugin calls the full guard set (for example `git commit --no-verify` and `rm -rf ~` are refused). Without it, the plugin's hook cannot start and **every call is let through** (fail-open); only the bash lite intent lock in Claude Code stays active. Install `pwsh` first (for example `dotnet tool install --global PowerShell --version 7.4.6`, or your OS package), then re-run `wkappbot-code install`.
+
 ## (f) Platform matrix
 
 | | Windows 10/11 x64 | macOS (arm64, x64) | Linux x64 |
 |---|---|---|---|
-| `npm i -g wkappbot-code`, agent + reflex plugin | ✅ | ✅ | ✅ |
+| `npm i -g wkappbot-code`, agent + reflex plugin | ✅ | ✅ (full guards need `pwsh`) | ✅ (full guards need `pwsh`) |
 | core binary via `wkappbot-code install` | use the [SDK installer](../INSTALL.md) | ✅ `osx-arm64` / `osx-x64` | ✅ `linux-x64` |
 | harness + public skills | ✅ | ✅ | ✅ |
 | `wkappbot skill` / `file` / `suggest` | ✅ | ✅ | ✅ |
@@ -133,7 +141,16 @@ rm -rf ~/.local/share/wkappbot ~/.local/bin/wkappbot ~/.wk-harness   # core bina
 rm -rf ~/.wkappbot/private-skills
 ```
 
-Then remove the `wisdom-kernel` entry from the `plugin` list in `~/.config/opencode/opencode.json` (or restore the `opencode.json.bak-<stamp>` that `install` saved).
+Then undo the machine-wide changes, or they keep pointing at deleted files:
+
+```bash
+git config --global --unset core.hooksPath      # or set back the value you had before
+rm -rf ~/.wk-harness-hooks
+# remove the wkharness-lite entries from ~/.claude/settings.json (Claude Code hooks)
+# remove the wk* shims left in "$(npm prefix -g)/bin" and ~/.local/bin
+```
+
+Finally remove the `wisdom-kernel` entry from the `plugin` list in `~/.config/opencode/opencode.json` (or restore the `opencode.json.bak-<stamp>` that `install` saved). A `wkappbot-code uninstall` that does all of this is planned.
 
 ---
 
