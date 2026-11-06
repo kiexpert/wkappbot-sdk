@@ -1,4 +1,5 @@
 name: Harness QA (Windows + macOS)
+# rerun: full matrix on kih main 6a8a207 (4 rows flipped to js, macOS e2e fixes)
 
 # Runs the harness repo's own self-tests on Windows and macOS runners, so a harness change made on a
 # Linux cloud VM is proven on the owner's two desktop platforms too. On macOS the Bash self-tests run a
