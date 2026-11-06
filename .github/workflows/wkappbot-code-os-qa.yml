@@ -132,5 +132,6 @@ jobs:
             echo "### ${{ matrix.os }} (${{ matrix.mode }})"
             echo '```'
             grep -E '^(PASS|WARN|FAIL|SKIP) ' "$RUNNER_TEMP/doctor.log" 2>/dev/null || echo "no doctor log"
+            grep -E 'FAIL|FAILED|rc [1-9]' "$RUNNER_TEMP/install.log" 2>/dev/null | head -8 || true
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
