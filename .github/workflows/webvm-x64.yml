@@ -116,11 +116,16 @@ jobs:
           set -eu
           git clone -q --depth 1 "https://x-access-token:${TOK}@github.com/${REPO}.git" src
           # IMAGE HASH: everything that lands in the image or the bundle -- this workflow file, the target repo's
-          # webvm/x64-build/**, the harness manifest and every file it lists, and the c2w assets rev. The page
+          # webvm/x64-build/**, the scrubbed harness copy exactly as it ships, and the c2w assets rev. The page
           # (webvm/x64/index.html) is not in it, so a page-only change never re-bakes.
+          # The harness part hashes the COPIER OUTPUT, not the manifest list: the copier adds every .ps1 a shipped script
+          # loads (static closure), and a change to one of those must re-bake too (QA 2026-11-06: the bundle lacked the
+          # files Write/Edit load, and a manifest-only hash would never have noticed a fix to them). ~30 s, deterministic.
+          # Road A: the pruned harness copy; the script exits 1 unless the scrub gate prints hits=0.
+          bash src/tools/wk-harness-min-copy.sh "$PWD/src" "$PWD/ctx/harness" src/tools/wk-harness-min-manifest.txt
           IMG_HASH=$( { sha256sum "$GITHUB_WORKSPACE/wf/.github/workflows/webvm-x64.yml" | cut -c1-64; echo "$C2W_ASSETS_REV";
             (cd src && find webvm/x64-build -type f | LC_ALL=C sort | xargs sha256sum);
-            (cd src && grep -v '^#' tools/wk-harness-min-manifest.txt | grep -v '^$' | LC_ALL=C sort -u | while IFS= read -r f; do [ -f "$f" ] && sha256sum "$f"; done; sha256sum tools/wk-harness-min-manifest.txt); } | sha256sum | cut -c1-16)
+            (cd ctx/harness && find . -type f -not -path './.git/*' | LC_ALL=C sort | xargs sha256sum); } | sha256sum | cut -c1-16)
           PUB=$(curl -fsSL "https://${REPO%%/*}.github.io/${REPO#*/}/webvm/x64/manifest.json?t=$(date +%s)" 2>/dev/null | python3 -c 'import json,sys; print(json.load(sys.stdin).get("imageHash",""))' 2>/dev/null || true)
           echo "image hash $IMG_HASH, published ${PUB:-none}"
           echo "IMG_HASH=$IMG_HASH" >> "$GITHUB_ENV"
@@ -130,8 +135,6 @@ jobs:
           git -C c2w-assets checkout -q "$C2W_ASSETS_REV"
           git -C c2w-assets apply --verbose ../src/webvm/x64-build/c2w-webvm.patch
           git -C c2w-assets diff --stat
-          # Road A: the pruned harness copy; the script exits 1 unless the scrub gate prints hits=0.
-          bash src/tools/wk-harness-min-copy.sh "$PWD/src" "$PWD/ctx/harness" src/tools/wk-harness-min-manifest.txt
           du -sh ctx/harness
           cp src/webvm/x64-build/wk-ai.sh ctx/wk-ai
           # Harness web install (owner 2026-11-04): the same scrubbed minimal harness as a tarball for the page.
