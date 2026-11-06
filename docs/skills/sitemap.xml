@@ -15,13 +15,16 @@
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot/grap-alias-system.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot/grap-target.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot/react-spa-automation-fiber-props-click-controlled-input-fill.html</loc></url>
+<url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot/schedule-command-cheatsheet.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot/standard-appbot-window.html</loc></url>
+<url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot/wkappbot-business-plan-draft.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot/wkappbot-taskkill-usage.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot/wkcdp-mon.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot/wkedit-shell-distortion-recovery.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot/wkfind-caller-hwnd-validation-3tier-pattern.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-core/a11y-screenshot-crash-safe-layered-alpha-restore-guard.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-core/elevated-eye-admin-pipe-server.html</loc></url>
+<url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-core/all-sudo-proxy-subprocess-timeout-hasexited-check.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-core/ask-web-chrome-launch-focusless-guard-allowlist.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-core/autoheal-userinput-protection.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-core/cdp-popup-auto-dismiss-strategy.html</loc></url>
@@ -33,6 +36,7 @@
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-core/nvidia-overlay-blackscreen-kill.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-core/safe-bugfix-protocol.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-core/skill-contribute-edit.html</loc></url>
+<url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-core/suggest-safety-defense-system.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-core/suggest-submit-similarity-nudge.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-core/taskkill-compat-shim-a11y-first-kill-routing.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-core/web-ai-ask-infrastructure-pump-cdp-worker-editor-send-paths.html</loc></url>
@@ -76,6 +80,7 @@
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/ask-suggest-priority-batching.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/ask-command-cheatsheet.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/chrome-profile-auth-sync-architecture.html</loc></url>
+<url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/claude-cli-automation-patterns-wkappbot-integration.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/claude-token-optimization.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/claude-kill-guard-hook.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/claude-md-todo-sync.html</loc></url>
@@ -84,6 +89,7 @@
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/codex-default-deny-allow-override-spec.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/diagnostic-commands-cheatsheet.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/file-command-cheatsheet.html</loc></url>
+<url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/foundation-is-roots-charge-not-a-chore.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/gemini-flash-reflection.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/git-commit-conventions.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/gpt-mini-reflection.html</loc></url>
@@ -98,6 +104,7 @@
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/multi-family-harness-coexistence.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/multi-tab-assistant-implementation-checklist.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/multi-tab-assistant-interface-mvp.html</loc></url>
+<url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/orchestrate-sectors-parallel-while-knowledgeifying.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/pace-95-circuit-breaker.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/partial-class-file-splitting-400-line-soft-cap.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/wk-tool-first-use-skill-nudge.html</loc></url>
@@ -105,6 +112,7 @@
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/prompt-send-self-prompting.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/qmd-local-codebase-search-install-index-and-query.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/quantbot-user-input-protection-guard.html</loc></url>
+<url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/slack-bot-self-mention-no-socket.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/stall-guard-wk-exemption.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/suggest-resolve-evidence-conventions.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/web-command-cheatsheet.html</loc></url>
@@ -124,6 +132,7 @@
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot/admin-eye-hot-swap-known-gap-options-for-fix.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot/always-on-ai-automation-daemon-appbot-eye-internals.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot/web-ocr-tesseract-cdp.html</loc></url>
+<url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot/claude-session-handoff.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot/eye-slack-thread-streaming-structure.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot/github-actions-budget-and-pat-recovery.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot/github-pat-fine-grained-permission-edit.html</loc></url>
@@ -136,6 +145,7 @@
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot/skill-coverage-ranking-news.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot/standard-chrome-window.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot/ocr-usage.html</loc></url>
+<url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot/wkappbot-public-launch-checklist.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot/wkfind-quick-process-chain-caller-window-detection-patterns.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot/wksplit-cs-utility.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot/wktest-promote.html</loc></url>
@@ -154,6 +164,7 @@
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-core/ansi-color-output-auto-disable-on-pipe-no-color.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-core/ask-prompt-pump-watchdog-dismiss-resend-recovery.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-core/ask-cdp-uia-focus-steal-coverage-via-sentinel.html</loc></url>
+<url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-core/attic-finance-subsystem-extracted-to-wkappbot-finance.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-core/black-desktop-progman-stuck.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-core/cdp-console-log-stderr-forwarding.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-core/cdp-prompt-pump-focusless-enter.html</loc></url>
@@ -176,6 +187,7 @@
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-core/nfrunlite-reconnect-popup-dismiss.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-core/operator-skill-template.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-core/post-compaction-recovery.html</loc></url>
+<url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-core/wkaq-printwindow-gdi.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-core/project-skill-template.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-core/reddit-flair-modal-add-button-uia-invisible-cdp-trusted-click-fails-only-physical-click-works.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-core/scenariorunner-process-key-no-dup-flag-for-existing-process-adoption.html</loc></url>
@@ -199,6 +211,7 @@
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-core/win-click-postmessage-mfc-nfrunlite.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-core/wkappbot-speak-tts-bugs-harness-95-auto-speak-loop-karaoke-drift.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-core/wkchat-shortcut-geometry-lnk-update.html</loc></url>
+<url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-core/wkchat-auto-startup-registration.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-core/wkchat-conpty-enter-intercept-rename-first-hardlink-live-swap.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-core/wkchat-session-routing-guard.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-core/wkchat-welcome-banner.html</loc></url>
@@ -208,6 +221,7 @@
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-kih/gemini-harness-decoupling-lessons.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-kih/harness-omega-guard.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-sdk/placement-port-pid-filter.html</loc></url>
+<url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-sdk/cross-repo-claude-notify.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-sdk/gmail-support-bot.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-sdk/license-pending-invite-detect-and-guide-user-to-accept.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-sdk/sdk-launcher-emergency-recovery.html</loc></url>
@@ -220,6 +234,8 @@
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-sdk/wkdoctor-sdk-environment-health-check.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-sdk/wksplit-smart-multi-language-dedup-round-trip-spec.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-sdk/wktasklist-tasklist-exe-full-compatibility-and-self-test.html</loc></url>
+<url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-sdk/wktasklist-intelligent-management.html</loc></url>
+<url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-sdk/wt-terminal-a11y-type-read-design.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-sdk/youtube-ad-skipper.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-webbot/cdp-appbot-sleep.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-webbot/cdp-abnormal-tab-remediation.html</loc></url>
@@ -246,6 +262,7 @@
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/wkappbot-workflow-appbot-shared-reflection.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/appbot-telemetry-promotion.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/claude-agent-team-no-code.html</loc></url>
+<url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/business-hours-triage-emergency-first.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/cdp-command-guide.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/a11y-find-cdp-runtime-eval-focus-guard.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/claude-terminal-via-appbot-primary.html</loc></url>
@@ -279,6 +296,7 @@
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/knowledge-op-approval-logic-2-consume-from-front.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/lm-wiki-personal-knowledge-base.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/logcat-command-cheatsheet.html</loc></url>
+<url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/mystery-window-diagnosis.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/native-tool-deny-is-codex-only-and-harness-logic-outranks-claude-md.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/nightly-schedule-guard.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/opus-files-bugs-on-sight.html</loc></url>
@@ -302,6 +320,7 @@
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/suggest-triage-playbook.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/wk-ai-tools-budget.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/wk-ai-tools-recovery.html</loc></url>
+<url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/wk-ai-tools-routing.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/wkappbot-ask-gpt-zombie-process-4-5-gb-memory-leak-detection-and-fix.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/find-tree-grap-pitfalls.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-workflow/wkedit-encoding-hell.html</loc></url>
@@ -329,11 +348,13 @@
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot/session-continuity-persist-command-history-and-agent-state.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot/standard-appbot-window-t1-core.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot/stop-ai-from-clicking-the-wrong-button-6-layer-target-safety-net.html</loc></url>
+<url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot/suggest-forward-acknowledge-and-close-stale-cross-system-forwards.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot/news---sudo-encoding.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot/win-click-dismiss-blocker-auto-dismiss-blocking-popup-dialogs.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot/win-click-coordinate-system-window-relative-vs-abs-screen-coords.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot/wk-cdp-fix-deploy-cdp-fix-deploy-launcher.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot/wkappbot-run-process-launcher-with-integrated-tracking.html</loc></url>
+<url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot/wkappbot-system-total-check.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot/wktest-promote-staging-binary-promotion.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-core/kampala-pattern-reverse-engineer-apps-into-apis-for-automation.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-core/punk-pattern-remote-claude-code-control-via-lightweight-proxy.html</loc></url>
@@ -390,6 +411,7 @@
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-sdk/diagnostics-subcommand-and-setup-ps1-implementation.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-sdk/harness-installer-owns-all-setup.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-sdk/idle-mung-conpty-autoprompt.html</loc></url>
+<url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-sdk/launcher-source-separation-private-core-stripped-from-public-repo.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-sdk/sdk-deployment-session-2026-04-28.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-sdk/sdk-first-run-onboarding-zero-to-first-command.html</loc></url>
 <url><loc>https://kiexpert.github.io/wkappbot-sdk/skills/wkappbot-sdk/sdk-operator-license-management-invite-tier-offboard.html</loc></url>
