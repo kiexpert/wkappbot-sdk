@@ -499,18 +499,23 @@ jobs:
           np=""; IFS=:; for d in $PATH; do { [ -e "$d/pwsh" ] || [ -e "$d/pwsh.exe" ]; } && continue; np="$np${np:+:}$d"; done; unset IFS
           echo "NOPWSH_PATH=$np" >> "$GITHUB_ENV"
           PATH="$np" bash -c 'echo "pwsh on PATH: $(command -v pwsh || echo none)"'
+      - name: Install OpenCode (the driver runs the real CLI)
+        run: |
+          npm i -g opencode-ai > /dev/null 2>&1 || npm i -g opencode-ai
+          echo "opencode $(opencode --version 2>&1 | head -1)"
       - name: selftest-opencode-e2e.sh nopwsh
         working-directory: kih
         run: |
           set +e
-          shells="bash"; [ "$RUNNER_OS" = macOS ] && shells="bash /bin/bash"
+          # macOS: /bin/bash is the stock 3.2 a Mac starts hooks with; Windows: Git Bash.
+          shells="bash"; [ "$RUNNER_OS" = macOS ] && shells="/bin/bash"
           fail=0
           for sh in $shells; do
             out=$(PATH="$NOPWSH_PATH" $sh wkappbot-code/selftest-opencode-e2e.sh nopwsh 2>&1); rc=$?
             echo "== $sh ($($sh -c 'echo $BASH_VERSION')) rc=$rc"
             printf '%s\n' "$out" | grep -E '^(PASS|FAIL|SKIP|CASE|RESULT)' | head -80
             r=$(printf '%s\n' "$out" | grep '^RESULT' | tail -1); set -- $r
-            [ "$rc" = 0 ] && [ -n "$r" ] && [ "${2%%/*}" = "${2##*/}" ] || { fail=1; printf '%s\n' "$out" | grep -E 'rror|not found|No such' | head -15; }
+            [ "$rc" = 0 ] && [ -n "$r" ] && [ "${2%%/*}" = "${2##*/}" ] || { fail=1; echo "-- last lines:"; printf '%s\n' "$out" | tail -20; }
           done
           exit $fail
 
