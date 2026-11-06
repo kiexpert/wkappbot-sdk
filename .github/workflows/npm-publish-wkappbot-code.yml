@@ -11,8 +11,8 @@ name: npm-publish-wkappbot-code
 #     npm i -g https://<pages>/wkappbot-code/wkappbot-code.tgz   (a versioned copy, SHA256SUMS and version.json beside it)
 #   OLD URL, KEPT ON PURPOSE: the same bytes are also written to appbot-code/wk-appbot-code.tgz (+ version.json,
 #     SHA256SUMS), because that install command was already handed out. Do not remove it.
-#   REGISTRY (optional): npm i -g wkappbot-code, published only when the NPM_TOKEN secret is set; a version already
-#     on the registry is skipped.
+#   REGISTRY: npm i -g wkappbot-code, published with provenance only when the NPM_TOKEN secret is set and the
+#     package is named wkappbot-code; a version already on the registry is skipped; a dry-run checks every run.
 on:
   workflow_dispatch:
   push:
@@ -29,6 +29,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write   # npm provenance: the registry links each version to this public workflow run
 
 # Own lock. Sharing harness-pages-relay got run 42156728552 cancelled while pending, because the 10-minute webvm-x64
 # schedule replaces the one pending run a group may hold. A gh-pages push race is handled by the rebase-and-retry
@@ -201,14 +202,25 @@ jobs:
           npm install -g --prefix "$RUNNER_TEMP/old" "$PAGES/appbot-code/wk-appbot-code.tgz"
           "$RUNNER_TEMP/old/bin/$CLI" --help
 
-      - name: Registry publish (optional; skipped without NPM_TOKEN or when the version is already published)
+      # Registry (owner 2026-11-06: "start the npm registry procedure"). The name wkappbot-code was free (404) on
+      # 2026-11-06. The owner's one step: an npm granular access token with publish rights, saved as the Actions
+      # secret NPM_TOKEN of this repo. Until then every run checks the contents with a dry-run and stays green.
+      # What is published is $TGZ: the SAME masked, scanned bytes that went to Pages.
+      - name: Registry dry-run (package contents check, every run)
+        run: |
+          set -eu
+          npm publish "$TGZ" --dry-run --access public
+
+      - name: Registry publish (skipped without NPM_TOKEN, or when this version is already on the registry)
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           set -eu
-          if npm view "$PKG@$VER" version >/dev/null 2>&1; then echo "$PKG@$VER already on the registry: skip"; exit 0; fi
-          if [ -z "$NODE_AUTH_TOKEN" ]; then echo "::notice::NPM_TOKEN not set: registry publish skipped; the web install is live"; exit 0; fi
-          npm publish "$TGZ" --access public
+          # Only the unified name goes to the registry: the old wk-appbot-code package is Pages-only.
+          if [ "$PKG" != "wkappbot-code" ]; then echo "package is still named $PKG (target not renamed yet) -- registry publish skipped (Pages still published)"; exit 0; fi
+          if npm view "$PKG@$VER" version >/dev/null 2>&1; then echo "$PKG@$VER already on the registry -- registry publish skipped (Pages still published)"; exit 0; fi
+          if [ -z "$NODE_AUTH_TOKEN" ]; then echo "NPM_TOKEN not set -- registry publish skipped (Pages still published)"; exit 0; fi
+          npm publish "$TGZ" --access public --provenance
           for i in 1 2 3 4 5 6; do npm view "$PKG@$VER" version && break; sleep 20; done
           npm install -g --prefix "$RUNNER_TEMP/reg" "$PKG@$VER"
           "$RUNNER_TEMP/reg/bin/$CLI" --help
