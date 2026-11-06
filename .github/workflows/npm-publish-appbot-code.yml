@@ -15,6 +15,9 @@ on:
     branches: [main]
     paths:
       - .github/workflows/npm-publish-appbot-code.yml
+      - scripts/public-safety-mask.py
+      - scripts/public-safety-scan.sh
+      - .github/public-safety-markers.txt
   # Hourly pick-up of a new appbot-code version on the target main (public repo, Linux runner: no minutes billed;
   # an unchanged tgz makes no Pages commit). The automation cannot dispatch or re-run (403), so the schedule is the road.
   schedule:
@@ -59,6 +62,9 @@ jobs:
           done
           echo "no token reaches the target repo"; exit 1
 
+      # The SDK checkout carries the public-safety mask, scan and marker list.
+      - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
@@ -93,6 +99,18 @@ jobs:
           find "$RUNNER_TEMP/pkg" -type f | sort
           echo "VER=$(node -p 'require("./package.json").version')" >> "$GITHUB_ENV"
           echo "TGZ=$PWD/$(ls wk-appbot-code-*.tgz)" >> "$GITHUB_ENV"
+
+      # Publish-time mask (owner 2026-11-06: the distributable fixes itself; masking only the sensitive words
+      # with *** is fine). Same rules as the core `skill public-mask`; the gate below must then print HITS 0.
+      - name: Public-safety mask and gate on the packed files
+        run: |
+          set -eu
+          python3 -I scripts/public-safety-mask.py "$RUNNER_TEMP/pkg"
+          bash scripts/public-safety-scan.sh "$RUNNER_TEMP/pkg"
+          # Repack from the masked tree, so what ships is exactly what was scanned.
+          rm -f "$TGZ"
+          (cd "$RUNNER_TEMP/pkg/package" && npm pack -s --pack-destination "$(dirname "$TGZ")")
+          ls -la "$TGZ"
 
       - name: The packed CLI runs before it is shipped
         run: |

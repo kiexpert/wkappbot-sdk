@@ -1,5 +1,6 @@
 # Private words that must never appear in public skills/ (case-insensitive, one per line).
 # "id"/"app" JSON values are exempt (stable identifiers); everything else is scanned.
+hantoo_cache
 hantoo
 kiwoom
 WkAutoQuant

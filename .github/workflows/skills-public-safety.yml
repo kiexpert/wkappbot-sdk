@@ -6,12 +6,14 @@ on:
       - 'skills/**'
       - '.github/public-safety-markers.txt'
       - 'scripts/public-safety-scan.sh'
+      - 'scripts/public-safety-mask.py'
       - '.github/workflows/skills-public-safety.yml'
   pull_request:
     paths:
       - 'skills/**'
       - '.github/public-safety-markers.txt'
       - 'scripts/public-safety-scan.sh'
+      - 'scripts/public-safety-mask.py'
       - '.github/workflows/skills-public-safety.yml'
 
 permissions:
