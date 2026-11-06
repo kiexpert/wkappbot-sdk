@@ -99,6 +99,19 @@ jobs:
           printf '%s' '{"session_id":"diag1","hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"ls /"}}' | bash -x "$L" pre 2>&1 | tail -60
           echo "allow rc=${PIPESTATUS[1]}"
           bash "$L" --verify 2>&1 | tail -5
+          # The same allow call and verify, started the way the installer starts them: node -> sh, Windows env.
+          cat > "$RUNNER_TEMP/diag.cjs" <<'JS'
+          const { spawnSync } = require("child_process"), os = require("os");
+          const sp = (p) => (process.platform === "win32" && /^[A-Za-z]:[\\/]/.test(p) ? "/" + p[0].toLowerCase() + p.slice(2).replace(/\\/g, "/") : p);
+          const L = sp(os.homedir() + "/.wk-harness/tools/wkharness-lite.sh"), env = { ...process.env, HOME: sp(os.homedir()) };
+          console.log("node PATH head: " + String(process.env.PATH).split(require("path").delimiter).slice(0, 8).join(" | "));
+          for (const c of ["awk", "head", "cat", "mkdir", "printf"]) console.log("which " + c + ": " + (spawnSync("sh", ["-c", "command -v " + c], { env, encoding: "utf8" }).stdout || "").trim());
+          const a = spawnSync("sh", ["-x", L, "pre"], { env, encoding: "utf8", input: '{"session_id":"diag2","hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"ls /"}}' });
+          console.log("node->sh allow rc=" + a.status + "\n" + String(a.stderr).split("\n").slice(-25).join("\n"));
+          const v = spawnSync("sh", [L, "--verify"], { env, encoding: "utf8" });
+          console.log("node->sh verify rc=" + v.status + ": " + String(v.stdout + v.stderr).trim().split("\n").slice(-3).join(" / "));
+          JS
+          node "$RUNNER_TEMP/diag.cjs"
 
       - name: wkappbot-code doctor
         run: |
