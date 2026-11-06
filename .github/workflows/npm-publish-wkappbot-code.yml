@@ -131,6 +131,30 @@ jobs:
           npm install -g --prefix "$RUNNER_TEMP/pre" "$TGZ"
           "$RUNNER_TEMP/pre/bin/$CLI" --help
 
+      # Registry (owner 2026-11-06: "start the npm registry procedure"). The name wkappbot-code was free (404) on
+      # 2026-11-06. The owner's one step: an npm granular access token with publish rights, saved as the Actions
+      # secret NPM_TOKEN of this repo. Until then every run checks the contents with a dry-run and stays green.
+      # What is published is $TGZ: the SAME masked, scanned bytes that then go to Pages. The registry steps run
+      # BEFORE the Pages steps on purpose: a slow Pages build (run 42180689182) must never block the npm publish.
+      - name: Registry dry-run (package contents check, every run)
+        run: |
+          set -eu
+          npm publish "$TGZ" --dry-run --access public
+
+      - name: Registry publish (skipped without NPM_TOKEN, or when this version is already on the registry)
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -eu
+          # Only the unified name goes to the registry: the old wk-appbot-code package is Pages-only.
+          if [ "$PKG" != "wkappbot-code" ]; then echo "package is still named $PKG (target not renamed yet) -- registry publish skipped (Pages still published)"; exit 0; fi
+          if npm view "$PKG@$VER" version >/dev/null 2>&1; then echo "$PKG@$VER already on the registry -- registry publish skipped (Pages still published)"; exit 0; fi
+          if [ -z "$NODE_AUTH_TOKEN" ]; then echo "NPM_TOKEN not set -- registry publish skipped (Pages still published)"; exit 0; fi
+          npm publish "$TGZ" --access public --provenance
+          for i in 1 2 3 4 5 6; do npm view "$PKG@$VER" version && break; sleep 20; done
+          npm install -g --prefix "$RUNNER_TEMP/reg" "$PKG@$VER"
+          "$RUNNER_TEMP/reg/bin/$CLI" --help
+
       - name: Ship to the harness Pages web (wkappbot-code/, plus the old appbot-code/ URL)
         run: |
           set -eu
@@ -202,25 +226,3 @@ jobs:
           npm install -g --prefix "$RUNNER_TEMP/old" "$PAGES/appbot-code/wk-appbot-code.tgz"
           "$RUNNER_TEMP/old/bin/$CLI" --help
 
-      # Registry (owner 2026-11-06: "start the npm registry procedure"). The name wkappbot-code was free (404) on
-      # 2026-11-06. The owner's one step: an npm granular access token with publish rights, saved as the Actions
-      # secret NPM_TOKEN of this repo. Until then every run checks the contents with a dry-run and stays green.
-      # What is published is $TGZ: the SAME masked, scanned bytes that went to Pages.
-      - name: Registry dry-run (package contents check, every run)
-        run: |
-          set -eu
-          npm publish "$TGZ" --dry-run --access public
-
-      - name: Registry publish (skipped without NPM_TOKEN, or when this version is already on the registry)
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          set -eu
-          # Only the unified name goes to the registry: the old wk-appbot-code package is Pages-only.
-          if [ "$PKG" != "wkappbot-code" ]; then echo "package is still named $PKG (target not renamed yet) -- registry publish skipped (Pages still published)"; exit 0; fi
-          if npm view "$PKG@$VER" version >/dev/null 2>&1; then echo "$PKG@$VER already on the registry -- registry publish skipped (Pages still published)"; exit 0; fi
-          if [ -z "$NODE_AUTH_TOKEN" ]; then echo "NPM_TOKEN not set -- registry publish skipped (Pages still published)"; exit 0; fi
-          npm publish "$TGZ" --access public --provenance
-          for i in 1 2 3 4 5 6; do npm view "$PKG@$VER" version && break; sleep 20; done
-          npm install -g --prefix "$RUNNER_TEMP/reg" "$PKG@$VER"
-          "$RUNNER_TEMP/reg/bin/$CLI" --help
