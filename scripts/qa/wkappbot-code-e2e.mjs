@@ -81,7 +81,7 @@ fs.writeFileSync(CFG, JSON.stringify(cfg, null, 2));
 
 const git = (...a) => spawnSync("git", a, { cwd: PROJ });
 git("init", "-q"); fs.writeFileSync(path.join(PROJ, "a.txt"), "hi\n"); git("add", "a.txt");
-git("-c", "user.email=qa@example.invalid", "-c", "user.name=qa", "commit", "-qm", "init");
+git("-c", "user.email=qa", "-c", "user.name=qa", "commit", "-qm", "init");
 
 // stdin closed (`opencode run` reads piped stdin and waits for EOF); PWD names the project (OpenCode reads it).
 const env = { ...process.env, PWD: PROJ };
