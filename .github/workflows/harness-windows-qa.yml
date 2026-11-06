@@ -517,6 +517,13 @@ jobs:
             printf '%s\n' "$out" | grep -E '^(PASS|FAIL|SKIP|CASE|RESULT)' | head -80
             r=$(printf '%s\n' "$out" | grep '^RESULT' | tail -1); set -- $r
             [ "$rc" = 0 ] && [ -n "$r" ] && [ "${2%%/*}" = "${2##*/}" ] || { fail=1; echo "-- last lines:"; printf '%s\n' "$out" | tail -20; }
+            # Bake drop report. Dropped names can be private, so each name except the lite harness prints only as an
+            # 8-hex sha256 of the name; kih can match it against its own file list.
+            printf '%s\n' "$out" | grep -E 'DROP|MISSING' | while IFS= read -r l; do
+              n=$(printf '%s\n' "$l" | grep -oE '[^ ]+$')
+              case "$n" in *wkharness-lite.sh) echo "BAKE $l";;
+                *) h=$(printf %s "$n" | { sha256sum 2>/dev/null || shasum -a 256; } | cut -c1-8); echo "BAKE $(printf '%s\n' "$l" | sed -E 's/[^ ]+$//')<name sha256:$h>";; esac
+            done
           done
           exit $fail
 
