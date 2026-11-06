@@ -474,7 +474,7 @@ jobs:
       matrix:
         os: [windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
+    timeout-minutes: 50
     defaults:
       run:
         shell: bash
@@ -517,6 +517,9 @@ jobs:
             printf '%s\n' "$out" | grep -E '^(PASS|FAIL|SKIP|CASE|RESULT)' | head -80
             r=$(printf '%s\n' "$out" | grep '^RESULT' | tail -1); set -- $r
             [ "$rc" = 0 ] && [ -n "$r" ] && [ "${2%%/*}" = "${2##*/}" ] || { fail=1; echo "-- last lines:"; printf '%s\n' "$out" | grep -v 'DROP ' | tail -20; }
+            # Driver case blocks ("--- case <name>" + up to 8 lines: MOCK-DONE / guard refusal text) for diagnosis.
+            # They hold only e2e scratch paths; raw DROP lines stay filtered.
+            printf '%s\n' "$out" | grep -v 'DROP ' | awk '/^--- case /{n=9} n>0{print "CASEBLK " $0; n--}' | head -120
             # Bake drop report. Dropped names can be private, so each name except the lite harness prints only as an
             # 8-hex sha256 of the name; kih can match it against its own file list.
             printf '%s\n' "$out" | grep -E 'DROP|MISSING' | while IFS= read -r l; do
@@ -526,6 +529,37 @@ jobs:
             done
           done
           exit $fail
+
+      - name: macOS c-write/c-edit diagnosis (scratch files only)
+        if: failure() && runner.os == 'macOS'
+        working-directory: kih
+        run: |
+          set +e
+          W=$(ls -dt "${TMPDIR:-/tmp}"/wkc-e2e-nopwsh.* /tmp/wkc-e2e-nopwsh.* 2>/dev/null | head -1)
+          echo "WORKDIR ${W:-none}"
+          [ -n "$W" ] || exit 0
+          echo "FILES: $(cd "$W" && ls -1 | tr '\n' ' ')"
+          for f in "$W"/case-write* "$W"/case-edit*; do
+            [ -f "$f" ] || continue; echo "== $(basename "$f") ($(wc -c < "$f") bytes), last 40 lines raw"; tail -40 "$f" | cut -c1-400 | sed 's/^/  /'; echo
+          done
+          [ -f "$W/mock.log" ] && { echo "== mock.log, last 80 lines raw"; tail -80 "$W/mock.log" | cut -c1-400; }
+          echo "== shim after the run: $(ls -l "$W/home/.local/bin/wkskill" 2>&1)"
+          if [ -x "$W/home/.local/bin/wkskill" ]; then
+            HOME="$W/home" PATH="$W/home/.local/bin:$NOPWSH_PATH" bash -c 'wkskill search write a project file; echo rc=$?' 2>&1 | tail -5
+          else echo "(shim removed by the driver's uninstall step, so (c) cannot be replayed after the run)"; fi
+          [ -f "$W/mock.out" ] && { echo "== mock.out tail"; tail -15 "$W/mock.out" | cut -c1-300; }
+          echo "== proj: $(ls -la "$W/proj" 2>&1 | tail -n +2 | awk '{print $5, $NF}' | tr '\n' ';')"
+          echo "== GNU-only constructs in the driver (line numbers + token only)"
+          grep -noE '(^|[^g])timeout |date \+%N|stat -c|sed -i[^.]|readlink -f|grep -P|mktemp --|xargs -r|head -c -|sort -V|base64 -w' wkappbot-code/selftest-opencode-e2e.sh | head -20
+          echo "== tools on this runner: timeout=$(command -v timeout || echo none) gtimeout=$(command -v gtimeout || echo none) base64=$(command -v base64)"
+          # SIGTRAP (rc 133) reproduction in the driver's own PATH: which bash runs min-copy there, and does it trap?
+          echo "== bash on NOPWSH_PATH: $(PATH="$NOPWSH_PATH" command -v bash) $(PATH="$NOPWSH_PATH" bash -c 'echo $BASH_VERSION')"
+          T=$RUNNER_TEMP/mc2; mkdir -p "$T"
+          for i in 1 2; do
+            PATH="$NOPWSH_PATH" GIT_CONFIG_GLOBAL=/dev/null PS4='+L${LINENO}d${#FUNCNAME[@]} ' bash -x tools/wk-harness-min-copy.sh "$PWD" "$T/x$i" tools/wk-harness-min-manifest.txt >/dev/null 2>"$T/tr$i"; rc=$?
+            echo "DRIVERPATH-XTRACE $i rc=$rc lines=$(wc -l < "$T/tr$i" | tr -d ' ')"
+            [ "$rc" = 0 ] || echo "  last frames: $(grep -oE '^\++L[0-9]+d[0-9]+' "$T/tr$i" | tail -25 | tr '\n' ' ')"
+          done
 
   # PS1 -> JS port parity proof (owner order 2026-11-06). A guard flips from shadow to authoritative JS only when its
   # corpus passes 100% here against the real ps1 on BOTH desktop platforms. ps1 runs under pwsh, and on Windows also
