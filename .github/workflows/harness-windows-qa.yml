@@ -459,6 +459,7 @@ jobs:
         run: |
           # Needs node, npm and python3 (aliased above). Drives the OpenCode plugin the way OpenCode does, plus the
           # installer, doctor, update and config parts with every network part mocked.
+          set +e   # the runner's bash -e would exit on the failing $( ) before any FAIL line is printed
           out=$(bash wkappbot-code/selftest.sh --synthetic-only 2>&1); rc=$?
           printf '%s\n' "$out" | grep -E '^FAIL|^RESULT'
           r=$(printf '%s\n' "$out" | grep '^RESULT' | tail -1); set -- $r
