@@ -540,10 +540,14 @@ jobs:
           echo "WORKDIR ${W:-none}"
           [ -n "$W" ] || exit 0
           echo "FILES: $(cd "$W" && ls -1 | tr '\n' ' ')"
-          for f in "$W"/case-write* "$W"/case-edit* "$W"/case-write-unpaid*; do
-            [ -f "$f" ] || continue; echo "== $(basename "$f") ($(wc -c < "$f") bytes)"; head -c 1500 "$f" | sed 's/^/  /'; echo
+          for f in "$W"/case-write* "$W"/case-edit*; do
+            [ -f "$f" ] || continue; echo "== $(basename "$f") ($(wc -c < "$f") bytes), last 40 lines raw"; tail -40 "$f" | cut -c1-400 | sed 's/^/  /'; echo
           done
-          [ -f "$W/mock.log" ] && { echo "== mock.log (lines naming write/edit/b.txt/a.txt, last 30)"; grep -nE 'write|edit|b\.txt|a\.txt' "$W/mock.log" | tail -30 | cut -c1-300; }
+          [ -f "$W/mock.log" ] && { echo "== mock.log, last 80 lines raw"; tail -80 "$W/mock.log" | cut -c1-400; }
+          echo "== shim after the run: $(ls -l "$W/home/.local/bin/wkskill" 2>&1)"
+          if [ -x "$W/home/.local/bin/wkskill" ]; then
+            HOME="$W/home" PATH="$W/home/.local/bin:$NOPWSH_PATH" bash -c 'wkskill search write a project file; echo rc=$?' 2>&1 | tail -5
+          else echo "(shim removed by the driver's uninstall step, so (c) cannot be replayed after the run)"; fi
           [ -f "$W/mock.out" ] && { echo "== mock.out tail"; tail -15 "$W/mock.out" | cut -c1-300; }
           echo "== proj: $(ls -la "$W/proj" 2>&1 | tail -n +2 | awk '{print $5, $NF}' | tr '\n' ';')"
           echo "== GNU-only constructs in the driver (line numbers + token only)"
