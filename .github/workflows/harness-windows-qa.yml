@@ -1,5 +1,5 @@
 name: Harness QA (Windows + macOS)
-# rerun: kih main (ca667cd+) with driver case blocks
+# diag: macOS c-write/c-edit scratch dump
 
 # Runs the harness repo's own self-tests on Windows and macOS runners, so a harness change made on a
 # Linux cloud VM is proven on the owner's two desktop platforms too. On macOS the Bash self-tests run a
@@ -530,6 +530,25 @@ jobs:
             done
           done
           exit $fail
+
+      - name: macOS c-write/c-edit diagnosis (scratch files only)
+        if: failure() && runner.os == 'macOS'
+        working-directory: kih
+        run: |
+          set +e
+          W=$(ls -dt "${TMPDIR:-/tmp}"/wkc-e2e-nopwsh.* /tmp/wkc-e2e-nopwsh.* 2>/dev/null | head -1)
+          echo "WORKDIR ${W:-none}"
+          [ -n "$W" ] || exit 0
+          echo "FILES: $(cd "$W" && ls -1 | tr '\n' ' ')"
+          for f in "$W"/case-write* "$W"/case-edit* "$W"/case-write-unpaid*; do
+            [ -f "$f" ] || continue; echo "== $(basename "$f") ($(wc -c < "$f") bytes)"; head -c 1500 "$f" | sed 's/^/  /'; echo
+          done
+          [ -f "$W/mock.log" ] && { echo "== mock.log (lines naming write/edit/b.txt/a.txt, last 30)"; grep -nE 'write|edit|b\.txt|a\.txt' "$W/mock.log" | tail -30 | cut -c1-300; }
+          [ -f "$W/mock.out" ] && { echo "== mock.out tail"; tail -15 "$W/mock.out" | cut -c1-300; }
+          echo "== proj: $(ls -la "$W/proj" 2>&1 | tail -n +2 | awk '{print $5, $NF}' | tr '\n' ';')"
+          echo "== GNU-only constructs in the driver (line numbers + token only)"
+          grep -noE '(^|[^g])timeout |date \+%N|stat -c|sed -i[^.]|readlink -f|grep -P|mktemp --|xargs -r|head -c -|sort -V|base64 -w' wkappbot-code/selftest-opencode-e2e.sh | head -20
+          echo "== tools on this runner: timeout=$(command -v timeout || echo none) gtimeout=$(command -v gtimeout || echo none) base64=$(command -v base64)"
 
   # PS1 -> JS port parity proof (owner order 2026-11-06). A guard flips from shadow to authoritative JS only when its
   # corpus passes 100% here against the real ps1 on BOTH desktop platforms. ps1 runs under pwsh, and on Windows also
