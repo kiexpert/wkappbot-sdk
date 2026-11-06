@@ -3,10 +3,10 @@
   "app": "wkappbot-sdk",
   "title": "Gmail Support Bot \u2014 OAuth2 setup \u002B auto-reply flow",
   "title_ko": null,
-  "desc": "Auto-read and reply to license/support emails at kiexpert@kivilab.co.kr via Gmail API OAuth2 Desktop flow.",
+  "desc": "Auto-read and reply to license/support emails at *** via Gmail API OAuth2 Desktop flow.",
   "steps": [
-    "Credentials in D:\\GitHub\\WKAppBot\\.env: GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET=GOCSPX-..., GMAIL_REFRESH_TOKEN. Project: kiexpert-kivilab, app: wkappbot-gmail (Desktop OAuth2, created 2026-04-29). Old secret disabled 2026-05-01.",
-    "Script: .github/scripts/gmail_support_bot.py. Run: python gmail_support_bot.py. Flags: --dry-run. Env deps: GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN, GH_LICENSE_TOKEN (optional), SLACK_BOT_TOKEN (optional).",
+    "Credentials in D:\\GitHub\\WKAppBot\\.env: GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET=GOCSPX-..., GMAIL_REFRESH_TOKEN. Project: kiexpert-***, app: wkappbot-gmail (Desktop OAuth2, created 2026-04-29). Old secret disabled 2026-05-01.",
+    "Script: .github/scripts/gmail_support_bot.py. Run: python gmail_support_bot.py. Flags: --dry-run. Env deps: GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN, GH_LICENSE_TOKEN (optional), *** (optional).",
     "Auto-reply routing: (1) activation/license -\u003E GH API perm \u002B expiry lookup; (2) refund -\u003E 7-day policy; (3) renewal -\u003E payment info; (4) feature/usage -\u003E docs; (5) fallback -\u003E human handoff.",
     "Post-reply: applies Gmail label wkappbot-support, removes UNREAD. Slack notification to C0APNELH2LR on each reply.",
     "Refresh token expiry: if unused 6\u002B months or revoked, re-run OAuth flow in Python, capture localhost:8765 callback code, exchange for new GMAIL_REFRESH_TOKEN, update .env.",

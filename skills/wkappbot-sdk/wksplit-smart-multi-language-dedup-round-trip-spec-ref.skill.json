@@ -5,7 +5,7 @@
   "title_ko": null,
   "desc": "Incident log and dated lessons for the multi-language dedup round-trip splitter spec",
   "steps": [
-    "2026-06-06: 691K harness append-corruption sparked this spec. 2026-06-10: Flash broke wkhippo via param() position bug -- parse-clean is NOT runtime-correct. 2026-06-23: Python backend proto (bin/wksplit-py-proto.py) passed 4/4 gates on hantoo_us.py. 2026-06-24: procedural PS block-split backend spec added + skill-affinity auto-partition."
+    "2026-06-06: 691K harness append-corruption sparked this spec. 2026-06-10: Flash broke wkhippo via param() position bug -- parse-clean is NOT runtime-correct. 2026-06-23: Python backend proto (bin/wksplit-py-proto.py) passed 4/4 gates on ***_us.py. 2026-06-24: procedural PS block-split backend spec added + skill-affinity auto-partition."
   ],
   "requirements": [
     {

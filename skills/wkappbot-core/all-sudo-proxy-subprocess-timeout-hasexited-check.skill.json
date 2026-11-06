@@ -13,8 +13,8 @@
     "Verified 2026-04-21: test-sudo-proxy-stdout-drain.cmd (resolve ts=2026-04-21T04:29)",
     "Verified 2026-04-22: test-sudo-stdout-utf8.sh (resolve ts=2026-04-21T03:27:42.9565479Z)",
     "Verified 2026-04-22: test-eye-tick-context-warned-persist.sh (resolve ts=2026-04-21T03:32:04.5603600Z)",
-    "Verified 2026-05-03: Timeout.Infinite (-1) was clamped to 5min by Math.Max(timeoutMs, 300_000) in ExecuteViaProxy line 633. Fix: timeoutMs \u003C= 0 ? Timeout.Infinite : Math.Max(timeoutMs, 300_000). wkappbot --sudo exec C:/KiwoomGlobal/bin/nfstarter.exe (3min HTS watch) no longer returns -1 from premature pipe-read timeout (resolve ts=2026-05-02T21:30:43).",
-    "Verified 2026-05-03: Timeout.Infinite (-1) was clamped to 5min by Math.Max(timeoutMs, 300_000) in ExecuteViaProxy line 633. Fix: timeoutMs \u003C= 0 ? Timeout.Infinite : Math.Max(timeoutMs, 300_000). wkappbot --sudo exec C:/KiwoomGlobal/bin/nfstarter.exe (3min HTS watch) no longer returns -1 from premature pipe-read timeout (resolve ts=2026-05-02T21:30:43)."
+    "Verified 2026-05-03: Timeout.Infinite (-1) was clamped to 5min by Math.Max(timeoutMs, 300_000) in ExecuteViaProxy line 633. Fix: timeoutMs \u003C= 0 ? Timeout.Infinite : Math.Max(timeoutMs, 300_000). wkappbot --sudo exec C:/***Global/bin/nfstarter.exe (3min HTS watch) no longer returns -1 from premature pipe-read timeout (resolve ts=2026-05-02T21:30:43).",
+    "Verified 2026-05-03: Timeout.Infinite (-1) was clamped to 5min by Math.Max(timeoutMs, 300_000) in ExecuteViaProxy line 633. Fix: timeoutMs \u003C= 0 ? Timeout.Infinite : Math.Max(timeoutMs, 300_000). wkappbot --sudo exec C:/***Global/bin/nfstarter.exe (3min HTS watch) no longer returns -1 from premature pipe-read timeout (resolve ts=2026-05-02T21:30:43)."
   ],
   "requirements": null,
   "primary_cmd": null,

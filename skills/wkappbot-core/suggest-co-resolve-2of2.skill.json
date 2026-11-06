@@ -31,7 +31,7 @@
   "requirements": [
     {
       "cmd": "wkappbot suggest resolve <cross-author-ts> note --skill X --evidence Y",
-      "expect": "[RESOLVE:HALF] 1/2 by DG-WKAppBot -- waiting for DG-WkAutoQuant to confirm",
+      "expect": "[RESOLVE:HALF] 1/2 by DG-WKAppBot -- waiting for DG-*** to confirm",
       "prompt": null
     },
     {

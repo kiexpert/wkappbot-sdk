@@ -1,8 +1,8 @@
 {
   "id": "cdp-dispatchkeyevent-timeout-transient-wkautoquant-ask",
   "app": "wkappbot",
-  "title": "CDP dispatchKeyEvent timeout: transient WkAutoQuant ask",
-  "desc": "CDP Input.dispatchKeyEvent may timeout (10s) during AskGemini calls from WkAutoQuant when WindowsTerminal is foreground. This is a transient network/CDP race; existing exception propagation handles it correctly. No code change needed.",
+  "title": "CDP dispatchKeyEvent timeout: transient *** ask",
+  "desc": "CDP Input.dispatchKeyEvent may timeout (10s) during AskGemini calls from *** when WindowsTerminal is foreground. This is a transient network/CDP race; existing exception propagation handles it correctly. No code change needed.",
   "steps": [
     "Check if timeout is reproducible across multiple runs before filing a bug. Transient CDP timeouts during AI ask sessions are expected when the browser tab is backgrounded or slow.",
     "If timeout persists across retries, check CdpClient.SendAsync timeout parameter (default 10s) and consider raising for slow AI sessions via --timeout flag.",

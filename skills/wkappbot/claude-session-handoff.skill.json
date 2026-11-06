@@ -5,7 +5,7 @@
   "title_ko": null,
   "desc": "Finds the previous Claude Code session JSONL file for the current project under ~/.claude/projects/<slug>/, reads the last ~120 lines, and extracts human/assistant text turns to reconstruct handoff context. Run at the start of a new session when the user asks to continue from the last session.",
   "steps": [
-    "1. Derive project slug: convert CWD path (drive letter + slashes) to hyphens, e.g. D:/GitHub/WkAutoQuant -> d--GitHub-WkAutoQuant",
+    "1. Derive project slug: convert CWD path (drive letter + slashes) to hyphens, e.g. D:/GitHub/*** -> d--GitHub-***",
     "2. List JSONL files sorted by mtime descending: ls -lt ~/.claude/projects/<slug>/*.jsonl ",
     " head -5. Current session is index [0], previous session is index [1]",
     "3. Read last 120 lines of the previous session JSONL via PowerShell: Get-Content <path> -Encoding UTF8 -Tail 120",
@@ -16,7 +16,7 @@
   ],
   "requirements": [
     {
-      "cmd": "ls -lt ~/.claude/projects/d--GitHub-WkAutoQuant/*.jsonl | head -5",
+      "cmd": "ls -lt ~/.claude/projects/d--GitHub-***/*.jsonl | head -5",
       "expect": "lists 5 JSONL files with timestamps; [0]=current session [1]=previous session",
       "prompt": null
     },

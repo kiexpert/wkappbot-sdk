@@ -1,0 +1,11 @@
+# Private words that must never appear in public skills/ (case-insensitive, one per line).
+# "id"/"app" JSON values are exempt (stable identifiers); everything else is scanned.
+hantoo
+kiwoom
+WkAutoQuant
+WkFeedQuant
+scalper
+wavevault
+GH_PAT
+SLACK_BOT_TOKEN
+kivilab

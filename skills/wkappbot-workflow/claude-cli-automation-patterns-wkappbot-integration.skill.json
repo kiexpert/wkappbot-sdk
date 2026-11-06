@@ -3,7 +3,7 @@
   "app": "wkappbot-workflow",
   "title": "Claude CLI automation patterns \u002B wkappbot integration",
   "title_ko": null,
-  "desc": "Operational knowhow for invoking claude -p in unattended pipelines, handling rc=1-but-success, system/user prompt split, bypassPermissions, max-budget, Korean argv workarounds, and orchestration with wkappbot (ask/slack/speak). Distilled from 2026-04-18/19 WkAutoQuant autonomous morning cycle build sessions.",
+  "desc": "Operational knowhow for invoking claude -p in unattended pipelines, handling rc=1-but-success, system/user prompt split, bypassPermissions, max-budget, Korean argv workarounds, and orchestration with wkappbot (ask/slack/speak). Distilled from 2026-04-18/19 *** autonomous morning cycle build sessions.",
   "steps": [
     "[FLAG TRIO for autonomous] claude -p --permission-mode bypassPermissions --max-budget-usd 1.0 --append-system-prompt-file mission.txt (stdin = short imperative user prompt). This is the canonical unattended-agent invocation. Print mode, bypasses UAC-style permission prompts, caps API spend, loads mission via FILE not argv (argv length \u002B encoding risks).",
     "[SYSTEM vs USER SPLIT \u2014 critical] Long missions (\u003E2000 chars) in user prompt cause META-CONFUSION: Claude writes meta-instructions for itself instead of executing. Fix: put mission in --append-system-prompt-file \u002B short imperative user prompt via STDIN (echo ... ",

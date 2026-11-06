@@ -10,7 +10,7 @@
     "TERMINALWINDOWHELPER API: (1) IsTerminalWindow(hwnd)=GetClassName==CASCADIA_HOSTING_WINDOW_CLASS. (2) FindInputSite(hwnd)=EnumChildWindows for Windows.UI.Input.InputSite.WindowClass child. (3) TypeToTerminal(hwnd,text)=PostMessage(inputSite,WM_CHAR=0x0102,char,Zero) per char 10ms NO SetForegroundWindow. (4) ReadTerminalText(hwnd,tabName)=AutomationElement.FromHandle(hwnd).FindFirst(Descendants,NameProperty==tabName).TextPattern.DocumentRange.GetText(4000).",
     "TYPE HOOK in ActionExecutor: before UIA SetValue path add: if(TerminalWindowHelper.IsTerminalWindow(resolvedHwnd)){TerminalWindowHelper.TypeToTerminal(resolvedHwnd,text);return Ok;} -- eliminates 10s timeout, fully focusless.",
     "READ HOOK in ActionExecutor: after GetAutomationElement add: if(element.GetSupportedPatterns().Contains(TextPattern.Pattern)){return ((TextPattern)element.GetCurrentPattern(TextPattern.Pattern)).DocumentRange.GetText(4000);} -- TextPattern on WT terminal Text element already implemented, just not called.",
-    "POWERSHELL PROOF (verified in session): TypeToTerminal -- WkAutoQuant Claude received WM_CHAR message and responded without focus disruption. ReadTerminalText -- full terminal text returned via UIAutomationClient. Both confirmed focusless via screenshot.",
+    "POWERSHELL PROOF (verified in session): TypeToTerminal -- *** Claude received WM_CHAR message and responded without focus disruption. ReadTerminalText -- full terminal text returned via UIAutomationClient. Both confirmed focusless via screenshot.",
     "SMOKE TESTS: wkappbot a11y type test CASCADIA_HWND => OK no 10s wait. wkappbot a11y read CASCADIA_HWND => terminal text returned not empty. focus stays on caller window throughout."
   ],
   "requirements": [

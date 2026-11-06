@@ -8,7 +8,7 @@
     "slack reply loads from the same per-cwd filename",
     "If stored cwd in the file mismatches caller cwd (legacy shared file), load returns null with a warn log and reply refuses to post",
     "Hash uses SHA256 of lowercased\u002Btrim-slash cwd so path casing doesn\u0027t split contexts",
-    "Effect: auto-briefings from DG-WKAppBot and DG-WkAutoQuant never overwrite each other\u0027s thread context",
+    "Effect: auto-briefings from DG-WKAppBot and DG-*** never overwrite each other\u0027s thread context",
     "Verified 2026-04-19: experience/tests/session/test-session-fix-verify-20260419.sh (resolve ts=2026-04-19T12:16:40)"
   ],
   "tags": [

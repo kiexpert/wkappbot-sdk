@@ -12,7 +12,7 @@
     "[TRIED: cmd.exe + chcp 65001] cmd.exe /c 'chcp 65001 && wkappbot speak 한글' — nested quote escape issues + CreateProcess still ANSI-converts. rc=1 path not found.",
     "[TRIED: Python subprocess UTF-8 encoding] subprocess.run([wk,speak,korean_text],encoding='utf-8') — Python argv passes fine but CreateProcessA conversion layer mangles. Same fail.",
     "[TRIED: ctypes SetConsoleCP 65001] SetConsoleCP+SetConsoleOutputCP before subprocess — does not affect child process argv decoding.",
-    "[WORKAROUND A: ASCII-only args + hwnd direct] Instead of a11y find {title:이탈종목} use resolve_hts_tables.py to get hwnd then a11y find {hwnd:0xNN}. Done in WkAutoQuant.",
+    "[WORKAROUND A: ASCII-only args + hwnd direct] Instead of a11y find {title:이탈종목} use resolve_hts_tables.py to get hwnd then a11y find {hwnd:0xNN}. Done in ***.",
     "[WORKAROUND B: file-based content] Write Korean to UTF-8 file, invoke wkappbot with ASCII file path arg (if supported). Suggest already filed for --from-file flag on speak/slack/prompt commands.",
     "[WORKAROUND C: short English-only] Accept speak limitation — emit English-only TTS or skip speak entirely when content has Korean.",
     "[ROOT FIX NEEDED IN WKAPPBOT] Use CommandLineToArgvW on raw wchar_t command line instead of trusting argv[]. That would bypass ANSI conversion entirely. Already in suggest queue.",

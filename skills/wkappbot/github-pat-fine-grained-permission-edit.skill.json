@@ -3,7 +3,7 @@
   "app": "wkappbot",
   "title": "GitHub Fine-grained PAT permission edit via webbot",
   "title_ko": null,
-  "desc": "Edit GH_PAT scopes (e.g. add secrets:write) without regenerating. Fine-grained PATs allow permission updates in-place \u2014 token value stays the same.",
+  "desc": "Edit *** scopes (e.g. add secrets:write) without regenerating. Fine-grained PATs allow permission updates in-place \u2014 token value stays the same.",
   "steps": [
     "1. web open https://github.com/settings/personal-access-tokens?type=beta",
     "2. a11y find token ID from list page",

@@ -1,0 +1,26 @@
+name: skills-public-safety
+
+on:
+  push:
+    paths:
+      - 'skills/**'
+      - '.github/public-safety-markers.txt'
+      - 'scripts/public-safety-scan.sh'
+      - '.github/workflows/skills-public-safety.yml'
+  pull_request:
+    paths:
+      - 'skills/**'
+      - '.github/public-safety-markers.txt'
+      - 'scripts/public-safety-scan.sh'
+      - '.github/workflows/skills-public-safety.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Public-safety scan of skills/
+        run: bash scripts/public-safety-scan.sh skills

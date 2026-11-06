@@ -62,12 +62,12 @@
     {
       "cmd": "wkappbot skill read suggest-resolve-pre-flight-checklist",
       "expect": "RESOLVE",
-      "prompt": "resolved duplicate exit flood in WkAutoQuant"
+      "prompt": "resolved duplicate exit flood in ***"
     },
     {
       "cmd": "wkappbot skill read errors-jsonl-triage",
       "expect": "errors",
-      "prompt": "resolved duplicate exit flood in WkAutoQuant"
+      "prompt": "resolved duplicate exit flood in ***"
     }
   ],
   "primary_cmd": "wkappbot skill read suggest-workflow",

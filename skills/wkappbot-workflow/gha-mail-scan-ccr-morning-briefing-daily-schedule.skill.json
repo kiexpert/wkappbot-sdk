@@ -5,7 +5,7 @@
   "title_ko": null,
   "desc": "Daily 09:00 KST automated pipeline: GHA scans Naver IMAP \u002B Gmail for headhunter emails and posts to GitHub daily issue; CCR remote agent reads committed news files and posts Korean morning briefing comment.",
   "steps": [
-    "GHA mail_scan.yml: cron 0 0 * * * (00:00 UTC = 09:00 KST). Needs repo secrets: NAVER_APP_PASSWORD, GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN, GH_PAT.",
+    "GHA mail_scan.yml: cron 0 0 * * * (00:00 UTC = 09:00 KST). Needs repo secrets: NAVER_APP_PASSWORD, GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN, ***.",
     "Naver scan in GHA: inline Python script using imaplib.IMAP4_SSL imap.naver.com:993 \u002B NAVER_APP_PASSWORD secret. Posts headhunter hits as comments on daily-news GitHub issue via wk_issue.post_comment().",
     "Gmail scan in GHA: inline Python script using OAuth2 refresh_token flow (no websocket, pure urllib). Fetches unread messages, keyword-filters, posts hits to same daily issue.",
     "CCR routine (claude.ai/code/routines): cron 5 0 * * * (09:05 KST). Reads today news/YYYY-MM-DD.md from repo, posts Korean morning briefing to daily issue via gh CLI. Routine ID: trig_01Y72zJnupSkK3m4JvqjmhhQ.",

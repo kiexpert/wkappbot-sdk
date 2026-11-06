@@ -2,10 +2,10 @@
   "id": "skill-contribute-edit-encoding-guard-korean-ui-relaxed-threshold",
   "app": "wkappbot",
   "title": "skill contribute/edit: Korean-UI app relaxed encoding-guard threshold",
-  "desc": "HasEncodingRisk's default 0.1pct Korean threshold rejected legit skill docs for Korean HTS apps. Relaxed to 30pct for Korean-UI app categories (hts-*, heroes*, kiwoom*, tuhon*, xingq*, invest-kr, claude-desktop) so UIA labels can be transcribed verbatim. Other apps keep the strict limit.",
+  "desc": "HasEncodingRisk's default 0.1pct Korean threshold rejected legit skill docs for Korean HTS apps. Relaxed to 30pct for Korean-UI app categories (hts-*, heroes*, ****, tuhon*, xingq*, invest-kr, claude-desktop) so UIA labels can be transcribed verbatim. Other apps keep the strict limit.",
   "steps": [
     "HasEncodingRisk(text, context, app?) now takes app hint",
-    "Korean-UI set: hts-, heroes, kiwoom, tuhon, xingq, invest-kr, claude-desktop",
+    "Korean-UI set: hts-, heroes, ***, tuhon, xingq, invest-kr, claude-desktop",
     "Korean-UI threshold 30pct; all others 0.1pct",
     "SkillCommand.contribute passes --app directly",
     "SkillCommand.edit reads skill.App after loading record then runs check",

@@ -17,7 +17,7 @@
   ],
   "requirements": [
     {
-      "cmd": "wkappbot file grep \u0022WM_SETFOCUS\u0022 \u0022D:/GitHub/WkAutoQuant/scripts/auto_dismiss_hts_popups.py\u0022",
+      "cmd": "wkappbot file grep \u0022WM_SETFOCUS\u0022 \u0022D:/GitHub/***/scripts/auto_dismiss_hts_popups.py\u0022",
       "expect": "WM_SETFOCUS",
       "prompt": null
     },
