@@ -26,7 +26,7 @@ function snapshot() {
   const st = path.join(HOME, ".claude", "settings.json");
   const prefix = (spawnSync("npm", ["prefix", "-g"], { encoding: "utf8", shell: IS_WIN }).stdout || "").trim();
   const binDir = IS_WIN ? prefix : path.join(prefix, "bin");
-  const ls = (d) => { try { return fs.readdirSync(d).filter((n) => !/^(npm|npx|corepack|node|wkappbot-code|wk-appbot-code|opencode)(\.cmd|\.ps1)?$/i.test(n)).sort().join(" "); } catch { return ""; } };
+  const ls = (d) => { try { return fs.readdirSync(d).filter((n) => !/^(node_modules|npm|npx|corepack|node|wkappbot-code|wk-appbot-code|opencode)(\.cmd|\.ps1)?$/i.test(n)).sort().join(" "); } catch { return ""; } };
   const sum = (f) => { try { return String(fs.readFileSync(f).length) + ":" + fs.readFileSync(f, "utf8").split("").reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7); } catch { return "absent"; } };
   return ["hooksPath=" + ((g.stdout || "").trim() || "unset"), "settings=" + sum(st), "prefix-bin=" + ls(binDir), "local-bin=" + ls(path.join(HOME, ".local", "bin"))].join("\n") + "\n";
 }
