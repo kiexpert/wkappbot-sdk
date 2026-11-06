@@ -79,6 +79,16 @@ jobs:
           wkappbot-code install $EXTRA 2>&1 | tee "$RUNNER_TEMP/install.log"; rc=${PIPESTATUS[0]}
           echo "install rc=$rc"; exit $rc
 
+      - name: Diagnose the lite hook when install fails (trace of one allow call)
+        if: failure()
+        run: |
+          set +e
+          L="$HOME/.wk-harness/tools/wkharness-lite.sh"
+          ls -la "$L" 2>&1; head -c 300 "$L" | od -c | head -5
+          printf '%s' '{"session_id":"diag1","hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"ls /"}}' | bash -x "$L" pre 2>&1 | tail -60
+          echo "allow rc=${PIPESTATUS[1]}"
+          bash "$L" --verify 2>&1 | tail -5
+
       - name: wkappbot-code doctor
         run: |
           set -u
