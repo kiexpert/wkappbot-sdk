@@ -175,7 +175,7 @@ jobs:
         gh release upload $tag @assets --clobber
         Write-Host "Assets uploaded: https://github.com/${{ github.repository }}/releases/tag/$tag"
 
-  # Portable core binaries (linux-x64, osx-arm64, osx-x64) + SHA256SUMS for `wk-appbot-code install`.
+  # Portable core binaries (linux-x64, osx-arm64, osx-x64) + SHA256SUMS for `wkappbot-code install`.
   # A release created with GITHUB_TOKEN triggers no other workflow, so it is called from here.
   portable-assets:
     needs: release

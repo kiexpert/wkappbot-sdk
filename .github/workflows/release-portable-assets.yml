@@ -1,6 +1,6 @@
 name: Release portable assets
 
-# Attaches the portable core binaries to an SDK release so `wk-appbot-code install` can fetch
+# Attaches the portable core binaries to an SDK release so `wkappbot-code install` can fetch
 #   releases/latest/download/wkappbot-<platform>   (wkappbot-linux-x64, wkappbot-osx-arm64, wkappbot-osx-x64)
 # and verify them against releases/latest/download/SHA256SUMS ("<sha256>  <name>", exactly those three names).
 # Source order, the same as the harness's wk-bin-acquire.sh: (1) the private core's newest release that carries the

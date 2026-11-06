@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Publish-time mask for anything the SDK ships (npm package, release bundle, skills).
+"""Publish-time mask for anything the SDK ships (the wkappbot-code npm package, release bundle, skills).
 
 Same rules as the core `wkappbot skill public-mask` (SkillCommand.PublicMask.cs), so the SDK can mask
 a build output without the private core binary:

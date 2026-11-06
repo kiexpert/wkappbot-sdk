@@ -1,6 +1,6 @@
 name: haiku-service
 
-# Haiku service daemon for AppBot Code (services/haiku-daemon). Three jobs:
+# Haiku service daemon for WKAppBot Code (services/haiku-daemon). Three jobs:
 #   unit    : node --test with a fake claude binary and a fake clock (every push/PR touching the daemon)
 #   selftest: ONE real Haiku call through the daemon's internal inbox, with the kill switch CLOSED to the
 #             public (the internal request is the only one answered). Prints the measured answer latency.

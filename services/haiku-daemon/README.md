@@ -1,6 +1,6 @@
 # haiku-daemon
 
-The Haiku service behind the AppBot Code demo. It runs as the `haiku-service` GitHub Actions workflow,
+The Haiku service behind the WKAppBot Code demo. It runs as the `haiku-service` GitHub Actions workflow,
 answers prompts with `claude -p --model haiku` (text only, every tool disabled), and publishes a status
 JSON that the portal shows as a service-VM row.
 

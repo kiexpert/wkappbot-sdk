@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Haiku service daemon for AppBot Code. Usage:
+// Haiku service daemon for WKAppBot Code. Usage:
 //   node daemon.mjs --once  --dir D --inbox I [--outbox O] [--origin internal|public]   one pass, local wire (CI)
 //   node daemon.mjs --serve --dir D [--takeover]   run loop with lease + handoff (Actions runner)
 // Environment (serve): GITHUB_TOKEN, GITHUB_REPOSITORY, STATUS_BRANCH (default svc/haiku-daemon), GITHUB_RUN_ID,
