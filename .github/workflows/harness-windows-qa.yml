@@ -578,7 +578,7 @@ jobs:
           # Kept as a bash-side PATH: on Windows GITHUB_ENV wants a Windows-style PATH, so the run step applies it inline.
           echo "NOPWSH_PATH=$np" >> "$GITHUB_ENV"
       - name: Break one JS guard in the runner copy (negative proof, dispatch input)
-        if: inputs.break_guard
+        if: true  # NEGATIVE PROOF BRANCH ONLY -- never merge
         working-directory: kih
         run: |
           g=$(node -e '
