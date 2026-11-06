@@ -1,0 +1,108 @@
+name: npm-publish-appbot-code
+
+# Publishes the AppBot Code CLI to the public npm registry as wk-appbot-code (owner 2026-11-06: you may publish from
+# the SDK repo, ship only what is needed). The source lives in the target repo's appbot-code/ folder; the target repo
+# is found by sha256 prefix and never named, as in webvm-x64.yml. Only the package's own "files" list is shipped, and
+# the publish is refused unless the target repo's scrub gate (SCRUB in tools/wk-harness-min-copy.sh) prints hits=0.
+# A version already on the registry is skipped, so a re-run never fails on "cannot publish over". Needs the NPM_TOKEN
+# secret (an npm automation token); without it the run stops at the publish step and says so.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/npm-publish-appbot-code.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: npm-publish-appbot-code
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      TARGET_HASH: 23ade98d428c8527
+      T1: ${{ secrets.GH_LICENSE_TOKEN }}
+      T2: ${{ secrets.WKAPPBOT_PAT }}
+      T3: ${{ secrets.WKAPPBOT_CORE_PAT }}
+    steps:
+      - name: Find the target repo and a token that can reach it
+        run: |
+          set -u
+          for t in "$T1" "$T2" "$T3"; do
+            [ -n "$t" ] || continue
+            names=$(GH_TOKEN="$t" gh repo list kiexpert --visibility private --limit 300 --json nameWithOwner -q '.[].nameWithOwner' 2>/dev/null || true)
+            for n in $names; do
+              if [ "$(printf %s "$n" | sha256sum | cut -c1-16)" = "$TARGET_HASH" ]; then
+                echo "::add-mask::$n"
+                echo "::add-mask::${n#*/}"
+                echo "::add-mask::$t"
+                { echo "REPO=$n"; echo "TOK=$t"; } >> "$GITHUB_ENV"
+                echo "target found"
+                exit 0
+              fi
+            done
+          done
+          echo "no token reaches the target repo"; exit 1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Fetch appbot-code only (sparse, shallow)
+        run: |
+          set -eu
+          git clone -q --depth 1 --filter=blob:none --sparse "https://x-access-token:${TOK}@github.com/${REPO}.git" src
+          git -C src sparse-checkout set --no-cone /appbot-code/ /tools/wk-harness-min-copy.sh
+          ls -la src/appbot-code src/tools
+
+      - name: Build the package from its files list and run the scrub gate
+        run: |
+          set -eu
+          cd src/appbot-code
+          # Public package: drop "private", point repository and homepage at this public repo.
+          node -e '
+            const fs=require("fs"); const p=JSON.parse(fs.readFileSync("package.json","utf8"));
+            delete p.private;
+            p.repository={type:"git",url:"git+https://github.com/"+process.env.GITHUB_REPOSITORY+".git"};
+            p.homepage="https://github.com/"+process.env.GITHUB_REPOSITORY;
+            p.publishConfig={access:"public"};
+            fs.writeFileSync("package.json",JSON.stringify(p,null,2)+"\n");'
+          npm pack -s
+          mkdir -p "$RUNNER_TEMP/pkg" && tar -xzf wk-appbot-code-*.tgz -C "$RUNNER_TEMP/pkg"
+          SCRUB=$(sed -n "s/^SCRUB='\\(.*\\)'$/\\1/p" ../tools/wk-harness-min-copy.sh)
+          [ -n "$SCRUB" ] || { echo "scrub pattern not found: nothing published"; exit 1; }
+          hits=$(grep -r -i -E -l -- "$SCRUB" "$RUNNER_TEMP/pkg" | wc -l)
+          echo "SCRUB GATE hits=$hits"
+          [ "$hits" = 0 ] || { grep -r -i -E -l -- "$SCRUB" "$RUNNER_TEMP/pkg"; echo "scrub gate failed: nothing published"; exit 1; }
+          find "$RUNNER_TEMP/pkg" -type f | sort
+          echo "VER=$(node -p 'require("./package.json").version')" >> "$GITHUB_ENV"
+          echo "TGZ=$PWD/$(ls wk-appbot-code-*.tgz)" >> "$GITHUB_ENV"
+
+      - name: The packed CLI runs before it is published
+        run: |
+          set -eu
+          npm install -g --prefix "$RUNNER_TEMP/pre" "$TGZ"
+          "$RUNNER_TEMP/pre/bin/wk-appbot-code" --help
+
+      - name: Publish (skipped when the version is already on the registry)
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -eu
+          if npm view "wk-appbot-code@$VER" version >/dev/null 2>&1; then echo "wk-appbot-code@$VER already published: skip"; exit 0; fi
+          [ -n "$NODE_AUTH_TOKEN" ] || { echo "NPM_TOKEN secret is not set: add an npm automation token as NPM_TOKEN in this repo's Actions secrets, then re-run"; exit 1; }
+          npm publish "$TGZ" --access public
+          echo "published wk-appbot-code@$VER"
+
+      - name: Verify the registry install
+        run: |
+          set -eu
+          for i in 1 2 3 4 5 6; do npm view "wk-appbot-code@$VER" version && break; sleep 20; done
+          npm install -g --prefix "$RUNNER_TEMP/reg" "wk-appbot-code@$VER"
+          "$RUNNER_TEMP/reg/bin/wk-appbot-code" --help
