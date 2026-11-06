@@ -687,7 +687,7 @@ jobs:
             label=$1; shift
             out=$("$@" 2>&1); rc=$?
             r=$(printf '%s\n' "$out" | grep -E '^RESULT' | tail -1)
-            printf '%s\n' "$out" | grep -E '^(FAIL|RESULT)' | sed "s/^/  [$label] /" | head -20
+            printf '%s\n' "$out" | grep -E '^(FAIL|RESULT)' | sed "s|^|  [$label] |" | head -20
             set -- $r
             if [ "$rc" = 0 ] && [ -n "$r" ] && [ "${2%%/*}" = "${2##*/}" ]; then echo "LEG $label PASS ($r)"
             else echo "LEG $label FAIL (rc=$rc, ${r:-no RESULT line})"; printf '%s\n' "$out" | grep -v '^RESULT' | tail -8 | sed "s/^/    /"; fail=1; fi
