@@ -517,8 +517,9 @@ jobs:
           # are not repo names.
           mask() { perl -MDigest::SHA=sha256_hex -pe 's{(?<![\w/.~:-])((?:[\w.-]+/)+[\w.-]+|[\w.-]+\.psm?1)\b}{my $n=$1; ($n=~m{^[\d./]+$|(^|/)wkharness-lite\.sh$|^wkappbot-code/selftest[\w.-]*\.sh$}) ? $n : "<name sha256:".substr(sha256_hex($n),0,8).">"}ge'; }
           # Windows npm needs these from the parent env; print presence only (names, never values).
+          # MSYS bash can expose them upper-cased (COMSPEC), so both spellings are checked.
           if [ "$RUNNER_OS" = Windows ]; then
-            for v in ComSpec SystemRoot PATHEXT; do eval "x=\${$v+set}"; echo "ENV-PRESENT $v=${x:-unset}"; done
+            for v in ComSpec COMSPEC SystemRoot SYSTEMROOT PATHEXT; do eval "x=\${$v+set}"; echo "ENV-PRESENT $v=${x:-unset}"; done
           fi
           for sh in $shells; do
             out=$(PATH="$NOPWSH_PATH" $sh wkappbot-code/selftest-opencode-e2e.sh nopwsh 2>&1); rc=$?
