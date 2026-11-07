@@ -23,6 +23,34 @@ Focusless. Self-healing. AI-native. The open-source bridge between LLMs and the 
 > `npm i -g wkappbot-code && wkappbot-code install && wkappbot-code doctor`
 > *개발자용 지혜 반사체 AI 코딩 에이전트 + a11y 연동 하네스 + A11Y QA — [소개와 설치 안내](docs/wkappbot-code/README.md#한국어-요약)*
 
+### Install without npm (harness only, one line)
+
+No Node.js? This one-line web install installs only the lite harness for Claude Code. The npm route above is still the full install.
+
+Linux / macOS (needs `curl`, `tar`, `python3`, and `sha256sum` or `shasum`):
+
+```sh
+curl -fsSL https://kiexpert.github.io/wkappbot-kih/webvm/x64/harness/install.sh | sh
+```
+
+Windows PowerShell (needs `tar.exe`, which ships with Windows 10 1803 and later; wiring the hooks also needs `sh.exe` from Git for Windows and `python` on `PATH`):
+
+```powershell
+irm https://kiexpert.github.io/wkappbot-kih/webvm/x64/harness/install.ps1 | iex
+```
+
+What the installer does:
+
+1. **Checks the download.** It fetches `version.json` and the published sha256, downloads `wk-harness-min.tar.gz`, and refuses a hash mismatch (exit 3). Nothing is installed in that case.
+2. **Unpacks** to `~/.wk-harness`.
+3. **Wires the Claude Code hooks.** It points the hooks in `~/.claude/settings.json` (PreToolUse, Stop, UserPromptSubmit, SessionStart) at the lite harness and keeps your other settings.
+4. **Adds commands.** On Linux and macOS it links `wkskill` and `wk-verify` into `~/.local/bin`. It also registers a global git pre-push dispatcher; if you already have a global `core.hooksPath`, it keeps yours and prints a warning.
+5. **Runs the lite verify.** The verify must print `PASS 6/6` (otherwise exit 4). `.installed-version` is written only after a pass.
+
+Nothing outside your home directory is touched, and no key or token is read or written. On Windows without `sh.exe` and `python`, the package is unpacked but the hooks are **not** wired; the installer says so, and you re-run the line once both are on `PATH`.
+
+CI runs both lines on fresh Linux, macOS and Windows runners with no node or npm on `PATH`.
+
 > ⚖️ **[The Reflex Constitution →](./REFLEX-CONSTITUTION.md)** · *[read as a page](https://kiexpert.github.io/wkappbot-sdk/reflex-constitution.html)*
 > How this project governs the speed of its own AI: norms that **execute** rather than a document that is filed.
 > **The system refuses its own authors** — and Article 12 states in advance what would prove it wrong.

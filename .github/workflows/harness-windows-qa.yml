@@ -18,9 +18,10 @@ on:
         required: false
         default: false
   push:
-    branches-ignore: [main]
+    # Any branch, main included, so a README change to the web-install lines is proven on main as well.
     paths:
       - '.github/workflows/harness-windows-qa.yml'
+      - 'README.md'
 
 permissions:
   contents: read
@@ -673,6 +674,92 @@ jobs:
 
   # Per-file selftests of new kih harness tools on each desktop shell (spokesman 2026-11-06 for kih ROOT I).
   # Prints only RESULT/FAIL lines; a leg fails unless its RESULT reads p/p.
+  # Owner 2026-11-07: the README's "Install without npm" one-liners must install every required tool on a fresh
+  # machine. Fresh HOME, no node or npm on PATH; the exact README line is run, so README drift fails the leg.
+  web-install:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          sparse-checkout: README.md
+          sparse-checkout-cone-mode: false
+      - name: Fresh HOME, no node or npm on PATH, README line extracted
+        run: |
+          set -u
+          H="$RUNNER_TEMP/fresh-home"; rm -rf "$H"; mkdir -p "$H/.claude"
+          # A prior setting the installer must keep.
+          printf '{"theme":"dark","permissions":{"allow":["Bash(ls)"]}}\n' > "$H/.claude/settings.json"
+          np=""; IFS=:; for d in $PATH; do
+            { [ -e "$d/node" ] || [ -e "$d/node.exe" ] || [ -e "$d/npm" ] || [ -e "$d/npm.cmd" ]; } && continue
+            np="$np${np:+:}$d"; done; unset IFS
+          echo "FRESH_HOME=$H" >> "$GITHUB_ENV"; echo "NONODE_PATH=$np" >> "$GITHUB_ENV"
+          if [ "$RUNNER_OS" = Windows ]; then
+            want='irm https://kiexpert.github.io/wkappbot-kih/webvm/x64/harness/install.ps1 | iex'
+          else
+            want='curl -fsSL https://kiexpert.github.io/wkappbot-kih/webvm/x64/harness/install.sh | sh'
+          fi
+          # README drift: the exact command line must be in the README, or the leg fails here.
+          grep -qxF "$want" README.md || { echo "README DRIFT: README.md has no line exactly: $want"; exit 1; }
+          printf '%s\n' "$want" > "$RUNNER_TEMP/readme-line.txt"; echo "README LINE: $want"
+      - name: Run the README line (Linux, macOS)
+        if: runner.os != 'Windows'
+        run: |
+          export HOME="$FRESH_HOME" PATH="$NONODE_PATH"
+          if command -v node >/dev/null 2>&1 || command -v npm >/dev/null 2>&1; then echo "node or npm still on PATH"; exit 1; fi
+          sh -c "$(cat "$RUNNER_TEMP/readme-line.txt")"; echo "INSTALL rc=$?"
+      - name: Run the README line (Windows PowerShell 5.1)
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          $env:PATH = (($env:PATH -split ';') | Where-Object { $_ -and -not ((Test-Path (Join-Path $_ 'node.exe')) -or (Test-Path (Join-Path $_ 'npm.cmd'))) }) -join ';'
+          if ((Get-Command node -ErrorAction SilentlyContinue) -or (Get-Command npm -ErrorAction SilentlyContinue)) { Write-Host 'node or npm still on PATH'; exit 1 }
+          # Every variable PowerShell, Git sh and python read a home from points at the fresh profile.
+          $fh = $env:FRESH_HOME -replace '/', '\'
+          $env:USERPROFILE = $fh; $env:HOME = $fh; $env:HOMEDRIVE = $fh.Substring(0, 2); $env:HOMEPATH = $fh.Substring(2)
+          $line = (Get-Content -Raw "$env:RUNNER_TEMP\readme-line.txt").Trim()
+          # A child Windows PowerShell so $HOME is the fresh profile and the installer's own exit ends only it.
+          powershell -NoProfile -ExecutionPolicy Bypass -Command $line
+          Write-Host "INSTALL rc=$LASTEXITCODE"
+          exit $LASTEXITCODE
+      - name: REQUIRED-TOOLS and install assertions
+        if: always()
+        run: |
+          set +e
+          H="$FRESH_HOME"; D="$H/.wk-harness"; S="$H/.claude/settings.json"; n=0; ok=0; miss=""
+          chk() { n=$((n+1)); if eval "$2" >/dev/null 2>&1; then ok=$((ok+1)); echo "PASS $1"; else echo "FAIL $1"; fi; }
+          echo "REQUIRED-TOOLS ($RUNNER_OS, PATH without node/npm)"
+          if [ "$RUNNER_OS" = Windows ]; then tools="tar.exe sh.exe python|python3 powershell"; else tools="curl tar python3 sha256sum|shasum sh"; fi
+          for t in $tools; do
+            p=""; for alt in $(echo "$t" | tr '|' ' '); do p=$(PATH="$NONODE_PATH" command -v "$alt" 2>/dev/null) && break; done
+            printf '  %-18s %s\n' "$t" "${p:-MISSING}"; n=$((n+1)); [ -n "$p" ] && ok=$((ok+1)) || miss="$miss $t"
+          done
+          [ -z "$miss" ] || echo "FAIL required tool missing:$miss"
+          chk "unpacked ~/.wk-harness/tools/wkharness-lite.sh" "[ -f '$D/tools/wkharness-lite.sh' ]"
+          chk "installed-version written" "[ -s '$D/.installed-version' ]"
+          PY=$(command -v python3 || command -v python)
+          cat > "$RUNNER_TEMP/hooks_ok.py" <<'EOF'
+          import json, sys
+          h = json.load(open(sys.argv[1], encoding="utf-8")).get("hooks", {})
+          missing = [e for e in ("PreToolUse", "Stop", "UserPromptSubmit", "SessionStart") if "wkharness-lite.sh" not in json.dumps(h.get(e, ""))]
+          print("hooks missing: " + ",".join(missing) if missing else "hooks: 4/4 lite")
+          sys.exit(1 if missing else 0)
+          EOF
+          "$PY" "$RUNNER_TEMP/hooks_ok.py" "$S"
+          chk "settings.json carries the 4 lite hooks" "'$PY' '$RUNNER_TEMP/hooks_ok.py' '$S'"
+          chk "settings.json kept prior settings (theme, permissions)" "grep -q '\"theme\"' '$S' && grep -q 'Bash(ls)' '$S'"
+          v=$(HOME="$H" PATH="$NONODE_PATH" sh "$D/tools/wkharness-lite.sh" --verify 2>&1); echo "VERIFY: $(printf '%s' "$v" | tail -1)"
+          chk "lite verify PASS 6/6" "printf '%s' \"\$v\" | grep -q 'PASS 6/6'"
+          echo "RESULT $ok/$n"
+          [ "$ok" = "$n" ]
+
   kih-tool-selftests:
     strategy:
       fail-fast: false
