@@ -701,8 +701,9 @@ jobs:
           printf '%s\n' "$out" | grep -E '^(RESULT|MISMATCH|FAIL|PSHOST)' > "$out_f"
           cat "$out_f"
           # DETAIL lines can carry stderr with private kih paths or file names: every path-like token
-          # (holds / or \) and every .ps1/.psm1/.js name prints only as an 8-hex sha256 of itself.
-          printf '%s\n' "$out" | grep -E '^DETAIL ' | head -40 | perl -MDigest::SHA=sha256_hex -pe 's{([^\s"'"'"'():,]*[/\\][^\s"'"'"'():,]*|[\w.-]+\.(?:psm?1|js))}{"<name sha256:".substr(sha256_hex($1),0,8).">"}ge' | cut -c1-1000
+          # (holds / or \) and every .ps1/.psm1/.js name prints only as an 8-hex sha256 of itself; pure counts
+          # such as 14/15 stay readable.
+          printf '%s\n' "$out" | grep -E '^DETAIL ' | head -40 | perl -MDigest::SHA=sha256_hex -pe 's{([^\s"'"'"'():,]*[/\\][^\s"'"'"'():,]*|[\w.-]+\.(?:psm?1|js))}{my $n=$1; $n=~m{^[\d./]+$} ? $n : "<name sha256:".substr(sha256_hex($n),0,8).">"}ge' | cut -c1-1000
           { echo "### wkjs parity ${{ runner.os }} / ${{ matrix.ps }} (rc=$rc)"; echo '```'; cat "$out_f"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
           [ -s "$out_f" ] || { echo "no RESULT lines"; printf '%s\n' "$out" | grep -E 'rror|nknown|sage' | head -10; exit 1; }
           grep -qE '^(MISMATCH|FAIL|PSHOST|SKIP)' "$out_f" && [ "$rc" = 0 ] && rc=1
