@@ -876,6 +876,53 @@ jobs:
           echo "RESULT $ok/$n"
           [ "$ok" = "$n" ]
 
+  # Owner 2026-11-07: a11y support per platform, measured before it is advertised. Downloads the published portable
+  # binary for the runner (releases/latest, sha256-checked against SHA256SUMS) and runs the a11y discovery commands a
+  # user would try first. Every command prints rc and its first lines; RESULT n/n counts the commands that exit 0 and
+  # print something. A README line per platform is added only once its leg is green.
+  a11y-qa:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest, asset: wkappbot-linux-x64, probe: '*' }
+          - { os: macos-latest,  asset: wkappbot-osx-arm64, probe: '*Finder*' }
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Download the published binary and check its sha256
+        run: |
+          set -e
+          base=https://github.com/${{ github.repository }}/releases/latest/download
+          curl -fsSL "$base/SHA256SUMS" -o SHA256SUMS
+          curl -fsSL "$base/${{ matrix.asset }}" -o wkappbot
+          want=$(awk -v n="${{ matrix.asset }}" '$2==n {print $1}' SHA256SUMS)
+          got=$( (sha256sum wkappbot 2>/dev/null || shasum -a 256 wkappbot) | cut -d' ' -f1)
+          echo "ASSET ${{ matrix.asset }} sha256 want=${want:0:16} got=${got:0:16}"
+          [ -n "$want" ] && [ "$want" = "$got" ]
+          chmod +x wkappbot
+      - name: a11y discovery commands
+        run: |
+          set +e
+          n=0; ok=0
+          run() { label="$1"; shift; n=$((n+1))
+            out=$(./wkappbot "$@" 2>&1); rc=$?
+            lines=$(printf '%s\n' "$out" | grep -c .)
+            if [ "$rc" = 0 ] && [ "$lines" -gt 0 ]; then ok=$((ok+1)); s=PASS; else s=FAIL; fi
+            echo "$s $label rc=$rc lines=$lines"
+            printf '%s\n' "$out" | head -8 | cut -c1-160 | sed 's/^/    /'
+          }
+          run "--version" --version
+          run "a11y --help" a11y --help
+          run "a11y windows" a11y windows
+          run "a11y find ${{ matrix.probe }}" a11y find '${{ matrix.probe }}'
+          run "a11y inspect ${{ matrix.probe }}" a11y inspect '${{ matrix.probe }}'
+          echo "RESULT $ok/$n (${{ runner.os }} a11y)"
+          [ "$ok" = "$n" ]
+
   kih-tool-selftests:
     strategy:
       fail-fast: false
