@@ -1001,6 +1001,45 @@ jobs:
           "$py" "$RUNNER_TEMP/atspi_ref.py"
           sleep 1; echo "REF zenity after click: $(pgrep zenity >/dev/null && echo still-open || echo closed)"
 
+  a11y-linux-gtk:
+    # Spokesman 2026-11-07: the kih GTK probe (tools/a11y-linux/atspi-find-invoke.py) opens a window with
+    # Order / Cancel / Confirm payment, finds all three over AT-SPI by name and clicks Cancel with doAction.
+    # It is the model for wkappbot a11y find/invoke on Linux. gi is built for python3.12 on the runner.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/wkappbot-kih
+          token: ${{ secrets.WKAPPBOT_CORE_PAT }}
+          path: kih
+      - name: Harness ref from the commit message (push runs)
+        if: github.event_name == 'push'
+        working-directory: kih
+        env:
+          MSG: ${{ github.event.head_commit.message }}
+        run: |
+          ref=$(printf '%s\n' "$MSG" | sed -n 's/^harness-ref: *//p' | head -1 | tr -d '\r ')
+          [ -n "$ref" ] || { echo "HARNESS-REF main"; exit 0; }
+          printf '%s' "$ref" | grep -qE '^[A-Za-z0-9._/-]{1,100}$' || { echo "bad harness-ref"; exit 1; }
+          git fetch --depth=1 origin "$ref" && git checkout -q FETCH_HEAD && echo "HARNESS-REF $ref $(git log -1 --format=%h)"
+      - name: GTK probe over AT-SPI (find by name + doAction)
+        working-directory: kih
+        run: |
+          probe=tools/a11y-linux/atspi-find-invoke.py
+          [ -f "$probe" ] || { echo "FAIL probe not in this kih ref (it lives on kih spk-a11y-linux until merged)"; echo "RESULT 0/1 (Linux GTK a11y)"; exit 1; }
+          sudo apt-get update -qq >/dev/null
+          sudo apt-get install -y -qq xvfb at-spi2-core dbus-x11 python3-pyatspi python3-gi gir1.2-gtk-3.0 >/dev/null
+          py=$(command -v python3.12 || command -v python3)
+          echo "PY $($py --version 2>&1)"
+          out=$(xvfb-run -a dbus-run-session -- "$py" "$probe" 2>&1) && rc=0 || rc=$?
+          printf '%s\n' "$out" | grep -E '^(PASS|FAIL|RESULT|NOTE)' | cut -c1-300
+          printf '%s\n' "$out" | grep -qE '^RESULT [0-9]+/[0-9]+' || echo "FAIL probe printed no RESULT line (rc=$rc)"
+          exit $rc
+
   kih-tool-selftests:
     strategy:
       fail-fast: false
