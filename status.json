@@ -1,1 +1,25 @@
-{"schema":1,"service":"haiku-daemon","state":"starting","kill_switch":"closed","queue":0,"requests_today":0,"answered_count":0,"last_answer_at":null,"last_latency_ms":null,"run_id":"42410696940","runner_id":"GitHub Actions 1000238750","started_at":"2026-11-07T20:21:58.000Z","updated_at":"2026-11-07T20:21:58.000Z"}
+{
+  "schema": 1,
+  "service": "haiku-daemon",
+  "display_name": "WK in-house model",
+  "state": "starting",
+  "kill_switch": "closed",
+  "wire": "unset",
+  "queue": 0,
+  "requests_today": 0,
+  "cap": 400,
+  "wire_writes_today": 0,
+  "answered_count": 0,
+  "refused_count": 0,
+  "rate_limited_count": 0,
+  "error_count": 0,
+  "writes_per_turn": null,
+  "last_answer_at": null,
+  "last_latency_ms": null,
+  "last_first_byte_ms": null,
+  "started_at": "2026-11-07T20:22:03.070Z",
+  "updated_at": "2026-11-07T20:22:03.276Z",
+  "handoff_at": null,
+  "run_id": "42410696940",
+  "runner_id": "GitHub Actions 1000238750"
+}
