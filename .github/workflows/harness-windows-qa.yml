@@ -958,6 +958,48 @@ jobs:
           fi
           echo "RESULT $ok/$n (${{ runner.os }} ${{ matrix.mode }} a11y)"
           [ "$ok" = "$n" ]
+      - name: AT-SPI reference probe (python pyatspi, the platform path wkappbot a11y must match)
+        if: always() && runner.os == 'Linux' && matrix.mode == 'desktop'
+        run: |
+          # Spokesman 2026-11-07, proven on a cloud VM: AT-SPI lists the GTK app's buttons by name and doAction clicks one.
+          # This is the reference the wkappbot a11y backend has to match; it does not use wkappbot.
+          sudo apt-get install -y -qq python3-pyatspi python3-gi gir1.2-gtk-3.0 >/dev/null
+          py=$(command -v python3.12 || command -v python3)
+          cat > "$RUNNER_TEMP/atspi_ref.py" <<'EOF'
+          import sys, time, pyatspi
+          desk = pyatspi.Registry.getDesktop(0)
+          def walk(a, depth=0):
+              if depth > 12 or a is None: return
+              yield a
+              for i in range(a.childCount):
+                  try: yield from walk(a.getChildAtIndex(i), depth + 1)
+                  except Exception: pass
+          win = None
+          for app in desk:
+              for node in walk(app):
+                  if node.getRoleName() in ("dialog", "frame", "alert") and "wkappbot-probe" in (node.name or ""):
+                      win = node; break
+              if win: break
+          ok = n = 0
+          n += 1
+          if win: ok += 1; print("PASS ref window found by name: wkappbot-probe")
+          else: print("FAIL ref window wkappbot-probe not found"); print("RESULT %d/%d (AT-SPI reference)" % (ok, n)); sys.exit(1)
+          buttons = [b for b in walk(win) if b.getRoleName() == "push button"]
+          names = [b.name for b in buttons]
+          n += 1
+          if any(x in ("Yes", "No") for x in names): ok += 1; print("PASS ref buttons by name: %s" % names)
+          else: print("FAIL ref buttons by name: %s" % names)
+          n += 1
+          target = next((b for b in buttons if b.name == "No"), None)
+          try:
+              target.queryAction().doAction(0); ok += 1; print("PASS ref doAction clicked No by name")
+          except Exception as ex:
+              print("FAIL ref doAction on No: %s" % type(ex).__name__)
+          print("RESULT %d/%d (AT-SPI reference)" % (ok, n))
+          sys.exit(0 if ok == n else 1)
+          EOF
+          "$py" "$RUNNER_TEMP/atspi_ref.py"
+          sleep 1; echo "REF zenity after click: $(pgrep zenity >/dev/null && echo still-open || echo closed)"
 
   kih-tool-selftests:
     strategy:
