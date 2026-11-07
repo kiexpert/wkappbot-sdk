@@ -516,6 +516,10 @@ jobs:
           # The lite harness, the e2e driver and pure-number counts (16/16) stay readable; absolute scratch paths
           # are not repo names.
           mask() { perl -MDigest::SHA=sha256_hex -pe 's{(?<![\w/.~:-])((?:[\w.-]+/)+[\w.-]+|[\w.-]+\.psm?1)\b}{my $n=$1; ($n=~m{^[\d./]+$|(^|/)wkharness-lite\.sh$|^wkappbot-code/selftest[\w.-]*\.sh$}) ? $n : "<name sha256:".substr(sha256_hex($n),0,8).">"}ge'; }
+          # Windows npm needs these from the parent env; print presence only (names, never values).
+          if [ "$RUNNER_OS" = Windows ]; then
+            for v in ComSpec SystemRoot PATHEXT; do eval "x=\${$v+set}"; echo "ENV-PRESENT $v=${x:-unset}"; done
+          fi
           for sh in $shells; do
             out=$(PATH="$NOPWSH_PATH" $sh wkappbot-code/selftest-opencode-e2e.sh nopwsh 2>&1); rc=$?
             # The pass/fail gate reads the RESULT line from the raw output, before any masking.
