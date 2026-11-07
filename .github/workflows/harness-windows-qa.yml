@@ -1036,8 +1036,11 @@ jobs:
           py=$(command -v python3.12 || command -v python3)
           echo "PY $($py --version 2>&1)"
           out=$(xvfb-run -a dbus-run-session -- "$py" "$probe" 2>&1) && rc=0 || rc=$?
-          printf '%s\n' "$out" | grep -E '^(PASS|FAIL|RESULT|NOTE)' | cut -c1-300
-          printf '%s\n' "$out" | grep -qE '^RESULT [0-9]+/[0-9]+' || echo "FAIL probe printed no RESULT line (rc=$rc)"
+          # Private kih paths and file names are sha256-masked like the e2e job; pure counts stay readable.
+          mask() { perl -MDigest::SHA=sha256_hex -pe 's{(?<![\w/.~:-])((?:[\w.-]+/)+[\w.-]+|[\w.-]+\.(?:py|psm?1|sh))\b}{my $n=$1; ($n=~m{^[\d./]+$}) ? $n : "<name sha256:".substr(sha256_hex($n),0,8).">"}ge'; }
+          echo "PROBE rc=$rc lines=$(printf '%s\n' "$out" | wc -l)"
+          printf '%s\n' "$out" | head -60 | cut -c1-300 | mask
+          printf '%s\n' "$out" | grep -qE 'RESULT [0-9]+/[0-9]+' || echo "FAIL probe printed no RESULT line (rc=$rc)"
           exit $rc
 
   kih-tool-selftests:
