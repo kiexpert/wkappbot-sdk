@@ -1,5 +1,5 @@
 name: Harness QA (Windows + macOS)
-# rerun: full matrix on kih branch stopframe-diff (pre-merge proof), 2026-11-07T13:32Z
+# rerun: full matrix on kih branch stopframe-diff 46ea85a (pre-merge proof), 2026-11-07T14:05Z
 
 # Runs the harness repo's own self-tests on Windows and macOS runners, so a harness change made on a
 # Linux cloud VM is proven on the owner's two desktop platforms too. On macOS the Bash self-tests run a
