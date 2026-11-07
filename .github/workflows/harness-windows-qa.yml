@@ -885,8 +885,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { os: ubuntu-latest, asset: wkappbot-linux-x64, probe: '*wkappbot-probe*', button: '*Yes*' }
-          - { os: macos-latest,  asset: wkappbot-osx-arm64, probe: '*Finder*', button: '' }
+          - { os: ubuntu-latest, asset: wkappbot-linux-x64, probe: '*wkappbot-probe*', button: '*Yes*', mode: desktop }
+          # Owner 2026-11-07: with no display, a headless CDP Chrome is the whole world for a11y.
+          - { os: ubuntu-latest, asset: wkappbot-linux-x64, probe: '*wkappbot-probe*', button: '*Yes*', mode: headless }
+          - { os: macos-latest,  asset: wkappbot-osx-arm64, probe: '*Finder*', button: '', mode: desktop }
     runs-on: ${{ matrix.os }}
     timeout-minutes: 10
     defaults:
@@ -905,7 +907,7 @@ jobs:
           [ -n "$want" ] && [ "$want" = "$got" ]
           chmod +x wkappbot
       - name: Linux desktop for AT-SPI (Xvfb, session D-Bus, at-spi bus, one GTK app)
-        if: runner.os == 'Linux'
+        if: runner.os == 'Linux' && matrix.mode == 'desktop'
         run: |
           # Owner 2026-11-07: Linux a11y means AT-SPI on an X server. zenity is a GTK app whose question dialog has
           # Yes and No buttons; a11y find must list them by name.
@@ -921,6 +923,16 @@ jobs:
           sleep 3
           { echo "DISPLAY=$DISPLAY"; echo "DBUS_SESSION_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS"; } >> "$GITHUB_ENV"
           echo "DESKTOP Xvfb=:99 dbus=$( [ -n "$DBUS_SESSION_BUS_ADDRESS" ] && echo up || echo down ) atspi=$(pgrep -f at-spi-bus-launcher >/dev/null && echo up || echo down) zenity=$(pgrep zenity >/dev/null && echo up || echo down)"
+      - name: Headless world (no X, no desktop) -- one headless Chrome on CDP with a probe page
+        if: matrix.mode == 'headless'
+        run: |
+          unset DISPLAY
+          mkdir -p probe && printf '%s\n' '<!doctype html><title>wkappbot-probe</title><h1>wkappbot-probe</h1><p>Headless a11y probe text.</p><button>Yes</button><button>No</button>' > probe/index.html
+          (cd probe && python3 -m http.server 8765 >/dev/null 2>&1 &)
+          chrome=$(command -v google-chrome || command -v chromium || command -v chromium-browser)
+          "$chrome" --headless=new --no-sandbox --remote-debugging-port=9222 --user-data-dir="$RUNNER_TEMP/chrome" http://127.0.0.1:8765/ >/dev/null 2>&1 &
+          for i in $(seq 1 20); do curl -fsS http://127.0.0.1:9222/json/version >/dev/null 2>&1 && break; sleep 1; done
+          echo "HEADLESS DISPLAY=${DISPLAY:-none} chrome=$(basename "$chrome") cdp=$(curl -fsS http://127.0.0.1:9222/json/version >/dev/null 2>&1 && echo up || echo down) tabs=$(curl -fsS http://127.0.0.1:9222/json/list 2>/dev/null | grep -c '"type": "page"')"
       - name: a11y discovery commands
         run: |
           set +e
@@ -937,10 +949,14 @@ jobs:
           run "a11y windows" a11y windows
           run "a11y find ${{ matrix.probe }}" a11y find '${{ matrix.probe }}'
           run "a11y inspect ${{ matrix.probe }}" a11y inspect '${{ matrix.probe }}'
+          if [ '${{ matrix.mode }}' = headless ]; then
+            unset DISPLAY
+            run "a11y read ${{ matrix.probe }} (page as text)" a11y read '${{ matrix.probe }}'
+          fi
           if [ -n '${{ matrix.button }}' ]; then
             run "a11y find ${{ matrix.probe }} button ${{ matrix.button }}" a11y find '${{ matrix.probe }}#${{ matrix.button }}'
           fi
-          echo "RESULT $ok/$n (${{ runner.os }} a11y)"
+          echo "RESULT $ok/$n (${{ runner.os }} ${{ matrix.mode }} a11y)"
           [ "$ok" = "$n" ]
 
   kih-tool-selftests:
