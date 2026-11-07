@@ -565,6 +565,14 @@ jobs:
           done
           exit $fail
 
+      - name: Windows install prerequisites as the driver's parent sees them
+        if: failure() && runner.os == 'Windows'
+        run: |
+          # Presence and version only. The kih harness install.sh needs curl, tar and python3, and exits 1 if one is missing.
+          for t in curl tar python3 python sha256sum sh git node; do
+            p=$(PATH="$NOPWSH_PATH" command -v "$t" 2>/dev/null || echo MISSING); echo "PREREQ $t $p"
+          done
+          echo "PREREQ python3 --version: $(PATH="$NOPWSH_PATH" python3 --version 2>&1 | head -1)"
       - name: macOS c-write/c-edit diagnosis (scratch files only)
         if: failure() && runner.os == 'macOS'
         working-directory: kih
