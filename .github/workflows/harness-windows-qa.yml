@@ -885,8 +885,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { os: ubuntu-latest, asset: wkappbot-linux-x64, probe: '*' }
-          - { os: macos-latest,  asset: wkappbot-osx-arm64, probe: '*Finder*' }
+          - { os: ubuntu-latest, asset: wkappbot-linux-x64, probe: '*wkappbot-probe*', button: '*Yes*' }
+          - { os: macos-latest,  asset: wkappbot-osx-arm64, probe: '*Finder*', button: '' }
     runs-on: ${{ matrix.os }}
     timeout-minutes: 10
     defaults:
@@ -904,6 +904,23 @@ jobs:
           echo "ASSET ${{ matrix.asset }} sha256 want=${want:0:16} got=${got:0:16}"
           [ -n "$want" ] && [ "$want" = "$got" ]
           chmod +x wkappbot
+      - name: Linux desktop for AT-SPI (Xvfb, session D-Bus, at-spi bus, one GTK app)
+        if: runner.os == 'Linux'
+        run: |
+          # Owner 2026-11-07: Linux a11y means AT-SPI on an X server. zenity is a GTK app whose question dialog has
+          # Yes and No buttons; a11y find must list them by name.
+          sudo apt-get update -qq && sudo apt-get install -y -qq xvfb at-spi2-core dbus-x11 zenity >/dev/null
+          Xvfb :99 -screen 0 1280x800x24 >/dev/null 2>&1 &
+          export DISPLAY=:99
+          eval "$(dbus-launch --sh-syntax)"
+          for b in /usr/libexec/at-spi-bus-launcher /usr/lib/at-spi2-core/at-spi-bus-launcher; do
+            [ -x "$b" ] && { "$b" --launch-immediately >/dev/null 2>&1 & break; }
+          done
+          sleep 2
+          NO_AT_BRIDGE=0 GTK_MODULES=gail:atk-bridge zenity --question --title=wkappbot-probe --text=wkappbot-probe >/dev/null 2>&1 &
+          sleep 3
+          { echo "DISPLAY=$DISPLAY"; echo "DBUS_SESSION_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS"; } >> "$GITHUB_ENV"
+          echo "DESKTOP Xvfb=:99 dbus=$( [ -n "$DBUS_SESSION_BUS_ADDRESS" ] && echo up || echo down ) atspi=$(pgrep -f at-spi-bus-launcher >/dev/null && echo up || echo down) zenity=$(pgrep zenity >/dev/null && echo up || echo down)"
       - name: a11y discovery commands
         run: |
           set +e
@@ -920,6 +937,9 @@ jobs:
           run "a11y windows" a11y windows
           run "a11y find ${{ matrix.probe }}" a11y find '${{ matrix.probe }}'
           run "a11y inspect ${{ matrix.probe }}" a11y inspect '${{ matrix.probe }}'
+          if [ -n '${{ matrix.button }}' ]; then
+            run "a11y find ${{ matrix.probe }} button ${{ matrix.button }}" a11y find '${{ matrix.probe }}#${{ matrix.button }}'
+          fi
           echo "RESULT $ok/$n (${{ runner.os }} a11y)"
           [ "$ok" = "$n" ]
 
