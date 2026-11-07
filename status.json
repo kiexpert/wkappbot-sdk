@@ -2,7 +2,7 @@
   "schema": 1,
   "service": "haiku-daemon",
   "display_name": "WK in-house model",
-  "state": "starting",
+  "state": "running",
   "kill_switch": "closed",
   "wire": "unset",
   "queue": 0,
@@ -18,7 +18,7 @@
   "last_latency_ms": null,
   "last_first_byte_ms": null,
   "started_at": "2026-11-07T20:22:03.070Z",
-  "updated_at": "2026-11-07T20:22:03.276Z",
+  "updated_at": "2026-11-07T20:27:04.178Z",
   "handoff_at": null,
   "run_id": "42410696940",
   "runner_id": "GitHub Actions 1000238750"
