@@ -192,6 +192,19 @@ jobs:
           ref: ${{ inputs.harness_ref || 'main' }}
           token: ${{ secrets.WKAPPBOT_CORE_PAT }}
           path: kih
+      - name: Harness ref from the commit message (push runs)
+        # A push whose head commit message has a line "harness-ref: <kih branch or sha>" tests that kih head
+        # instead of main, so a kih branch can be proven here before it merges.
+        if: github.event_name == 'push'
+        shell: bash
+        working-directory: kih
+        env:
+          MSG: ${{ github.event.head_commit.message }}
+        run: |
+          ref=$(printf '%s\n' "$MSG" | sed -n 's/^harness-ref: *//p' | head -1 | tr -d '\r ')
+          [ -n "$ref" ] || { echo "HARNESS-REF main"; exit 0; }
+          printf '%s' "$ref" | grep -qE '^[A-Za-z0-9._/-]{1,100}$' || { echo "bad harness-ref"; exit 1; }
+          git fetch --depth=1 origin "$ref" && git checkout -q FETCH_HEAD && echo "HARNESS-REF $ref $(git log -1 --format=%h)"
 
       - name: Setup Python
         uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6
@@ -487,6 +500,19 @@ jobs:
           ref: ${{ inputs.harness_ref || 'main' }}
           token: ${{ secrets.WKAPPBOT_CORE_PAT }}
           path: kih
+      - name: Harness ref from the commit message (push runs)
+        # A push whose head commit message has a line "harness-ref: <kih branch or sha>" tests that kih head
+        # instead of main, so a kih branch can be proven here before it merges.
+        if: github.event_name == 'push'
+        shell: bash
+        working-directory: kih
+        env:
+          MSG: ${{ github.event.head_commit.message }}
+        run: |
+          ref=$(printf '%s\n' "$MSG" | sed -n 's/^harness-ref: *//p' | head -1 | tr -d '\r ')
+          [ -n "$ref" ] || { echo "HARNESS-REF main"; exit 0; }
+          printf '%s' "$ref" | grep -qE '^[A-Za-z0-9._/-]{1,100}$' || { echo "bad harness-ref"; exit 1; }
+          git fetch --depth=1 origin "$ref" && git checkout -q FETCH_HEAD && echo "HARNESS-REF $ref $(git log -1 --format=%h)"
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
@@ -599,6 +625,19 @@ jobs:
           ref: ${{ inputs.harness_ref || 'main' }}
           token: ${{ secrets.WKAPPBOT_CORE_PAT }}
           path: kih
+      - name: Harness ref from the commit message (push runs)
+        # A push whose head commit message has a line "harness-ref: <kih branch or sha>" tests that kih head
+        # instead of main, so a kih branch can be proven here before it merges.
+        if: github.event_name == 'push'
+        shell: bash
+        working-directory: kih
+        env:
+          MSG: ${{ github.event.head_commit.message }}
+        run: |
+          ref=$(printf '%s\n' "$MSG" | sed -n 's/^harness-ref: *//p' | head -1 | tr -d '\r ')
+          [ -n "$ref" ] || { echo "HARNESS-REF main"; exit 0; }
+          printf '%s' "$ref" | grep -qE '^[A-Za-z0-9._/-]{1,100}$' || { echo "bad harness-ref"; exit 1; }
+          git fetch --depth=1 origin "$ref" && git checkout -q FETCH_HEAD && echo "HARNESS-REF $ref $(git log -1 --format=%h)"
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
@@ -779,6 +818,19 @@ jobs:
           ref: ${{ inputs.harness_ref || 'main' }}
           token: ${{ secrets.WKAPPBOT_CORE_PAT }}
           path: kih
+      - name: Harness ref from the commit message (push runs)
+        # A push whose head commit message has a line "harness-ref: <kih branch or sha>" tests that kih head
+        # instead of main, so a kih branch can be proven here before it merges.
+        if: github.event_name == 'push'
+        shell: bash
+        working-directory: kih
+        env:
+          MSG: ${{ github.event.head_commit.message }}
+        run: |
+          ref=$(printf '%s\n' "$MSG" | sed -n 's/^harness-ref: *//p' | head -1 | tr -d '\r ')
+          [ -n "$ref" ] || { echo "HARNESS-REF main"; exit 0; }
+          printf '%s' "$ref" | grep -qE '^[A-Za-z0-9._/-]{1,100}$' || { echo "bad harness-ref"; exit 1; }
+          git fetch --depth=1 origin "$ref" && git checkout -q FETCH_HEAD && echo "HARNESS-REF $ref $(git log -1 --format=%h)"
       - name: Selftests per shell
         working-directory: kih
         run: |
