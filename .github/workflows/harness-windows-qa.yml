@@ -811,6 +811,71 @@ jobs:
           echo "RESULT $ok/$n"
           [ "$ok" = "$n" ]
 
+  # Spokesman 2026-11-07: Agent.cmd routing and the polyglot launcher on every OS. The routing selftest runs under
+  # pwsh; Agent.cmd --help runs through sh on Linux/macOS and through cmd on Windows. A run that leaves a new
+  # *.tmp file in the checkout fails the leg (".tmp-free").
+  agent-cmd-check:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout harness repo
+        uses: actions/checkout@v5
+        with:
+          repository: ${{ github.repository_owner }}/wkappbot-kih
+          ref: ${{ inputs.harness_ref || 'main' }}
+          token: ${{ secrets.WKAPPBOT_CORE_PAT }}
+          path: kih
+      - name: Harness ref from the commit message (push runs)
+        # A push whose head commit message has a line "harness-ref: <kih branch or sha>" tests that kih head
+        # instead of main, so a kih branch can be proven here before it merges.
+        if: github.event_name == 'push'
+        shell: bash
+        working-directory: kih
+        env:
+          MSG: ${{ github.event.head_commit.message }}
+        run: |
+          ref=$(printf '%s\n' "$MSG" | sed -n 's/^harness-ref: *//p' | head -1 | tr -d '\r ')
+          [ -n "$ref" ] || { echo "HARNESS-REF main"; exit 0; }
+          printf '%s' "$ref" | grep -qE '^[A-Za-z0-9._/-]{1,100}$' || { echo "bad harness-ref"; exit 1; }
+          git fetch --depth=1 origin "$ref" && git checkout -q FETCH_HEAD && echo "HARNESS-REF $ref $(git log -1 --format=%h)"
+
+      - name: Agent routing selftest and Agent.cmd --help
+        working-directory: kih
+        run: |
+          set +e
+          echo "HARNESS $(git log -1 --format='%h %cs')"
+          before=$(find . -name '*.tmp' -not -path './.git/*' | sort)
+          n=0; ok=0
+          chk() { n=$((n+1)); if [ "$1" = 0 ]; then ok=$((ok+1)); echo "PASS $2"; else echo "FAIL $2 (rc=$1)"; fi; }
+          if [ -f tools/Agent.routing-selftest.ps1 ]; then
+            out=$(pwsh -NoProfile -File tools/Agent.routing-selftest.ps1 2>&1); rc=$?
+            printf '%s\n' "$out" | grep -E '^(RESULT|FAIL)' | head -20 | sed 's/^/  [routing] /'
+            chk $rc "Agent.routing-selftest.ps1 (pwsh)"
+          else
+            chk 1 "Agent.routing-selftest.ps1 present"
+          fi
+          if [ "$RUNNER_OS" = Windows ]; then
+            out=$(cmd //c "tools\\Agent.cmd --help" 2>&1); rc=$?
+            label="tools\\Agent.cmd --help (cmd)"
+          else
+            out=$(sh tools/Agent.cmd --help 2>&1); rc=$?
+            label="sh tools/Agent.cmd --help"
+          fi
+          echo "  [help] $(printf '%s\n' "$out" | grep -c .) lines of help output"
+          chk $rc "$label"
+          after=$(find . -name '*.tmp' -not -path './.git/*' | sort)
+          new=$(comm -13 <(printf '%s\n' "$before") <(printf '%s\n' "$after") | grep -c . || true)
+          [ "$new" = 0 ]; chk $? ".tmp-free (new .tmp files: $new)"
+          echo "RESULT $ok/$n"
+          [ "$ok" = "$n" ]
+
   kih-tool-selftests:
     strategy:
       fail-fast: false
