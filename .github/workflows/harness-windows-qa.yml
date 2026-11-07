@@ -586,7 +586,8 @@ jobs:
           - { os: macos-latest, ps: none }
     name: wkjs-parity (${{ matrix.os }}, ${{ matrix.ps }})
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
+    # kih PR 82 gives the PS5.1 oracle up to 45 min per slow row; the job cap must sit above it.
+    timeout-minutes: 60
     defaults:
       run:
         shell: bash
