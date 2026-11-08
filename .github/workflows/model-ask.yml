@@ -1,0 +1,70 @@
+name: model-ask
+
+# One brief -> one answer from an external model, with the API keys the SDK already holds
+# (GEMINI_API_KEY, GROQ_API_KEY, CEREBRAS_API_KEY). No login on a fresh VM: the runner has the keys.
+# Two ways to send a brief:
+#   1. workflow_dispatch: inputs brief + family.
+#   2. push a branch model-ask/<id> whose commit holds model-ask/brief.txt and model-ask/family
+#      (for seats whose token cannot dispatch). Delete the branch after reading the answer.
+# Read the answer: the "ANSWER <family>:" log line, the job summary, or artifact model-ask-<run id>.
+# This repo is PUBLIC: the brief and the answer appear in the log. Never put a secret or private
+# detail in a brief. Keys are never printed (scripts/model_ask.py prints only HTTP status on error).
+on:
+  workflow_dispatch:
+    inputs:
+      brief:
+        description: "Prompt for the model (public: no secrets)"
+        required: true
+        type: string
+      family:
+        description: "gemini | groq | cerebras"
+        required: true
+        default: gemini
+        type: choice
+        options: [gemini, groq, cerebras]
+  push:
+    branches: ['model-ask/**']
+
+permissions:
+  contents: read
+
+jobs:
+  ask:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4
+      - name: Read the brief
+        env:
+          IN_BRIEF: ${{ inputs.brief }}
+          IN_FAMILY: ${{ inputs.family }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/ask"
+          if [ "${{ github.event_name }}" = workflow_dispatch ]; then
+            printf '%s\n' "$IN_BRIEF" > "$RUNNER_TEMP/ask/brief.txt"; fam="$IN_FAMILY"
+          else
+            [ -f model-ask/brief.txt ] || { echo "::error::branch has no model-ask/brief.txt"; exit 1; }
+            cp model-ask/brief.txt "$RUNNER_TEMP/ask/brief.txt"
+            fam="$(tr -d ' \r\n' < model-ask/family 2>/dev/null || echo gemini)"
+          fi
+          case "$fam" in gemini|groq|cerebras) ;; *) echo "::error::unknown family '$fam'"; exit 1;; esac
+          echo "FAMILY=$fam" >> "$GITHUB_ENV"
+          echo "family: $fam, brief: $(wc -c < "$RUNNER_TEMP/ask/brief.txt") bytes"
+      - name: Ask ${{ env.FAMILY }}
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          CEREBRAS_API_KEY: ${{ secrets.CEREBRAS_API_KEY }}
+        run: python3 scripts/model_ask.py "$FAMILY" "$RUNNER_TEMP/ask/brief.txt" "$RUNNER_TEMP/ask/answer.txt"
+      - name: Summary
+        run: |
+          {
+            echo "### model-ask ($FAMILY)"
+            echo '**Brief**'; echo '```'; cat "$RUNNER_TEMP/ask/brief.txt"; echo '```'
+            echo '**Answer**'; echo '```'; cat "$RUNNER_TEMP/ask/answer.txt"; echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7
+        with:
+          name: model-ask-${{ github.run_id }}
+          path: ${{ runner.temp }}/ask/
+          retention-days: 7
