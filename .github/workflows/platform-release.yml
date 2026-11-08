@@ -8,7 +8,7 @@ name: Platform Release (build / verify / release)
 #            browser-wasm (ubuntu: dotnet publish WKAppBot.Wasm + Node/Playwright smoke; artifact wasm-bundle)
 #   verify   each binary on its native runner: --version, skill read on-load, smoke. Any red stops.
 #            + kih harness QA (kih tools/wk-harness-qa.sh --quick) against the same binary.
-#   release  tag push only: SHA256SUMS + assets on the GitHub release. The asset names are a
+#   release  every green main run (as v<core X.Y.N>-sdk, marked latest) and every tag push: SHA256SUMS + assets. The asset names are a
 #            contract (kih tools/wk-bin-acquire.sh downloads releases/latest/download/<name>).
 #   publish-to-kih  green run on main (push, core-updated dispatch, cron) or a tag: kih bin/ +
 #            MANIFEST.md updated with kih's own wk-bin-acquire.sh publish, one commit naming the core
@@ -72,6 +72,7 @@ jobs:
       sha: ${{ steps.r.outputs.sha }}
       build: ${{ steps.r.outputs.build }}
       patch: ${{ steps.p.outputs.patch }}
+      version: ${{ steps.p.outputs.version }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4
       - name: Resolve ref, and on cron skip an unchanged core
@@ -381,8 +382,11 @@ jobs:
 
   release:
     name: publish GitHub release
-    if: startsWith(github.ref, 'refs/tags/v')
-    needs: checksums
+    # A tag push releases that tag. Every green farm run on main (push, dispatch, cron) also publishes or refreshes
+    # v<core X.Y.N>-sdk and marks it latest, because installers (kih wk-bin-acquire.sh, npm wkappbot-code) download
+    # releases/latest/download/<asset>: without this, users kept getting the last hand-tagged core.
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+    needs: [resolve, checksums]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -395,17 +399,30 @@ jobs:
       - name: Create or update release
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.ref_name }}
+          CORE_VERSION: ${{ needs.resolve.outputs.version }}
+          CORE_SHA: ${{ needs.resolve.outputs.sha }}
         run: |
           cd dist && sha256sum -c SHA256SUMS && cd ..
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            TAG="$GITHUB_REF_NAME"; target=(--verify-tag)
+          else
+            [ -n "$CORE_VERSION" ] || { echo "::error::no core version from resolve"; exit 1; }
+            TAG="v${CORE_VERSION}-sdk"; target=(--target "$GITHUB_SHA")
+          fi
           ver="${TAG#v}"
-          # Release notes = this version's CHANGELOG section.
+          echo "release tag: $TAG (core ${CORE_VERSION:-?} @ ${CORE_SHA:0:9})"
+          # Release notes = this version's CHANGELOG section, else a farm-build note.
           awk -v h="## [$ver]" 'index($0,h)==1{f=1;next} f&&/^## \[/{exit} f' CHANGELOG.md > notes.md
-          [ -s notes.md ] || echo "See CHANGELOG.md" > notes.md
+          if [ ! -s notes.md ]; then
+            printf 'Platform build of the WKAppBot core %s (core commit %s), built and verified on linux-x64, osx-arm64, osx-x64 and win-x64 by %s/%s/actions/runs/%s.\n\nSee CHANGELOG.md for the SDK changes.\n' \
+              "${CORE_VERSION:-$ver}" "${CORE_SHA:0:9}" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" > notes.md
+          fi
+          pre=$(case "$TAG" in *-pre*|*-rc*|*-beta*) echo --prerelease ;; *) echo --latest ;; esac)
           gh release view "$TAG" >/dev/null 2>&1 || \
-            gh release create "$TAG" --title "WKAppBot $TAG" --notes-file notes.md --verify-tag \
-              $(case "$TAG" in *-pre*|*-rc*|*-beta*) echo --prerelease ;; esac)
+            gh release create "$TAG" --title "WKAppBot $TAG" --notes-file notes.md "${target[@]}" $pre
           gh release upload "$TAG" dist/* --clobber
+          [ "$pre" = --latest ] && gh release edit "$TAG" --latest >/dev/null
+          echo "release: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/tag/$TAG"
           gh release view "$TAG" --json assets --jq '.assets[] | "\(.name) \(.size)"'
 
   publish-to-kih:
