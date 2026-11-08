@@ -145,8 +145,15 @@ jobs:
           set -u
           new=true
           if npm view "$PKG@$VER" version >/dev/null 2>&1; then new=false; echo "$PKG@$VER is already on the registry: nothing to publish, no QA"; fi
-          k=$(ls src/bin/linux-x64/* 2>/dev/null | head -1)
-          kc=""; if [ -n "$k" ]; then chmod +x "$k"; kc="$("$k" --version 2>&1 | tr -d '\r' | grep -m1 -E '^wkappbot v' || true)"; fi
+          # kih bin/linux-x64/ can hold an old name next to the current one (wkappbot 7.12.8 beside wkappbot-linux-x64
+          # 7.12.34): take the HIGHEST version any of its binaries prints, not the first file name.
+          kc=""
+          for k in src/bin/linux-x64/*; do
+            [ -f "$k" ] || continue; chmod +x "$k"
+            v="$("$k" --version 2>&1 | tr -d '\r' | grep -m1 -E '^wkappbot v' || true)"; [ -n "$v" ] || continue
+            echo "kih $(basename "$k"): $v"
+            if [ -z "$kc" ] || [ "$(printf '%s\n%s\n' "$(echo "$kc" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')" "$(echo "$v" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')" | sort -V | tail -1)" != "$(echo "$kc" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')" ]; then kc="$v"; fi
+          done
           echo "kih bin core: ${kc:-unknown}"
           { echo "ver=$VER"; echo "pkg=$PKG"; echo "new=$new"; echo "kih_core=$kc"; } >> "$GITHUB_OUTPUT"
           mkdir -p "$RUNNER_TEMP/tgzout" && cp "$TGZ" "$RUNNER_TEMP/tgzout/"
