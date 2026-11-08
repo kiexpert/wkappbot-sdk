@@ -357,7 +357,7 @@ jobs:
           merge-multiple: true
       - name: Clone kih
         env:
-          GH_TOKEN: ${{ secrets.KIH_PUSH_PAT }}
+          GH_TOKEN: ${{ secrets.KIH_PUSH_PAT || secrets.GH_LICENSE_TOKEN || secrets.WKAPPBOT_PAT || secrets.WKAPPBOT_CORE_PAT }}
         run: bash .github/scripts/clone-kih.sh
       - name: Publish (skip unchanged) and push once
         env:
