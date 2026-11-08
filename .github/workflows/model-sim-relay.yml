@@ -96,7 +96,10 @@ jobs:
             git -C "$d" config user.name relay-bot
             git -C "$d" config user.email relay-bot@users.noreply.github.com
           done
-          git -C ans add -A ans
+          # Stage a queue folder only when it exists on disk or still has tracked files: an empty queue has no folder
+          # (git keeps no empty dirs), and `git add -A req` on it died with "pathspec 'req' did not match any files".
+          stage() { if [ -e "$1/$2" ] || [ -n "$(git -C "$1" ls-files -- "$2")" ]; then git -C "$1" add -A -- "$2"; fi; }
+          stage ans ans
           git -C ans diff --cached --quiet || { git -C ans commit -qm "relay: answers" && git -C ans push -q origin HEAD:relay/model-ans; }
-          git -C req add -A req
+          stage req req
           git -C req diff --cached --quiet || { git -C req commit -qm "relay: answered" && git -C req push -q origin HEAD:relay/model-req; }
