@@ -1112,3 +1112,47 @@ jobs:
             fi
           fi
           exit $fail
+
+  wkhippo-history:
+    # Spokesman 2026-11-08: the kih wkhippo reflex history merge is proven by its own selftest on the owner's two
+    # desktop platforms. The step fails unless the selftest prints RESULT n/n, and fails when the kih ref has no selftest.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/wkappbot-kih
+          token: ${{ secrets.WKAPPBOT_CORE_PAT }}
+          path: kih
+      - name: Harness ref from the commit message (push runs)
+        if: github.event_name == 'push'
+        working-directory: kih
+        env:
+          MSG: ${{ github.event.head_commit.message }}
+        run: |
+          ref=$(printf '%s\n' "$MSG" | sed -n 's/^harness-ref: *//p' | head -1 | tr -d '\r ')
+          [ -n "$ref" ] || { echo "HARNESS-REF main"; exit 0; }
+          printf '%s' "$ref" | grep -qE '^[A-Za-z0-9._/-]{1,100}$' || { echo "bad harness-ref"; exit 1; }
+          git fetch --depth=1 origin "$ref" && git checkout -q FETCH_HEAD && echo "HARNESS-REF $ref $(git log -1 --format=%h)"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: wkhippo reflex history selftest
+        working-directory: kih
+        run: |
+          t=bin/wkhippo-lib/wkhippo_reflex_history_selftest.py
+          [ -f "$t" ] || { echo "FAIL selftest not in this kih ref"; echo "RESULT 0/1 (wkhippo history)"; exit 1; }
+          py=$(command -v python3 || command -v python)
+          out=$("$py" -u "$t" 2>&1) && rc=0 || rc=$?
+          # Private kih paths and file names are sha256-masked like the e2e job; pure counts stay readable.
+          mask() { perl -MDigest::SHA=sha256_hex -pe 's{(?<![\w/.~:-])(/?(?:[\w.-]+/)+[\w.-]+|[\w.-]+\.(?:py|psm?1|sh))\b}{my $n=$1; ($n=~m{^[\d./]+$}) ? $n : "<name sha256:".substr(sha256_hex($n),0,8).">"}ge'; }
+          printf '%s\n' "$out" | grep -E '^(CASE .*FAIL|FAIL|RESULT)' | cut -c1-300 | mask || true
+          r=$(printf '%s\n' "$out" | grep -E '^RESULT' | tail -1 || true); set -- $r
+          [ "$rc" = 0 ] && [ -n "$r" ] && [ "${2%%/*}" = "${2##*/}" ] || { echo "FAIL rc=$rc"; printf '%s\n' "$out" | tail -20 | cut -c1-300 | mask; exit 1; }
