@@ -475,7 +475,8 @@ jobs:
           # installer, doctor, update and config parts with every network part mocked.
           set +e   # the runner's bash -e would exit on the failing $( ) before any FAIL line is printed
           out=$(bash wkappbot-code/selftest.sh --synthetic-only 2>&1); rc=$?
-          printf '%s\n' "$out" | grep -E '^FAIL|^RESULT'
+          # a FAIL detail can span lines: print each FAIL line plus its continuation up to the next PASS/FAIL/RESULT line
+          printf '%s\n' "$out" | awk '/^(PASS|FAIL|RESULT)/{f=0} /^FAIL/{f=1} f||/^RESULT/' | cut -c1-600
           r=$(printf '%s\n' "$out" | grep '^RESULT' | tail -1); set -- $r
           [ "$rc" = 0 ] && [ -n "$r" ] && [ "${2%%/*}" = "${2##*/}" ] || { printf '%s\n' "$out" | tail -25; exit 1; }
 
