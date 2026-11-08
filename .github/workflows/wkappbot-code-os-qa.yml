@@ -78,8 +78,10 @@ jobs:
       - name: npm i -g wkappbot-code (registry)
         run: |
           set -eu
-          npm i -g wkappbot-code
-          wkappbot-code --version
+          npm i -g wkappbot-code 2>&1 | tee "$RUNNER_TEMP/npm-install.log"; rc=${PIPESTATUS[0]}
+          echo "npm install rc=$rc"; [ "$rc" = 0 ] || exit "$rc"
+          # the first wkappbot-code run after install: 0.3.11+ prints a first-run banner
+          wkappbot-code --version 2>&1 | tee "$RUNNER_TEMP/first-run.log"
           npm view wkappbot-code version
 
       - name: wkappbot-code install
@@ -124,6 +126,29 @@ jobs:
           set -u
           echo "mode ${{ matrix.mode }}, pwsh on PATH: $(command -v pwsh || echo none)"
           node scripts/qa/wkappbot-code-e2e.mjs --uninstall "$RUNNER_TEMP/before.txt"
+
+      - name: Release report (postinstall marker, core version, banner, tool rows)
+        if: always()
+        run: |
+          set +e
+          {
+            echo "REPORT os=${{ matrix.os }} mode=${{ matrix.mode }}"
+            echo "REPORT package: $(npm view wkappbot-code version 2>/dev/null) installed: $(wkappbot-code --version 2>/dev/null | tail -1)"
+            echo "REPORT $(grep -h 'npm install rc=' "$RUNNER_TEMP/npm-install.log" 2>/dev/null || echo 'npm install rc=see step')"
+            m="$HOME/.wkappbot-code/postinstall.done"
+            if [ -f "$m" ]; then echo "REPORT postinstall.done:"; head -c 1500 "$m" | sed 's/^/REPORT   /'; echo
+            else echo "REPORT postinstall.done: MISSING ($m)"; fi
+            echo "REPORT first-run banner: $(head -3 "$RUNNER_TEMP/first-run.log" 2>/dev/null | tr '\n' ' ' | cut -c1-300)"
+            core=""
+            for c in "$HOME/.wkappbot-code/bin/wkappbot" "$HOME/.wkappbot-code/bin/wkappbot-core.exe" "$HOME/.local/bin/wkappbot" "$(command -v wkappbot 2>/dev/null)"; do
+              [ -n "$c" ] && [ -x "$c" ] && { core="$c"; break; }
+            done
+            if [ -n "$core" ]; then echo "REPORT core --version: $("$core" --version 2>&1 | tr -d '\r' | grep -m1 -E '^wkappbot v' || echo '?') ($core)"
+            else echo "REPORT core --version: no core binary found"; fi
+            echo "REPORT tool rows:"
+            grep -iE 'launcher|wkhippo|pwsh|python|core' "$RUNNER_TEMP/doctor.log" 2>/dev/null | sed 's/^/REPORT   /' | head -20
+          } | tee "$RUNNER_TEMP/report.txt"
+          { echo "### release report ${{ matrix.os }} (${{ matrix.mode }})"; echo '```'; sed 's/^REPORT //' "$RUNNER_TEMP/report.txt"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Summary
         if: always()
