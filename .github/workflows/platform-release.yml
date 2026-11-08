@@ -19,7 +19,8 @@ name: Platform Release (build / verify / release)
 #
 # Run book: docs/platform-release.md
 # Build request 2026-11-08: core main with the output-budget PRs (owner: build output is not secret);
-# rerun after kih 985053cd (harness QA skill-list follows the raw: log when the list is budget-cut).
+# rerun after kih 985053cd (harness QA skill-list follows the raw: log when the list is budget-cut)
+# and kih ad2371d4 (that raw: path is read whole on Windows: spaces, backslashes, cygpath -u).
 
 on:
   workflow_dispatch:
