@@ -6,7 +6,7 @@
 #   patch = git rev-list --count bump..HEAD -- '*.cs' '*.csproj' '*.props' '*.yaml'
 # Every build job gets it as env WKAPPBOT_PATCH and -p:WKAppBotPatch (the override from WKAppBot
 # PR #185), so all platforms print the same X.Y.N.
-# Needs ./core cloned by clone-core.sh (full history). Writes patch=<N> and bump=<sha>.
+# Needs ./core cloned by clone-core.sh (full history). Writes patch=<N>, version=<X.Y.N> and bump=<sha>.
 set -euo pipefail
 out() { echo "$1"; [ -n "${GITHUB_OUTPUT:-}" ] && echo "$1" >> "$GITHUB_OUTPUT"; return 0; }
 cd core
@@ -21,3 +21,4 @@ echo "core base version: $base -> $base.$n"
 echo "core version bump commit: $(git log -1 --format='%h %cI %s' "$bump" | cut -c1-120)"
 out "bump=$bump"
 out "patch=$n"
+out "version=$base.$n"
