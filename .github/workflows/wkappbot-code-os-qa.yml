@@ -9,6 +9,18 @@ name: wkappbot-code-os-qa
 # The cases mirror the kih driver wkappbot-code/selftest-opencode-e2e.sh. A second Linux job REMOVES PowerShell, so
 # the bash lite harness alone must refuse the same risky set.
 on:
+  # Called by npm-publish-wkappbot-code BEFORE it publishes: installs the PACKED tgz (artifact) instead of the registry
+  # package, and writes one qa-result-<leg> artifact per leg for scripts/npm-release-gate.sh.
+  workflow_call:
+    inputs:
+      tgz_artifact:
+        description: "artifact holding the packed wkappbot-code tgz (empty = install from the registry)"
+        type: string
+        default: ''
+      version:
+        description: "the version the tgz carries"
+        type: string
+        default: ''
   workflow_dispatch:
   push:
     branches: [main]
@@ -27,7 +39,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: wkappbot-code-os-qa
+  # a pre-publish call runs in its caller's group, so it never waits behind (or replaces) a registry QA run
+  group: wkappbot-code-os-qa-${{ inputs.tgz_artifact != '' && github.run_id || 'registry' }}
   cancel-in-progress: false
 
 jobs:
@@ -36,12 +49,13 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { os: ubuntu-latest, mode: full }
-          - { os: ubuntu-latest, mode: lite }
-          - { os: macos-latest, mode: full }
-          - { os: windows-latest, mode: full }
+          - { os: ubuntu-latest, mode: full, leg: linux-x64 }
+          - { os: ubuntu-latest, mode: lite, leg: linux-x64-lite }
+          - { os: macos-latest, mode: full, leg: osx-arm64 }
+          - { os: macos-15-intel, mode: full, leg: osx-x64 }
+          - { os: windows-latest, mode: full, leg: win-x64 }
     runs-on: ${{ matrix.os }}
-    name: ${{ matrix.os }} (${{ matrix.mode }})
+    name: ${{ matrix.leg }} on ${{ matrix.os }} (${{ matrix.mode }})
     timeout-minutes: 40
     defaults:
       run:
@@ -76,16 +90,26 @@ jobs:
           printf '%s\n' '{"permissions":{"allow":["Bash(ls)"]},"hooks":{"PreToolUse":[{"hooks":[{"type":"command","command":"/usr/local/bin/my-own-linter.sh"}]}]}}' > "$HOME/.claude/settings.json"
           node scripts/qa/wkappbot-code-e2e.mjs --snapshot "$RUNNER_TEMP/before.txt"
 
-      - name: npm i -g wkappbot-code (registry)
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4
+        if: inputs.tgz_artifact != ''
+        with:
+          name: ${{ inputs.tgz_artifact }}
+          path: ${{ runner.temp }}/tgz
+
+      - name: npm i -g wkappbot-code (packed tgz before publish, else the registry)
+        id: npmi
         run: |
           set -eu
-          npm i -g wkappbot-code 2>&1 | tee "$RUNNER_TEMP/npm-install.log"; rc=${PIPESTATUS[0]}
+          src=wkappbot-code
+          if [ -n "${{ inputs.tgz_artifact }}" ]; then src="$(ls "$RUNNER_TEMP"/tgz/*.tgz | head -1)"; echo "installing the PACKED tgz: $(basename "$src")"; fi
+          npm i -g "$src" 2>&1 | tee "$RUNNER_TEMP/npm-install.log"; rc=${PIPESTATUS[0]}
           echo "npm install rc=$rc"; [ "$rc" = 0 ] || exit "$rc"
           # the first wkappbot-code run after install: 0.3.11+ prints a first-run banner
           wkappbot-code --version 2>&1 | tee "$RUNNER_TEMP/first-run.log"
           npm view wkappbot-code version
 
       - name: wkappbot-code install
+        id: inst
         run: |
           set -u
           # win-x64 has no single core asset yet (the SDK installer ships it), so Windows installs without the core.
@@ -146,10 +170,30 @@ jobs:
           { echo "### release report ${{ matrix.os }} (${{ matrix.mode }})"; echo '```'; sed 's/^REPORT //' "$RUNNER_TEMP/report.txt"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Hooks end-to-end in real OpenCode
+        id: e2e
         run: |
           set -u
           echo "mode ${{ matrix.mode }}, pwsh on PATH: $(command -v pwsh || echo none)"
           node scripts/qa/wkappbot-code-e2e.mjs --uninstall "$RUNNER_TEMP/before.txt"
+
+      - name: Gate result for this leg (read by scripts/npm-release-gate.sh)
+        if: always()
+        run: |
+          set +e
+          mkdir -p "$RUNNER_TEMP/qa-result"
+          r="$RUNNER_TEMP/qa-result/${{ matrix.leg }}.txt"
+          inst=1; [ "${{ steps.npmi.outcome }}" = success ] && [ "${{ steps.inst.outcome }}" = success ] && inst=0
+          dfail=$(grep -cE '^FAIL ' "$RUNNER_TEMP/doctor.log" 2>/dev/null); [ -f "$RUNNER_TEMP/doctor.log" ] || dfail=missing
+          oc=MISSING; grep -qE '^PASS +opencode( |$)' "$RUNNER_TEMP/doctor.log" 2>/dev/null && oc=PASS
+          v="$(wkappbot-code --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)"
+          printf 'leg=%s\nversion=%s\ninstall=%s\ndoctor_fail=%s\nopencode=%s\ne2e=%s\n' \
+            "${{ matrix.leg }}" "$v" "$inst" "$dfail" "$oc" "${{ steps.e2e.outcome }}" | tee "$r"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7
+        if: always()
+        with:
+          name: qa-result-${{ matrix.leg }}
+          path: ${{ runner.temp }}/qa-result/
+          retention-days: 14
 
       - name: Summary
         if: always()
