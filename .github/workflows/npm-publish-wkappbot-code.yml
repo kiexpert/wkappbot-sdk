@@ -11,8 +11,12 @@ name: npm-publish-wkappbot-code
 #     npm i -g https://<pages>/wkappbot-code/wkappbot-code.tgz   (a versioned copy, SHA256SUMS and version.json beside it)
 #   OLD URL, KEPT ON PURPOSE: the same bytes are also written to appbot-code/wk-appbot-code.tgz (+ version.json,
 #     SHA256SUMS), because that install command was already handed out. Do not remove it.
-#   QA: every completed run here triggers wkappbot-code-os-qa.yml (Linux full + lite, macOS, Windows) on the registry
-#     package, so each release is installed and hook-tested on every OS from a fresh HOME.
+#   GATE (owner 2026-11-08: "npm goes to the team -- no mistakes"): a version not yet on the registry is published
+#     (registry AND Pages) only when scripts/npm-release-gate.sh passes: the version is listed in
+#     .github/npm-release-approved.txt, the SDK releases/latest core is >= the kih bin core, and wkappbot-code-os-qa
+#     run on the PACKED tgz (workflow_call, before publish) is green on linux-x64, osx-arm64, osx-x64 and win-x64
+#     with doctor fail 0 and PASS opencode. Any refusal publishes nothing. Jobs: pack -> qa -> gate -> publish.
+#   QA: every completed run here also triggers wkappbot-code-os-qa.yml on the registry package (post-publish check).
 #   REGISTRY: npm i -g wkappbot-code, published with provenance only when the NPM_TOKEN secret is set and the
 #     package is named wkappbot-code; a version already on the registry is skipped; a dry-run checks every run.
 on:
@@ -21,6 +25,9 @@ on:
     branches: [main]
     paths:
       - .github/workflows/npm-publish-wkappbot-code.yml
+      - .github/scripts/npm-find-target.sh
+      - scripts/npm-release-gate.sh
+      - .github/npm-release-approved.txt
       - scripts/public-safety-mask.py
       - scripts/public-safety-scan.sh
       - .github/public-safety-markers.txt
@@ -41,36 +48,25 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  publish:
+  # 1. pack: build, scrub, mask and scan the tgz exactly as before, then hand it to QA as an artifact.
+  pack:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    outputs:
+      ver: ${{ steps.meta.outputs.ver }}
+      pkg: ${{ steps.meta.outputs.pkg }}
+      new: ${{ steps.meta.outputs.new }}
+      kih_core: ${{ steps.meta.outputs.kih_core }}
     env:
       TARGET_HASH: 23ade98d428c8527
       T1: ${{ secrets.GH_LICENSE_TOKEN }}
       T2: ${{ secrets.WKAPPBOT_PAT }}
       T3: ${{ secrets.WKAPPBOT_CORE_PAT }}
     steps:
-      - name: Find the target repo and a token that can reach it
-        run: |
-          set -u
-          for t in "$T1" "$T2" "$T3"; do
-            [ -n "$t" ] || continue
-            names=$(GH_TOKEN="$t" gh repo list kiexpert --visibility private --limit 300 --json nameWithOwner -q '.[].nameWithOwner' 2>/dev/null || true)
-            for n in $names; do
-              if [ "$(printf %s "$n" | sha256sum | cut -c1-16)" = "$TARGET_HASH" ]; then
-                echo "::add-mask::$n"
-                echo "::add-mask::${n#*/}"
-                echo "::add-mask::$t"
-                { echo "REPO=$n"; echo "TOK=$t"; echo "PAGES=https://${n%%/*}.github.io/${n#*/}"; } >> "$GITHUB_ENV"
-                echo "target found"
-                exit 0
-              fi
-            done
-          done
-          echo "no token reaches the target repo"; exit 1
-
-      # The SDK checkout carries the public-safety mask, scan and marker list.
       - uses: actions/checkout@v4
+      - name: Find the target repo and a token that can reach it
+        run: bash .github/scripts/npm-find-target.sh
+      # (The SDK checkout above carries the public-safety mask, scan and marker list.)
 
       - uses: actions/setup-node@v4
         with:
@@ -81,7 +77,7 @@ jobs:
         run: |
           set -eu
           git clone -q --depth 1 --filter=blob:none --sparse "https://x-access-token:${TOK}@github.com/${REPO}.git" src
-          git -C src sparse-checkout set --no-cone /wkappbot-code/ /appbot-code/ /tools/wk-harness-min-copy.sh
+          git -C src sparse-checkout set --no-cone /wkappbot-code/ /appbot-code/ /tools/wk-harness-min-copy.sh /bin/MANIFEST.md /bin/linux-x64/
           # wkappbot-code/ is the canonical folder; appbot-code/ only while the target has not renamed it yet.
           if [ -f src/wkappbot-code/package.json ]; then d=wkappbot-code; else d=appbot-code; echo "::notice::target has no wkappbot-code/ yet: reading appbot-code/"; fi
           [ -f "src/$d/package.json" ] || { echo "no package folder in the target"; exit 1; }
@@ -143,6 +139,94 @@ jobs:
           set -eu
           npm publish "$TGZ" --dry-run --access public
 
+      - name: Version facts for the gate (new on the registry? kih bin core version)
+        id: meta
+        run: |
+          set -u
+          new=true
+          if npm view "$PKG@$VER" version >/dev/null 2>&1; then new=false; echo "$PKG@$VER is already on the registry: nothing to publish, no QA"; fi
+          k=$(ls src/bin/linux-x64/* 2>/dev/null | head -1)
+          kc=""; if [ -n "$k" ]; then chmod +x "$k"; kc="$("$k" --version 2>&1 | tr -d '\r' | grep -m1 -E '^wkappbot v' || true)"; fi
+          echo "kih bin core: ${kc:-unknown}"
+          { echo "ver=$VER"; echo "pkg=$PKG"; echo "new=$new"; echo "kih_core=$kc"; } >> "$GITHUB_OUTPUT"
+          mkdir -p "$RUNNER_TEMP/tgzout" && cp "$TGZ" "$RUNNER_TEMP/tgzout/"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7
+        with:
+          name: wkappbot-code-tgz
+          path: ${{ runner.temp }}/tgzout/
+          retention-days: 14
+
+  # 2. QA the PACKED tgz on every OS before anything is published (only for a version not yet on the registry).
+  qa:
+    needs: pack
+    if: needs.pack.outputs.new == 'true'
+    uses: ./.github/workflows/wkappbot-code-os-qa.yml
+    with:
+      tgz_artifact: wkappbot-code-tgz
+      version: ${{ needs.pack.outputs.ver }}
+
+  # 3. gate: approved version + releases/latest core >= kih bin core + green packed-tgz QA on all four platforms.
+  gate:
+    needs: [pack, qa]
+    if: always() && needs.pack.outputs.new == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4
+        with:
+          pattern: qa-result-*
+          path: qa
+          merge-multiple: true
+        continue-on-error: true
+      - name: releases/latest core version
+        run: |
+          set -u
+          curl -fsSL -o core "https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/wkappbot-linux-x64" && chmod +x core
+          echo "RELEASE_CORE=$(./core --version 2>&1 | tr -d '\r' | grep -m1 -E '^wkappbot v' || echo unknown)" >> "$GITHUB_ENV"
+      - name: Release gate (refuses unless every check passes)
+        env:
+          VER: ${{ needs.pack.outputs.ver }}
+          KIH_CORE: ${{ needs.pack.outputs.kih_core }}
+          QA_DIR: qa
+          APPROVED_FILE: .github/npm-release-approved.txt
+          LEGS: linux-x64 osx-arm64 osx-x64 win-x64
+        run: bash scripts/npm-release-gate.sh | tee gate.txt; exit ${PIPESTATUS[0]}
+      - name: Gate summary
+        if: always()
+        run: '{ echo "### npm release gate"; echo "\`\`\`"; cat gate.txt 2>/dev/null; echo "\`\`\`"; } >> "$GITHUB_STEP_SUMMARY"'
+
+  # 4. publish: only after the gate passed. Registry first, then the Pages web copy (unchanged logic).
+  publish:
+    needs: [pack, gate]
+    if: needs.gate.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      TARGET_HASH: 23ade98d428c8527
+      T1: ${{ secrets.GH_LICENSE_TOKEN }}
+      T2: ${{ secrets.WKAPPBOT_PAT }}
+      T3: ${{ secrets.WKAPPBOT_CORE_PAT }}
+      VER: ${{ needs.pack.outputs.ver }}
+      PKG: ${{ needs.pack.outputs.pkg }}
+      CLI: wkappbot-code
+    steps:
+      - uses: actions/checkout@v4
+      - name: Find the target repo and a token that can reach it
+        run: bash .github/scripts/npm-find-target.sh
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4
+        with:
+          name: wkappbot-code-tgz
+          path: ${{ runner.temp }}/tgz
+      - name: The gated bytes
+        run: |
+          set -eu
+          t="$(ls "$RUNNER_TEMP"/tgz/*.tgz | head -1)"; echo "TGZ=$t" >> "$GITHUB_ENV"
+          echo "publishing $PKG@$VER: $(basename "$t") sha256=$(sha256sum "$t" | cut -d' ' -f1)"
       - name: Registry publish (skipped without NPM_TOKEN, or when this version is already on the registry)
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

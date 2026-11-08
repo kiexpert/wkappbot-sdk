@@ -1,0 +1,4 @@
+# wkappbot-code versions a human approved for publishing (npm registry + the Pages tgz).
+# One version per line. The publish workflow refuses any version not listed here (scripts/npm-release-gate.sh G1).
+# Add a version only after its owner-side checks are reported and the install is confirmed by the spokesman.
+0.3.11
