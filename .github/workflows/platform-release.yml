@@ -11,7 +11,7 @@ name: Platform Release (build / verify / release)
 #            contract (kih tools/wk-bin-acquire.sh downloads releases/latest/download/<name>).
 #   publish-to-kih  green run on main (push, core-updated dispatch, cron) or a tag: kih bin/ +
 #            MANIFEST.md updated with kih's own wk-bin-acquire.sh publish, one commit naming the core
-#            sha and this run, one push; no commit when nothing changed.
+#            sha and this run, one push; no commit when nothing changed. Fails red when KIH_PUSH_PAT is unset.
 #
 # The SDK repo is the build farm for the core: the core repo fires repository_dispatch core-updated
 # (client_payload.ref = core sha) when csharp/ changes; an hourly cron is the fallback and builds
@@ -344,24 +344,22 @@ jobs:
       KIH_PUSH_PAT_SET: ${{ secrets.KIH_PUSH_PAT != '' }}
     steps:
       - name: KIH_PUSH_PAT present?
-        if: env.KIH_PUSH_PAT_SET != 'true'
         run: |
-          echo "::warning::publish-to-kih skipped -- secret KIH_PUSH_PAT is not set. Owner: gh secret set KIH_PUSH_PAT --repo kiexpert/wkappbot-sdk"
+          if [ "$KIH_PUSH_PAT_SET" != true ]; then
+            echo "::error::publish-to-kih FAILED -- secret KIH_PUSH_PAT is not set, nothing was published to kih bin/. Owner: gh secret set KIH_PUSH_PAT --repo kiexpert/wkappbot-sdk"
+            exit 1
+          fi
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4
-        if: env.KIH_PUSH_PAT_SET == 'true'
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4
-        if: env.KIH_PUSH_PAT_SET == 'true'
         with:
           pattern: bin-*
           path: dist
           merge-multiple: true
       - name: Clone kih
-        if: env.KIH_PUSH_PAT_SET == 'true'
         env:
           GH_TOKEN: ${{ secrets.KIH_PUSH_PAT }}
         run: bash .github/scripts/clone-kih.sh
       - name: Publish (skip unchanged) and push once
-        if: env.KIH_PUSH_PAT_SET == 'true'
         env:
           CORE_SHA: ${{ needs.resolve.outputs.sha }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
