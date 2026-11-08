@@ -56,6 +56,7 @@ jobs:
       ver: ${{ steps.meta.outputs.ver }}
       pkg: ${{ steps.meta.outputs.pkg }}
       new: ${{ steps.meta.outputs.new }}
+      pages_only: ${{ steps.meta.outputs.pages_only }}
       kih_core: ${{ steps.meta.outputs.kih_core }}
     env:
       TARGET_HASH: 23ade98d428c8527
@@ -124,10 +125,13 @@ jobs:
           ls -la "$TGZ"
 
       - name: The packed CLI runs before it is shipped
+        # Every verification install runs under its own throw-away HOME: 0.3.12+ runs its auto-setup at npm install,
+        # which wires a global git push-owner gate into HOME -- on the runner's real HOME that refused the Pages push
+        # (run 42509848799: "[push-owner-gate] refused: pushing as unresolved, not the owner account").
         run: |
           set -eu
-          npm install -g --prefix "$RUNNER_TEMP/pre" "$TGZ"
-          "$RUNNER_TEMP/pre/bin/$CLI" --help
+          mkdir -p "$RUNNER_TEMP/iso-pre"; HOME="$RUNNER_TEMP/iso-pre" USERPROFILE="$RUNNER_TEMP/iso-pre" XDG_CONFIG_HOME="$RUNNER_TEMP/iso-pre/.config" npm install -g --prefix "$RUNNER_TEMP/pre" "$TGZ"
+          HOME="$RUNNER_TEMP/iso-pre" USERPROFILE="$RUNNER_TEMP/iso-pre" XDG_CONFIG_HOME="$RUNNER_TEMP/iso-pre/.config" "$RUNNER_TEMP/pre/bin/$CLI" --help
 
       # Registry (owner 2026-11-06: "start the npm registry procedure"). The name wkappbot-code was free (404) on
       # 2026-11-06. The owner's one step: an npm granular access token with publish rights, saved as the Actions
@@ -143,8 +147,15 @@ jobs:
         id: meta
         run: |
           set -u
-          new=true
-          if npm view "$PKG@$VER" version >/dev/null 2>&1; then new=false; echo "$PKG@$VER is already on the registry: nothing to publish, no QA"; fi
+          new=true; pages_only=false
+          if npm view "$PKG@$VER" version >/dev/null 2>&1; then
+            new=false
+            # A version already on the registry passed the gate when it was published. If the Pages copy is behind it
+            # (a failed Pages step), ship the REGISTRY's own bytes of that version to Pages; nothing else is redone.
+            pv=$(curl -fsSL "$PAGES/wkappbot-code/version.json?t=$(date +%s)" 2>/dev/null | node -p 'JSON.parse(require("fs").readFileSync(0,"utf8")).version' 2>/dev/null || echo none)
+            if [ "$pv" != "$VER" ]; then pages_only=true; echo "$PKG@$VER is on the registry but Pages serves $pv: Pages catch-up with the registry bytes"
+            else echo "$PKG@$VER is already on the registry and Pages: nothing to publish, no QA"; fi
+          fi
           # kih bin/linux-x64/ can hold an old name next to the current one (wkappbot 7.12.8 beside wkappbot-linux-x64
           # 7.12.34): take the HIGHEST version any of its binaries prints, not the first file name.
           kc=""
@@ -155,7 +166,7 @@ jobs:
             if [ -z "$kc" ] || [ "$(printf '%s\n%s\n' "$(echo "$kc" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')" "$(echo "$v" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')" | sort -V | tail -1)" != "$(echo "$kc" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')" ]; then kc="$v"; fi
           done
           echo "kih bin core: ${kc:-unknown}"
-          { echo "ver=$VER"; echo "pkg=$PKG"; echo "new=$new"; echo "kih_core=$kc"; } >> "$GITHUB_OUTPUT"
+          { echo "ver=$VER"; echo "pkg=$PKG"; echo "new=$new"; echo "pages_only=$pages_only"; echo "kih_core=$kc"; } >> "$GITHUB_OUTPUT"
           mkdir -p "$RUNNER_TEMP/tgzout" && cp "$TGZ" "$RUNNER_TEMP/tgzout/"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7
         with:
@@ -203,10 +214,11 @@ jobs:
         if: always()
         run: '{ echo "### npm release gate"; echo "\`\`\`"; cat gate.txt 2>/dev/null; echo "\`\`\`"; } >> "$GITHUB_STEP_SUMMARY"'
 
-  # 4. publish: only after the gate passed. Registry first, then the Pages web copy (unchanged logic).
+  # 4. publish: only after the gate passed (a new version), or as a Pages catch-up of a version the gate already
+  #    published to the registry. Registry first, then the Pages web copy.
   publish:
     needs: [pack, gate]
-    if: needs.gate.result == 'success'
+    if: always() && (needs.gate.result == 'success' || needs.pack.outputs.pages_only == 'true')
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
@@ -226,12 +238,17 @@ jobs:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4
+        if: needs.gate.result == 'success'
         with:
           name: wkappbot-code-tgz
           path: ${{ runner.temp }}/tgz
-      - name: The gated bytes
+      - name: The gated bytes (for a Pages catch-up, the registry's own tarball of this version)
         run: |
           set -eu
+          if [ "${{ needs.gate.result }}" != success ]; then
+            mkdir -p "$RUNNER_TEMP/tgz" && (cd "$RUNNER_TEMP/tgz" && npm pack -s "$PKG@$VER" >/dev/null)
+            echo "Pages catch-up: $PKG@$VER from the registry"
+          fi
           t="$(ls "$RUNNER_TEMP"/tgz/*.tgz | head -1)"; echo "TGZ=$t" >> "$GITHUB_ENV"
           echo "publishing $PKG@$VER: $(basename "$t") sha256=$(sha256sum "$t" | cut -d' ' -f1)"
       - name: Registry publish (skipped without NPM_TOKEN, or when this version is already on the registry)
@@ -245,8 +262,8 @@ jobs:
           if [ -z "$NODE_AUTH_TOKEN" ]; then echo "NPM_TOKEN not set -- registry publish skipped (Pages still published)"; exit 0; fi
           npm publish "$TGZ" --access public --provenance
           for i in 1 2 3 4 5 6; do npm view "$PKG@$VER" version && break; sleep 20; done
-          npm install -g --prefix "$RUNNER_TEMP/reg" "$PKG@$VER"
-          "$RUNNER_TEMP/reg/bin/$CLI" --help
+          mkdir -p "$RUNNER_TEMP/iso-reg"; HOME="$RUNNER_TEMP/iso-reg" USERPROFILE="$RUNNER_TEMP/iso-reg" XDG_CONFIG_HOME="$RUNNER_TEMP/iso-reg/.config" npm install -g --prefix "$RUNNER_TEMP/reg" "$PKG@$VER"
+          HOME="$RUNNER_TEMP/iso-reg" USERPROFILE="$RUNNER_TEMP/iso-reg" XDG_CONFIG_HOME="$RUNNER_TEMP/iso-reg/.config" "$RUNNER_TEMP/reg/bin/$CLI" --help
 
       - name: Ship to the harness Pages web (wkappbot-code/, plus the old appbot-code/ URL)
         run: |
@@ -314,8 +331,8 @@ jobs:
             echo "$u sha256=$s"
             [ "$s" = "$SHA" ] || { echo "$u does not serve the shipped bytes"; exit 1; }
           done
-          npm install -g --prefix "$RUNNER_TEMP/web" "$PAGES/wkappbot-code/wkappbot-code.tgz"
-          "$RUNNER_TEMP/web/bin/$CLI" --help
-          npm install -g --prefix "$RUNNER_TEMP/old" "$PAGES/appbot-code/wk-appbot-code.tgz"
-          "$RUNNER_TEMP/old/bin/$CLI" --help
+          mkdir -p "$RUNNER_TEMP/iso-web"; HOME="$RUNNER_TEMP/iso-web" USERPROFILE="$RUNNER_TEMP/iso-web" XDG_CONFIG_HOME="$RUNNER_TEMP/iso-web/.config" npm install -g --prefix "$RUNNER_TEMP/web" "$PAGES/wkappbot-code/wkappbot-code.tgz"
+          HOME="$RUNNER_TEMP/iso-web" USERPROFILE="$RUNNER_TEMP/iso-web" XDG_CONFIG_HOME="$RUNNER_TEMP/iso-web/.config" "$RUNNER_TEMP/web/bin/$CLI" --help
+          mkdir -p "$RUNNER_TEMP/iso-old"; HOME="$RUNNER_TEMP/iso-old" USERPROFILE="$RUNNER_TEMP/iso-old" XDG_CONFIG_HOME="$RUNNER_TEMP/iso-old/.config" npm install -g --prefix "$RUNNER_TEMP/old" "$PAGES/appbot-code/wk-appbot-code.tgz"
+          HOME="$RUNNER_TEMP/iso-old" USERPROFILE="$RUNNER_TEMP/iso-old" XDG_CONFIG_HOME="$RUNNER_TEMP/iso-old/.config" "$RUNNER_TEMP/old/bin/$CLI" --help
 
