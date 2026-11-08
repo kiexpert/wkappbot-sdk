@@ -164,7 +164,10 @@ jobs:
           echo "no token reaches the portal repo"; exit 1
       - name: Check out the portal
         shell: bash
-        run: git clone -q --depth 1 "https://x-access-token:${TOK}@github.com/${REPO}.git" site
+        run: |
+          git clone -q --depth 1 "https://x-access-token:${TOK}@github.com/${REPO}.git" site
+          # the portal sha this job tests, so a result can be tied to a portal commit (the repo name stays masked)
+          echo "PORTAL-REF $(git -C site rev-parse --short HEAD) $(git -C site log -1 --format=%cI)"
       - uses: actions/setup-node@v5
         with:
           node-version: 22
