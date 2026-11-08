@@ -52,6 +52,9 @@ jobs:
       - name: Copy the site folder to the gh-pages branch of the target repo
         env:
           SEAL_PASS: ${{ secrets.ENV_BACKUP_PASSPHRASE }}
+          # the owner's long-used password lives in ENV_ZIP_PASSWORD (secrets-env-backup seals env-backup.7z with it);
+          # ENV_BACKUP_PASSPHRASE is an empty registry slot, so the seal falls back to the zip password (owner 2026-11-08)
+          SEAL_PASS_ALT: ${{ secrets.ENV_ZIP_PASSWORD }}
           SEAL_GH: ${{ secrets.GH_PAT }}
           SEAL_GH_ALT: ${{ secrets.WKAPPBOT_PAT }}
           SEAL_GL: ${{ secrets.GITLAB_TOKEN }}
@@ -94,10 +97,11 @@ jobs:
           # Generated at deploy time only, never committed to any branch but this force-pushed publish; the values go in
           # through env and are masked; the tool prints one STATE line, never a value. Unset or SET-ME skips quietly.
           if [ -f src/tools/seal-portal-key.js ] && [ -d out/go ]; then
-            for v in "$SEAL_PASS" "$SEAL_GH" "$SEAL_GH_ALT" "$SEAL_GL"; do [ -n "$v" ] && echo "::add-mask::$v"; done
+            for v in "$SEAL_PASS" "$SEAL_PASS_ALT" "$SEAL_GH" "$SEAL_GH_ALT" "$SEAL_GL"; do [ -n "$v" ] && echo "::add-mask::$v"; done
             # the owner's GitHub token: GH_PAT, else the account PAT this workflow already uses (an unset or SET-ME GH_PAT falls back)
             case "$SEAL_GH" in ''|SET-ME) SEAL_GH="$SEAL_GH_ALT" ;; esac
-            SEAL_GH="$SEAL_GH" node src/tools/seal-portal-key.js out/go/key.json
+            case "$SEAL_PASS" in ''|SET-ME) SEAL_PASS="$SEAL_PASS_ALT" ;; esac
+            SEAL_PASS="$SEAL_PASS" SEAL_GH="$SEAL_GH" node src/tools/seal-portal-key.js out/go/key.json
             if [ -f out/go/key.json ] && grep -EI 'ghp_[A-Za-z0-9]|github_pat_[A-Za-z0-9]|glpat-[A-Za-z0-9]' out/go/key.json >/dev/null; then
               echo "TOKEN-PREFIX LEAK in the sealed key"; exit 1
             fi
