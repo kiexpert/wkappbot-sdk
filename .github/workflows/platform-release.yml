@@ -341,12 +341,12 @@ jobs:
     needs: [resolve, verify-portable, verify-windows]
     runs-on: ubuntu-latest
     env:
-      KIH_PUSH_PAT_SET: ${{ secrets.KIH_PUSH_PAT != '' }}
+      KIH_PUSH_PAT_SET: ${{ (secrets.KIH_PUSH_PAT || secrets.GH_LICENSE_TOKEN || secrets.WKAPPBOT_PAT || secrets.WKAPPBOT_CORE_PAT) != '' }}
     steps:
       - name: KIH_PUSH_PAT present?
         run: |
           if [ "$KIH_PUSH_PAT_SET" != true ]; then
-            echo "::error::publish-to-kih FAILED -- secret KIH_PUSH_PAT is not set, nothing was published to kih bin/. Owner: gh secret set KIH_PUSH_PAT --repo kiexpert/wkappbot-sdk"
+            echo "::error::publish-to-kih FAILED -- no publish token is set (KIH_PUSH_PAT, GH_LICENSE_TOKEN, WKAPPBOT_PAT or WKAPPBOT_CORE_PAT), nothing was published to kih bin/. Owner: gh secret set KIH_PUSH_PAT --repo kiexpert/wkappbot-sdk"
             exit 1
           fi
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4
