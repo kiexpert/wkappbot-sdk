@@ -97,7 +97,7 @@ wkappbot-code --version
 
 `install` takes `--no-npm`, `--no-bin`, `--no-harness`, `--no-skills`, `--web-harness`, `--config-dir DIR`. An existing `~/.config/opencode/opencode.json` is backed up (`opencode.json.bak-<stamp>`) and only the plugin entry is merged in; every other key you set stays. A config that is not plain JSON is left untouched, and `wkappbot-code.json` is written beside it for you to merge by hand.
 
-**Coming next (not in 0.3.0):** `wkappbot-code update` (sha-checked self-update) and `wkappbot-code config` (detect, edit or generate the minimum OpenCode settings). Until then, re-run `npm i -g wkappbot-code@latest && wkappbot-code install` to update.
+**Update and config (shipped):** `wkappbot-code update` re-runs a sha-checked self-update, and `wkappbot-code config [--yes] [--project] [--set key=value]` detects, edits or generates the minimum OpenCode settings. `doctor` shows `WARN opencode-config missing model` until a model is set, for example with `wkappbot-code config --set model=<provider>/<model>`.
 
 **Pick a model:** `opencode run -m provider/model "prompt"` for one headless turn, or `/models` inside the TUI. Keys stay in your environment; nothing is stored in git.
 
