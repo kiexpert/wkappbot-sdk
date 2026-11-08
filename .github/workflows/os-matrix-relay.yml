@@ -33,7 +33,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
-      TARGET_HASH: ce712644e054789d
+      TARGET_HASH: 754961bb6a5574dd
       T1: ${{ secrets.GH_LICENSE_TOKEN }}
       T2: ${{ secrets.WKAPPBOT_PAT }}
       T3: ${{ secrets.WKAPPBOT_CORE_PAT }}

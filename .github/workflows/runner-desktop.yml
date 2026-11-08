@@ -69,7 +69,7 @@ jobs:
       run:
         shell: bash
     env:
-      TARGET_HASH: ce712644e054789d
+      TARGET_HASH: 754961bb6a5574dd
       DESKTOP_OS: ${{ matrix.osn }}
       MODE: ${{ github.event_name == 'push' && 'proof' || inputs.mode || 'owner' }}
       HANDOFF_FROM: ${{ inputs.handoff_from }}
