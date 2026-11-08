@@ -4,7 +4,8 @@ name: Platform Release (build / verify / release)
 # ubuntu / macos / windows runners are free; the private core is cloned with WKAPPBOT_CORE_PAT
 # (same relay pattern as macos-test.yml, skill macos-ci-via-sdk-relay).
 #
-#   build    linux-x64 (ubuntu), osx-arm64 + osx-x64 (macos), win-x64 core + launcher (windows)
+#   build    linux-x64 (ubuntu), osx-arm64 + osx-x64 (macos), win-x64 core + launcher (windows),
+#            browser-wasm (ubuntu: dotnet publish WKAppBot.Wasm + Node/Playwright smoke; artifact wasm-bundle)
 #   verify   each binary on its native runner: --version, skill read on-load, smoke. Any red stops.
 #            + kih harness QA (kih tools/wk-harness-qa.sh --quick) against the same binary.
 #   release  tag push only: SHA256SUMS + assets on the GitHub release. The asset names are a
@@ -38,6 +39,7 @@ on:
     paths:
       - '.github/workflows/platform-release.yml'
       - '.github/scripts/clone-core.sh'
+      - '.github/scripts/core-patch.sh'
       - '.github/scripts/resolve-core.sh'
       - '.github/scripts/portable-smoke.sh'
       - '.github/scripts/clone-kih.sh'
@@ -69,6 +71,7 @@ jobs:
     outputs:
       sha: ${{ steps.r.outputs.sha }}
       build: ${{ steps.r.outputs.build }}
+      patch: ${{ steps.p.outputs.patch }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4
       - name: Resolve ref, and on cron skip an unchanged core
@@ -78,6 +81,16 @@ jobs:
           KIH_TOKEN: ${{ secrets.KIH_PUSH_PAT || secrets.WKAPPBOT_CORE_PAT }}
           EVENT: ${{ github.event_name }}
         run: bash .github/scripts/resolve-core.sh
+      - name: Clone core (full history) for the patch number
+        if: steps.r.outputs.build == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.WKAPPBOT_CORE_PAT }}
+          CORE_REF: ${{ steps.r.outputs.sha }}
+        run: bash .github/scripts/clone-core.sh
+      - name: Patch number, once for every platform (core rule; WKAPPBOT_PATCH override)
+        id: p
+        if: steps.r.outputs.build == 'true'
+        run: bash .github/scripts/core-patch.sh
 
   build-portable:
     name: build ${{ matrix.rid }}
@@ -103,9 +116,11 @@ jobs:
         run: bash .github/scripts/clone-core.sh
       - name: Publish wkappbot-${{ matrix.rid }}
         working-directory: core/csharp/src/WKAppBot.CLI.Linux
+        env:
+          WKAPPBOT_PATCH: ${{ needs.resolve.outputs.patch }}
         run: |
           dotnet publish WKAppBot.CLI.Linux.csproj -c Release -r ${{ matrix.rid }} --self-contained true \
-            -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o "publish/${{ matrix.rid }}"
+            -p:WKAppBotPatch=${{ needs.resolve.outputs.patch }} -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o "publish/${{ matrix.rid }}"
           mkdir -p "$GITHUB_WORKSPACE/out"
           cp "publish/${{ matrix.rid }}/wkappbot" "$GITHUB_WORKSPACE/out/wkappbot-${{ matrix.rid }}"
           ls -la "$GITHUB_WORKSPACE/out"
@@ -133,9 +148,11 @@ jobs:
         run: bash .github/scripts/clone-core.sh
       - name: Build wkappbot-core.exe
         shell: pwsh
+        env:
+          WKAPPBOT_PATCH: ${{ needs.resolve.outputs.patch }}
         run: |
           dotnet publish core/csharp/src/WKAppBot.CLI/WKAppBot.CLI.csproj --configuration Release `
-            --verbosity minimal -p:PublishSingleFile=true -p:SkipDeployCore=true -o core-publish
+            -p:WKAppBotPatch=${{ needs.resolve.outputs.patch }} --verbosity minimal -p:PublishSingleFile=true -p:SkipDeployCore=true -o core-publish
           if (!(Test-Path core-publish/wkappbot-core.exe)) { throw 'wkappbot-core.exe missing after publish' }
       - name: Build wkappbot.exe (launcher)
         shell: pwsh
@@ -155,9 +172,50 @@ jobs:
           path: out/
           retention-days: 14
 
+  build-wasm:
+    name: build + smoke browser-wasm
+    needs: resolve
+    if: needs.resolve.outputs.build == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4
+      - uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7  # v5
+        with:
+          dotnet-version: 8.0.x
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Clone core
+        env:
+          GH_TOKEN: ${{ secrets.WKAPPBOT_CORE_PAT }}
+          CORE_REF: ${{ needs.resolve.outputs.sha }}
+        run: bash .github/scripts/clone-core.sh
+      - name: Publish WKAppBot.Wasm (no wasm-tools workload)
+        run: |
+          [ -d core/csharp/src/WKAppBot.Wasm ] || { echo "::error::core has no csharp/src/WKAppBot.Wasm at this sha"; exit 1; }
+          dotnet publish core/csharp/src/WKAppBot.Wasm -c Release -o "$RUNNER_TEMP/wasm-publish"
+          ls -la "$RUNNER_TEMP/wasm-publish/wwwroot"
+          for f in index.html main.js a11y.js cdp.js _framework; do
+            [ -e "$RUNNER_TEMP/wasm-publish/wwwroot/$f" ] || { echo "::error::bundle missing wwwroot/$f"; exit 1; }
+          done
+      - name: REQUIRED wasm smoke (run.mjs RESULT PASS in budget, v1-selftest 11/11)
+        working-directory: core/tools/wasm-smoke
+        run: |
+          if [ -f package.json ]; then npm ci 2>/dev/null || npm install; else npm install --no-save playwright@1.49.1; fi
+          npx playwright install --with-deps chromium
+          node run.mjs "$RUNNER_TEMP/wasm-publish" 2>&1 | tee "$RUNNER_TEMP/wasm-smoke.log"
+          grep -q 'RESULT PASS' "$RUNNER_TEMP/wasm-smoke.log" || { echo "::error::wasm smoke: no RESULT PASS"; exit 1; }
+          node v1-selftest.mjs 2>&1 | tee "$RUNNER_TEMP/wasm-selftest.log"
+          grep -qE '11/11' "$RUNNER_TEMP/wasm-selftest.log" || { echo "::error::wasm v1-selftest is not 11/11"; exit 1; }
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7
+        with:
+          name: wasm-bundle   # not bin-*: publish-to-kih / SHA256SUMS merge bin-* flat
+          path: ${{ runner.temp }}/wasm-publish/wwwroot/
+          retention-days: 14
+
   verify-portable:
     name: verify ${{ matrix.rid }} on ${{ matrix.os }}
-    needs: build-portable
+    needs: [resolve, build-portable]
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -186,6 +244,12 @@ jobs:
             WKAPPBOT_BASE_URL="file://$PWD/dist" WKAPPBOT_INSTALL_DIR="$RUNNER_TEMP/bin" sh install.sh 2>&1 | tee install.log
             grep -q "Downloading $asset " install.log
           fi
+      - name: REQUIRED one patch number (--version ends in .${{ needs.resolve.outputs.patch }})
+        shell: bash
+        run: |
+          v="$("$RUNNER_TEMP/bin/wkappbot" --version 2>&1 | head -1)"; echo "$v"
+          echo "$v" | grep -qE "v[0-9]+\.[0-9]+\.${{ needs.resolve.outputs.patch }}( |$)" \
+            || { echo "::error::${{ matrix.rid }} prints '$v', want patch ${{ needs.resolve.outputs.patch }}"; exit 1; }
       - name: REQUIRED smoke (--version + label, skill read/search/list, file write/read/edit/new folder)
         shell: bash
         run: bash .github/scripts/portable-smoke.sh "$RUNNER_TEMP/bin/wkappbot" ${{ matrix.rid }}
@@ -221,6 +285,12 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force bin/wkappbot.hq/skills/wkappbot-workflow | Out-Null
           Copy-Item skills/wkappbot-workflow/on-load*.skill.json bin/wkappbot.hq/skills/wkappbot-workflow/
+      - name: REQUIRED one patch number (core --version ends in .${{ needs.resolve.outputs.patch }})
+        shell: bash
+        run: |
+          v="$(bin/wkappbot-core.exe --version 2>&1 | head -1 | tr -d '\r')"; echo "$v"
+          echo "$v" | grep -qE "v[0-9]+\.[0-9]+\.${{ needs.resolve.outputs.patch }}( |$)" \
+            || { echo "::error::win-x64 core prints '$v', want patch ${{ needs.resolve.outputs.patch }}"; exit 1; }
       - name: REQUIRED core --version and skill read on-load (120 s budget each)
         shell: pwsh
         run: |

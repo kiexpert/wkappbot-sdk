@@ -29,10 +29,11 @@ unless every platform's build and verify jobs are green.
 | build linux-x64 | ubuntu-latest | `dotnet publish core/csharp/src/WKAppBot.CLI.Linux -r linux-x64 --self-contained -p:PublishSingleFile=true` |
 | build osx-arm64, osx-x64 | macos-latest | same project, `-r osx-arm64` / `-r osx-x64` |
 | build win-x64 | windows-latest | `WKAppBot.CLI` -> `wkappbot-core.exe`; this repo's `WKAppBot.Launcher` -> `wkappbot.exe` |
+| build + smoke browser-wasm | ubuntu-latest | `dotnet publish core/csharp/src/WKAppBot.Wasm -c Release` (no wasm-tools workload); bundle = `wwwroot` (`index.html`, `main.js`, `a11y.js`, `cdp.js`, `_framework/`); REQUIRED `node tools/wasm-smoke/run.mjs <publishDir>` RESULT PASS and `node tools/wasm-smoke/v1-selftest.mjs` 11/11; artifact `wasm-bundle`. kih `bin/wasm/` publish is the next step. |
 | verify (x4) | native runner | Linux / macOS: `install.sh` from the artifact (checksum-verified), then `.github/scripts/portable-smoke.sh` (`--version`, `help`, `skill read on-load` against a seeded skills dir, `skill list`, Hangul file round-trip). osx-x64 runs under Rosetta 2. Windows: core `--version` and `skill read on-load` (120 s budget each), launcher file version. |
 | SHA256SUMS | ubuntu-latest | `wkappbot-core.exe` over 100 MB is shipped as `wkappbot-core.exe.xz`; sums for all assets; artifact `release-assets` |
 | release | ubuntu-latest | only on a `v*-sdk` tag: creates the release with the CHANGELOG section as notes and uploads the assets |
-| resolve | ubuntu-latest | ref -> one core sha; cron decides whether anything changed |
+| resolve | ubuntu-latest | ref -> one core sha; cron decides whether anything changed; full core clone -> `.github/scripts/core-patch.sh` computes the patch ONCE (commit count since the last `<Version>`/`<VersionPrefix>` change) and every core build gets it as env `WKAPPBOT_PATCH` and `-p:WKAppBotPatch`; each verify job REQUIRES `--version` to end in that patch |
 | publish-to-kih | ubuntu-latest | green run on `main` (push, dispatch or cron) or a tag; FAILS (red row, nothing published) while `KIH_PUSH_PAT` is unset: `.github/scripts/publish-to-kih.sh` runs kih `tools/wk-bin-acquire.sh publish` per changed binary (`WK_BIN_NO_PUSH=1`), then one `git push origin HEAD:main` with a rebase-retry loop. Unchanged binaries (sha256 equal to the MANIFEST row; the Windows core compared decompressed) make no commit. |
 
 Every verify job also clones kih (`KIH_PUSH_PAT`) and runs `tools/wk-harness-qa.sh --quick --json`
