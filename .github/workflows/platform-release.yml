@@ -18,7 +18,8 @@ name: Platform Release (build / verify / release)
 # only when WKAppBot main moved past the sha kih bin/ was last published from AND csharp/ changed.
 #
 # Run book: docs/platform-release.md
-# Build request 2026-11-08: core main with the output-budget PRs (owner: build output is not secret).
+# Build request 2026-11-08: core main with the output-budget PRs (owner: build output is not secret);
+# rerun after kih 985053cd (harness QA skill-list follows the raw: log when the list is budget-cut).
 
 on:
   workflow_dispatch:
