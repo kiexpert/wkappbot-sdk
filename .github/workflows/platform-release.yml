@@ -4,7 +4,8 @@ name: Platform Release (build / verify / release)
 # ubuntu / macos / windows runners are free; the private core is cloned with WKAPPBOT_CORE_PAT
 # (same relay pattern as macos-test.yml, skill macos-ci-via-sdk-relay).
 #
-#   build    linux-x64 (ubuntu), osx-arm64 + osx-x64 (macos), win-x64 core + launcher (windows)
+#   build    linux-x64 (ubuntu), osx-arm64 + osx-x64 (macos), win-x64 core + launcher (windows),
+#            browser-wasm (ubuntu: dotnet publish WKAppBot.Wasm + Node/Playwright smoke; artifact wasm-bundle)
 #   verify   each binary on its native runner: --version, skill read on-load, smoke. Any red stops.
 #            + kih harness QA (kih tools/wk-harness-qa.sh --quick) against the same binary.
 #   release  tag push only: SHA256SUMS + assets on the GitHub release. The asset names are a
@@ -153,6 +154,47 @@ jobs:
         with:
           name: bin-win-x64
           path: out/
+          retention-days: 14
+
+  build-wasm:
+    name: build + smoke browser-wasm
+    needs: resolve
+    if: needs.resolve.outputs.build == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4
+      - uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7  # v5
+        with:
+          dotnet-version: 8.0.x
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Clone core
+        env:
+          GH_TOKEN: ${{ secrets.WKAPPBOT_CORE_PAT }}
+          CORE_REF: ${{ needs.resolve.outputs.sha }}
+        run: bash .github/scripts/clone-core.sh
+      - name: Publish WKAppBot.Wasm (no wasm-tools workload)
+        run: |
+          [ -d core/csharp/src/WKAppBot.Wasm ] || { echo "::error::core has no csharp/src/WKAppBot.Wasm at this sha"; exit 1; }
+          dotnet publish core/csharp/src/WKAppBot.Wasm -c Release -o "$RUNNER_TEMP/wasm-publish"
+          ls -la "$RUNNER_TEMP/wasm-publish/wwwroot"
+          for f in index.html main.js a11y.js cdp.js _framework; do
+            [ -e "$RUNNER_TEMP/wasm-publish/wwwroot/$f" ] || { echo "::error::bundle missing wwwroot/$f"; exit 1; }
+          done
+      - name: REQUIRED wasm smoke (run.mjs RESULT PASS in budget, v1-selftest 11/11)
+        working-directory: core/tools/wasm-smoke
+        run: |
+          if [ -f package.json ]; then npm ci 2>/dev/null || npm install; else npm install --no-save playwright@1.49.1; fi
+          npx playwright install --with-deps chromium
+          node run.mjs "$RUNNER_TEMP/wasm-publish" 2>&1 | tee "$RUNNER_TEMP/wasm-smoke.log"
+          grep -q 'RESULT PASS' "$RUNNER_TEMP/wasm-smoke.log" || { echo "::error::wasm smoke: no RESULT PASS"; exit 1; }
+          node v1-selftest.mjs 2>&1 | tee "$RUNNER_TEMP/wasm-selftest.log"
+          grep -qE '11/11' "$RUNNER_TEMP/wasm-selftest.log" || { echo "::error::wasm v1-selftest is not 11/11"; exit 1; }
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7
+        with:
+          name: wasm-bundle   # not bin-*: publish-to-kih / SHA256SUMS merge bin-* flat
+          path: ${{ runner.temp }}/wasm-publish/wwwroot/
           retention-days: 14
 
   verify-portable:
