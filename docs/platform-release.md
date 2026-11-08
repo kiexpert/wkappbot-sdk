@@ -33,7 +33,7 @@ unless every platform's build and verify jobs are green.
 | SHA256SUMS | ubuntu-latest | `wkappbot-core.exe` over 100 MB is shipped as `wkappbot-core.exe.xz`; sums for all assets; artifact `release-assets` |
 | release | ubuntu-latest | only on a `v*-sdk` tag: creates the release with the CHANGELOG section as notes and uploads the assets |
 | resolve | ubuntu-latest | ref -> one core sha; cron decides whether anything changed |
-| publish-to-kih | ubuntu-latest | green run on `main` (push, dispatch or cron) or a tag; skipped with a warning while `KIH_PUSH_PAT` is unset: `.github/scripts/publish-to-kih.sh` runs kih `tools/wk-bin-acquire.sh publish` per changed binary (`WK_BIN_NO_PUSH=1`), then one `git push origin HEAD:main` with a rebase-retry loop. Unchanged binaries (sha256 equal to the MANIFEST row; the Windows core compared decompressed) make no commit. |
+| publish-to-kih | ubuntu-latest | green run on `main` (push, dispatch or cron) or a tag; FAILS (red row, nothing published) while `KIH_PUSH_PAT` is unset: `.github/scripts/publish-to-kih.sh` runs kih `tools/wk-bin-acquire.sh publish` per changed binary (`WK_BIN_NO_PUSH=1`), then one `git push origin HEAD:main` with a rebase-retry loop. Unchanged binaries (sha256 equal to the MANIFEST row; the Windows core compared decompressed) make no commit. |
 
 Every verify job also clones kih (`KIH_PUSH_PAT`) and runs `tools/wk-harness-qa.sh --quick --json`
 with `WKAPPBOT_CORE` pointing at the binary under test (`.github/scripts/kih-harness-qa.sh`;
