@@ -19,21 +19,40 @@ manifest_sha() {  # manifest_sha REL -> sha256 column of the bin/MANIFEST.md row
 
 published=0
 base="$(git rev-parse HEAD)"
+present() {  # present SHA PLATFORM -> 0 when any file under bin/PLATFORM/ already holds that content
+  local want="$1" f got
+  for f in bin/"$2"/*; do
+    [ -f "$f" ] || continue
+    case "$f" in *.xz) got="$(xz -dc "$f" | sha256sum | cut -d' ' -f1)" ;; *) got="$(sha "$f")" ;; esac
+    [ "$got" = "$want" ] && { echo "$f"; return 0; }
+  done
+  return 1
+}
 pub() {  # pub SRC PLATFORM REL
-  local src="$1" plat="$2" rel="$3" have want
+  local src="$1" plat="$2" rel="$3" have want hit
   have="$(sha "$src")"
-  if [ "$plat" = win-x64 ] && [ "$rel" = win-x64/wkappbot-core.exe.xz ]; then
-    want=""
-    [ -f "bin/$rel" ] && want="$(xz -dc "bin/$rel" | sha256sum | cut -d' ' -f1)"
-  else
-    want="$(manifest_sha "$rel" || true)"
+  # Compare with the content kih actually holds (kih may name the file wkappbot-<rid>, not the MANIFEST rel),
+  # then with the MANIFEST row: an identical binary must never reach wk-bin-acquire (it makes no commit).
+  if hit="$(present "$have" "$plat")"; then
+    echo "up to date: $hit ($have)"
+    return 0
   fi
+  want="$(manifest_sha "$rel" || true)"
   if [ "$have" = "$want" ]; then
     echo "up to date: bin/$rel ($have)"
     return 0
   fi
   echo "publish: $src -> bin/$rel (kih ${want:-none} -> $have)"
-  WK_BIN_NO_PUSH=1 bash "$acq" publish "$src" --platform "$plat"
+  local before; before="$(git rev-parse HEAD)"
+  if ! WK_BIN_NO_PUSH=1 bash "$acq" publish "$src" --platform "$plat"; then
+    # wk-bin-acquire exits non-zero on "nothing to commit": the content is already there under its own name
+    if [ "$(git rev-parse HEAD)" = "$before" ] && git diff --quiet HEAD -- bin && git diff --cached --quiet HEAD -- bin; then
+      echo "note: wk-bin-acquire made no change for $src -- already published"
+      return 0
+    fi
+    echo "::error::wk-bin-acquire publish failed for $src"; return 1
+  fi
+  [ "$(git rev-parse HEAD)" = "$before" ] && { echo "note: no new commit for $src"; return 0; }
   published=$((published + 1))
 }
 
