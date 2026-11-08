@@ -203,7 +203,7 @@ jobs:
         run: |
           if [ -f package.json ]; then npm ci 2>/dev/null || npm install; else npm install --no-save playwright@1.49.1; fi
           npx playwright install --with-deps chromium
-          node run.mjs "$RUNNER_TEMP/wasm-publish" 2>&1 | tee "$RUNNER_TEMP/wasm-smoke.log"
+          node run.mjs "$RUNNER_TEMP/wasm-publish/wwwroot" 2>&1 | tee "$RUNNER_TEMP/wasm-smoke.log"
           grep -q 'RESULT PASS' "$RUNNER_TEMP/wasm-smoke.log" || { echo "::error::wasm smoke: no RESULT PASS"; exit 1; }
           node v1-selftest.mjs 2>&1 | tee "$RUNNER_TEMP/wasm-selftest.log"
           grep -qE '11/11' "$RUNNER_TEMP/wasm-selftest.log" || { echo "::error::wasm v1-selftest is not 11/11"; exit 1; }
@@ -247,7 +247,7 @@ jobs:
       - name: REQUIRED one patch number (--version ends in .${{ needs.resolve.outputs.patch }})
         shell: bash
         run: |
-          v="$("$RUNNER_TEMP/bin/wkappbot" --version 2>&1 | head -1)"; echo "$v"
+          v="$("$RUNNER_TEMP/bin/wkappbot" --version 2>&1 | tr -d '\r' | grep -m1 -E '^wkappbot v[0-9]' || true)"; echo "version line: $v"
           echo "$v" | grep -qE "v[0-9]+\.[0-9]+\.${{ needs.resolve.outputs.patch }}( |$)" \
             || { echo "::error::${{ matrix.rid }} prints '$v', want patch ${{ needs.resolve.outputs.patch }}"; exit 1; }
       - name: REQUIRED smoke (--version + label, skill read/search/list, file write/read/edit/new folder)
@@ -288,7 +288,7 @@ jobs:
       - name: REQUIRED one patch number (core --version ends in .${{ needs.resolve.outputs.patch }})
         shell: bash
         run: |
-          v="$(bin/wkappbot-core.exe --version 2>&1 | head -1 | tr -d '\r')"; echo "$v"
+          v="$(bin/wkappbot-core.exe --version 2>&1 | tr -d '\r' | grep -m1 -E '^wkappbot v[0-9]' || true)"; echo "version line: $v"
           echo "$v" | grep -qE "v[0-9]+\.[0-9]+\.${{ needs.resolve.outputs.patch }}( |$)" \
             || { echo "::error::win-x64 core prints '$v', want patch ${{ needs.resolve.outputs.patch }}"; exit 1; }
       - name: REQUIRED core --version and skill read on-load (120 s budget each)
