@@ -16,8 +16,9 @@ on:
       - .github/workflows/wkappbot-code-os-qa.yml
       - scripts/qa/wkappbot-code-e2e.mjs
   # Re-run after every publish of the package, and daily, so a registry release is QA'd on every OS.
+  # ...and after every farm run, which refreshes releases/latest (the core asset the npm install downloads).
   workflow_run:
-    workflows: [npm-publish-wkappbot-code]
+    workflows: [npm-publish-wkappbot-code, "Platform Release (build / verify / release)"]
     types: [completed]
   schedule:
     - cron: '41 5 * * *'
