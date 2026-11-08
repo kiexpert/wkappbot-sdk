@@ -122,12 +122,6 @@ jobs:
           wkappbot-code doctor 2>&1 | tee "$RUNNER_TEMP/doctor.log"; rc=${PIPESTATUS[0]}
           echo "doctor rc=$rc"; exit $rc
 
-      - name: Hooks end-to-end in real OpenCode
-        run: |
-          set -u
-          echo "mode ${{ matrix.mode }}, pwsh on PATH: $(command -v pwsh || echo none)"
-          node scripts/qa/wkappbot-code-e2e.mjs --uninstall "$RUNNER_TEMP/before.txt"
-
       - name: Release report (postinstall marker, core version, banner, tool rows)
         if: always()
         run: |
@@ -150,6 +144,12 @@ jobs:
             grep -iE 'launcher|wkhippo|pwsh|python|core' "$RUNNER_TEMP/doctor.log" 2>/dev/null | sed 's/^/REPORT   /' | head -20
           } | tee "$RUNNER_TEMP/report.txt"
           { echo "### release report ${{ matrix.os }} (${{ matrix.mode }})"; echo '```'; sed 's/^REPORT //' "$RUNNER_TEMP/report.txt"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Hooks end-to-end in real OpenCode
+        run: |
+          set -u
+          echo "mode ${{ matrix.mode }}, pwsh on PATH: $(command -v pwsh || echo none)"
+          node scripts/qa/wkappbot-code-e2e.mjs --uninstall "$RUNNER_TEMP/before.txt"
 
       - name: Summary
         if: always()
