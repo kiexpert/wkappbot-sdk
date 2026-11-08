@@ -6,7 +6,7 @@ name: model-ask
 #   1. workflow_dispatch: inputs brief + family.
 #   2. push a branch model-ask/<id> whose commit holds model-ask/brief.txt and model-ask/family
 #      (for seats whose token cannot dispatch). Delete the branch after reading the answer.
-# Read the answer: the "ANSWER <family>:" log line, the job summary, or artifact model-ask-<run id>.
+# Read the answer: the "MODEL" + "ANSWER <family>:" log lines, the job summary, or artifact model-ask-<run id>.
 # This repo is PUBLIC: the brief and the answer appear in the log. Never put a secret or private
 # detail in a brief. Keys are never printed (scripts/model_ask.py prints only HTTP status on error).
 on:
