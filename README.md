@@ -21,6 +21,7 @@ Focusless. Self-healing. AI-native. The open-source bridge between LLMs and the 
 > **An AI coding agent with a wisdom reflex body, wired to an a11y-linked harness and A11Y QA.**
 > Reflex guards refuse a bad tool call before it runs, and every refusal names the skill that fixes it. A11Y QA clicks and reads the real app through its accessibility tree, so a passing test means the screen works.
 > `npm i -g wkappbot-code && wkappbot-code install && wkappbot-code doctor`
+> Then set a model: `wkappbot-code config` (or `wkappbot-code config --set model=<provider>/<model>`); until then `doctor` shows `WARN opencode-config missing model`. On Windows the wkappbot core binary is not installed by this line; get it from the [SDK installer](docs/INSTALL.md).
 > *개발자용 지혜 반사체 AI 코딩 에이전트 + a11y 연동 하네스 + A11Y QA — [소개와 설치 안내](docs/wkappbot-code/README.md#한국어-요약)*
 
 ### Install without npm (harness only, one line)
