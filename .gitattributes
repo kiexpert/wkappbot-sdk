@@ -1,6 +1,12 @@
 # Force LF for all text files (skills, source, docs)
 * text=auto eol=lf
 
+# Windows batch files: always CRLF on checkout. cmd.exe finds a :label by scanning the file in 512-byte
+# blocks; with LF-only lines a label can be missed ("The system cannot find the batch label specified"),
+# which broke build.cmd's :download_release on a fresh Windows clone (user-perspective-qa).
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
 # Skill JSON files: always LF -- wkappbot skill parser is LF-native
 *.skill.json text eol=lf
 
