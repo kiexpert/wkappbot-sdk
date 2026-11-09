@@ -23,11 +23,9 @@ Focusless. Self-healing. AI-native. The open-source bridge between LLMs and the 
 >
 > ```sh
 > npm i -g wkappbot-code
-> wkappbot-code install
-> wkappbot-code doctor
 > ```
 >
-> Then set a model with `wkappbot-code config`; until then `doctor` shows `WARN opencode-config missing model`. On Windows the wkappbot core binary comes from the [SDK installer](docs/INSTALL.md), not from npm.
+> Setup, the health check and the selftest run by themselves after the install; the first `wkappbot-code` run prints the result. Then set a model with `wkappbot-code config`. On Windows the wkappbot core binary comes from the [SDK installer](docs/INSTALL.md), not from npm.
 > *개발자용 지혜 반사체 AI 코딩 에이전트 + a11y 연동 하네스 + A11Y QA — [소개와 설치 안내](docs/wkappbot-code/README.md#한국어-요약)*
 
 > ⚖️ **[The Reflex Constitution →](./REFLEX-CONSTITUTION.md)** · *[read as a page](https://kiexpert.github.io/wkappbot-sdk/reflex-constitution.html)*
@@ -353,9 +351,9 @@ Per-repo isolation: each git clone gets its own Eye instance and DataDir (`{root
 
 ```sh
 npm i -g wkappbot-code
-wkappbot-code install
-wkappbot-code doctor
 ```
+
+Setup, the health check and the selftest run by themselves after the install; the first `wkappbot-code` run prints the result.
 
 On Windows the wkappbot core binary is not installed by npm: get it from the SDK (below, or [INSTALL.md](docs/INSTALL.md)).
 
@@ -367,9 +365,9 @@ On Windows the wkappbot core binary is not installed by npm: get it from the SDK
 
 ```sh
 npm i -g wkappbot-code
-wkappbot-code install
-wkappbot-code doctor
 ```
+
+Setup, the health check and the selftest run by themselves after the install; the first `wkappbot-code` run prints the result.
 
 **2. Harness only, no Node.js.** This installs only the lite harness for Claude Code; route 1 is the full install.
 
@@ -465,12 +463,13 @@ npm rm -g wkappbot-code
 ## Troubleshoot
 
 ```sh
-wkappbot-code doctor
+wkappbot-code install   # re-run setup
+wkappbot-code doctor    # health check
 wkappbot-code config
 wkappbot-code update
 ```
 
-`WARN opencode-config missing model` means no model is set yet: run `wkappbot-code config`. More in the [troubleshooting guide](https://kiexpert.github.io/wkappbot-sdk/guide/troubleshooting).
+The setup log is `~/.wkappbot-code/postinstall.log` and its result `~/.wkappbot-code/postinstall.done`. `WARN opencode-config missing model` means no model is set yet: run `wkappbot-code config`. More in the [troubleshooting guide](https://kiexpert.github.io/wkappbot-sdk/guide/troubleshooting).
 
 ---
 
