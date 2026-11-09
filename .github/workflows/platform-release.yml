@@ -411,6 +411,14 @@ jobs:
           fi
           ver="${TAG#v}"
           echo "release tag: $TAG (core ${CORE_VERSION:-?} @ ${CORE_SHA:0:9})"
+          # Windows ZIP (the asset contract of build.cmd and the README install: wkappbot-<ver>.zip holding
+          # wkappbot.exe + wkappbot-core.exe). The core ships .xz-compressed over 100 MB, so unpack it for the ZIP.
+          zdir="$RUNNER_TEMP/winzip"; rm -rf "$zdir"; mkdir -p "$zdir"
+          cp dist/wkappbot.exe "$zdir/"
+          if [ -f dist/wkappbot-core.exe.xz ]; then xz -dc dist/wkappbot-core.exe.xz > "$zdir/wkappbot-core.exe"; else cp dist/wkappbot-core.exe "$zdir/"; fi
+          (cd "$zdir" && zip -q -9 "$GITHUB_WORKSPACE/dist/wkappbot-${ver}.zip" wkappbot.exe wkappbot-core.exe)
+          (cd dist && sha256sum "wkappbot-${ver}.zip" >> SHA256SUMS && sha256sum -c SHA256SUMS)
+          unzip -l "dist/wkappbot-${ver}.zip"
           # Release notes = this version's CHANGELOG section, else a farm-build note.
           awk -v h="## [$ver]" 'index($0,h)==1{f=1;next} f&&/^## \[/{exit} f' CHANGELOG.md > notes.md
           if [ ! -s notes.md ]; then
