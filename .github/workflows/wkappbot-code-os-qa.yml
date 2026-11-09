@@ -21,6 +21,7 @@ run-name: wkappbot-code-os-qa${{ inputs.leg != '' && format(' leg={0} respawn={1
 # fakes linux-x64's probe on the FIRST attempt only (respawn 1 must go green and the gate pass the leg);
 # fake_net_fail=all, or a branch qa/respawn-b-*, fakes it on EVERY attempt (respawn 1 and 2 respawn, the third is a
 # real red and the gate refuses the leg). On those branches a gate-proof job runs the real gate on linux-x64.
+# (proof run B marker)
 on:
   # Called by npm-publish-wkappbot-code BEFORE it publishes: installs the PACKED tgz (artifact) instead of the registry
   # package, and writes one qa-result-<leg> artifact per leg for scripts/npm-release-gate.sh.
