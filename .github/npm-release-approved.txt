@@ -8,3 +8,5 @@
 0.3.14
 # 0.3.15: kih main 2e55490 (PR 126 bump; the nine remaining download-retry sites of PR 125), same owner order 2026-11-09 relayed by the spokesman.
 0.3.15
+# 0.3.16: kih main 5c33201 (PR 127: the emergency-edit grant list keeps the raw path, fixing the win-x64 DOOR miss), same owner order 2026-11-09 relayed by the spokesman.
+0.3.16
