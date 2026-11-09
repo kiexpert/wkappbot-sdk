@@ -12,3 +12,5 @@
 0.3.16
 # 0.3.17: kih main f740d1e (PR 128: every fetch retries 6x/5s; uninstall waits for the background setup worker), same owner order 2026-11-09 relayed by the spokesman.
 0.3.17
+# 0.3.19: kih main 4a0aba4 (PR 131: intent-lock skill-store fallback, Windows Git ucrt64 curl, launchOpenCode .cmd shim; PR 129 three-reds fixes under it), owner order 2026-11-09 14:26 relayed by the spokesman. 0.3.18 is skipped (never green).
+0.3.19
