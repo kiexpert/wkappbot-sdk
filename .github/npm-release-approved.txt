@@ -6,3 +6,5 @@
 0.3.13
 # 0.3.14: kih main fbcdb28 (PR 124 release-fetch retry on top of the PR 123 bump; door + uninstall fixes of PR 121/122), owner order 2026-11-09 relayed by the spokesman.
 0.3.14
+# 0.3.15: kih main 2e55490 (PR 126 bump; the nine remaining download-retry sites of PR 125), same owner order 2026-11-09 relayed by the spokesman.
+0.3.15
