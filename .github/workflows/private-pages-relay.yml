@@ -115,14 +115,86 @@ jobs:
           git add -A && git commit -q -m "publish ${SITE_DIR} $(date -u +%FT%TZ)"
           git push -q -f "https://x-access-token:${TOK}@github.com/${REPO}.git" gh-pages
           echo "pushed $(git ls-files | wc -l) files"
-      - name: Turn on Pages from gh-pages and request a build
+      - name: Write the relay data into main docs/ (the owner's Pages source) and commit only what changed
+        env:
+          SEAL_PASS: ${{ secrets.ENV_BACKUP_PASSPHRASE }}
+          SEAL_PASS_ALT: ${{ secrets.ENV_ZIP_PASSWORD }}
+          SEAL_GH: ${{ secrets.GH_PAT }}
+          SEAL_GH_ALT: ${{ secrets.WKAPPBOT_PAT }}
+        run: |
+          set -eu
+          # main /docs is a byte copy of the site folder (owner 2026-11-09: the web lives under main/docs); this step only
+          # refreshes the deploy-time data paths the target's sync-docs-web.js identity check already excludes.
+          for v in "$SEAL_PASS" "$SEAL_PASS_ALT" "$SEAL_GH" "$SEAL_GH_ALT"; do [ -n "$v" ] && echo "::add-mask::$v"; done
+          git clone -q --depth 1 -b main "https://x-access-token:${TOK}@github.com/${REPO}.git" m
+          if [ ! -d m/docs ]; then echo "main has no docs/ yet; skipping the main write"; exit 0; fi
+          mkdir -p m/docs/portal
+          for f in modules-results.json os-matrix.json intelligence-e2e-proof.json svc-health.json svc-status.png; do
+            if [ -f "out/portal/$f" ]; then cp "out/portal/$f" "m/docs/portal/$f"; fi
+          done
+          for f in m/docs/portal/modules-results.json m/docs/portal/svc-health.json m/docs/portal/intelligence-e2e-proof.json m/docs/portal/os-matrix.json; do
+            [ -f "$f" ] || continue
+            if grep -EI 'ghp_[A-Za-z0-9]|github_pat_[A-Za-z0-9]|glpat-[A-Za-z0-9]|sk-ant-[A-Za-z0-9]' "$f" >/dev/null; then
+              echo "TOKEN-PREFIX LEAK detected in ${f#m/}"; exit 1
+            fi
+          done
+          echo "main leak-grep: 0"
+          paths="docs/portal/modules-results.json docs/portal/os-matrix.json docs/portal/intelligence-e2e-proof.json docs/portal/svc-health.json docs/portal/svc-status.png"
+          # The sealed owner key goes to docs/go/key.json only when a source secret changed: the seal is salted, so a
+          # fresh seal of the same secrets would commit every hour. The fingerprint (sha256 of the inputs) is kept
+          # outside docs/, so it is never published, in .relay/key-src.sha256.
+          if [ -f m/tools/seal-portal-key.js ] && [ -d m/docs/go ]; then
+            case "$SEAL_GH" in ''|SET-ME) SEAL_GH="$SEAL_GH_ALT" ;; esac
+            case "$SEAL_PASS" in ''|SET-ME) SEAL_PASS="$SEAL_PASS_ALT" ;; esac
+            fp=$(printf '%s\n%s\n' "$SEAL_PASS" "$SEAL_GH" | sha256sum | cut -c1-64)
+            old=$(cat m/.relay/key-src.sha256 2>/dev/null || true)
+            if [ "$fp" != "$old" ]; then
+              (cd m && SEAL_PASS="$SEAL_PASS" SEAL_GH="$SEAL_GH" node tools/seal-portal-key.js docs/go/key.json)
+              if grep -EI 'ghp_[A-Za-z0-9]|github_pat_[A-Za-z0-9]|glpat-[A-Za-z0-9]' m/docs/go/key.json >/dev/null; then
+                echo "TOKEN-PREFIX LEAK in the sealed key"; exit 1
+              fi
+              # shape check: every leaf is a number or a base64/hex-like string, and no key names a plain secret
+              node -e '
+                const j = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
+                const bad = [];
+                (function walk(o, p) {
+                  for (const [k, v] of Object.entries(o)) {
+                    if (/^(token|pat|password|pass|secret|gh|gl)$/i.test(k)) bad.push(p + k + " (plain-secret key)");
+                    if (v && typeof v === "object") walk(v, p + k + ".");
+                    else if (typeof v === "string" && !/^[A-Za-z0-9+\/=_.:-]*$/.test(v)) bad.push(p + k + " (not cipher text)");
+                  }
+                })(j, "");
+                if (bad.length) { console.log("KEY SHAPE FAIL: " + bad.join(", ")); process.exit(1); }
+                console.log("key shape: cipher fields only");
+              ' m/docs/go/key.json
+              mkdir -p m/.relay && printf '%s\n' "$fp" > m/.relay/key-src.sha256
+              paths="$paths docs/go/key.json .relay/key-src.sha256"
+              echo "owner key: a source secret changed, resealed"
+            else
+              echo "owner key: source secrets unchanged, key.json kept"
+            fi
+          fi
+          cd m
+          git config user.name "pages-relay"
+          git config user.email "pages-relay@users.noreply.github.com"
+          existing=""
+          for p in $paths; do [ -e "$p" ] && existing="$existing $p"; done
+          [ -n "$existing" ] || { echo "nothing to write"; exit 0; }
+          git add -- $existing
+          if git diff --cached --quiet -- docs/ .relay/; then echo "main docs/: no change"; exit 0; fi
+          git commit -q -m "pages-relay: refresh docs/ data $(date -u +%FT%TZ)" -- $existing
+          if ! git push -q origin HEAD:main; then
+            git pull -q --rebase origin main
+            git push -q origin HEAD:main
+          fi
+          echo "main docs/ updated: $(git rev-parse --short HEAD)"
+      - name: Request a Pages build (the Pages source is the owner's setting; it is read here, never changed)
         env:
           GH_TOKEN: ${{ env.TOK }}
         run: |
           set -u
-          gh api -X POST "repos/${REPO}/pages" -f 'source[branch]=gh-pages' -f 'source[path]=/' >/dev/null 2>&1 \
-            || gh api -X PUT "repos/${REPO}/pages" -f 'source[branch]=gh-pages' -f 'source[path]=/' >/dev/null 2>&1 \
-            || echo "pages source call failed (status below)"
+          src=$(gh api "repos/${REPO}/pages" -q '.source.branch + " " + .source.path' 2>/dev/null || echo "unknown")
+          echo "pages source: $src"
           gh api -X POST "repos/${REPO}/pages/builds" >/dev/null 2>&1 || true
           for i in $(seq 1 30); do
             s=$(gh api "repos/${REPO}/pages/builds/latest" -q .status 2>/dev/null || echo unknown)

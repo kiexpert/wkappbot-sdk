@@ -1,0 +1,114 @@
+name: private-branch-prune
+
+# Prunes branch heads that are already merged into main, in the account's own repos (owner 2026-11-09: "필요없는
+# 브렌치는 삭제하삼"). A cloud agent seat cannot delete a branch it did not open (the session git proxy answers 403),
+# so the deletion runs here with a workflow token. Targets are found by a sha256 prefix and never named in this file
+# or its logs, on the same pattern as private-pages-relay.
+# Dry run by default: it prints every merged head and every unmerged head (ahead count, last commit date).
+# With confirm=yes it pushes an archive/<branch> tag at each merged tip first, then deletes the head.
+# Always kept: main, gh-pages, relay/*, every open pull-request head, and heads matching the keep input.
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "yes = tag archive/<name> and delete the merged heads; anything else = dry run"
+        required: false
+        default: "no"
+      targets:
+        description: "space-separated 16-hex sha256 prefixes of owner/repo; empty = all three default targets"
+        required: false
+        default: ""
+      keep:
+        description: "extra extended regex of branch names to keep (for example ^claude/ for live sessions)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: private-branch-prune
+  cancel-in-progress: false
+
+jobs:
+  prune:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # kih, the SDK itself, aiportal-demo
+      DEFAULT_TARGETS: "23ade98d428c8527 c8d999f8542fb0a1 754961bb6a5574dd"
+      T1: ${{ secrets.GH_LICENSE_TOKEN }}
+      T2: ${{ secrets.WKAPPBOT_PAT }}
+      T3: ${{ secrets.WKAPPBOT_CORE_PAT }}
+      CONFIRM: ${{ inputs.confirm }}
+      TARGETS_IN: ${{ inputs.targets }}
+      KEEP_RE: ${{ inputs.keep }}
+    steps:
+      - name: Prune merged heads
+        run: |
+          set -u
+          targets="${TARGETS_IN:-$DEFAULT_TARGETS}"
+          [ -n "$targets" ] || targets="$DEFAULT_TARGETS"
+          for t in "$T1" "$T2" "$T3"; do [ -n "$t" ] && echo "::add-mask::$t"; done
+          rc=0
+          for h in $targets; do
+            repo=""; tok=""
+            for t in "$T1" "$T2" "$T3"; do
+              [ -n "$t" ] || continue
+              names=$(GH_TOKEN="$t" gh repo list kiexpert --limit 400 --json nameWithOwner -q '.[].nameWithOwner' 2>/dev/null || true)
+              for n in $names; do
+                if [ "$(printf %s "$n" | sha256sum | cut -c1-16)" = "$h" ]; then repo="$n"; tok="$t"; break 2; fi
+              done
+            done
+            if [ -z "$repo" ]; then echo "== target $h: no token reaches it"; rc=1; continue; fi
+            echo "::add-mask::$repo"; echo "::add-mask::${repo#*/}"
+            echo "== target $h"
+            d="w-$h"; rm -rf "$d"; git init -q "$d"
+            url="https://x-access-token:${tok}@github.com/${repo}.git"
+            git -C "$d" remote add origin "$url"
+            if ! git -C "$d" fetch -q --filter=tree:0 origin '+refs/heads/*:refs/remotes/origin/*' '+refs/tags/archive/*:refs/tags/archive/*'; then
+              echo "fetch failed"; rc=1; continue
+            fi
+            open=$(GH_TOKEN="$tok" gh pr list -R "$repo" --state open --limit 300 --json headRefName -q '.[].headRefName' 2>/dev/null || true)
+            heads=$(git -C "$d" for-each-ref --format='%(refname:strip=3)' refs/remotes/origin/ | grep -v '^HEAD$' || true)
+            total=$(printf '%s\n' "$heads" | grep -c . || true)
+            merged=""; nm=0; nu=0; nk=0
+            for b in $heads; do
+              case "$b" in main|gh-pages|relay/*) nk=$((nk+1)); continue ;; esac
+              if printf '%s\n' "$open" | grep -qxF "$b"; then echo "KEEP open-pr $b"; nk=$((nk+1)); continue; fi
+              if [ -n "$KEEP_RE" ] && printf '%s\n' "$b" | grep -Eq "$KEEP_RE"; then echo "KEEP keep-input $b"; nk=$((nk+1)); continue; fi
+              tip=$(git -C "$d" rev-parse "refs/remotes/origin/$b")
+              if git -C "$d" merge-base --is-ancestor "$tip" refs/remotes/origin/main; then
+                echo "MERGED $b ${tip:0:8}"; merged="$merged $b"; nm=$((nm+1))
+              else
+                a=$(git -C "$d" rev-list --count "refs/remotes/origin/main..$tip")
+                dt=$(git -C "$d" log -1 --format=%cs "$tip" 2>/dev/null || echo "?")
+                echo "UNMERGED $b ahead=$a date=$dt"; nu=$((nu+1))
+              fi
+            done
+            echo "SUMMARY target $h: heads=$total merged=$nm unmerged=$nu kept=$nk"
+            if [ "$CONFIRM" != "yes" ]; then echo "dry run: nothing changed"; continue; fi
+            # archive tags first, in batches; a tag that already exists is left as it is
+            refs=""; n=0
+            for b in $merged; do
+              tag="archive/$b"
+              if git -C "$d" rev-parse -q --verify "refs/tags/$tag" >/dev/null; then continue; fi
+              refs="$refs refs/remotes/origin/$b:refs/tags/$tag"; n=$((n+1))
+              if [ "$n" -ge 50 ]; then git -C "$d" push -q origin $refs || rc=1; refs=""; n=0; fi
+            done
+            [ -n "$refs" ] && { git -C "$d" push -q origin $refs || rc=1; }
+            git -C "$d" fetch -q origin '+refs/tags/archive/*:refs/tags/archive/*' || true
+            # delete only heads whose archive tag now points at the same tip
+            dels=""; n=0; nd=0
+            for b in $merged; do
+              tip=$(git -C "$d" rev-parse "refs/remotes/origin/$b")
+              at=$(git -C "$d" rev-parse -q --verify "refs/tags/archive/$b^{commit}" 2>/dev/null || true)
+              [ "$at" = "$tip" ] || { echo "SKIP $b (archive tag missing or differs)"; continue; }
+              dels="$dels :refs/heads/$b"; n=$((n+1)); nd=$((nd+1))
+              if [ "$n" -ge 50 ]; then git -C "$d" push -q origin $dels || rc=1; dels=""; n=0; fi
+            done
+            [ -n "$dels" ] && { git -C "$d" push -q origin $dels || rc=1; }
+            left=$(git ls-remote --heads "$url" | grep -c . || true)
+            echo "DELETED target $h: $nd heads; heads now $left"
+          done
+          exit $rc
