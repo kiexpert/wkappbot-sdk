@@ -27,15 +27,17 @@ else
   gate core no "releases/latest core $r < kih bin core $k -- an npm install would fetch an older core"
 fi
 
-for leg in ${LEGS:-linux-x64 osx-arm64 osx-x64 win-x64}; do
+for leg in ${LEGS:-linux-x64 osx-arm64 osx-x64 win-x64 win-x64-nopy}; do
   f="${QA_DIR:-.}/$leg.txt"
   if [ ! -f "$f" ]; then gate "qa $leg" no "no pre-publish QA result ($f)"; continue; fi
   get() { sed -n "s/^$1=//p" "$f" | head -1; }
-  i="$(get install)" d="$(get doctor_fail)" o="$(get opencode)" e="$(get e2e)" v="$(get version)"
-  if [ "$v" = "$VER" ] && [ "$i" = 0 ] && [ "$d" = 0 ] && [ "$o" = PASS ] && [ "$e" = success ]; then
-    gate "qa $leg" ok "version=$v install=$i doctor_fail=$d opencode=$o e2e=$e"
+  i="$(get install)" d="$(get doctor_fail)" o="$(get opencode)" e="$(get e2e)" v="$(get version)" p="$(get python)"
+  # Windows legs carry the python contract (Store stub -> python installed; real python -> install skipped).
+  pok=1; case "$leg" in win-*) [ "$p" = ok ] || pok=0 ;; esac
+  if [ "$v" = "$VER" ] && [ "$i" = 0 ] && [ "$d" = 0 ] && [ "$o" = PASS ] && [ "$e" = success ] && [ "$pok" = 1 ]; then
+    gate "qa $leg" ok "version=$v install=$i doctor_fail=$d opencode=$o e2e=$e python=${p:-none}"
   else
-    gate "qa $leg" no "version=${v:-?} install=${i:-?} doctor_fail=${d:-?} opencode=${o:-?} e2e=${e:-?} (want $VER/0/0/PASS/success)"
+    gate "qa $leg" no "version=${v:-?} install=${i:-?} doctor_fail=${d:-?} opencode=${o:-?} e2e=${e:-?} python=${p:-?} (want $VER/0/0/PASS/success, python=ok on win-*)"
   fi
 done
 
