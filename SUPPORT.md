@@ -24,7 +24,7 @@ wkappbot eye tick --timeout 5
 
 | Symptom | First step |
 |---------|-----------|
-| `wkappbot: command not found` | Add `bin\` to PATH — see [README](README.md#installation) |
+| `wkappbot: command not found` | Add `bin\` to PATH — see [README](README.md#install) |
 | License shows Free after payment | Accept the GitHub collaborator invitation in your email |
 | Eye won't start | Check `bin\wkappbot.hq\logs\` for errors |
 | Build fails (vswhere) | Install Visual Studio Build Tools 2022 |

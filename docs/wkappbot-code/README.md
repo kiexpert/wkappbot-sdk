@@ -7,7 +7,9 @@
 > And it tests the way a person does: **A11Y QA** clicks and reads the real app through its accessibility tree, so a passing test means the screen works, not that a mock passed.
 
 ```bash
-npm i -g wkappbot-code && wkappbot-code install && wkappbot-code doctor
+npm i -g wkappbot-code
+wkappbot-code install
+wkappbot-code doctor
 ```
 
 [![npm](https://img.shields.io/npm/v/wkappbot-code?label=npm%20wkappbot-code)](https://www.npmjs.com/package/wkappbot-code)
@@ -144,22 +146,16 @@ Until a fixed release ships, treat the guards in OpenCode as **not active**.
 ## (g) Uninstall
 
 ```bash
-npm uninstall -g wkappbot-code opencode-ai
-rm -rf ~/.local/share/wkappbot ~/.local/bin/wkappbot ~/.wk-harness   # core binary, its link, web harness
-# optional: your own skill edits
-rm -rf ~/.wkappbot/private-skills
+wkappbot-code uninstall
+npm rm -g wkappbot-code
 ```
 
-Then undo the machine-wide changes, or they keep pointing at deleted files:
+`uninstall` gives back what `install` changed: the global `core.hooksPath` you had before, your own entries in `~/.claude/settings.json` (only the harness hook arms and allow rules leave), the shims it added to the bin dirs, `~/.wk-harness`, `~/.wk-harness-hooks` and the `wisdom-kernel` plugin entry in `opencode.json`. It keeps opencode-ai and the wkappbot core with its skills; remove those by hand if you want them gone:
 
 ```bash
-git config --global --unset core.hooksPath      # or set back the value you had before
-rm -rf ~/.wk-harness-hooks
-# remove the wkharness-lite entries from ~/.claude/settings.json (Claude Code hooks)
-# remove the wk* shims left in "$(npm prefix -g)/bin" and ~/.local/bin
+npm rm -g opencode-ai
+rm -rf ~/.local/share/wkappbot ~/.wkappbot/private-skills
 ```
-
-Finally remove the `wisdom-kernel` entry from the `plugin` list in `~/.config/opencode/opencode.json` (or restore the `opencode.json.bak-<stamp>` that `install` saved). A `wkappbot-code uninstall` that does all of this is planned.
 
 ---
 
