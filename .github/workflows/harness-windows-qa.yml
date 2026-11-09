@@ -5,9 +5,34 @@ name: Harness QA (Windows + macOS)
 # second time under /bin/bash 3.2, the shell a stock Mac starts hooks with.
 # Only RESULT and CASE lines are printed; nothing from the harness repo is published.
 
+# RESPAWN ON A BAD NETWORK (owner 2026-11-09, the scalper-runner road; the same road as wkappbot-code-os-qa.yml): every
+# job leg first probes the hosts it needs (curl --retry 6 --retry-delay 5). A leg whose runner has a dead network does
+# not run its steps; it dispatches a fresh run of this workflow for that one leg (only_leg=<job>:<matrix values>,
+# respawn=n+1, parent=<first run>) and ends "respawned, network" -- never a product FAIL. Capped at 2 respawns; the
+# third dead network is a real red. In a respawned run every other leg is switched off. Proof hooks: a branch
+# qa/hwq-respawn-a-* fakes a dead network on web-install:ubuntu-latest's first attempt only (respawn 1 must go green);
+# a branch qa/hwq-respawn-b-* fakes it on every attempt (respawn 2 must be the real red).
+run-name: Harness QA (Windows + macOS)${{ inputs.only_leg != '' && format(' leg={0} respawn={1} parent={2}', inputs.only_leg, inputs.respawn, inputs.parent) || '' }}
+
 on:
   workflow_dispatch:
     inputs:
+      only_leg:
+        description: 'Run only this leg, as <job>:<matrix values joined by -> (set by a respawn; empty = all legs)'
+        required: false
+        default: ''
+      respawn:
+        description: 'Respawn count of this run (0 = first attempt)'
+        required: false
+        default: '0'
+      parent:
+        description: 'Run id of the first attempt (set by a respawn)'
+        required: false
+        default: ''
+      fake_net_fail:
+        description: 'Proof hook: 1 = fake a dead network on the first attempt, all = on every attempt'
+        required: false
+        default: '0'
       harness_ref:
         description: 'Harness branch, tag or commit to test'
         required: false
@@ -25,6 +50,7 @@ on:
 
 permissions:
   contents: read
+  actions: write   # a leg on a dead network dispatches a fresh run of itself (GITHUB_TOKEN may start workflow_dispatch)
 
 jobs:
   # Read-only daily tools of the owner's docs repo on both desktop platforms (owner 2026-11-05).
@@ -42,7 +68,25 @@ jobs:
       T2: ${{ secrets.GH_LICENSE_TOKEN }}
       T3: ${{ secrets.WKAPPBOT_CORE_PAT }}
     steps:
+      - name: Network probe and leg filter (a dead network respawns this leg on a fresh runner)
+        shell: bash
+        env:
+          LEG_ID: ${{ github.job }}:${{ join(matrix.*, '-') }}
+          ONLY_LEG: ${{ inputs.only_leg }}
+          FAKE_NET_FAIL: ${{ ((inputs.fake_net_fail == 'all') || (startsWith(github.ref_name, 'qa/hwq-respawn-b-') && github.job == 'web-install' && matrix.os == 'ubuntu-latest') || (((inputs.fake_net_fail == '1') || (startsWith(github.ref_name, 'qa/hwq-respawn-a-') && github.job == 'web-install' && matrix.os == 'ubuntu-latest')) && (inputs.respawn == '' || inputs.respawn == '0'))) && '1' || '0' }}
+        run: |
+          set +e
+          if [ -n "$ONLY_LEG" ] && [ "$ONLY_LEG" != "$LEG_ID" ]; then echo "LEG_OFF=1" >> "$GITHUB_ENV"; echo "leg $LEG_ID is off in this respawn of $ONLY_LEG"; exit 0; fi
+          down=""
+          for h in github.com objects.githubusercontent.com kiexpert.github.io registry.npmjs.org; do
+            c="$(curl -sS -o /dev/null -w '%{http_code}' --retry 6 --retry-delay 5 --max-time 30 "https://$h/" 2>/dev/null)"
+            echo "probe $h -> ${c:-none}"
+            case "$c" in 000|''|5??) down="$down $h";; esac
+          done
+          if [ "$FAKE_NET_FAIL" = 1 ]; then echo "probe: fake_net_fail -> treating the network as down (proof hook)"; down="$down (fake)"; fi
+          if [ -n "$down" ]; then { echo "LEG_OFF=1"; echo "NET_DOWN=1"; echo "NET_WHY=probe:$down"; } >> "$GITHUB_ENV"; echo "::warning::$LEG_ID: network down at leg start:$down"; fi
       - name: Find the docs repo and a token that can reach it
+        if: env.LEG_OFF != '1'
         shell: bash
         run: |
           set -u
@@ -61,13 +105,16 @@ jobs:
           done
           echo "no token reaches the docs repo"; exit 1
       - name: Check out the docs repo
+        if: env.LEG_OFF != '1'
         shell: bash
         run: git clone -q --depth 1 "https://x-access-token:${TOK}@github.com/${REPO}.git" docsrepo
       - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6
+        if: env.LEG_OFF != '1'
         with:
           # 3.12, not '3.x': '3.x' resolved to a just-released 3.15 that PyMuPDF (court_pdf) had no build for.
           python-version: '3.12'
       - name: Run each read-only tool and record PASS or FAIL
+        if: env.LEG_OFF != '1'
         shell: bash
         working-directory: docsrepo
         run: |
@@ -129,6 +176,27 @@ jobs:
           echo "RESULT $pass/$total"
           [ "$pass" -eq "$total" ]
 
+      - name: Respawn this leg on a fresh runner (network down; capped at 2 respawns, the third is a real red)
+        if: always() && env.NET_DOWN == '1'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LEG_ID: ${{ github.job }}:${{ join(matrix.*, '-') }}
+          N: ${{ inputs.respawn || '0' }}
+          PARENT: ${{ inputs.parent || github.run_id }}
+          HARNESS_REF: ${{ inputs.harness_ref || 'main' }}
+          BREAK_GUARD: ${{ inputs.break_guard && 'true' || 'false' }}
+          FAKE_NEXT: ${{ inputs.fake_net_fail == 'all' && 'all' || '0' }}
+          REF: ${{ github.ref_name }}
+        run: |
+          set -u
+          next=$((N + 1))
+          if [ "$N" -ge 2 ]; then echo "::error::$LEG_ID: network down on the 3rd attempt ($NET_WHY) -- a real red"; exit 1; fi
+          gh workflow run harness-windows-qa.yml --repo "$GITHUB_REPOSITORY" --ref "$REF" -f only_leg="$LEG_ID" -f respawn="$next" \
+            -f parent="$PARENT" -f harness_ref="$HARNESS_REF" -f break_guard="$BREAK_GUARD" -f fake_net_fail="$FAKE_NEXT"
+          echo "RESPAWNED, NETWORK: $LEG_ID -> fresh run 'leg=$LEG_ID respawn=$next parent=$PARENT' ($NET_WHY)"
+          { echo "### $LEG_ID: respawned, network"; echo "$NET_WHY"; echo "fresh run: leg=$LEG_ID respawn=$next parent=$PARENT"; } >> "$GITHUB_STEP_SUMMARY"
+
   # Portal selftests on the owner's two desktop platforms (owner 2026-11-05: compatibility demo on GitHub runners).
   # The portal repo is found by sha256 prefix and never named; its name and every token are masked.
   portal-selftest:
@@ -144,7 +212,25 @@ jobs:
       T2: ${{ secrets.GH_LICENSE_TOKEN }}
       T3: ${{ secrets.WKAPPBOT_CORE_PAT }}
     steps:
+      - name: Network probe and leg filter (a dead network respawns this leg on a fresh runner)
+        shell: bash
+        env:
+          LEG_ID: ${{ github.job }}:${{ join(matrix.*, '-') }}
+          ONLY_LEG: ${{ inputs.only_leg }}
+          FAKE_NET_FAIL: ${{ ((inputs.fake_net_fail == 'all') || (startsWith(github.ref_name, 'qa/hwq-respawn-b-') && github.job == 'web-install' && matrix.os == 'ubuntu-latest') || (((inputs.fake_net_fail == '1') || (startsWith(github.ref_name, 'qa/hwq-respawn-a-') && github.job == 'web-install' && matrix.os == 'ubuntu-latest')) && (inputs.respawn == '' || inputs.respawn == '0'))) && '1' || '0' }}
+        run: |
+          set +e
+          if [ -n "$ONLY_LEG" ] && [ "$ONLY_LEG" != "$LEG_ID" ]; then echo "LEG_OFF=1" >> "$GITHUB_ENV"; echo "leg $LEG_ID is off in this respawn of $ONLY_LEG"; exit 0; fi
+          down=""
+          for h in github.com objects.githubusercontent.com kiexpert.github.io registry.npmjs.org; do
+            c="$(curl -sS -o /dev/null -w '%{http_code}' --retry 6 --retry-delay 5 --max-time 30 "https://$h/" 2>/dev/null)"
+            echo "probe $h -> ${c:-none}"
+            case "$c" in 000|''|5??) down="$down $h";; esac
+          done
+          if [ "$FAKE_NET_FAIL" = 1 ]; then echo "probe: fake_net_fail -> treating the network as down (proof hook)"; down="$down (fake)"; fi
+          if [ -n "$down" ]; then { echo "LEG_OFF=1"; echo "NET_DOWN=1"; echo "NET_WHY=probe:$down"; } >> "$GITHUB_ENV"; echo "::warning::$LEG_ID: network down at leg start:$down"; fi
       - name: Find the portal repo and a token that can reach it
+        if: env.LEG_OFF != '1'
         shell: bash
         run: |
           set -u
@@ -163,22 +249,47 @@ jobs:
           done
           echo "no token reaches the portal repo"; exit 1
       - name: Check out the portal
+        if: env.LEG_OFF != '1'
         shell: bash
         run: |
           git clone -q --depth 1 "https://x-access-token:${TOK}@github.com/${REPO}.git" site
           # the portal sha this job tests, so a result can be tied to a portal commit (the repo name stays masked)
           echo "PORTAL-REF $(git -C site rev-parse --short HEAD) $(git -C site log -1 --format=%cI)"
       - uses: actions/setup-node@v5
+        if: env.LEG_OFF != '1'
         with:
           node-version: 22
       - name: Install Chromium
+        if: env.LEG_OFF != '1'
         shell: bash
         run: |
           npm i -s playwright@1.49.1
           npx playwright install --with-deps chromium
       - name: Portal selftest
+        if: env.LEG_OFF != '1'
         shell: bash
         run: node site/poc-site/portal/selftest.js
+
+      - name: Respawn this leg on a fresh runner (network down; capped at 2 respawns, the third is a real red)
+        if: always() && env.NET_DOWN == '1'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LEG_ID: ${{ github.job }}:${{ join(matrix.*, '-') }}
+          N: ${{ inputs.respawn || '0' }}
+          PARENT: ${{ inputs.parent || github.run_id }}
+          HARNESS_REF: ${{ inputs.harness_ref || 'main' }}
+          BREAK_GUARD: ${{ inputs.break_guard && 'true' || 'false' }}
+          FAKE_NEXT: ${{ inputs.fake_net_fail == 'all' && 'all' || '0' }}
+          REF: ${{ github.ref_name }}
+        run: |
+          set -u
+          next=$((N + 1))
+          if [ "$N" -ge 2 ]; then echo "::error::$LEG_ID: network down on the 3rd attempt ($NET_WHY) -- a real red"; exit 1; fi
+          gh workflow run harness-windows-qa.yml --repo "$GITHUB_REPOSITORY" --ref "$REF" -f only_leg="$LEG_ID" -f respawn="$next" \
+            -f parent="$PARENT" -f harness_ref="$HARNESS_REF" -f break_guard="$BREAK_GUARD" -f fake_net_fail="$FAKE_NEXT"
+          echo "RESPAWNED, NETWORK: $LEG_ID -> fresh run 'leg=$LEG_ID respawn=$next parent=$PARENT' ($NET_WHY)"
+          { echo "### $LEG_ID: respawned, network"; echo "$NET_WHY"; echo "fresh run: leg=$LEG_ID respawn=$next parent=$PARENT"; } >> "$GITHUB_STEP_SUMMARY"
 
   harness-qa:
     strategy:
@@ -188,7 +299,25 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 25
     steps:
+      - name: Network probe and leg filter (a dead network respawns this leg on a fresh runner)
+        shell: bash
+        env:
+          LEG_ID: ${{ github.job }}:${{ join(matrix.*, '-') }}
+          ONLY_LEG: ${{ inputs.only_leg }}
+          FAKE_NET_FAIL: ${{ ((inputs.fake_net_fail == 'all') || (startsWith(github.ref_name, 'qa/hwq-respawn-b-') && github.job == 'web-install' && matrix.os == 'ubuntu-latest') || (((inputs.fake_net_fail == '1') || (startsWith(github.ref_name, 'qa/hwq-respawn-a-') && github.job == 'web-install' && matrix.os == 'ubuntu-latest')) && (inputs.respawn == '' || inputs.respawn == '0'))) && '1' || '0' }}
+        run: |
+          set +e
+          if [ -n "$ONLY_LEG" ] && [ "$ONLY_LEG" != "$LEG_ID" ]; then echo "LEG_OFF=1" >> "$GITHUB_ENV"; echo "leg $LEG_ID is off in this respawn of $ONLY_LEG"; exit 0; fi
+          down=""
+          for h in github.com objects.githubusercontent.com kiexpert.github.io registry.npmjs.org; do
+            c="$(curl -sS -o /dev/null -w '%{http_code}' --retry 6 --retry-delay 5 --max-time 30 "https://$h/" 2>/dev/null)"
+            echo "probe $h -> ${c:-none}"
+            case "$c" in 000|''|5??) down="$down $h";; esac
+          done
+          if [ "$FAKE_NET_FAIL" = 1 ]; then echo "probe: fake_net_fail -> treating the network as down (proof hook)"; down="$down (fake)"; fi
+          if [ -n "$down" ]; then { echo "LEG_OFF=1"; echo "NET_DOWN=1"; echo "NET_WHY=probe:$down"; } >> "$GITHUB_ENV"; echo "::warning::$LEG_ID: network down at leg start:$down"; fi
       - name: Checkout harness repo
+        if: env.LEG_OFF != '1'
         uses: actions/checkout@v5
         with:
           repository: ${{ github.repository_owner }}/wkappbot-kih
@@ -198,7 +327,7 @@ jobs:
       - name: Harness ref from the commit message (push runs)
         # A push whose head commit message has a line "harness-ref: <kih branch or sha>" tests that kih head
         # instead of main, so a kih branch can be proven here before it merges.
-        if: github.event_name == 'push'
+        if: (github.event_name == 'push') && env.LEG_OFF != '1'
         shell: bash
         working-directory: kih
         env:
@@ -210,12 +339,13 @@ jobs:
           git fetch --depth=1 origin "$ref" && git checkout -q FETCH_HEAD && echo "HARNESS-REF $ref $(git log -1 --format=%h)"
 
       - name: Setup Python
+        if: env.LEG_OFF != '1'
         uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6
         with:
           python-version: '3.x'
 
       - name: python3 alias (the harness scripts call python3)
-        if: runner.os == 'Windows'
+        if: (runner.os == 'Windows') && env.LEG_OFF != '1'
         shell: pwsh
         run: |
           if (-not (Get-Command python3 -ErrorAction SilentlyContinue)) {
@@ -225,6 +355,7 @@ jobs:
           python3 --version
 
       - name: Harness commit and shells under test
+        if: env.LEG_OFF != '1'
         shell: bash
         working-directory: kih
         run: |
@@ -237,6 +368,7 @@ jobs:
           if [ -n "$mid" ]; then echo "CASE machine-id PASS ($mid)"; else echo "CASE machine-id FAIL (empty: the archive cannot file anything on this OS)"; exit 1; fi
 
       - name: Fixture transcript (where Claude Code keeps transcripts)
+        if: env.LEG_OFF != '1'
         shell: bash
         run: |
           mkdir -p "$HOME/.claude/projects/ci"
@@ -251,6 +383,7 @@ jobs:
           git config --global user.email ci@example.com; git config --global user.name ci
 
       - name: 1. PowerShell parse check of the edited hooks
+        if: env.LEG_OFF != '1'
         shell: pwsh
         working-directory: kih
         run: |
@@ -274,6 +407,7 @@ jobs:
           if ($bad) { exit 1 }
 
       - name: 2. Hippo tool resolves from the harness with no WKAppBot checkout
+        if: env.LEG_OFF != '1'
         shell: pwsh
         working-directory: kih
         run: |
@@ -290,6 +424,7 @@ jobs:
           if ($fail) { exit 1 }
 
       - name: 3. Python self-tests
+        if: env.LEG_OFF != '1'
         shell: bash
         working-directory: kih
         run: |
@@ -303,6 +438,7 @@ jobs:
           exit $fail
 
       - name: 4. Launchers -- wkhippo reflex and history-push (bash)
+        if: env.LEG_OFF != '1'
         shell: bash
         working-directory: kih
         run: |
@@ -318,7 +454,7 @@ jobs:
           echo "RESULT $pass/$total"; [ "$pass" -eq "$total" ]
 
       - name: 5. Launcher -- wkhippo.cmd reflex and history-push (cmd)
-        if: runner.os == 'Windows'
+        if: (runner.os == 'Windows') && env.LEG_OFF != '1'
         shell: cmd
         working-directory: kih
         run: |
@@ -329,7 +465,7 @@ jobs:
           echo RESULT 2/2
 
       - name: 5b. PC installer registers the one-source stop hook (Git Bash)
-        if: runner.os == 'Windows'
+        if: (runner.os == 'Windows') && env.LEG_OFF != '1'
         shell: pwsh
         working-directory: kih
         run: |
@@ -358,6 +494,7 @@ jobs:
           if ($pass -ne 4) { exit 1 }
 
       - name: 5c. Agent-run ledger records a login failure (Agent.ps1 seam, owner 2026-10-28)
+        if: env.LEG_OFF != '1'
         shell: pwsh
         working-directory: kih
         run: |
@@ -384,6 +521,7 @@ jobs:
           if ($pass -ne 3) { exit 1 }
 
       - name: 5d. Install the family CLIs (claude, codex, grok, muse, agy)
+        if: env.LEG_OFF != '1'
         shell: bash
         run: |
           # Every family the harness delegates to, installed the way its vendor documents (owner 2026-10-29).
@@ -413,11 +551,13 @@ jobs:
 
       # On Windows agy answers a no-login run by opening Edge for its login; the NATIVE scan skips files Edge still holds open or removes mid-scan (run 40803302559).
       - name: 5e. Live -- each CLI run with no login lands its login error in the agent-run ledger (NATIVE lines measure the CLI's own session file)
+        if: env.LEG_OFF != '1'
         shell: pwsh
         working-directory: kih
         run: ./tools/wkharness-common-agentrun/Test-WkAgentLoginLive.ps1 -Families claude,codex,grok,muse,agy -TimeoutSec 90 -Python python3
 
       - name: 5f. One installer -- install.cmd from bash (Linux, macOS, Git Bash) and cmd
+        if: env.LEG_OFF != '1'
         shell: bash
         working-directory: kih
         run: |
@@ -433,7 +573,7 @@ jobs:
           echo "RESULT $pass/$total"; [ "$pass" -eq "$total" ]
 
       - name: 5g. One installer -- install.cmd from PowerShell
-        if: runner.os == 'Windows'
+        if: (runner.os == 'Windows') && env.LEG_OFF != '1'
         shell: pwsh
         working-directory: kih
         run: |
@@ -444,6 +584,7 @@ jobs:
           if (-not $ok) { exit 1 }
 
       - name: 6. Bash self-tests
+        if: env.LEG_OFF != '1'
         shell: bash
         working-directory: kih
         run: |
@@ -457,7 +598,7 @@ jobs:
           exit $fail
 
       - name: 7. Bash self-tests under /bin/bash 3.2 (stock macOS)
-        if: runner.os == 'macOS'
+        if: (runner.os == 'macOS') && env.LEG_OFF != '1'
         shell: bash
         working-directory: kih
         run: |
@@ -471,6 +612,7 @@ jobs:
           exit $fail
 
       - name: 8. wkappbot-code selftest (synthetic; real-hook cases b1/c1/f2 skipped)
+        if: env.LEG_OFF != '1'
         shell: bash
         working-directory: kih
         run: |
@@ -482,6 +624,27 @@ jobs:
           printf '%s\n' "$out" | awk '/^(PASS|FAIL|RESULT)/{f=0} /^FAIL/{f=1} f||/^RESULT/' | cut -c1-600
           r=$(printf '%s\n' "$out" | grep '^RESULT' | tail -1); set -- $r
           [ "$rc" = 0 ] && [ -n "$r" ] && [ "${2%%/*}" = "${2##*/}" ] || { printf '%s\n' "$out" | tail -25; exit 1; }
+
+      - name: Respawn this leg on a fresh runner (network down; capped at 2 respawns, the third is a real red)
+        if: always() && env.NET_DOWN == '1'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LEG_ID: ${{ github.job }}:${{ join(matrix.*, '-') }}
+          N: ${{ inputs.respawn || '0' }}
+          PARENT: ${{ inputs.parent || github.run_id }}
+          HARNESS_REF: ${{ inputs.harness_ref || 'main' }}
+          BREAK_GUARD: ${{ inputs.break_guard && 'true' || 'false' }}
+          FAKE_NEXT: ${{ inputs.fake_net_fail == 'all' && 'all' || '0' }}
+          REF: ${{ github.ref_name }}
+        run: |
+          set -u
+          next=$((N + 1))
+          if [ "$N" -ge 2 ]; then echo "::error::$LEG_ID: network down on the 3rd attempt ($NET_WHY) -- a real red"; exit 1; fi
+          gh workflow run harness-windows-qa.yml --repo "$GITHUB_REPOSITORY" --ref "$REF" -f only_leg="$LEG_ID" -f respawn="$next" \
+            -f parent="$PARENT" -f harness_ref="$HARNESS_REF" -f break_guard="$BREAK_GUARD" -f fake_net_fail="$FAKE_NEXT"
+          echo "RESPAWNED, NETWORK: $LEG_ID -> fresh run 'leg=$LEG_ID respawn=$next parent=$PARENT' ($NET_WHY)"
+          { echo "### $LEG_ID: respawned, network"; echo "$NET_WHY"; echo "fresh run: leg=$LEG_ID respawn=$next parent=$PARENT"; } >> "$GITHUB_STEP_SUMMARY"
 
   # kih wkappbot-code: the OpenCode end-to-end driver on the owner's two desktop platforms with PowerShell removed
   # from PATH (the "nopwsh" road a stock Mac or Linux box takes). macOS also runs it under /bin/bash 3.2.
@@ -497,7 +660,25 @@ jobs:
       run:
         shell: bash
     steps:
+      - name: Network probe and leg filter (a dead network respawns this leg on a fresh runner)
+        shell: bash
+        env:
+          LEG_ID: ${{ github.job }}:${{ join(matrix.*, '-') }}
+          ONLY_LEG: ${{ inputs.only_leg }}
+          FAKE_NET_FAIL: ${{ ((inputs.fake_net_fail == 'all') || (startsWith(github.ref_name, 'qa/hwq-respawn-b-') && github.job == 'web-install' && matrix.os == 'ubuntu-latest') || (((inputs.fake_net_fail == '1') || (startsWith(github.ref_name, 'qa/hwq-respawn-a-') && github.job == 'web-install' && matrix.os == 'ubuntu-latest')) && (inputs.respawn == '' || inputs.respawn == '0'))) && '1' || '0' }}
+        run: |
+          set +e
+          if [ -n "$ONLY_LEG" ] && [ "$ONLY_LEG" != "$LEG_ID" ]; then echo "LEG_OFF=1" >> "$GITHUB_ENV"; echo "leg $LEG_ID is off in this respawn of $ONLY_LEG"; exit 0; fi
+          down=""
+          for h in github.com objects.githubusercontent.com kiexpert.github.io registry.npmjs.org; do
+            c="$(curl -sS -o /dev/null -w '%{http_code}' --retry 6 --retry-delay 5 --max-time 30 "https://$h/" 2>/dev/null)"
+            echo "probe $h -> ${c:-none}"
+            case "$c" in 000|''|5??) down="$down $h";; esac
+          done
+          if [ "$FAKE_NET_FAIL" = 1 ]; then echo "probe: fake_net_fail -> treating the network as down (proof hook)"; down="$down (fake)"; fi
+          if [ -n "$down" ]; then { echo "LEG_OFF=1"; echo "NET_DOWN=1"; echo "NET_WHY=probe:$down"; } >> "$GITHUB_ENV"; echo "::warning::$LEG_ID: network down at leg start:$down"; fi
       - name: Checkout harness repo
+        if: env.LEG_OFF != '1'
         uses: actions/checkout@v5
         with:
           repository: ${{ github.repository_owner }}/wkappbot-kih
@@ -507,7 +688,7 @@ jobs:
       - name: Harness ref from the commit message (push runs)
         # A push whose head commit message has a line "harness-ref: <kih branch or sha>" tests that kih head
         # instead of main, so a kih branch can be proven here before it merges.
-        if: github.event_name == 'push'
+        if: (github.event_name == 'push') && env.LEG_OFF != '1'
         shell: bash
         working-directory: kih
         env:
@@ -518,24 +699,29 @@ jobs:
           printf '%s' "$ref" | grep -qE '^[A-Za-z0-9._/-]{1,100}$' || { echo "bad harness-ref"; exit 1; }
           git fetch --depth=1 origin "$ref" && git checkout -q FETCH_HEAD && echo "HARNESS-REF $ref $(git log -1 --format=%h)"
       - uses: actions/setup-node@v4
+        if: env.LEG_OFF != '1'
         with:
           node-version: '20'
       - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6
+        if: env.LEG_OFF != '1'
         with:
           python-version: '3.12'
       - name: python3 alias (Windows)
-        if: runner.os == 'Windows'
+        if: (runner.os == 'Windows') && env.LEG_OFF != '1'
         run: command -v python3 >/dev/null || cp "$(command -v python)" "$(dirname "$(command -v python)")/python3.exe"
       - name: Remove pwsh from PATH
+        if: env.LEG_OFF != '1'
         run: |
           np=""; IFS=:; for d in $PATH; do { [ -e "$d/pwsh" ] || [ -e "$d/pwsh.exe" ]; } && continue; np="$np${np:+:}$d"; done; unset IFS
           echo "NOPWSH_PATH=$np" >> "$GITHUB_ENV"
           PATH="$np" bash -c 'echo "pwsh on PATH: $(command -v pwsh || echo none)"'
       - name: Install OpenCode (the driver runs the real CLI)
+        if: env.LEG_OFF != '1'
         run: |
           npm i -g opencode-ai > /dev/null 2>&1 || npm i -g opencode-ai
           echo "opencode $(opencode --version 2>&1 | head -1)"
       - name: selftest-opencode-e2e.sh nopwsh
+        if: env.LEG_OFF != '1'
         working-directory: kih
         run: |
           set +e
@@ -572,7 +758,7 @@ jobs:
           exit $fail
 
       - name: Windows install prerequisites as the driver's parent sees them
-        if: failure() && runner.os == 'Windows'
+        if: (failure() && runner.os == 'Windows') && env.LEG_OFF != '1'
         run: |
           # Presence and version only. The kih harness install.sh needs curl, tar and python3, and exits 1 if one is missing.
           for t in curl tar python3 python sha256sum sh git node; do
@@ -580,7 +766,7 @@ jobs:
           done
           echo "PREREQ python3 --version: $(PATH="$NOPWSH_PATH" python3 --version 2>&1 | head -1)"
       - name: macOS c-write/c-edit diagnosis (scratch files only)
-        if: failure() && runner.os == 'macOS'
+        if: (failure() && runner.os == 'macOS') && env.LEG_OFF != '1'
         working-directory: kih
         run: |
           set +e
@@ -610,6 +796,27 @@ jobs:
             [ "$rc" = 0 ] || echo "  last frames: $(grep -oE '^\++L[0-9]+d[0-9]+' "$T/tr$i" | tail -25 | tr '\n' ' ')"
           done
 
+      - name: Respawn this leg on a fresh runner (network down; capped at 2 respawns, the third is a real red)
+        if: always() && env.NET_DOWN == '1'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LEG_ID: ${{ github.job }}:${{ join(matrix.*, '-') }}
+          N: ${{ inputs.respawn || '0' }}
+          PARENT: ${{ inputs.parent || github.run_id }}
+          HARNESS_REF: ${{ inputs.harness_ref || 'main' }}
+          BREAK_GUARD: ${{ inputs.break_guard && 'true' || 'false' }}
+          FAKE_NEXT: ${{ inputs.fake_net_fail == 'all' && 'all' || '0' }}
+          REF: ${{ github.ref_name }}
+        run: |
+          set -u
+          next=$((N + 1))
+          if [ "$N" -ge 2 ]; then echo "::error::$LEG_ID: network down on the 3rd attempt ($NET_WHY) -- a real red"; exit 1; fi
+          gh workflow run harness-windows-qa.yml --repo "$GITHUB_REPOSITORY" --ref "$REF" -f only_leg="$LEG_ID" -f respawn="$next" \
+            -f parent="$PARENT" -f harness_ref="$HARNESS_REF" -f break_guard="$BREAK_GUARD" -f fake_net_fail="$FAKE_NEXT"
+          echo "RESPAWNED, NETWORK: $LEG_ID -> fresh run 'leg=$LEG_ID respawn=$next parent=$PARENT' ($NET_WHY)"
+          { echo "### $LEG_ID: respawned, network"; echo "$NET_WHY"; echo "fresh run: leg=$LEG_ID respawn=$next parent=$PARENT"; } >> "$GITHUB_STEP_SUMMARY"
+
   # PS1 -> JS port parity proof (owner order 2026-11-06). A guard flips from shadow to authoritative JS only when its
   # corpus passes 100% here against the real ps1 on BOTH desktop platforms. ps1 runs under pwsh, and on Windows also
   # under Windows PowerShell 5.1; the "none" leg removes pwsh from PATH and proves the JS road alone still gives verdicts.
@@ -632,7 +839,25 @@ jobs:
       run:
         shell: bash
     steps:
+      - name: Network probe and leg filter (a dead network respawns this leg on a fresh runner)
+        shell: bash
+        env:
+          LEG_ID: ${{ github.job }}:${{ join(matrix.*, '-') }}
+          ONLY_LEG: ${{ inputs.only_leg }}
+          FAKE_NET_FAIL: ${{ ((inputs.fake_net_fail == 'all') || (startsWith(github.ref_name, 'qa/hwq-respawn-b-') && github.job == 'web-install' && matrix.os == 'ubuntu-latest') || (((inputs.fake_net_fail == '1') || (startsWith(github.ref_name, 'qa/hwq-respawn-a-') && github.job == 'web-install' && matrix.os == 'ubuntu-latest')) && (inputs.respawn == '' || inputs.respawn == '0'))) && '1' || '0' }}
+        run: |
+          set +e
+          if [ -n "$ONLY_LEG" ] && [ "$ONLY_LEG" != "$LEG_ID" ]; then echo "LEG_OFF=1" >> "$GITHUB_ENV"; echo "leg $LEG_ID is off in this respawn of $ONLY_LEG"; exit 0; fi
+          down=""
+          for h in github.com objects.githubusercontent.com kiexpert.github.io registry.npmjs.org; do
+            c="$(curl -sS -o /dev/null -w '%{http_code}' --retry 6 --retry-delay 5 --max-time 30 "https://$h/" 2>/dev/null)"
+            echo "probe $h -> ${c:-none}"
+            case "$c" in 000|''|5??) down="$down $h";; esac
+          done
+          if [ "$FAKE_NET_FAIL" = 1 ]; then echo "probe: fake_net_fail -> treating the network as down (proof hook)"; down="$down (fake)"; fi
+          if [ -n "$down" ]; then { echo "LEG_OFF=1"; echo "NET_DOWN=1"; echo "NET_WHY=probe:$down"; } >> "$GITHUB_ENV"; echo "::warning::$LEG_ID: network down at leg start:$down"; fi
       - name: Checkout harness repo
+        if: env.LEG_OFF != '1'
         uses: actions/checkout@v5
         with:
           repository: ${{ github.repository_owner }}/wkappbot-kih
@@ -642,7 +867,7 @@ jobs:
       - name: Harness ref from the commit message (push runs)
         # A push whose head commit message has a line "harness-ref: <kih branch or sha>" tests that kih head
         # instead of main, so a kih branch can be proven here before it merges.
-        if: github.event_name == 'push'
+        if: (github.event_name == 'push') && env.LEG_OFF != '1'
         shell: bash
         working-directory: kih
         env:
@@ -653,9 +878,11 @@ jobs:
           printf '%s' "$ref" | grep -qE '^[A-Za-z0-9._/-]{1,100}$' || { echo "bad harness-ref"; exit 1; }
           git fetch --depth=1 origin "$ref" && git checkout -q FETCH_HEAD && echo "HARNESS-REF $ref $(git log -1 --format=%h)"
       - uses: actions/setup-node@v4
+        if: env.LEG_OFF != '1'
         with:
           node-version: '20'
       - name: Harness commit and hosts
+        if: env.LEG_OFF != '1'
         working-directory: kih
         run: |
           echo "HARNESS $(git log -1 --format='%h %cs')"
@@ -669,13 +896,13 @@ jobs:
             echo "FLAG $flag $(grep -c -- "$flag" tools/wkjs/parity.js)"; done
           true
       - name: Remove pwsh from PATH (none leg)
-        if: matrix.ps == 'none'
+        if: (matrix.ps == 'none') && env.LEG_OFF != '1'
         run: |
           np=""; IFS=:; for d in $PATH; do { [ -e "$d/pwsh" ] || [ -e "$d/pwsh.exe" ]; } && continue; np="$np${np:+:}$d"; done; unset IFS
           # Kept as a bash-side PATH: on Windows GITHUB_ENV wants a Windows-style PATH, so the run step applies it inline.
           echo "NOPWSH_PATH=$np" >> "$GITHUB_ENV"
       - name: Break one JS guard in the runner copy (negative proof, dispatch input)
-        if: inputs.break_guard
+        if: (inputs.break_guard) && env.LEG_OFF != '1'
         working-directory: kih
         run: |
           g=$(node -e '
@@ -688,6 +915,7 @@ jobs:
             s=s.replace(/(["\x27])(allow|deny|block)\1/g,(m,q,v)=>q+(v==="allow"?"deny":"allow")+q);fs.writeFileSync(f,s)' "$g"
           echo "BROKEN $(basename "$g")"
       - name: Parity run
+        if: env.LEG_OFF != '1'
         working-directory: kih
         env:
           WKJS_PS_HOST: ${{ matrix.ps }}
@@ -720,12 +948,33 @@ jobs:
           [ "$want" = "$got" ] || { echo "GUARD COUNT MISMATCH"; [ "$rc" = 0 ] && rc=1; }
           exit $rc
       - name: Upload RESULT table
-        if: always()
+        if: (always()) && env.LEG_OFF != '1'
         uses: actions/upload-artifact@v4
         with:
           name: wkjs-parity-${{ runner.os }}-${{ matrix.ps }}
           path: ${{ runner.temp }}/parity-*.txt
           if-no-files-found: ignore
+
+      - name: Respawn this leg on a fresh runner (network down; capped at 2 respawns, the third is a real red)
+        if: always() && env.NET_DOWN == '1'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LEG_ID: ${{ github.job }}:${{ join(matrix.*, '-') }}
+          N: ${{ inputs.respawn || '0' }}
+          PARENT: ${{ inputs.parent || github.run_id }}
+          HARNESS_REF: ${{ inputs.harness_ref || 'main' }}
+          BREAK_GUARD: ${{ inputs.break_guard && 'true' || 'false' }}
+          FAKE_NEXT: ${{ inputs.fake_net_fail == 'all' && 'all' || '0' }}
+          REF: ${{ github.ref_name }}
+        run: |
+          set -u
+          next=$((N + 1))
+          if [ "$N" -ge 2 ]; then echo "::error::$LEG_ID: network down on the 3rd attempt ($NET_WHY) -- a real red"; exit 1; fi
+          gh workflow run harness-windows-qa.yml --repo "$GITHUB_REPOSITORY" --ref "$REF" -f only_leg="$LEG_ID" -f respawn="$next" \
+            -f parent="$PARENT" -f harness_ref="$HARNESS_REF" -f break_guard="$BREAK_GUARD" -f fake_net_fail="$FAKE_NEXT"
+          echo "RESPAWNED, NETWORK: $LEG_ID -> fresh run 'leg=$LEG_ID respawn=$next parent=$PARENT' ($NET_WHY)"
+          { echo "### $LEG_ID: respawned, network"; echo "$NET_WHY"; echo "fresh run: leg=$LEG_ID respawn=$next parent=$PARENT"; } >> "$GITHUB_STEP_SUMMARY"
 
   # Per-file selftests of new kih harness tools on each desktop shell (spokesman 2026-11-06 for kih ROOT I).
   # Prints only RESULT/FAIL lines; a leg fails unless its RESULT reads p/p.
@@ -742,11 +991,30 @@ jobs:
       run:
         shell: bash
     steps:
+      - name: Network probe and leg filter (a dead network respawns this leg on a fresh runner)
+        shell: bash
+        env:
+          LEG_ID: ${{ github.job }}:${{ join(matrix.*, '-') }}
+          ONLY_LEG: ${{ inputs.only_leg }}
+          FAKE_NET_FAIL: ${{ ((inputs.fake_net_fail == 'all') || (startsWith(github.ref_name, 'qa/hwq-respawn-b-') && github.job == 'web-install' && matrix.os == 'ubuntu-latest') || (((inputs.fake_net_fail == '1') || (startsWith(github.ref_name, 'qa/hwq-respawn-a-') && github.job == 'web-install' && matrix.os == 'ubuntu-latest')) && (inputs.respawn == '' || inputs.respawn == '0'))) && '1' || '0' }}
+        run: |
+          set +e
+          if [ -n "$ONLY_LEG" ] && [ "$ONLY_LEG" != "$LEG_ID" ]; then echo "LEG_OFF=1" >> "$GITHUB_ENV"; echo "leg $LEG_ID is off in this respawn of $ONLY_LEG"; exit 0; fi
+          down=""
+          for h in github.com objects.githubusercontent.com kiexpert.github.io registry.npmjs.org; do
+            c="$(curl -sS -o /dev/null -w '%{http_code}' --retry 6 --retry-delay 5 --max-time 30 "https://$h/" 2>/dev/null)"
+            echo "probe $h -> ${c:-none}"
+            case "$c" in 000|''|5??) down="$down $h";; esac
+          done
+          if [ "$FAKE_NET_FAIL" = 1 ]; then echo "probe: fake_net_fail -> treating the network as down (proof hook)"; down="$down (fake)"; fi
+          if [ -n "$down" ]; then { echo "LEG_OFF=1"; echo "NET_DOWN=1"; echo "NET_WHY=probe:$down"; } >> "$GITHUB_ENV"; echo "::warning::$LEG_ID: network down at leg start:$down"; fi
       - uses: actions/checkout@v5
+        if: env.LEG_OFF != '1'
         with:
           sparse-checkout: README.md
           sparse-checkout-cone-mode: false
       - name: Fresh HOME, no node or npm on PATH, README line extracted
+        if: env.LEG_OFF != '1'
         run: |
           set -u
           H="$RUNNER_TEMP/fresh-home"; rm -rf "$H"; mkdir -p "$H/.claude"
@@ -765,13 +1033,13 @@ jobs:
           grep -qxF "$want" README.md || { echo "README DRIFT: README.md has no line exactly: $want"; exit 1; }
           printf '%s\n' "$want" > "$RUNNER_TEMP/readme-line.txt"; echo "README LINE: $want"
       - name: Run the README line (Linux, macOS)
-        if: runner.os != 'Windows'
+        if: (runner.os != 'Windows') && env.LEG_OFF != '1'
         run: |
           export HOME="$FRESH_HOME" PATH="$NONODE_PATH"
           if command -v node >/dev/null 2>&1 || command -v npm >/dev/null 2>&1; then echo "node or npm still on PATH"; exit 1; fi
           sh -c "$(cat "$RUNNER_TEMP/readme-line.txt")"; echo "INSTALL rc=$?"
       - name: Run the README line (Windows PowerShell 5.1)
-        if: runner.os == 'Windows'
+        if: (runner.os == 'Windows') && env.LEG_OFF != '1'
         shell: powershell
         run: |
           $env:PATH = (($env:PATH -split ';') | Where-Object { $_ -and -not ((Test-Path (Join-Path $_ 'node.exe')) -or (Test-Path (Join-Path $_ 'npm.cmd'))) }) -join ';'
@@ -785,7 +1053,7 @@ jobs:
           Write-Host "INSTALL rc=$LASTEXITCODE"
           exit $LASTEXITCODE
       - name: REQUIRED-TOOLS and install assertions
-        if: always()
+        if: (always()) && env.LEG_OFF != '1'
         run: |
           set +e
           H="$FRESH_HOME"; D="$H/.wk-harness"; S="$H/.claude/settings.json"; n=0; ok=0; miss=""
@@ -815,6 +1083,27 @@ jobs:
           echo "RESULT $ok/$n"
           [ "$ok" = "$n" ]
 
+      - name: Respawn this leg on a fresh runner (network down; capped at 2 respawns, the third is a real red)
+        if: always() && env.NET_DOWN == '1'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LEG_ID: ${{ github.job }}:${{ join(matrix.*, '-') }}
+          N: ${{ inputs.respawn || '0' }}
+          PARENT: ${{ inputs.parent || github.run_id }}
+          HARNESS_REF: ${{ inputs.harness_ref || 'main' }}
+          BREAK_GUARD: ${{ inputs.break_guard && 'true' || 'false' }}
+          FAKE_NEXT: ${{ inputs.fake_net_fail == 'all' && 'all' || '0' }}
+          REF: ${{ github.ref_name }}
+        run: |
+          set -u
+          next=$((N + 1))
+          if [ "$N" -ge 2 ]; then echo "::error::$LEG_ID: network down on the 3rd attempt ($NET_WHY) -- a real red"; exit 1; fi
+          gh workflow run harness-windows-qa.yml --repo "$GITHUB_REPOSITORY" --ref "$REF" -f only_leg="$LEG_ID" -f respawn="$next" \
+            -f parent="$PARENT" -f harness_ref="$HARNESS_REF" -f break_guard="$BREAK_GUARD" -f fake_net_fail="$FAKE_NEXT"
+          echo "RESPAWNED, NETWORK: $LEG_ID -> fresh run 'leg=$LEG_ID respawn=$next parent=$PARENT' ($NET_WHY)"
+          { echo "### $LEG_ID: respawned, network"; echo "$NET_WHY"; echo "fresh run: leg=$LEG_ID respawn=$next parent=$PARENT"; } >> "$GITHUB_STEP_SUMMARY"
+
   # Spokesman 2026-11-07: Agent.cmd routing and the polyglot launcher on every OS. The routing selftest runs under
   # pwsh; Agent.cmd --help runs through sh on Linux/macOS and through cmd on Windows. A run that leaves a new
   # *.tmp file in the checkout fails the leg (".tmp-free").
@@ -829,7 +1118,25 @@ jobs:
       run:
         shell: bash
     steps:
+      - name: Network probe and leg filter (a dead network respawns this leg on a fresh runner)
+        shell: bash
+        env:
+          LEG_ID: ${{ github.job }}:${{ join(matrix.*, '-') }}
+          ONLY_LEG: ${{ inputs.only_leg }}
+          FAKE_NET_FAIL: ${{ ((inputs.fake_net_fail == 'all') || (startsWith(github.ref_name, 'qa/hwq-respawn-b-') && github.job == 'web-install' && matrix.os == 'ubuntu-latest') || (((inputs.fake_net_fail == '1') || (startsWith(github.ref_name, 'qa/hwq-respawn-a-') && github.job == 'web-install' && matrix.os == 'ubuntu-latest')) && (inputs.respawn == '' || inputs.respawn == '0'))) && '1' || '0' }}
+        run: |
+          set +e
+          if [ -n "$ONLY_LEG" ] && [ "$ONLY_LEG" != "$LEG_ID" ]; then echo "LEG_OFF=1" >> "$GITHUB_ENV"; echo "leg $LEG_ID is off in this respawn of $ONLY_LEG"; exit 0; fi
+          down=""
+          for h in github.com objects.githubusercontent.com kiexpert.github.io registry.npmjs.org; do
+            c="$(curl -sS -o /dev/null -w '%{http_code}' --retry 6 --retry-delay 5 --max-time 30 "https://$h/" 2>/dev/null)"
+            echo "probe $h -> ${c:-none}"
+            case "$c" in 000|''|5??) down="$down $h";; esac
+          done
+          if [ "$FAKE_NET_FAIL" = 1 ]; then echo "probe: fake_net_fail -> treating the network as down (proof hook)"; down="$down (fake)"; fi
+          if [ -n "$down" ]; then { echo "LEG_OFF=1"; echo "NET_DOWN=1"; echo "NET_WHY=probe:$down"; } >> "$GITHUB_ENV"; echo "::warning::$LEG_ID: network down at leg start:$down"; fi
       - name: Checkout harness repo
+        if: env.LEG_OFF != '1'
         uses: actions/checkout@v5
         with:
           repository: ${{ github.repository_owner }}/wkappbot-kih
@@ -839,7 +1146,7 @@ jobs:
       - name: Harness ref from the commit message (push runs)
         # A push whose head commit message has a line "harness-ref: <kih branch or sha>" tests that kih head
         # instead of main, so a kih branch can be proven here before it merges.
-        if: github.event_name == 'push'
+        if: (github.event_name == 'push') && env.LEG_OFF != '1'
         shell: bash
         working-directory: kih
         env:
@@ -851,6 +1158,7 @@ jobs:
           git fetch --depth=1 origin "$ref" && git checkout -q FETCH_HEAD && echo "HARNESS-REF $ref $(git log -1 --format=%h)"
 
       - name: Agent routing selftest and Agent.cmd --help
+        if: env.LEG_OFF != '1'
         working-directory: kih
         run: |
           set +e
@@ -880,6 +1188,27 @@ jobs:
           echo "RESULT $ok/$n"
           [ "$ok" = "$n" ]
 
+      - name: Respawn this leg on a fresh runner (network down; capped at 2 respawns, the third is a real red)
+        if: always() && env.NET_DOWN == '1'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LEG_ID: ${{ github.job }}:${{ join(matrix.*, '-') }}
+          N: ${{ inputs.respawn || '0' }}
+          PARENT: ${{ inputs.parent || github.run_id }}
+          HARNESS_REF: ${{ inputs.harness_ref || 'main' }}
+          BREAK_GUARD: ${{ inputs.break_guard && 'true' || 'false' }}
+          FAKE_NEXT: ${{ inputs.fake_net_fail == 'all' && 'all' || '0' }}
+          REF: ${{ github.ref_name }}
+        run: |
+          set -u
+          next=$((N + 1))
+          if [ "$N" -ge 2 ]; then echo "::error::$LEG_ID: network down on the 3rd attempt ($NET_WHY) -- a real red"; exit 1; fi
+          gh workflow run harness-windows-qa.yml --repo "$GITHUB_REPOSITORY" --ref "$REF" -f only_leg="$LEG_ID" -f respawn="$next" \
+            -f parent="$PARENT" -f harness_ref="$HARNESS_REF" -f break_guard="$BREAK_GUARD" -f fake_net_fail="$FAKE_NEXT"
+          echo "RESPAWNED, NETWORK: $LEG_ID -> fresh run 'leg=$LEG_ID respawn=$next parent=$PARENT' ($NET_WHY)"
+          { echo "### $LEG_ID: respawned, network"; echo "$NET_WHY"; echo "fresh run: leg=$LEG_ID respawn=$next parent=$PARENT"; } >> "$GITHUB_STEP_SUMMARY"
+
   # Owner 2026-11-07: a11y support per platform, measured before it is advertised. Downloads the published portable
   # binary for the runner (releases/latest, sha256-checked against SHA256SUMS) and runs the a11y discovery commands a
   # user would try first. Every command prints rc and its first lines; RESULT n/n counts the commands that exit 0 and
@@ -899,7 +1228,25 @@ jobs:
       run:
         shell: bash
     steps:
+      - name: Network probe and leg filter (a dead network respawns this leg on a fresh runner)
+        shell: bash
+        env:
+          LEG_ID: ${{ github.job }}:${{ join(matrix.*, '-') }}
+          ONLY_LEG: ${{ inputs.only_leg }}
+          FAKE_NET_FAIL: ${{ ((inputs.fake_net_fail == 'all') || (startsWith(github.ref_name, 'qa/hwq-respawn-b-') && github.job == 'web-install' && matrix.os == 'ubuntu-latest') || (((inputs.fake_net_fail == '1') || (startsWith(github.ref_name, 'qa/hwq-respawn-a-') && github.job == 'web-install' && matrix.os == 'ubuntu-latest')) && (inputs.respawn == '' || inputs.respawn == '0'))) && '1' || '0' }}
+        run: |
+          set +e
+          if [ -n "$ONLY_LEG" ] && [ "$ONLY_LEG" != "$LEG_ID" ]; then echo "LEG_OFF=1" >> "$GITHUB_ENV"; echo "leg $LEG_ID is off in this respawn of $ONLY_LEG"; exit 0; fi
+          down=""
+          for h in github.com objects.githubusercontent.com kiexpert.github.io registry.npmjs.org; do
+            c="$(curl -sS -o /dev/null -w '%{http_code}' --retry 6 --retry-delay 5 --max-time 30 "https://$h/" 2>/dev/null)"
+            echo "probe $h -> ${c:-none}"
+            case "$c" in 000|''|5??) down="$down $h";; esac
+          done
+          if [ "$FAKE_NET_FAIL" = 1 ]; then echo "probe: fake_net_fail -> treating the network as down (proof hook)"; down="$down (fake)"; fi
+          if [ -n "$down" ]; then { echo "LEG_OFF=1"; echo "NET_DOWN=1"; echo "NET_WHY=probe:$down"; } >> "$GITHUB_ENV"; echo "::warning::$LEG_ID: network down at leg start:$down"; fi
       - name: Download the published binary and check its sha256
+        if: env.LEG_OFF != '1'
         run: |
           set -e
           base=https://github.com/${{ github.repository }}/releases/latest/download
@@ -911,7 +1258,7 @@ jobs:
           [ -n "$want" ] && [ "$want" = "$got" ]
           chmod +x wkappbot
       - name: Linux desktop for AT-SPI (Xvfb, session D-Bus, at-spi bus, one GTK app)
-        if: runner.os == 'Linux' && matrix.mode == 'desktop'
+        if: (runner.os == 'Linux' && matrix.mode == 'desktop') && env.LEG_OFF != '1'
         run: |
           # Owner 2026-11-07: Linux a11y means AT-SPI on an X server. zenity is a GTK app whose question dialog has
           # Yes and No buttons; a11y find must list them by name.
@@ -928,7 +1275,7 @@ jobs:
           { echo "DISPLAY=$DISPLAY"; echo "DBUS_SESSION_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS"; } >> "$GITHUB_ENV"
           echo "DESKTOP Xvfb=:99 dbus=$( [ -n "$DBUS_SESSION_BUS_ADDRESS" ] && echo up || echo down ) atspi=$(pgrep -f at-spi-bus-launcher >/dev/null && echo up || echo down) zenity=$(pgrep zenity >/dev/null && echo up || echo down)"
       - name: Headless world (no X, no desktop) -- one headless Chrome on CDP with a probe page
-        if: matrix.mode == 'headless'
+        if: (matrix.mode == 'headless') && env.LEG_OFF != '1'
         run: |
           unset DISPLAY
           mkdir -p probe && printf '%s\n' '<!doctype html><title>wkappbot-probe</title><h1>wkappbot-probe</h1><p>Headless a11y probe text.</p><button>Yes</button><button>No</button>' > probe/index.html
@@ -938,6 +1285,7 @@ jobs:
           for i in $(seq 1 20); do curl -fsS http://127.0.0.1:9222/json/version >/dev/null 2>&1 && break; sleep 1; done
           echo "HEADLESS DISPLAY=${DISPLAY:-none} chrome=$(basename "$chrome") cdp=$(curl -fsS http://127.0.0.1:9222/json/version >/dev/null 2>&1 && echo up || echo down) tabs=$(curl -fsS http://127.0.0.1:9222/json/list 2>/dev/null | grep -c '"type": "page"')"
       - name: a11y discovery commands
+        if: env.LEG_OFF != '1'
         run: |
           set +e
           n=0; ok=0
@@ -963,7 +1311,7 @@ jobs:
           echo "RESULT $ok/$n (${{ runner.os }} ${{ matrix.mode }} a11y)"
           [ "$ok" = "$n" ]
       - name: AT-SPI reference probe (python pyatspi, the platform path wkappbot a11y must match)
-        if: always() && runner.os == 'Linux' && matrix.mode == 'desktop'
+        if: (always() && runner.os == 'Linux' && matrix.mode == 'desktop') && env.LEG_OFF != '1'
         run: |
           # Spokesman 2026-11-07, proven on a cloud VM: AT-SPI lists the GTK app's buttons by name and doAction clicks one.
           # This is the reference the wkappbot a11y backend has to match; it does not use wkappbot.
@@ -1005,6 +1353,27 @@ jobs:
           "$py" "$RUNNER_TEMP/atspi_ref.py"
           sleep 1; echo "REF zenity after click: $(pgrep zenity >/dev/null && echo still-open || echo closed)"
 
+      - name: Respawn this leg on a fresh runner (network down; capped at 2 respawns, the third is a real red)
+        if: always() && env.NET_DOWN == '1'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LEG_ID: ${{ github.job }}:${{ join(matrix.*, '-') }}
+          N: ${{ inputs.respawn || '0' }}
+          PARENT: ${{ inputs.parent || github.run_id }}
+          HARNESS_REF: ${{ inputs.harness_ref || 'main' }}
+          BREAK_GUARD: ${{ inputs.break_guard && 'true' || 'false' }}
+          FAKE_NEXT: ${{ inputs.fake_net_fail == 'all' && 'all' || '0' }}
+          REF: ${{ github.ref_name }}
+        run: |
+          set -u
+          next=$((N + 1))
+          if [ "$N" -ge 2 ]; then echo "::error::$LEG_ID: network down on the 3rd attempt ($NET_WHY) -- a real red"; exit 1; fi
+          gh workflow run harness-windows-qa.yml --repo "$GITHUB_REPOSITORY" --ref "$REF" -f only_leg="$LEG_ID" -f respawn="$next" \
+            -f parent="$PARENT" -f harness_ref="$HARNESS_REF" -f break_guard="$BREAK_GUARD" -f fake_net_fail="$FAKE_NEXT"
+          echo "RESPAWNED, NETWORK: $LEG_ID -> fresh run 'leg=$LEG_ID respawn=$next parent=$PARENT' ($NET_WHY)"
+          { echo "### $LEG_ID: respawned, network"; echo "$NET_WHY"; echo "fresh run: leg=$LEG_ID respawn=$next parent=$PARENT"; } >> "$GITHUB_STEP_SUMMARY"
+
   a11y-linux-gtk:
     # Spokesman 2026-11-07: the kih GTK probe (tools/a11y-linux/atspi-find-invoke.py) opens a window with
     # Order / Cancel / Confirm payment, finds all three over AT-SPI by name and clicks Cancel with doAction.
@@ -1015,13 +1384,31 @@ jobs:
       run:
         shell: bash
     steps:
+      - name: Network probe and leg filter (a dead network respawns this leg on a fresh runner)
+        shell: bash
+        env:
+          LEG_ID: ${{ github.job }}:${{ join(matrix.*, '-') }}
+          ONLY_LEG: ${{ inputs.only_leg }}
+          FAKE_NET_FAIL: ${{ ((inputs.fake_net_fail == 'all') || (startsWith(github.ref_name, 'qa/hwq-respawn-b-') && github.job == 'web-install' && matrix.os == 'ubuntu-latest') || (((inputs.fake_net_fail == '1') || (startsWith(github.ref_name, 'qa/hwq-respawn-a-') && github.job == 'web-install' && matrix.os == 'ubuntu-latest')) && (inputs.respawn == '' || inputs.respawn == '0'))) && '1' || '0' }}
+        run: |
+          set +e
+          if [ -n "$ONLY_LEG" ] && [ "$ONLY_LEG" != "$LEG_ID" ]; then echo "LEG_OFF=1" >> "$GITHUB_ENV"; echo "leg $LEG_ID is off in this respawn of $ONLY_LEG"; exit 0; fi
+          down=""
+          for h in github.com objects.githubusercontent.com kiexpert.github.io registry.npmjs.org; do
+            c="$(curl -sS -o /dev/null -w '%{http_code}' --retry 6 --retry-delay 5 --max-time 30 "https://$h/" 2>/dev/null)"
+            echo "probe $h -> ${c:-none}"
+            case "$c" in 000|''|5??) down="$down $h";; esac
+          done
+          if [ "$FAKE_NET_FAIL" = 1 ]; then echo "probe: fake_net_fail -> treating the network as down (proof hook)"; down="$down (fake)"; fi
+          if [ -n "$down" ]; then { echo "LEG_OFF=1"; echo "NET_DOWN=1"; echo "NET_WHY=probe:$down"; } >> "$GITHUB_ENV"; echo "::warning::$LEG_ID: network down at leg start:$down"; fi
       - uses: actions/checkout@v4
+        if: env.LEG_OFF != '1'
         with:
           repository: ${{ github.repository_owner }}/wkappbot-kih
           token: ${{ secrets.WKAPPBOT_CORE_PAT }}
           path: kih
       - name: Harness ref from the commit message (push runs)
-        if: github.event_name == 'push'
+        if: (github.event_name == 'push') && env.LEG_OFF != '1'
         working-directory: kih
         env:
           MSG: ${{ github.event.head_commit.message }}
@@ -1031,6 +1418,7 @@ jobs:
           printf '%s' "$ref" | grep -qE '^[A-Za-z0-9._/-]{1,100}$' || { echo "bad harness-ref"; exit 1; }
           git fetch --depth=1 origin "$ref" && git checkout -q FETCH_HEAD && echo "HARNESS-REF $ref $(git log -1 --format=%h)"
       - name: GTK probe over AT-SPI (find by name + doAction)
+        if: env.LEG_OFF != '1'
         working-directory: kih
         run: |
           probe=tools/a11y-linux/atspi-find-invoke.py
@@ -1047,6 +1435,27 @@ jobs:
           printf '%s\n' "$out" | grep -qE 'RESULT [0-9]+/[0-9]+' || { echo "FAIL probe printed no RESULT line (rc=$rc)"; echo "RESULT 0/1 (Linux GTK a11y)"; exit 1; }
           exit $rc
 
+      - name: Respawn this leg on a fresh runner (network down; capped at 2 respawns, the third is a real red)
+        if: always() && env.NET_DOWN == '1'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LEG_ID: ${{ github.job }}:${{ join(matrix.*, '-') }}
+          N: ${{ inputs.respawn || '0' }}
+          PARENT: ${{ inputs.parent || github.run_id }}
+          HARNESS_REF: ${{ inputs.harness_ref || 'main' }}
+          BREAK_GUARD: ${{ inputs.break_guard && 'true' || 'false' }}
+          FAKE_NEXT: ${{ inputs.fake_net_fail == 'all' && 'all' || '0' }}
+          REF: ${{ github.ref_name }}
+        run: |
+          set -u
+          next=$((N + 1))
+          if [ "$N" -ge 2 ]; then echo "::error::$LEG_ID: network down on the 3rd attempt ($NET_WHY) -- a real red"; exit 1; fi
+          gh workflow run harness-windows-qa.yml --repo "$GITHUB_REPOSITORY" --ref "$REF" -f only_leg="$LEG_ID" -f respawn="$next" \
+            -f parent="$PARENT" -f harness_ref="$HARNESS_REF" -f break_guard="$BREAK_GUARD" -f fake_net_fail="$FAKE_NEXT"
+          echo "RESPAWNED, NETWORK: $LEG_ID -> fresh run 'leg=$LEG_ID respawn=$next parent=$PARENT' ($NET_WHY)"
+          { echo "### $LEG_ID: respawned, network"; echo "$NET_WHY"; echo "fresh run: leg=$LEG_ID respawn=$next parent=$PARENT"; } >> "$GITHUB_STEP_SUMMARY"
+
   kih-tool-selftests:
     strategy:
       fail-fast: false
@@ -1058,7 +1467,25 @@ jobs:
       run:
         shell: bash
     steps:
+      - name: Network probe and leg filter (a dead network respawns this leg on a fresh runner)
+        shell: bash
+        env:
+          LEG_ID: ${{ github.job }}:${{ join(matrix.*, '-') }}
+          ONLY_LEG: ${{ inputs.only_leg }}
+          FAKE_NET_FAIL: ${{ ((inputs.fake_net_fail == 'all') || (startsWith(github.ref_name, 'qa/hwq-respawn-b-') && github.job == 'web-install' && matrix.os == 'ubuntu-latest') || (((inputs.fake_net_fail == '1') || (startsWith(github.ref_name, 'qa/hwq-respawn-a-') && github.job == 'web-install' && matrix.os == 'ubuntu-latest')) && (inputs.respawn == '' || inputs.respawn == '0'))) && '1' || '0' }}
+        run: |
+          set +e
+          if [ -n "$ONLY_LEG" ] && [ "$ONLY_LEG" != "$LEG_ID" ]; then echo "LEG_OFF=1" >> "$GITHUB_ENV"; echo "leg $LEG_ID is off in this respawn of $ONLY_LEG"; exit 0; fi
+          down=""
+          for h in github.com objects.githubusercontent.com kiexpert.github.io registry.npmjs.org; do
+            c="$(curl -sS -o /dev/null -w '%{http_code}' --retry 6 --retry-delay 5 --max-time 30 "https://$h/" 2>/dev/null)"
+            echo "probe $h -> ${c:-none}"
+            case "$c" in 000|''|5??) down="$down $h";; esac
+          done
+          if [ "$FAKE_NET_FAIL" = 1 ]; then echo "probe: fake_net_fail -> treating the network as down (proof hook)"; down="$down (fake)"; fi
+          if [ -n "$down" ]; then { echo "LEG_OFF=1"; echo "NET_DOWN=1"; echo "NET_WHY=probe:$down"; } >> "$GITHUB_ENV"; echo "::warning::$LEG_ID: network down at leg start:$down"; fi
       - name: Checkout harness repo
+        if: env.LEG_OFF != '1'
         uses: actions/checkout@v5
         with:
           repository: ${{ github.repository_owner }}/wkappbot-kih
@@ -1068,7 +1495,7 @@ jobs:
       - name: Harness ref from the commit message (push runs)
         # A push whose head commit message has a line "harness-ref: <kih branch or sha>" tests that kih head
         # instead of main, so a kih branch can be proven here before it merges.
-        if: github.event_name == 'push'
+        if: (github.event_name == 'push') && env.LEG_OFF != '1'
         shell: bash
         working-directory: kih
         env:
@@ -1079,6 +1506,7 @@ jobs:
           printf '%s' "$ref" | grep -qE '^[A-Za-z0-9._/-]{1,100}$' || { echo "bad harness-ref"; exit 1; }
           git fetch --depth=1 origin "$ref" && git checkout -q FETCH_HEAD && echo "HARNESS-REF $ref $(git log -1 --format=%h)"
       - name: Selftests per shell
+        if: env.LEG_OFF != '1'
         working-directory: kih
         run: |
           set +e
@@ -1113,6 +1541,27 @@ jobs:
           fi
           exit $fail
 
+      - name: Respawn this leg on a fresh runner (network down; capped at 2 respawns, the third is a real red)
+        if: always() && env.NET_DOWN == '1'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LEG_ID: ${{ github.job }}:${{ join(matrix.*, '-') }}
+          N: ${{ inputs.respawn || '0' }}
+          PARENT: ${{ inputs.parent || github.run_id }}
+          HARNESS_REF: ${{ inputs.harness_ref || 'main' }}
+          BREAK_GUARD: ${{ inputs.break_guard && 'true' || 'false' }}
+          FAKE_NEXT: ${{ inputs.fake_net_fail == 'all' && 'all' || '0' }}
+          REF: ${{ github.ref_name }}
+        run: |
+          set -u
+          next=$((N + 1))
+          if [ "$N" -ge 2 ]; then echo "::error::$LEG_ID: network down on the 3rd attempt ($NET_WHY) -- a real red"; exit 1; fi
+          gh workflow run harness-windows-qa.yml --repo "$GITHUB_REPOSITORY" --ref "$REF" -f only_leg="$LEG_ID" -f respawn="$next" \
+            -f parent="$PARENT" -f harness_ref="$HARNESS_REF" -f break_guard="$BREAK_GUARD" -f fake_net_fail="$FAKE_NEXT"
+          echo "RESPAWNED, NETWORK: $LEG_ID -> fresh run 'leg=$LEG_ID respawn=$next parent=$PARENT' ($NET_WHY)"
+          { echo "### $LEG_ID: respawned, network"; echo "$NET_WHY"; echo "fresh run: leg=$LEG_ID respawn=$next parent=$PARENT"; } >> "$GITHUB_STEP_SUMMARY"
+
   wkhippo-history:
     # Spokesman 2026-11-08: the kih wkhippo reflex history merge is proven by its own selftest on the owner's two
     # desktop platforms. The step fails unless the selftest prints RESULT n/n, and fails when the kih ref has no selftest.
@@ -1126,13 +1575,31 @@ jobs:
       run:
         shell: bash
     steps:
+      - name: Network probe and leg filter (a dead network respawns this leg on a fresh runner)
+        shell: bash
+        env:
+          LEG_ID: ${{ github.job }}:${{ join(matrix.*, '-') }}
+          ONLY_LEG: ${{ inputs.only_leg }}
+          FAKE_NET_FAIL: ${{ ((inputs.fake_net_fail == 'all') || (startsWith(github.ref_name, 'qa/hwq-respawn-b-') && github.job == 'web-install' && matrix.os == 'ubuntu-latest') || (((inputs.fake_net_fail == '1') || (startsWith(github.ref_name, 'qa/hwq-respawn-a-') && github.job == 'web-install' && matrix.os == 'ubuntu-latest')) && (inputs.respawn == '' || inputs.respawn == '0'))) && '1' || '0' }}
+        run: |
+          set +e
+          if [ -n "$ONLY_LEG" ] && [ "$ONLY_LEG" != "$LEG_ID" ]; then echo "LEG_OFF=1" >> "$GITHUB_ENV"; echo "leg $LEG_ID is off in this respawn of $ONLY_LEG"; exit 0; fi
+          down=""
+          for h in github.com objects.githubusercontent.com kiexpert.github.io registry.npmjs.org; do
+            c="$(curl -sS -o /dev/null -w '%{http_code}' --retry 6 --retry-delay 5 --max-time 30 "https://$h/" 2>/dev/null)"
+            echo "probe $h -> ${c:-none}"
+            case "$c" in 000|''|5??) down="$down $h";; esac
+          done
+          if [ "$FAKE_NET_FAIL" = 1 ]; then echo "probe: fake_net_fail -> treating the network as down (proof hook)"; down="$down (fake)"; fi
+          if [ -n "$down" ]; then { echo "LEG_OFF=1"; echo "NET_DOWN=1"; echo "NET_WHY=probe:$down"; } >> "$GITHUB_ENV"; echo "::warning::$LEG_ID: network down at leg start:$down"; fi
       - uses: actions/checkout@v4
+        if: env.LEG_OFF != '1'
         with:
           repository: ${{ github.repository_owner }}/wkappbot-kih
           token: ${{ secrets.WKAPPBOT_CORE_PAT }}
           path: kih
       - name: Harness ref from the commit message (push runs)
-        if: github.event_name == 'push'
+        if: (github.event_name == 'push') && env.LEG_OFF != '1'
         working-directory: kih
         env:
           MSG: ${{ github.event.head_commit.message }}
@@ -1142,9 +1609,11 @@ jobs:
           printf '%s' "$ref" | grep -qE '^[A-Za-z0-9._/-]{1,100}$' || { echo "bad harness-ref"; exit 1; }
           git fetch --depth=1 origin "$ref" && git checkout -q FETCH_HEAD && echo "HARNESS-REF $ref $(git log -1 --format=%h)"
       - uses: actions/setup-python@v5
+        if: env.LEG_OFF != '1'
         with:
           python-version: '3.12'
       - name: wkhippo reflex history selftest
+        if: env.LEG_OFF != '1'
         working-directory: kih
         run: |
           t=bin/wkhippo-lib/wkhippo_reflex_history_selftest.py
@@ -1156,3 +1625,24 @@ jobs:
           printf '%s\n' "$out" | grep -E '^(CASE .*FAIL|FAIL|RESULT)' | cut -c1-300 | mask || true
           r=$(printf '%s\n' "$out" | grep -E '^RESULT' | tail -1 || true); set -- $r
           [ "$rc" = 0 ] && [ -n "$r" ] && [ "${2%%/*}" = "${2##*/}" ] || { echo "FAIL rc=$rc"; printf '%s\n' "$out" | tail -20 | cut -c1-300 | mask; exit 1; }
+
+      - name: Respawn this leg on a fresh runner (network down; capped at 2 respawns, the third is a real red)
+        if: always() && env.NET_DOWN == '1'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LEG_ID: ${{ github.job }}:${{ join(matrix.*, '-') }}
+          N: ${{ inputs.respawn || '0' }}
+          PARENT: ${{ inputs.parent || github.run_id }}
+          HARNESS_REF: ${{ inputs.harness_ref || 'main' }}
+          BREAK_GUARD: ${{ inputs.break_guard && 'true' || 'false' }}
+          FAKE_NEXT: ${{ inputs.fake_net_fail == 'all' && 'all' || '0' }}
+          REF: ${{ github.ref_name }}
+        run: |
+          set -u
+          next=$((N + 1))
+          if [ "$N" -ge 2 ]; then echo "::error::$LEG_ID: network down on the 3rd attempt ($NET_WHY) -- a real red"; exit 1; fi
+          gh workflow run harness-windows-qa.yml --repo "$GITHUB_REPOSITORY" --ref "$REF" -f only_leg="$LEG_ID" -f respawn="$next" \
+            -f parent="$PARENT" -f harness_ref="$HARNESS_REF" -f break_guard="$BREAK_GUARD" -f fake_net_fail="$FAKE_NEXT"
+          echo "RESPAWNED, NETWORK: $LEG_ID -> fresh run 'leg=$LEG_ID respawn=$next parent=$PARENT' ($NET_WHY)"
+          { echo "### $LEG_ID: respawned, network"; echo "$NET_WHY"; echo "fresh run: leg=$LEG_ID respawn=$next parent=$PARENT"; } >> "$GITHUB_STEP_SUMMARY"
