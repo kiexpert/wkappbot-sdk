@@ -92,7 +92,7 @@ if errorlevel 1 (
 echo [BUILD] dotnet: %DOTNET_EXE%
 
 if "%DEPLOY_ONLY%"=="0" (
-  echo [1/3] Publish launcher (AOT, single-file, self-contained)
+  echo [1/3] Publish launcher ^(AOT, single-file, self-contained^)
   call :publish_launcher
   if errorlevel 1 exit /b 1
 
@@ -107,7 +107,7 @@ if "%DEPLOY_ONLY%"=="0" (
     exit /b 1
   )
 ) else (
-  echo [BUILD] deploy-only mode (skip publish)
+  echo [BUILD] deploy-only mode ^(skip publish^)
 )
 
 echo [2/3] Deploy binaries to %BIN_DIR%
@@ -275,7 +275,7 @@ rem command reached PowerShell broken ("Missing closing '}'", then cmd ran '$a' 
 powershell -NoProfile -ExecutionPolicy Bypass -Command "try { $r = Invoke-RestMethod 'https://api.github.com/repos/kiexpert/wkappbot-sdk/releases/latest'; $a = $r.assets | Where-Object { $_.name -like '*.zip' } | Select-Object -First 1; if ($null -eq $a) { exit 1 }; Invoke-WebRequest $a.browser_download_url -OutFile '%DL_TMP%\wkappbot.zip' -UseBasicParsing; Write-Host '[BUILD]   Downloaded.' } catch { exit 1 }" 2>&1
 if errorlevel 1 (
   echo [BUILD]   Download unavailable. wkappbot-core.exe must be obtained
-  echo [BUILD]   from a GitHub Release (no source available in this repo).
+  echo [BUILD]   from a GitHub Release ^(no source available in this repo^).
   rmdir /s /q "%DL_TMP%" 2>nul
   exit /b 1
 )
