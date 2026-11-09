@@ -261,8 +261,10 @@ jobs:
           if npm view "$PKG@$VER" version >/dev/null 2>&1; then echo "$PKG@$VER already on the registry -- registry publish skipped (Pages still published)"; exit 0; fi
           if [ -z "$NODE_AUTH_TOKEN" ]; then echo "NPM_TOKEN not set -- registry publish skipped (Pages still published)"; exit 0; fi
           npm publish "$TGZ" --access public --provenance
-          for i in 1 2 3 4 5 6; do npm view "$PKG@$VER" version && break; sleep 20; done
-          mkdir -p "$RUNNER_TEMP/iso-reg"; HOME="$RUNNER_TEMP/iso-reg" USERPROFILE="$RUNNER_TEMP/iso-reg" XDG_CONFIG_HOME="$RUNNER_TEMP/iso-reg/.config" npm install -g --prefix "$RUNNER_TEMP/reg" "$PKG@$VER"
+          # The registry can take minutes to serve a fresh version (run 42584249295: still E404 after 2 min), so wait
+          # up to 10 min for it to appear, then verify the install exactly as before (a real failure still fails here).
+          for i in $(seq 1 30); do npm view "$PKG@$VER" version --prefer-online && break; sleep 20; done
+          mkdir -p "$RUNNER_TEMP/iso-reg"; HOME="$RUNNER_TEMP/iso-reg" USERPROFILE="$RUNNER_TEMP/iso-reg" XDG_CONFIG_HOME="$RUNNER_TEMP/iso-reg/.config" npm install -g --prefer-online --prefix "$RUNNER_TEMP/reg" "$PKG@$VER"
           HOME="$RUNNER_TEMP/iso-reg" USERPROFILE="$RUNNER_TEMP/iso-reg" XDG_CONFIG_HOME="$RUNNER_TEMP/iso-reg/.config" "$RUNNER_TEMP/reg/bin/$CLI" --help
 
       - name: Ship to the harness Pages web (wkappbot-code/, plus the old appbot-code/ URL)
