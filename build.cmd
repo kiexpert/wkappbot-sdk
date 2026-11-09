@@ -270,12 +270,9 @@ if not errorlevel 1 (
 )
 
 rem --- Fallback: unauthenticated PowerShell (public repo only) ---
-powershell -NoProfile -ExecutionPolicy Bypass -Command ^
-  "try { $r = Invoke-RestMethod 'https://api.github.com/repos/kiexpert/wkappbot-sdk/releases/latest'; ^
-   $a = $r.assets | Where-Object { $_.name -like '*.zip' } | Select-Object -First 1; ^
-   if ($null -eq $a) { exit 1 }; ^
-   Invoke-WebRequest $a.browser_download_url -OutFile '%DL_TMP%\wkappbot.zip' -UseBasicParsing; ^
-   Write-Host '[BUILD]   Downloaded.' } catch { exit 1 }" 2>&1
+rem One physical line: cmd does not treat ^ as a continuation inside a quoted string, so the old split
+rem command reached PowerShell broken ("Missing closing '}'", then cmd ran '$a' as a command).
+powershell -NoProfile -ExecutionPolicy Bypass -Command "try { $r = Invoke-RestMethod 'https://api.github.com/repos/kiexpert/wkappbot-sdk/releases/latest'; $a = $r.assets | Where-Object { $_.name -like '*.zip' } | Select-Object -First 1; if ($null -eq $a) { exit 1 }; Invoke-WebRequest $a.browser_download_url -OutFile '%DL_TMP%\wkappbot.zip' -UseBasicParsing; Write-Host '[BUILD]   Downloaded.' } catch { exit 1 }" 2>&1
 if errorlevel 1 (
   echo [BUILD]   Download unavailable. wkappbot-core.exe must be obtained
   echo [BUILD]   from a GitHub Release (no source available in this repo).
