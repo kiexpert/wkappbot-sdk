@@ -219,7 +219,7 @@ jobs:
           KIH_CORE: ${{ needs.pack.outputs.kih_core }}
           QA_DIR: qa
           APPROVED_FILE: .github/npm-release-approved.txt
-          LEGS: linux-x64 osx-arm64 osx-x64 win-x64
+          LEGS: linux-x64 osx-arm64 osx-x64 win-x64 win-x64-nopy
         run: bash scripts/npm-release-gate.sh | tee gate.txt; exit ${PIPESTATUS[0]}
       - name: Gate summary
         if: always()

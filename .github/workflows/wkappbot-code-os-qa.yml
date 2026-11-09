@@ -49,7 +49,7 @@ on:
       version: { description: "the version the tgz carries", type: string, default: '' }
       fake_net_fail: { description: "1 = fake a dead network on the first attempt, all = on every attempt (proof hooks)", type: string, default: '0' }
   push:
-    branches: [main, 'qa/respawn-a-*', 'qa/respawn-b-*']
+    branches: [main, 'qa/respawn-a-*', 'qa/respawn-b-*', 'qa/pystub-*']
     paths:
       - .github/workflows/wkappbot-code-os-qa.yml
       - scripts/qa/wkappbot-code-e2e.mjs
@@ -81,7 +81,7 @@ jobs:
           LEG: ${{ inputs.leg }}
         run: |
           set -eu
-          all='[{"os":"ubuntu-latest","mode":"full","leg":"linux-x64"},{"os":"ubuntu-latest","mode":"lite","leg":"linux-x64-lite"},{"os":"macos-latest","mode":"full","leg":"osx-arm64"},{"os":"macos-15-intel","mode":"full","leg":"osx-x64"},{"os":"windows-latest","mode":"full","leg":"win-x64"}]'
+          all='[{"os":"ubuntu-latest","mode":"full","leg":"linux-x64"},{"os":"ubuntu-latest","mode":"lite","leg":"linux-x64-lite"},{"os":"macos-latest","mode":"full","leg":"osx-arm64"},{"os":"macos-15-intel","mode":"full","leg":"osx-x64"},{"os":"windows-latest","mode":"full","leg":"win-x64"},{"os":"windows-latest","mode":"nopy","leg":"win-x64-nopy"}]'
           m="$all"
           if [ -n "$LEG" ]; then m="$(printf '%s' "$all" | jq -c --arg l "$LEG" '[.[] | select(.leg == $l)]')"; [ "$m" != "[]" ] || { echo "unknown leg: $LEG"; exit 1; }; fi
           echo "matrix={\"include\":$m}" >> "$GITHUB_OUTPUT"
@@ -105,7 +105,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          sparse-checkout: scripts/qa
+          sparse-checkout: |
+            scripts/qa
+            scripts/win-python-store-stub.ps1
+          sparse-checkout-cone-mode: false
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
@@ -137,6 +140,15 @@ jobs:
         run: |
           while p=$(command -v pwsh); do sudo rm -f "$p" "$(readlink -f "$p")"; done
           echo "pwsh on PATH: $(command -v pwsh || echo none)"
+
+      - name: Store python stub first on PATH, real python hidden (win-x64-nopy, as on a fresh Windows 11)
+        # Owner 2026-11-09: with only the Store alias, the harness install failed with code 49. This leg puts the
+        # Windows "App execution alias" stub where Windows keeps it (%LOCALAPPDATA%\Microsoft\WindowsApps, python.exe
+        # and python3.exe, rc 9009 and the Store message), hides every real python (PATH entries, the py launcher, the
+        # tool cache folder, the PEP 514 registry keys), and checks that python3 really does not run before install.
+        if: matrix.mode == 'nopy' && env.NET_DOWN != '1'
+        shell: powershell
+        run: '& scripts/win-python-store-stub.ps1'
 
       - name: A user's own settings, then the pre-install snapshot (uninstall must restore it)
         if: env.NET_DOWN != '1'
@@ -285,6 +297,33 @@ jobs:
           echo "mode ${{ matrix.mode }}, pwsh on PATH: $(command -v pwsh || echo none)"
           node scripts/qa/wkappbot-code-e2e.mjs --uninstall "$RUNNER_TEMP/before.txt"
 
+      - name: Python contract on Windows (Store stub -> python installed and working; real python -> install skipped)
+        # wkappbot-code >= 0.3.20: install prints an "OK python" line in both cases; with only the stub it installs a
+        # python (winget, else the python.org embeddable zip) so that a FRESH PATH (machine + user, as a new terminal
+        # sees it) runs python3 -c "print(3)"; with a real python it installs nothing. Older versions: python=na.
+        id: pyc
+        if: always() && runner.os == 'Windows' && env.NET_DOWN != '1' && steps.inst.outcome != 'skipped'
+        shell: powershell
+        run: |
+          $v = ((& wkappbot-code --version 2>$null) | Select-String -Pattern '\d+\.\d+\.\d+' | Select-Object -First 1).Matches.Value
+          $out = Join-Path $env:RUNNER_TEMP 'python.txt'
+          $log = Get-Content -Raw (Join-Path $env:RUNNER_TEMP 'install.log') -ErrorAction SilentlyContinue
+          if (-not $v -or ([version]$v -lt [version]'0.3.20')) { Set-Content -Encoding ascii $out 'na'; Write-Host "python=na (wkappbot-code $v predates the python contract)"; exit 0 }
+          $why = @()
+          if ($log -notmatch '(?m)OK +python') { $why += 'no "OK python" line in the install log' }
+          if ('${{ matrix.mode }}' -eq 'nopy') {
+            $fresh = [Environment]::GetEnvironmentVariable('PATH', 'Machine') + ';' + [Environment]::GetEnvironmentVariable('PATH', 'User')
+            $env:PATH = $fresh
+            $o = (& python3 -c "print(3)" 2>&1 | Out-String).Trim(); $rc = $LASTEXITCODE
+            $where = (Get-Command python3 -ErrorAction SilentlyContinue).Source
+            Write-Host "fresh PATH: python3 -> $where, rc=$rc '$o'"
+            if ($o -ne '3') { $why += "python3 -c print(3) on a fresh PATH gave rc=$rc '$o' ($where)" }
+          } else {
+            if ($log -match '(?i)winget[^\r\n]*python|embeddable|installing python') { $why += 'python was present but the install installed one anyway' }
+          }
+          if ($why.Count) { Set-Content -Encoding ascii $out ('fail: ' + ($why -join '; ')); Write-Host ('python=FAIL: ' + ($why -join '; ')); exit 1 }
+          Set-Content -Encoding ascii $out 'ok'; Write-Host 'python=ok'
+
       - name: Gate result for this leg (read by scripts/npm-release-gate.sh)
         if: always() && env.NET_DOWN != '1'
         run: |
@@ -296,8 +335,9 @@ jobs:
           oc=MISSING; grep -qE '^PASS +opencode( |$)' "$RUNNER_TEMP/doctor.log" 2>/dev/null && oc=PASS
           v="$(wkappbot-code --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)"
           door="$(cat "$RUNNER_TEMP/door.txt" 2>/dev/null || echo missing)"
-          printf 'leg=%s\nversion=%s\ninstall=%s\ndoctor_fail=%s\nopencode=%s\ne2e=%s\ndoor=%s\n' \
-            "${{ matrix.leg }}" "$v" "$inst" "$dfail" "$oc" "${{ steps.e2e.outcome }}" "$door" | tee "$r"
+          py="$(cat "$RUNNER_TEMP/python.txt" 2>/dev/null || echo none)"; [ "$RUNNER_OS" = Windows ] || py=none
+          printf 'leg=%s\nversion=%s\ninstall=%s\ndoctor_fail=%s\nopencode=%s\ne2e=%s\ndoor=%s\npython=%s\n' \
+            "${{ matrix.leg }}" "$v" "$inst" "$dfail" "$oc" "${{ steps.e2e.outcome }}" "$door" "$py" | tee "$r"
       - name: Respawn this leg on a fresh runner (network down; capped at 2 respawns, the third is a real red)
         if: always() && env.NET_DOWN == '1'
         env:
