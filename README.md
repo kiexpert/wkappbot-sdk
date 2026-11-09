@@ -20,37 +20,15 @@ Focusless. Self-healing. AI-native. The open-source bridge between LLMs and the 
 > 🧠 **NEW — [Wisdom Kernel AppBot Code (`wkappbot-code`) →](docs/wkappbot-code/README.md)**
 > **An AI coding agent with a wisdom reflex body, wired to an a11y-linked harness and A11Y QA.**
 > Reflex guards refuse a bad tool call before it runs, and every refusal names the skill that fixes it. A11Y QA clicks and reads the real app through its accessibility tree, so a passing test means the screen works.
-> `npm i -g wkappbot-code && wkappbot-code install && wkappbot-code doctor`
-> Then set a model: `wkappbot-code config` (or `wkappbot-code config --set model=<provider>/<model>`); until then `doctor` shows `WARN opencode-config missing model`. On Windows the wkappbot core binary is not installed by this line; get it from the [SDK installer](docs/INSTALL.md).
+>
+> ```sh
+> npm i -g wkappbot-code
+> wkappbot-code install
+> wkappbot-code doctor
+> ```
+>
+> Then set a model with `wkappbot-code config`; until then `doctor` shows `WARN opencode-config missing model`. On Windows the wkappbot core binary comes from the [SDK installer](docs/INSTALL.md), not from npm.
 > *개발자용 지혜 반사체 AI 코딩 에이전트 + a11y 연동 하네스 + A11Y QA — [소개와 설치 안내](docs/wkappbot-code/README.md#한국어-요약)*
-
-### Install without npm (harness only, one line)
-
-No Node.js? This one-line web install installs only the lite harness for Claude Code. The npm route above is still the full install.
-
-Linux / macOS (needs `curl`, `tar`, `python3`, and `sha256sum` or `shasum`):
-
-```sh
-curl -fsSL https://kiexpert.github.io/wkappbot-kih/webvm/x64/harness/install.sh | sh
-```
-
-Windows PowerShell (needs `tar.exe`, which ships with Windows 10 1803 and later; wiring the hooks also needs `sh.exe` from Git for Windows and `python` on `PATH`):
-
-```powershell
-irm https://kiexpert.github.io/wkappbot-kih/webvm/x64/harness/install.ps1 | iex
-```
-
-What the installer does:
-
-1. **Checks the download.** It fetches `version.json` and the published sha256, downloads `wk-harness-min.tar.gz`, and refuses a hash mismatch (exit 3). Nothing is installed in that case.
-2. **Unpacks** to `~/.wk-harness`.
-3. **Wires the Claude Code hooks.** It points the hooks in `~/.claude/settings.json` (PreToolUse, Stop, UserPromptSubmit, SessionStart) at the lite harness and keeps your other settings.
-4. **Adds commands.** On Linux and macOS it links `wkskill` and `wk-verify` into `~/.local/bin`. It also registers a global git pre-push dispatcher; if you already have a global `core.hooksPath`, it keeps yours and prints a warning.
-5. **Runs the lite verify.** The verify must print `PASS 6/6` (otherwise exit 4). `.installed-version` is written only after a pass.
-
-Nothing outside your home directory is touched, and no key or token is read or written. On Windows without `sh.exe` and `python`, the package is unpacked but the hooks are **not** wired; the installer says so, and you re-run the line once both are on `PATH`.
-
-CI runs both lines on fresh Linux, macOS and Windows runners with no node or npm on `PATH`.
 
 > ⚖️ **[The Reflex Constitution →](./REFLEX-CONSTITUTION.md)** · *[read as a page](https://kiexpert.github.io/wkappbot-sdk/reflex-constitution.html)*
 > How this project governs the speed of its own AI: norms that **execute** rather than a document that is filed.
@@ -309,7 +287,6 @@ Triad runs thesis-antithesis-synthesis debate. Useful for architecture decisions
 ### Skill System
 Accumulated operator knowledge lives in versioned skills, queryable at any time:
 ```bash
-wkappbot skill list
 wkappbot skill read focusless-first-principle
 wkappbot skill read grap
 ```
@@ -319,7 +296,7 @@ Skills capture per-project knowhow — UIA quirks, CDP gotchas, owner-drawn-cont
 ```bash
 wkappbot suggest "title: description"              # queue a bug or improvement mid-task
 wkappbot suggest list                              # review the backlog
-wkappbot suggest resolve <ts> "note" --i-completed-... evidence.sh
+wkappbot suggest --help                            # resolve options (an evidence script is required)
 ```
 AI agents queue findings without interrupting the current task. Evidence scripts are required to close a suggest -- no unverified resolves.
 
@@ -372,137 +349,128 @@ Per-repo isolation: each git clone gets its own Eye instance and DataDir (`{root
 
 ---
 
-## 60-second quickstart
+## Quick start
 
-```bat
-git clone https://github.com/kiexpert/wkappbot-sdk %USERPROFILE%\Documents\wkappbot
-cd %USERPROFILE%\Documents\wkappbot
-build.cmd
+```sh
+npm i -g wkappbot-code
+wkappbot-code install
+wkappbot-code doctor
 ```
 
-Then add `bin\` to PATH (see [INSTALL.md](docs/INSTALL.md)), open a new terminal, and:
-
-```bash
-wkappbot --version              # verify install
-wkappbot find "*"               # list open windows (title + UIA search)
-wkappbot skill list             # browse built-in knowhow
-wkappbot a11y find "*Notepad*"  # resolve a window element
-```
+On Windows the wkappbot core binary is not installed by npm: get it from the SDK (below, or [INSTALL.md](docs/INSTALL.md)).
 
 ---
 
-## Installation
+## Install
 
-**Clone = install.** That's it.
+**1. wkappbot-code (all platforms, needs Node.js)**
 
-```bash
+```sh
+npm i -g wkappbot-code
+wkappbot-code install
+wkappbot-code doctor
+```
+
+**2. Harness only, no Node.js.** This installs only the lite harness for Claude Code; route 1 is the full install.
+
+Linux / macOS (needs `curl`, `tar`, `python3`, and `sha256sum` or `shasum`):
+
+```sh
+curl -fsSL https://kiexpert.github.io/wkappbot-kih/webvm/x64/harness/install.sh | sh
+```
+
+Windows PowerShell (needs `tar.exe`, which ships with Windows 10 1803 and later; wiring the hooks also needs `sh.exe` from Git for Windows and `python` on `PATH`):
+
+```powershell
+irm https://kiexpert.github.io/wkappbot-kih/webvm/x64/harness/install.ps1 | iex
+```
+
+What the installer does:
+
+1. **Checks the download.** It fetches `version.json` and the published sha256, downloads `wk-harness-min.tar.gz`, and refuses a hash mismatch (exit 3). Nothing is installed in that case.
+2. **Unpacks** to `~/.wk-harness`.
+3. **Wires the Claude Code hooks.** It points the hooks in `~/.claude/settings.json` (PreToolUse, Stop, UserPromptSubmit, SessionStart) at the lite harness and keeps your other settings.
+4. **Adds commands.** On Linux and macOS it links `wkskill` and `wk-verify` into `~/.local/bin`. It also registers a global git pre-push dispatcher; if you already have a global `core.hooksPath`, it keeps yours and prints a warning.
+5. **Runs the lite verify.** The verify must print `PASS 6/6` (otherwise exit 4). `.installed-version` is written only after a pass.
+
+Nothing outside your home directory is touched, and no key or token is read or written. On Windows without `sh.exe` and `python`, the package is unpacked but the hooks are **not** wired; the installer says so, and you re-run the line once both are on `PATH`.
+
+CI runs both lines on fresh Linux, macOS and Windows runners with no node or npm on `PATH`.
+
+**3. Windows core from source** (needs the .NET SDK 8+). Clone under `Documents\` so your automation data stays in your home folder:
+
+```bat
 git clone https://github.com/kiexpert/wkappbot-sdk %USERPROFILE%\Documents\wkappbot
 cd %USERPROFILE%\Documents\wkappbot
 build.cmd
 ```
 
-Pre-built binaries are also available if you prefer not to build:
-
-| | |
-|---|---|
-| [Latest Release](https://github.com/kiexpert/wkappbot-sdk/releases/latest) | `wkappbot-X.Y.Z.zip` — extract anywhere |
-| [CI Artifacts](https://github.com/kiexpert/wkappbot-sdk/actions/workflows/build.yml) | Every build → `wkappbot-bin-{run_id}` (90-day retention) |
-
-**Recommended layout** — clone under `Documents\` so your personal automation data (experience DB, logs, skills) stays in your home directory and is easy to find, back up, or exclude from sharing:
-
-> **Why Documents?** WKAppBot learns from your usage and stores UI experience data under `bin\wkappbot.hq\`. Keeping this under your personal Documents folder protects your privacy — it stays separate from shared or version-controlled paths.
-
-```
-%USERPROFILE%\Documents\wkappbot\  ← recommended clone location (easy to find in Explorer)
-  bin\
-    wkappbot.exe                 ← launcher / busybox entry point
-    wkappbot-core.exe            ← core worker (hot-swapped on update)
-    wkappbot.hq\                 ← runtime data: skills, logs, experience DB (auto-created)
-  csharp\
-  handlers\
-  skills\
-  ...
-```
-
-Add `bin\` to your `PATH` so `wkappbot` is available in any terminal:
+Then put `bin\` on your `PATH` (PowerShell, current user, permanent) and open a new terminal:
 
 ```powershell
-# PowerShell (permanent, current user)
-[Environment]::SetEnvironmentVariable(
-  'PATH',
-  "$env:USERPROFILE\Documents\wkappbot\bin;$([Environment]::GetEnvironmentVariable('PATH','User'))",
-  'User'
-)
+[Environment]::SetEnvironmentVariable('PATH', "$env:USERPROFILE\Documents\wkappbot\bin;$([Environment]::GetEnvironmentVariable('PATH','User'))", 'User')
 ```
 
-Build from source (requires .NET SDK 8+):
+Prefer not to build? Download `wkappbot-X.Y.Z.zip` from the [latest release](https://github.com/kiexpert/wkappbot-sdk/releases/latest) and extract it anywhere.
 
-```bat
-build.cmd
-```
+> **Requirements:** Windows 10 22621+ (64-bit). No separate .NET runtime needed: the binary is self-contained.
+> Runtime data (skills, logs, experience DB) lives in `bin\wkappbot.hq\` and is created on first run.
 
-Verify the install:
+---
+
+## Use
 
 ```bash
 wkappbot --version
 wkappbot skill list
+wkappbot find "*"
+wkappbot a11y find "*Notepad*"
 ```
 
-> **Requirements:** Windows 10 22621+ (64-bit). No separate .NET runtime needed — the binary is self-contained.
+Pro tier:
+
+```bash
+wkappbot ask triad "is this approach correct?"
+wkappbot a11y read "{proc:'chrome'}"
+```
+
+More commands: [CLI at a glance](docs/reference/cli-at-a-glance.md) and the [command reference](docs/reference/commands.md).
 
 ---
 
-## Activate License
+## Activate license (optional)
 
-Free tier works out of the box — no signup. To unlock CDP browser automation,
-multi-AI `ask`, `schedule`, or `--sudo` admin access:
+Free tier works with no signup. Pro unlocks CDP browser automation, multi-AI `ask`, `schedule` and `--sudo`. It needs the [GitHub CLI](https://cli.github.com/):
 
 ```bash
-gh auth login              # authenticate with GitHub
-wkappbot license status    # confirms current tier (Free until you subscribe)
+gh auth login
+wkappbot license status
 ```
 
-Then follow [SUBSCRIBE.md](./SUBSCRIBE.md) — KIS bank transfer with your GitHub
-username as the memo, accept the GitHub collaborator invite, and the same binary
-unlocks Pro features within 1 hour. See [PRICING.md](./PRICING.md) for tier details.
+Then follow [SUBSCRIBE.md](./SUBSCRIBE.md); [PRICING.md](./PRICING.md) lists the tiers.
 
 ---
 
-## CLI at a Glance
+## Uninstall
 
-```bash
-# Discovery
-wkappbot a11y inspect <grap>           # dump UIA tree
-wkappbot a11y find <grap>              # resolve + print # TARGET
-wkappbot a11y highlight <grap>         # visualize with zoom overlay
-wkappbot find <keyword>                # unified window-title + UIA element search
-wkappbot scan <window-title>           # scan app structure, build Experience DB
-
-# Interaction (focusless where possible)
-wkappbot a11y click  <grap>
-wkappbot a11y type   <grap> "text"
-wkappbot a11y read   <grap>            # CDP-first on browser windows, UIA fallback
-wkappbot a11y scroll <grap> down 3
-wkappbot dismiss "<window-title>"      # auto-dismiss popups (OCR importance check)
-
-# Browser / CDP
-wkappbot a11y read   "{proc:'chrome'}"                   # full page text via CDP
-wkappbot a11y click  ".submit-btn"                       # CSS selector
-wkappbot a11y read   "{proc:'chrome'}" --eval-js "document.title"
-
-# Scenarios & high-level automation
-wkappbot run scenario.yaml             # run a YAML test scenario
-wkappbot do "<window>" <form> <button> # full combo-select + click + dialog flow
-
-# AI delegation
-wkappbot ask triad  "is this lock-free?"
-wkappbot ask claude "explain this chart" chart.png
-
-# Daemon & context
-wkappbot eye tick                      # one-shot status + ctx%
-wkappbot newchat "continue from: ..."  # handoff to fresh session
-wkappbot claude-usage                  # JSONL size + context %
+```sh
+wkappbot-code uninstall
+npm rm -g wkappbot-code
 ```
+
+`uninstall` gives back what `install` changed: your earlier global `core.hooksPath`, your `~/.claude/settings.json` entries, the shims it added, `~/.wk-harness` and the opencode plugin entry. It keeps opencode-ai and the wkappbot core with its skills.
+
+---
+
+## Troubleshoot
+
+```sh
+wkappbot-code doctor
+wkappbot-code config
+wkappbot-code update
+```
+
+`WARN opencode-config missing model` means no model is set yet: run `wkappbot-code config`. More in the [troubleshooting guide](https://kiexpert.github.io/wkappbot-sdk/guide/troubleshooting).
 
 ---
 
