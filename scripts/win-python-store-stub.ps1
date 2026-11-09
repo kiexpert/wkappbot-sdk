@@ -26,6 +26,8 @@ $user = ([Environment]::GetEnvironmentVariable('PATH', 'User') -split ';') | Whe
 $new = (@($keep) + $wa) -join ';'
 "PATH=$new" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
 $env:PATH = $new
+# PS 5.1 turns a native stderr line under 2>&1 into an error record; with Stop it would end the script here.
+$ErrorActionPreference = 'Continue'
 $o = (& python3 -c "print(3)" 2>&1 | Out-String).Trim(); $rc = $LASTEXITCODE
 Write-Host "stub=$kind at $wa; python3 -c print(3) -> rc=$rc '$o'"
 if ($o -eq '3') { Write-Error 'a real python is still reachable: the leg would not test the stub' }
