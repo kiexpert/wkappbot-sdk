@@ -155,9 +155,9 @@ jobs:
             'FROM alpine:3.21' \
             'RUN apk add --no-cache python3 py3-pip git curl ca-certificates nodejs npm github-cli bash tree file less jq htop' \
             'RUN npm install -g --no-fund --no-audit @anthropic-ai/claude-code@2.1.112 @openai/codex @google/gemini-cli && npm cache clean --force' \
-            "RUN curl -fsSL -o /tmp/agy.tgz $AGY_URL && echo '$AGY_SHA512  /tmp/agy.tgz' | sha512sum -c - && tar -xzf /tmp/agy.tgz -C /usr/local/bin antigravity && mv /usr/local/bin/antigravity /usr/local/bin/agy && rm /tmp/agy.tgz" \
+            "RUN curl -fsSL --retry 5 --retry-all-errors --retry-delay 5 -o /tmp/agy.tgz $AGY_URL && echo '$AGY_SHA512  /tmp/agy.tgz' | sha512sum -c - && tar -xzf /tmp/agy.tgz -C /usr/local/bin antigravity && mv /usr/local/bin/antigravity /usr/local/bin/agy && rm /tmp/agy.tgz" \
             'RUN apk add --no-cache icu-libs libintl krb5-libs libstdc++ gcompat' \
-            "RUN curl -fsSL -o /tmp/pwsh.tgz $PWSH_URL && echo '$PWSH_SHA256  /tmp/pwsh.tgz' | sha256sum -c - && mkdir -p /opt/microsoft/powershell/7 && tar -xzf /tmp/pwsh.tgz -C /opt/microsoft/powershell/7 && chmod +x /opt/microsoft/powershell/7/pwsh && ln -s /opt/microsoft/powershell/7/pwsh /usr/bin/pwsh && rm /tmp/pwsh.tgz" \
+            "RUN curl -fsSL --retry 5 --retry-all-errors --retry-delay 5 -o /tmp/pwsh.tgz $PWSH_URL && echo '$PWSH_SHA256  /tmp/pwsh.tgz' | sha256sum -c - && mkdir -p /opt/microsoft/powershell/7 && tar -xzf /tmp/pwsh.tgz -C /opt/microsoft/powershell/7 && chmod +x /opt/microsoft/powershell/7/pwsh && ln -s /opt/microsoft/powershell/7/pwsh /usr/bin/pwsh && rm /tmp/pwsh.tgz" \
             'COPY harness /opt/wk-harness' \
             'COPY wk-ai /usr/local/sbin/wk-ai' \
             'RUN chmod 755 /usr/local/sbin/wk-ai && for c in claude codex gemini grok agy; do ln -sf wk-ai /usr/local/sbin/$c; if [ -e /usr/local/bin/$c ]; then ln -sf /usr/local/bin/$c /usr/local/bin/$c-vm; fi; done; ls -l /usr/local/sbin' \
