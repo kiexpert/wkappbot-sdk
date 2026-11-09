@@ -8,9 +8,9 @@
 
 ```bash
 npm i -g wkappbot-code
-wkappbot-code install
-wkappbot-code doctor
 ```
+
+Setup, the health check and the selftest run by themselves after the install; the first `wkappbot-code` run prints the result.
 
 [![npm](https://img.shields.io/npm/v/wkappbot-code?label=npm%20wkappbot-code)](https://www.npmjs.com/package/wkappbot-code)
 Published from this repository's [`npm-publish-wkappbot-code`](../../.github/workflows/npm-publish-wkappbot-code.yml) workflow, with npm provenance.
@@ -24,7 +24,7 @@ Published from this repository's [`npm-publish-wkappbot-code`](../../.github/wor
 - **지혜 반사체:** 스킬이 기억 역할을 합니다. 잘못된 도구 호출은 실행되기 *전에* 반사 가드가 거부하고, 거부할 때마다 해결 방법이 담긴 스킬 이름을 알려 줍니다. 거부에서 얻은 교훈은 다시 스킬에 새겨집니다.
 - **a11y 연동 하네스:** Windows UIA, Chrome CDP, macOS AX 같은 접근성 트리로 실제 데스크톱·웹 앱을 다룹니다. 컨트롤을 **이름으로** 찾고, 화면 좌표를 쓰지 않으며, 창이 화면 밖에 있어도 동작하고, 사용자의 창 크기를 바꾸지 않습니다.
 - **A11Y QA:** 사람이 하듯 실제 앱을 접근성 트리로 클릭하고 읽는 QA입니다. 그래서 테스트 통과가 곧 실제 화면이 동작한다는 뜻입니다.
-- **설치:** `npm i -g wkappbot-code` → `wkappbot-code install` → `wkappbot-code doctor`
+- **설치:** `npm i -g wkappbot-code` 한 줄이면 끝입니다. 설정, 상태 점검, 셀프테스트가 설치 뒤에 자동으로 돌고, 처음 `wkappbot-code`를 실행하면 결과가 한 줄로 나옵니다.
 - **플랫폼:** a11y·CDP 구동은 현재 Windows에서 전부 지원합니다. Linux·macOS에서는 에이전트, 하네스, 스킬(`skill`/`file`/`suggest`)이 동작하고, a11y 구동은 준비 중입니다(아래 표 참고).
 
 ---
@@ -92,10 +92,9 @@ wkappbot a11y read "Chrome#example.com"        # a browser tab: CDP first, UIA f
 
 ```bash
 npm i -g wkappbot-code          # Node 18+; also installs the command alias wk-appbot-code
-wkappbot-code install           # lays down every part below (idempotent; safe to re-run)
-wkappbot-code doctor            # one PASS / WARN / FAIL / SKIP row per part
-wkappbot-code --version
 ```
+
+Setup, the health check and the selftest run by themselves after the install; the first `wkappbot-code` run prints the result. To re-run setup later: `wkappbot-code install` (idempotent). Health check: `wkappbot-code doctor` (one PASS / WARN / FAIL / SKIP row per part).
 
 `install` takes `--no-npm`, `--no-bin`, `--no-harness`, `--no-skills`, `--web-harness`, `--config-dir DIR`. An existing `~/.config/opencode/opencode.json` is backed up (`opencode.json.bak-<stamp>`) and only the plugin entry is merged in; every other key you set stays. A config that is not plain JSON is left untouched, and `wkappbot-code.json` is written beside it for you to merge by hand.
 
