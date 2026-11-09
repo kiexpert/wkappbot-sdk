@@ -1646,3 +1646,4 @@ jobs:
             -f parent="$PARENT" -f harness_ref="$HARNESS_REF" -f break_guard="$BREAK_GUARD" -f fake_net_fail="$FAKE_NEXT"
           echo "RESPAWNED, NETWORK: $LEG_ID -> fresh run 'leg=$LEG_ID respawn=$next parent=$PARENT' ($NET_WHY)"
           { echo "### $LEG_ID: respawned, network"; echo "$NET_WHY"; echo "fresh run: leg=$LEG_ID respawn=$next parent=$PARENT"; } >> "$GITHUB_STEP_SUMMARY"
+# rerun marker: kih ccr-7470e7f7-dbekw3 7f493dd
