@@ -179,6 +179,9 @@ jobs:
     needs: pack
     if: needs.pack.outputs.new == 'true'
     uses: ./.github/workflows/wkappbot-code-os-qa.yml
+    permissions:
+      contents: read
+      actions: write   # a QA leg on a dead network respawns itself (wkappbot-code-os-qa.yml)
     with:
       tgz_artifact: wkappbot-code-tgz
       version: ${{ needs.pack.outputs.ver }}
@@ -188,7 +191,10 @@ jobs:
     needs: [pack, qa]
     if: always() && needs.pack.outputs.new == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      actions: read    # read a respawned QA leg's newest run and its result
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4
@@ -197,6 +203,11 @@ jobs:
           path: qa
           merge-multiple: true
         continue-on-error: true
+      - name: A respawned QA leg (dead network) is judged by its newest finished respawn
+        env:
+          GH_TOKEN: ${{ github.token }}
+          QA_DIR: qa
+        run: bash scripts/npm-gate-resolve-respawn.sh
       - name: releases/latest core version
         run: |
           set -u

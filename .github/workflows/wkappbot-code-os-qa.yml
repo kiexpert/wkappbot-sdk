@@ -8,6 +8,19 @@ name: wkappbot-code-os-qa
 # (write, edit), by every model request carrying the reflex rules, and by uninstall restoring the pre-install state.
 # The cases mirror the kih driver wkappbot-code/selftest-opencode-e2e.sh. A second Linux job REMOVES PowerShell, so
 # the bash lite harness alone must refuse the same risky set.
+# A respawned leg names itself so the release gate can find the newest run of that leg (see the respawn note below).
+run-name: wkappbot-code-os-qa${{ inputs.leg != '' && format(' leg={0} respawn={1} parent={2}', inputs.leg, inputs.respawn, inputs.parent) || '' }}
+
+# RESPAWN ON A BAD NETWORK (owner 2026-11-09, the scalper-runner road: a runner whose network is bad is dropped and a
+# fresh one started). Each leg first probes the hosts it needs, each with curl --retry 6 --retry-delay 5. If a probe still fails
+# with 5xx/timeout, or the install later fails on a 5xx/unreachable download, the leg writes e2e=respawned and
+# dispatches a fresh run of the SAME leg (inputs leg, respawn=n+1, parent = the first run). Respawn is capped at 2; the
+# third network failure is a real red. The npm release gate (scripts/npm-gate-resolve-respawn.sh) swaps a respawned
+# leg's result for the newest finished respawn of that leg, so a network blip is never counted as a product FAIL and
+# never counted as a pass either. Proof hooks (both directions): fake_net_fail=1, or a push to a branch qa/respawn-a-*,
+# fakes linux-x64's probe on the FIRST attempt only (respawn 1 must go green and the gate pass the leg);
+# fake_net_fail=all, or a branch qa/respawn-b-*, fakes it on EVERY attempt (respawn 1 and 2 respawn, the third is a
+# real red and the gate refuses the leg). On those branches a gate-proof job runs the real gate on linux-x64.
 on:
   # Called by npm-publish-wkappbot-code BEFORE it publishes: installs the PACKED tgz (artifact) instead of the registry
   # package, and writes one qa-result-<leg> artifact per leg for scripts/npm-release-gate.sh.
@@ -21,9 +34,22 @@ on:
         description: "the version the tgz carries"
         type: string
         default: ''
+      leg: { type: string, default: '' }
+      respawn: { type: string, default: '0' }
+      parent: { type: string, default: '' }
+      tgz_run_id: { type: string, default: '' }
+      fake_net_fail: { type: string, default: '0' }
   workflow_dispatch:
+    inputs:
+      leg: { description: "run only this leg (empty = all)", type: string, default: '' }
+      respawn: { description: "respawn count of this run (0 = first attempt)", type: string, default: '0' }
+      parent: { description: "run id of the first attempt (set by a respawn)", type: string, default: '' }
+      tgz_artifact: { description: "packed tgz artifact name (empty = the registry)", type: string, default: '' }
+      tgz_run_id: { description: "run that holds tgz_artifact", type: string, default: '' }
+      version: { description: "the version the tgz carries", type: string, default: '' }
+      fake_net_fail: { description: "1 = fake a dead network on the first attempt, all = on every attempt (proof hooks)", type: string, default: '0' }
   push:
-    branches: [main]
+    branches: [main, 'qa/respawn-a-*', 'qa/respawn-b-*']
     paths:
       - .github/workflows/wkappbot-code-os-qa.yml
       - scripts/qa/wkappbot-code-e2e.mjs
@@ -40,26 +66,42 @@ permissions:
 
 concurrency:
   # a pre-publish call runs in its caller's group, so it never waits behind (or replaces) a registry QA run
-  group: wkappbot-code-os-qa-${{ inputs.tgz_artifact != '' && github.run_id || 'registry' }}
+  # a respawned leg also gets its own group, so a newer registry run can never replace it while it waits
+  group: wkappbot-code-os-qa-${{ (inputs.tgz_artifact != '' || inputs.leg != '' || github.ref_name != 'main') && github.run_id || 'registry' }}
   cancel-in-progress: false
 
 jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.m.outputs.matrix }}
+    steps:
+      - id: m
+        env:
+          LEG: ${{ inputs.leg }}
+        run: |
+          set -eu
+          all='[{"os":"ubuntu-latest","mode":"full","leg":"linux-x64"},{"os":"ubuntu-latest","mode":"lite","leg":"linux-x64-lite"},{"os":"macos-latest","mode":"full","leg":"osx-arm64"},{"os":"macos-15-intel","mode":"full","leg":"osx-x64"},{"os":"windows-latest","mode":"full","leg":"win-x64"}]'
+          m="$all"
+          if [ -n "$LEG" ]; then m="$(printf '%s' "$all" | jq -c --arg l "$LEG" '[.[] | select(.leg == $l)]')"; [ "$m" != "[]" ] || { echo "unknown leg: $LEG"; exit 1; }; fi
+          echo "matrix={\"include\":$m}" >> "$GITHUB_OUTPUT"
+
   qa:
+    needs: plan
+    permissions:
+      contents: read
+      actions: write   # a leg on a bad network dispatches a fresh run of itself (GITHUB_TOKEN may start workflow_dispatch)
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - { os: ubuntu-latest, mode: full, leg: linux-x64 }
-          - { os: ubuntu-latest, mode: lite, leg: linux-x64-lite }
-          - { os: macos-latest, mode: full, leg: osx-arm64 }
-          - { os: macos-15-intel, mode: full, leg: osx-x64 }
-          - { os: windows-latest, mode: full, leg: win-x64 }
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
     runs-on: ${{ matrix.os }}
     name: ${{ matrix.leg }} on ${{ matrix.os }} (${{ matrix.mode }})
     timeout-minutes: 40
     defaults:
       run:
         shell: bash
+    env:
+      FAKE_NET_FAIL: ${{ ((inputs.fake_net_fail == 'all') || (startsWith(github.ref_name, 'qa/respawn-b-') && matrix.leg == 'linux-x64') || (((inputs.fake_net_fail == '1') || (startsWith(github.ref_name, 'qa/respawn-a-') && matrix.leg == 'linux-x64')) && (inputs.respawn == '' || inputs.respawn == '0'))) && '1' || '0' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -68,7 +110,20 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Network probe (the hosts this leg needs; a dead network respawns the leg, it is not a product FAIL)
+        run: |
+          set +e
+          down=""
+          for h in github.com objects.githubusercontent.com kiexpert.github.io registry.npmjs.org; do
+            c="$(curl -sS -o /dev/null -w '%{http_code}' --retry 6 --retry-delay 5 --max-time 30 "https://$h/" 2>/dev/null)"
+            echo "probe $h -> ${c:-none}"
+            case "$c" in 000|''|5??) down="$down $h";; esac
+          done
+          if [ "$FAKE_NET_FAIL" = 1 ]; then echo "probe: fake_net_fail=1 -> treating the network as down (proof hook)"; down="$down (fake)"; fi
+          if [ -n "$down" ]; then echo "NET_DOWN=1" >> "$GITHUB_ENV"; echo "NET_WHY=probe:$down" >> "$GITHUB_ENV"; echo "::warning::network down at leg start:$down"; fi
+
       - name: Fresh HOME and npm prefix
+        if: env.NET_DOWN != '1'
         run: |
           set -eu
           H="$RUNNER_TEMP/home"; P="$RUNNER_TEMP/prefix"; mkdir -p "$H" "$P"
@@ -78,12 +133,13 @@ jobs:
           git config --global user.email qa@example.invalid; git config --global user.name qa
 
       - name: Remove PowerShell (lite mode, as on a stock Linux box)
-        if: matrix.mode == 'lite'
+        if: matrix.mode == 'lite' && env.NET_DOWN != '1'
         run: |
           while p=$(command -v pwsh); do sudo rm -f "$p" "$(readlink -f "$p")"; done
           echo "pwsh on PATH: $(command -v pwsh || echo none)"
 
       - name: A user's own settings, then the pre-install snapshot (uninstall must restore it)
+        if: env.NET_DOWN != '1'
         run: |
           set -eu
           mkdir -p "$HOME/.claude"
@@ -91,13 +147,21 @@ jobs:
           node scripts/qa/wkappbot-code-e2e.mjs --snapshot "$RUNNER_TEMP/before.txt"
 
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4
-        if: inputs.tgz_artifact != ''
+        if: inputs.tgz_artifact != '' && inputs.tgz_run_id == '' && env.NET_DOWN != '1'
         with:
           name: ${{ inputs.tgz_artifact }}
           path: ${{ runner.temp }}/tgz
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4  (a respawn: the tgz of the first run)
+        if: inputs.tgz_artifact != '' && inputs.tgz_run_id != '' && env.NET_DOWN != '1'
+        with:
+          name: ${{ inputs.tgz_artifact }}
+          path: ${{ runner.temp }}/tgz
+          run-id: ${{ inputs.tgz_run_id }}
+          github-token: ${{ github.token }}
 
       - name: npm i -g wkappbot-code (packed tgz before publish, else the registry)
         id: npmi
+        if: env.NET_DOWN != '1'
         run: |
           set -eu
           src=wkappbot-code
@@ -110,6 +174,7 @@ jobs:
 
       - name: wkappbot-code install
         id: inst
+        if: env.NET_DOWN != '1'
         run: |
           set -u
           # Windows: wkappbot-code >= 0.3.13 takes wkappbot.exe + wkappbot-core.exe.xz from the SDK release itself
@@ -123,8 +188,16 @@ jobs:
           wkappbot-code install $EXTRA 2>&1 | tee "$RUNNER_TEMP/install.log"; rc=${PIPESTATUS[0]}
           echo "install rc=$rc"; exit $rc
 
+      - name: Was the install failure the network? (5xx / unreachable downloads respawn the leg)
+        if: failure() && env.NET_DOWN != '1' && (steps.npmi.outcome == 'failure' || steps.inst.outcome == 'failure')
+        run: |
+          set +e
+          why="$(cat "$RUNNER_TEMP/npm-install.log" "$RUNNER_TEMP/install.log" 2>/dev/null | grep -m3 -E 'returned error: 5[0-9][0-9]|UNREACHABLE|Could not resolve host|Operation timed out|Connection timed out|ETIMEDOUT|ECONNRESET|EAI_AGAIN|E50[0-9]' | tr '\n' ' ')"
+          if [ -n "$why" ]; then echo "NET_DOWN=1" >> "$GITHUB_ENV"; echo "NET_WHY=install: ${why:0:200}" >> "$GITHUB_ENV"; echo "network failure during install: $why"
+          else echo "the install failure is not a network failure -- a real red"; fi
+
       - name: Diagnose the lite hook when install fails (trace of one allow call)
-        if: failure()
+        if: failure() && env.NET_DOWN != '1'
         run: |
           set +e
           L="$HOME/.wk-harness/tools/wkharness-lite.sh"
@@ -147,6 +220,7 @@ jobs:
           node "$RUNNER_TEMP/diag.cjs"
 
       - name: wkappbot-code doctor
+        if: env.NET_DOWN != '1'
         run: |
           set -u
           wkappbot-code doctor 2>&1 | tee "$RUNNER_TEMP/doctor.log"; rc=${PIPESTATUS[0]}
@@ -177,7 +251,7 @@ jobs:
 
       - name: Emergency-edit door opens on a user install (lite hook refusal, then an edit of the granted path)
         id: door
-        if: always() && steps.inst.outcome == 'success'
+        if: always() && steps.inst.outcome == 'success' && env.NET_DOWN != '1'
         run: |
           # Owner spec 2026-11-09: the emergency-edit door opens even with no harness repo and wherever
           # the guard files sit. A risky call is refused (rc 2, [risk-guard]) and grants the installed
@@ -205,13 +279,14 @@ jobs:
 
       - name: Hooks end-to-end in real OpenCode
         id: e2e
+        if: env.NET_DOWN != '1'
         run: |
           set -u
           echo "mode ${{ matrix.mode }}, pwsh on PATH: $(command -v pwsh || echo none)"
           node scripts/qa/wkappbot-code-e2e.mjs --uninstall "$RUNNER_TEMP/before.txt"
 
       - name: Gate result for this leg (read by scripts/npm-release-gate.sh)
-        if: always()
+        if: always() && env.NET_DOWN != '1'
         run: |
           set +e
           mkdir -p "$RUNNER_TEMP/qa-result"
@@ -223,6 +298,33 @@ jobs:
           door="$(cat "$RUNNER_TEMP/door.txt" 2>/dev/null || echo missing)"
           printf 'leg=%s\nversion=%s\ninstall=%s\ndoctor_fail=%s\nopencode=%s\ne2e=%s\ndoor=%s\n' \
             "${{ matrix.leg }}" "$v" "$inst" "$dfail" "$oc" "${{ steps.e2e.outcome }}" "$door" | tee "$r"
+      - name: Respawn this leg on a fresh runner (network down; capped at 2 respawns, the third is a real red)
+        if: always() && env.NET_DOWN == '1'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LEG: ${{ matrix.leg }}
+          N: ${{ inputs.respawn || '0' }}
+          PARENT: ${{ inputs.parent || github.run_id }}
+          TGZ_ARTIFACT: ${{ inputs.tgz_artifact }}
+          TGZ_RUN_ID: ${{ inputs.tgz_artifact != '' && (inputs.tgz_run_id || github.run_id) || '' }}
+          VERSION: ${{ inputs.version }}
+          REF: ${{ github.ref_name }}
+          FAKE_NEXT: ${{ inputs.fake_net_fail == 'all' && 'all' || '0' }}
+        run: |
+          set -u
+          mkdir -p "$RUNNER_TEMP/qa-result"; r="$RUNNER_TEMP/qa-result/$LEG.txt"
+          next=$((N + 1))
+          if [ "$N" -ge 2 ]; then
+            printf 'leg=%s\nversion=\ninstall=net\ndoctor_fail=net\nopencode=net\ne2e=network-failure\nparent=%s\n' "$LEG" "$PARENT" | tee "$r"
+            echo "::error::$LEG: network down on the 3rd attempt ($NET_WHY) -- a real red"; exit 1
+          fi
+          gh workflow run wkappbot-code-os-qa.yml --repo "$GITHUB_REPOSITORY" --ref "$REF" \
+            -f leg="$LEG" -f respawn="$next" -f parent="$PARENT" -f tgz_artifact="$TGZ_ARTIFACT" -f tgz_run_id="$TGZ_RUN_ID" \
+            -f version="$VERSION" -f fake_net_fail="$FAKE_NEXT"
+          printf 'leg=%s\nversion=\ninstall=net\ndoctor_fail=net\nopencode=net\ne2e=respawned\nrespawn_next=%s\nparent=%s\n' "$LEG" "$next" "$PARENT" | tee "$r"
+          echo "RESPAWNED, NETWORK: $LEG -> fresh run 'leg=$LEG respawn=$next parent=$PARENT' ($NET_WHY)"
+          { echo "### $LEG: respawned, network"; echo "$NET_WHY"; echo "fresh run: leg=$LEG respawn=$next parent=$PARENT"; } >> "$GITHUB_STEP_SUMMARY"
+
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7
         if: always()
         with:
@@ -240,3 +342,38 @@ jobs:
             grep -E 'FAIL|FAILED|rc [1-9]' "$RUNNER_TEMP/install.log" 2>/dev/null | head -8 || true
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+
+  # Proof of the respawn road (branches qa/respawn-a-* and qa/respawn-b-* only): the REAL resolver and the REAL gate
+  # judge linux-x64 from this run's results, exactly as npm-publish-wkappbot-code does before a publish.
+  gate-proof:
+    needs: qa
+    if: always() && (startsWith(github.ref_name, 'qa/respawn-a-') || startsWith(github.ref_name, 'qa/respawn-b-')) && inputs.leg == ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4
+        with:
+          pattern: qa-result-*
+          path: qa
+          merge-multiple: true
+      - name: Resolve a respawned leg (scripts/npm-gate-resolve-respawn.sh)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          QA_DIR: qa
+        run: bash scripts/npm-gate-resolve-respawn.sh
+      - name: The release gate on linux-x64 (scripts/npm-release-gate.sh)
+        env:
+          QA_DIR: qa
+          APPROVED_FILE: .github/npm-release-approved.txt
+          LEGS: linux-x64
+        run: |
+          set -u
+          VER="$(npm view wkappbot-code version)"; export VER
+          export RELEASE_CORE="$VER" KIH_CORE="$VER"   # G2 is not what this proof is about; G1 and G3 are real
+          bash scripts/npm-release-gate.sh | tee gate.txt; rc=${PIPESTATUS[0]}
+          { echo "### gate-proof (${GITHUB_REF_NAME})"; echo '```'; cat gate.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          exit $rc
