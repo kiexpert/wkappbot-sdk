@@ -19,6 +19,7 @@ run-name: wkappbot-code-os-qa${{ inputs.leg != '' && format(' leg={0} respawn={1
 # leg's result for the newest finished respawn of that leg, so a network blip is never counted as a product FAIL and
 # never counted as a pass either. Proof hook: fake_net_fail=1 (or a push to branch qa/respawn-proof, which fakes it
 # on linux-x64) makes the first attempt's probe fail.
+# (proof run marker)
 on:
   # Called by npm-publish-wkappbot-code BEFORE it publishes: installs the PACKED tgz (artifact) instead of the registry
   # package, and writes one qa-result-<leg> artifact per leg for scripts/npm-release-gate.sh.
