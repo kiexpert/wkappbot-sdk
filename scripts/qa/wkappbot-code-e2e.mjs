@@ -127,7 +127,9 @@ const before = arg("--uninstall");
 if (before) {
   const u = spawnSync(IS_WIN ? "wkappbot-code.cmd" : "wkappbot-code", ["uninstall"], { encoding: "utf8", shell: IS_WIN });
   const after = snapshot(), was = fs.readFileSync(before, "utf8");
-  ok("uninstall rc 0 and the machine state equals the pre-install snapshot", u.status === 0 && after === was, "rc=" + u.status + "\nbefore:\n" + was + "after:\n" + after + (u.stdout || "").slice(-300) + (u.stderr || "").slice(-300));
+  // On a failure, also show every line that names the cause (a short tail can cut it off, as on win-x64).
+  const why = ((u.stdout || "") + "\n" + (u.stderr || "")).split(/\r?\n/).filter((l) => /could not|blocked by|error|fail|denied|EBUSY|EPERM|rc[ =][1-9]/i.test(l)).slice(0, 12).join("\n");
+  ok("uninstall rc 0 and the machine state equals the pre-install snapshot", u.status === 0 && after === was, "rc=" + u.status + "\nbefore:\n" + was + "after:\n" + after + (why ? "cause lines:\n" + why + "\n" : "") + "stdout tail: " + (u.stdout || "").slice(-300) + "\nstderr tail: " + (u.stderr || "").slice(-300));
 }
 console.log("model calls: " + calls + "  platform: " + process.platform + "/" + process.arch);
 console.log("RESULT " + pass + "/" + total);
