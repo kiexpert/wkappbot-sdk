@@ -175,6 +175,25 @@ jobs:
           } | tee "$RUNNER_TEMP/report.txt"
           { echo "### release report ${{ matrix.os }} (${{ matrix.mode }})"; echo '```'; sed 's/^REPORT //' "$RUNNER_TEMP/report.txt"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Emergency-edit door stays shut on a user install (lite hook refusal)
+        id: door
+        if: always() && steps.inst.outcome == 'success'
+        run: |
+          # A user install must refuse a risky call with the risk guard and never offer the
+          # emergency-edit door (that door is for a dev seat only). Recorded as door= in the
+          # leg result; runs before the e2e step because that step uninstalls.
+          set +e
+          L="$HOME/.wk-harness/tools/wkharness-lite.sh"
+          out="$(printf '%s' '{"session_id":"door1","hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"git commit --no-verify -m x"}}' | bash "$L" pre 2>&1)"
+          rc=$?
+          printf '%s\n' "$out" | tail -20 | sed 's/^/DOOR   /'
+          rg=no; printf '%s' "$out" | grep -qF '[risk-guard]' && rg=yes
+          ee=no; printf '%s' "$out" | grep -qi 'emergency-edit' && ee=yes
+          res=FAIL; [ "$rc" = 2 ] && [ "$rg" = yes ] && [ "$ee" = no ] && res=PASS
+          echo "DOOR (1) user install ${{ matrix.leg }}: rc=$rc risk-guard=$rg emergency-edit=$ee -> $res"
+          echo "$res" > "$RUNNER_TEMP/door.txt"
+          [ "$res" = PASS ] || echo "::error::emergency-edit door check failed on ${{ matrix.leg }} (rc=$rc risk-guard=$rg emergency-edit=$ee)"
+
       - name: Hooks end-to-end in real OpenCode
         id: e2e
         run: |
@@ -192,8 +211,9 @@ jobs:
           dfail=$(grep -cE '^FAIL ' "$RUNNER_TEMP/doctor.log" 2>/dev/null); [ -f "$RUNNER_TEMP/doctor.log" ] || dfail=missing
           oc=MISSING; grep -qE '^PASS +opencode( |$)' "$RUNNER_TEMP/doctor.log" 2>/dev/null && oc=PASS
           v="$(wkappbot-code --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)"
-          printf 'leg=%s\nversion=%s\ninstall=%s\ndoctor_fail=%s\nopencode=%s\ne2e=%s\n' \
-            "${{ matrix.leg }}" "$v" "$inst" "$dfail" "$oc" "${{ steps.e2e.outcome }}" | tee "$r"
+          door="$(cat "$RUNNER_TEMP/door.txt" 2>/dev/null || echo missing)"
+          printf 'leg=%s\nversion=%s\ninstall=%s\ndoctor_fail=%s\nopencode=%s\ne2e=%s\ndoor=%s\n' \
+            "${{ matrix.leg }}" "$v" "$inst" "$dfail" "$oc" "${{ steps.e2e.outcome }}" "$door" | tee "$r"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7
         if: always()
         with:
