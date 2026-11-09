@@ -112,8 +112,14 @@ jobs:
         id: inst
         run: |
           set -u
-          # win-x64 has no single core asset yet (the SDK installer ships it), so Windows installs without the core.
-          EXTRA=""; [ "$RUNNER_OS" = Windows ] && EXTRA="--no-bin"
+          # Windows: wkappbot-code >= 0.3.13 takes wkappbot.exe + wkappbot-core.exe.xz from the SDK release itself
+          # (sha-verified), so install WITH the core and let doctor judge it; older versions had no win-x64 core road.
+          EXTRA=""
+          if [ "$RUNNER_OS" = Windows ]; then
+            v="$(wkappbot-code --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)"
+            if [ "$(printf '%s\n0.3.13\n' "$v" | sort -V | head -1)" != 0.3.13 ]; then EXTRA="--no-bin"; fi
+            echo "windows install of $v: ${EXTRA:-with the core (win-x64 acquire from the SDK release)}"
+          fi
           wkappbot-code install $EXTRA 2>&1 | tee "$RUNNER_TEMP/install.log"; rc=${PIPESTATUS[0]}
           echo "install rc=$rc"; exit $rc
 
