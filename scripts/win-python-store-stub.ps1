@@ -32,3 +32,6 @@ $o = (& python3 -c "print(3)" 2>&1 | Out-String).Trim(); $rc = $LASTEXITCODE
 Write-Host "stub=$kind at $wa; python3 -c print(3) -> rc=$rc '$o'"
 if ($o -eq '3') { Write-Error 'a real python is still reachable: the leg would not test the stub' }
 Set-Content -Encoding ascii (Join-Path $env:RUNNER_TEMP 'stub.txt') "stub=$kind rc=$rc"
+# The runner's powershell wrapper exits with $LASTEXITCODE: the stub's 9009 must not end the step red.
+$global:LASTEXITCODE = 0
+exit 0
