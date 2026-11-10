@@ -20,7 +20,7 @@ name: npm-publish-wkappbot-code
 #   REGISTRY: npm i -g wkappbot-code, published with provenance only when the NPM_TOKEN secret is set and the
 #     package is named wkappbot-code; a version already on the registry is skipped; a dry-run checks every run.
 on:
-  workflow_dispatch: # manual release entry; push to this workflow also starts the pipeline
+  workflow_dispatch: # manual release entry; push also picks up the repaired CLI diagnostic
   push:
     branches: [main]
     paths:
