@@ -1,4 +1,4 @@
-name: Prune verified merged QA matrix branches
+name: Prune verified merged test branches
 on:
   push:
     paths:
@@ -16,22 +16,20 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - name: Archive and delete only old, fully merged QA matrix heads
+      - name: Archive and delete only old, fully merged test heads
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
         shell: bash
         run: |
           set -euo pipefail
-          cutoff=$(date -u -d '14 days ago' +%s)
+          cutoff=$(date -u -d '30 days ago' +%s)
           count=0; skipped=0
-          page=1
-          while :; do
-            data=$(gh api "repos/$REPO/branches?per_page=100&page=$page")
-            length=$(jq 'length' <<<"$data")
-            [ "$length" -gt 0 ] || break
+          # Snapshot all heads before deleting; pagination while deleting skips branches.
+          data=$(gh api "repos/$REPO/branches?per_page=100" --paginate --slurp | jq -c 'add')
+          prs=$(gh api "repos/$REPO/pulls?state=open&per_page=100" --paginate --jq '.[].head.ref')
             while IFS= read -r b; do
-              [[ "$b" =~ ^qa/matrix-[a-zA-Z0-9-]+$ ]] || continue
+              [[ "$b" =~ ^(qa/matrix-|qa/portal-|ci/approve-)[a-zA-Z0-9.-]+$ ]] || continue
               info=$(jq -c --arg b "$b" '.[] | select(.name==$b)' <<<"$data")
               [ "$(jq -r '.protected' <<<"$info")" = false ] || { echo "SKIP protected $b"; skipped=$((skipped+1)); continue; }
               tip=$(jq -r '.commit.sha' <<<"$info")
@@ -40,9 +38,8 @@ jobs:
               [ "$stamp" -lt "$cutoff" ] || { echo "SKIP recent $b"; skipped=$((skipped+1)); continue; }
               ahead=$(gh api "repos/$REPO/compare/main...$tip" --jq '.ahead_by')
               [ "$ahead" = 0 ] || { echo "SKIP unmerged $b ahead=$ahead"; skipped=$((skipped+1)); continue; }
-              prs=$(gh api "repos/$REPO/pulls?state=open&per_page=100" --paginate --jq '.[].head.ref')
               if grep -qxF "$b" <<<"$prs"; then echo "SKIP open PR $b"; skipped=$((skipped+1)); continue; fi
-              tag="archive/pruned-qa-matrix/${b#qa/matrix-}"
+              tag="archive/pruned-test/$b"
               if gh api "repos/$REPO/git/ref/tags/$tag" --jq '.object.sha' >/dev/null 2>&1; then
                 existing=$(gh api "repos/$REPO/git/ref/tags/$tag" --jq '.object.sha')
                 [ "$existing" = "$tip" ] || { echo "SKIP archive conflict $b"; skipped=$((skipped+1)); continue; }
@@ -55,7 +52,4 @@ jobs:
               echo "DELETED $b tip=$tip archive=$tag"
               count=$((count+1))
             done < <(jq -r '.[].name' <<<"$data")
-            [ "$length" -eq 100 ] || break
-            page=$((page+1))
-          done
           echo "Deleted=$count Skipped=$skipped" >> "$GITHUB_STEP_SUMMARY"
