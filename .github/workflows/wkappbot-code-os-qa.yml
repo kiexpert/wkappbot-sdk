@@ -239,6 +239,17 @@ jobs:
           wkappbot-code doctor 2>&1 | tee "$RUNNER_TEMP/doctor.log"; rc=${PIPESTATUS[0]}
           echo "doctor rc=$rc"; exit $rc
 
+      - name: Windows npm core license marker (real installed binary)
+        if: matrix.leg == 'win-x64' || matrix.leg == 'win-x64-nopy'
+        shell: pwsh
+        run: |
+          $core = Join-Path $env:HOME '.local/share/wkappbot/wkappbot-core.exe'
+          $marker = Join-Path (Split-Path $core) '.wkappbot-code-install'
+          if (!(Test-Path $core)) { throw "Windows Core missing: $core" }
+          if (!(Test-Path $marker)) { throw "npm license marker missing: $marker" }
+          if ((Get-Content -Raw $marker).Trim() -ne 'wkappbot-code npm install') { throw "npm marker ownership invalid" }
+          Write-Host "PASS npm license marker beside actual Windows core: $marker"
+
       - name: Release report (postinstall marker, core version, banner, tool rows)
         if: always()
         run: |
