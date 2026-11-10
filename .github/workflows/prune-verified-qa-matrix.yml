@@ -1,0 +1,61 @@
+name: Prune verified merged QA matrix branches
+on:
+  push:
+    paths:
+      - .github/workflows/prune-verified-qa-matrix.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+  pull-requests: read
+concurrency:
+  group: prune-verified-qa-matrix
+  cancel-in-progress: false
+jobs:
+  prune:
+    if: github.repository == 'kiexpert/wkappbot-sdk' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Archive and delete only old, fully merged QA matrix heads
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cutoff=$(date -u -d '14 days ago' +%s)
+          count=0; skipped=0
+          page=1
+          while :; do
+            data=$(gh api "repos/$REPO/branches?per_page=100&page=$page")
+            length=$(jq 'length' <<<"$data")
+            [ "$length" -gt 0 ] || break
+            while IFS= read -r b; do
+              [[ "$b" =~ ^qa/matrix-[a-zA-Z0-9-]+$ ]] || continue
+              info=$(jq -c --arg b "$b" '.[] | select(.name==$b)' <<<"$data")
+              [ "$(jq -r '.protected' <<<"$info")" = false ] || { echo "SKIP protected $b"; skipped=$((skipped+1)); continue; }
+              tip=$(jq -r '.commit.sha' <<<"$info")
+              dt=$(gh api "repos/$REPO/commits/$tip" --jq '.commit.committer.date')
+              stamp=$(date -u -d "$dt" +%s)
+              [ "$stamp" -lt "$cutoff" ] || { echo "SKIP recent $b"; skipped=$((skipped+1)); continue; }
+              ahead=$(gh api "repos/$REPO/compare/main...$tip" --jq '.ahead_by')
+              [ "$ahead" = 0 ] || { echo "SKIP unmerged $b ahead=$ahead"; skipped=$((skipped+1)); continue; }
+              prs=$(gh api "repos/$REPO/pulls?state=open&per_page=100" --paginate --jq '.[].head.ref')
+              if grep -qxF "$b" <<<"$prs"; then echo "SKIP open PR $b"; skipped=$((skipped+1)); continue; fi
+              tag="archive/pruned-qa-matrix/${b#qa/matrix-}"
+              if gh api "repos/$REPO/git/ref/tags/$tag" --jq '.object.sha' >/dev/null 2>&1; then
+                existing=$(gh api "repos/$REPO/git/ref/tags/$tag" --jq '.object.sha')
+                [ "$existing" = "$tip" ] || { echo "SKIP archive conflict $b"; skipped=$((skipped+1)); continue; }
+              else
+                gh api -X POST "repos/$REPO/git/refs" -f ref="refs/tags/$tag" -f sha="$tip" >/dev/null
+              fi
+              now=$(gh api "repos/$REPO/git/ref/heads/$b" --jq '.object.sha')
+              [ "$now" = "$tip" ] || { echo "SKIP moved $b"; skipped=$((skipped+1)); continue; }
+              gh api -X DELETE "repos/$REPO/git/refs/heads/$b"
+              echo "DELETED $b tip=$tip archive=$tag"
+              count=$((count+1))
+            done < <(jq -r '.[].name' <<<"$data")
+            [ "$length" -eq 100 ] || break
+            page=$((page+1))
+          done
+          echo "Deleted=$count Skipped=$skipped" >> "$GITHUB_STEP_SUMMARY"
