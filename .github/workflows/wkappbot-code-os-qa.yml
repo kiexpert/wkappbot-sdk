@@ -53,6 +53,7 @@ on:
     paths:
       - .github/workflows/wkappbot-code-os-qa.yml
       - scripts/qa/wkappbot-code-e2e.mjs
+      - scripts/win-python-store-stub.ps1
   # Re-run after every publish of the package, and daily, so a registry release is QA'd on every OS.
   # ...and after every farm run, which refreshes releases/latest (the core asset the npm install downloads).
   workflow_run:
