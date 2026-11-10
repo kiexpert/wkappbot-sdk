@@ -240,7 +240,7 @@ jobs:
           echo "doctor rc=$rc"; exit $rc
 
       - name: Windows npm core license marker (real installed binary)
-        if: matrix.leg == 'win-x64' || matrix.leg == 'win-x64-nopy'
+        if: matrix.leg == 'win-x64'
         shell: pwsh
         run: |
           $core = Join-Path $env:HOME '.local/share/wkappbot/wkappbot-core.exe'
@@ -310,7 +310,7 @@ jobs:
           node scripts/qa/wkappbot-code-e2e.mjs --uninstall "$RUNNER_TEMP/before.txt"
 
       - name: Windows npm license marker removed on uninstall
-        if: (matrix.leg == 'win-x64' || matrix.leg == 'win-x64-nopy') && steps.e2e.outcome == 'success'
+        if: matrix.leg == 'win-x64' && steps.e2e.outcome == 'success'
         shell: pwsh
         run: |
           $marker = Join-Path $env:HOME '.local/share/wkappbot/.wkappbot-code-install'
