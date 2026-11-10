@@ -28,7 +28,6 @@ jobs:
           set -euo pipefail
           branches=$(gh api "repos/$REPO/branches?per_page=100" --paginate --slurp | jq -c 'add')
           prs=$(gh api "repos/$REPO/pulls?state=open&per_page=100" --paginate --slurp | jq -c 'add')
-          cutoff=$(date -u -d '7 days ago' +%s)
           deleted=0; held=0; unmerged=0
           while IFS= read -r b; do
             case "$b" in main|master|develop|development|release|release/*|stable/*|backup*|autobackup/*|gh-pages|relay/*|archive/*|production|prod) continue;; esac
@@ -44,11 +43,9 @@ jobs:
             if git grep -F -q -- "$b" -- .github/workflows .github/actions scripts 2>/dev/null; then
               echo "KEEP referenced $b"; held=$((held+1)); continue
             fi
-            dt=$(gh api "repos/$REPO/commits/$tip" --jq '.commit.committer.date')
-            [[ "$(date -u -d "$dt" +%s)" -lt "$cutoff" ]] || { echo "KEEP recent $b"; held=$((held+1)); continue; }
             ahead=$(gh api "repos/$REPO/compare/main...$tip" --jq '.ahead_by')
             if [[ "$ahead" != 0 ]]; then
-              echo "REVIEW unmerged $b ahead=$ahead tip=$tip"; unmerged=$((unmerged+1)); continue
+              echo "CANDIDATE unmerged $b ahead=$ahead tip=$tip reason=unreferenced-no-open-pr"; unmerged=$((unmerged+1)); continue
             fi
             tag="archive/orphan-pruned/$b"
             if existing=$(gh api "repos/$REPO/git/ref/tags/$tag" --jq '.object.sha' 2>/dev/null); then
@@ -62,4 +59,4 @@ jobs:
             echo "DELETED $b archive=$tag"
             deleted=$((deleted+1))
           done < <(jq -r '.[].name' <<<"$branches")
-          echo "Deleted=$deleted Held=$held UnmergedReview=$unmerged" | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "Deleted=$deleted Held=$held UnmergedCandidates=$unmerged" | tee -a "$GITHUB_STEP_SUMMARY"
