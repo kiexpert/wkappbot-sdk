@@ -23,7 +23,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cutoff=$(date -u -d '30 days ago' +%s)
+          cutoff=$(date -u -d '48 hours ago' +%s)
           count=0; skipped=0
           # Snapshot all heads before deleting; pagination while deleting skips branches.
           data=$(gh api "repos/$REPO/branches?per_page=100" --paginate --slurp | jq -c 'add')
@@ -36,6 +36,7 @@ jobs:
               dt=$(gh api "repos/$REPO/commits/$tip" --jq '.commit.committer.date')
               stamp=$(date -u -d "$dt" +%s)
               [ "$stamp" -lt "$cutoff" ] || { echo "SKIP recent $b"; skipped=$((skipped+1)); continue; }
+              # Never prune a head with any unique commits, even if its purpose looks obsolete.
               ahead=$(gh api "repos/$REPO/compare/main...$tip" --jq '.ahead_by')
               [ "$ahead" = 0 ] || { echo "SKIP unmerged $b ahead=$ahead"; skipped=$((skipped+1)); continue; }
               if grep -qxF "$b" <<<"$prs"; then echo "SKIP open PR $b"; skipped=$((skipped+1)); continue; fi
@@ -52,4 +53,4 @@ jobs:
               echo "DELETED $b tip=$tip archive=$tag"
               count=$((count+1))
             done < <(jq -r '.[].name' <<<"$data")
-          echo "Deleted=$count Skipped=$skipped" >> "$GITHUB_STEP_SUMMARY"
+          echo "Deleted=$count Skipped=$skipped" | tee -a "$GITHUB_STEP_SUMMARY"
