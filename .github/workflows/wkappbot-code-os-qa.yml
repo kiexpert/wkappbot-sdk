@@ -316,8 +316,18 @@ jobs:
           $why = @()
           if ($log -notmatch '(?m)OK +python') { $why += 'no "OK python" line in the install log' }
           if ('${{ matrix.mode }}' -eq 'nopy') {
-            $fresh = [Environment]::GetEnvironmentVariable('PATH', 'Machine') + ';' + [Environment]::GetEnvironmentVariable('PATH', 'User')
+            $mp = [Environment]::GetEnvironmentVariable('PATH', 'Machine'); $up = [Environment]::GetEnvironmentVariable('PATH', 'User')
+            # Diagnostics for the installer side (kih 2026-11-10): where WindowsApps and the installed python sit.
+            $pick = { param($p) (($p -split ';') | Where-Object { $_ -match '(?i)WindowsApps|python|wk-harness' }) -join ' ; ' }
+            Write-Host ("DIAG Machine PATH python/WindowsApps entries: " + (& $pick $mp))
+            Write-Host ("DIAG User PATH: " + $up)
+            foreach ($h in @($env:HOME, $env:USERPROFILE, [Environment]::GetFolderPath('UserProfile'))) {
+              if (-not $h) { continue }; $d = Join-Path ($h -replace '/', '\') '.wk-harness\python'
+              Write-Host ("DIAG {0}: python.exe={1} python3.exe={2}" -f $d, (Test-Path (Join-Path $d 'python.exe')), (Test-Path (Join-Path $d 'python3.exe')))
+            }
+            $fresh = $mp + ';' + $up
             $env:PATH = $fresh
+            Write-Host ("DIAG fresh-PATH python3 candidates: " + ((Get-Command python3 -All -ErrorAction SilentlyContinue | ForEach-Object Source) -join ' ; '))
             $o = (& python3 -c "print(3)" 2>&1 | Out-String).Trim(); $rc = $LASTEXITCODE
             $where = (Get-Command python3 -ErrorAction SilentlyContinue).Source
             Write-Host "fresh PATH: python3 -> $where, rc=$rc '$o'"
