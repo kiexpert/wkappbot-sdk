@@ -309,6 +309,14 @@ jobs:
           echo "mode ${{ matrix.mode }}, pwsh on PATH: $(command -v pwsh || echo none)"
           node scripts/qa/wkappbot-code-e2e.mjs --uninstall "$RUNNER_TEMP/before.txt"
 
+      - name: Windows npm license marker removed on uninstall
+        if: (matrix.leg == 'win-x64' || matrix.leg == 'win-x64-nopy') && steps.e2e.outcome == 'success'
+        shell: pwsh
+        run: |
+          $marker = Join-Path $env:HOME '.local/share/wkappbot/.wkappbot-code-install'
+          if (Test-Path $marker) { throw "npm license marker survived uninstall: $marker" }
+          Write-Host "PASS npm license marker removed on uninstall"
+
       - name: Python contract on Windows (Store stub -> python installed and working; real python -> install skipped)
         # wkappbot-code >= 0.3.20: install prints an "OK python" line in both cases; with only the stub it installs a
         # python (winget, else the python.org embeddable zip) so that a FRESH PATH (machine + user, as a new terminal
