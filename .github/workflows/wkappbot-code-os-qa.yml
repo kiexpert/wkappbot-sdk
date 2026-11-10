@@ -334,7 +334,7 @@ jobs:
           if ('${{ matrix.mode }}' -eq 'nopy') {
             $fresh = [Environment]::GetEnvironmentVariable('PATH', 'Machine') + ';' + [Environment]::GetEnvironmentVariable('PATH', 'User')
             $env:PATH = $fresh
-            $o = (& python3 -c "print(3)" 2>&1 | Out-String).Trim(); $rc = $LASTEXITCODE
+            $o = try { (& python3 -c "print(3)" 2>&1 | Out-String).Trim() } catch { $_.Exception.Message }; $rc = $LASTEXITCODE
             $where = (Get-Command python3 -ErrorAction SilentlyContinue).Source
             Write-Host "fresh PATH: python3 -> $where, rc=$rc '$o'"
             if ($o -ne '3') { $why += "python3 -c print(3) on a fresh PATH gave rc=$rc '$o' ($where)" }
