@@ -313,7 +313,8 @@ jobs:
           echo "PUSHED=1" >> "$GITHUB_ENV"
 
       - name: Request a Pages build
-        if: env.PUSHED == '1'
+        # A retry may find identical gh-pages bytes while the previous Pages build is still stuck.
+        # Request/recheck the build even when the push step had nothing new to commit.
         env:
           GH_TOKEN: ${{ env.TOK }}
         run: |
