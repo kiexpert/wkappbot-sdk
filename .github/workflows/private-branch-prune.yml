@@ -15,7 +15,7 @@ on:
         required: false
         default: "no"
       targets:
-        description: "space-separated 16-hex sha256 prefixes of owner/repo; empty = all three default targets"
+        description: "space-separated 16-hex sha256 prefixes of owner/repo; empty = all four default targets"
         required: false
         default: ""
       keep:
@@ -35,8 +35,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
-      # kih, the SDK itself, aiportal-demo
-      DEFAULT_TARGETS: "23ade98d428c8527 c8d999f8542fb0a1 754961bb6a5574dd"
+      # kih, the SDK itself, aiportal-demo, the core (spokesman 2026-11-10: merged core heads such as the npm-install
+      # license branch get pruned too; WKAPPBOT_CORE_PAT reaches it)
+      DEFAULT_TARGETS: "23ade98d428c8527 c8d999f8542fb0a1 754961bb6a5574dd 672ba0838e4271b4"
       T1: ${{ secrets.GH_LICENSE_TOKEN }}
       T2: ${{ secrets.WKAPPBOT_PAT }}
       T3: ${{ secrets.WKAPPBOT_CORE_PAT }}
