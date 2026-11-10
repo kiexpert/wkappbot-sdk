@@ -18,3 +18,5 @@
 0.3.20
 # 0.3.21: kih main fc68102 (PRs 137-138: shell-free python probe, System32 tar.exe zip unpack, Windows order python/py -3/python3; fixes the 0.3.20 win-x64 regression of os-qa 42730232937), spokesman URGENT hotfix order 2026-11-10.
 0.3.21
+# 0.3.22: Windows npm Core license marker; release remains blocked unless packed-tgz all-OS QA passes.
+0.3.22
