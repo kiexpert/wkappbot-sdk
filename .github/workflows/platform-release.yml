@@ -60,7 +60,7 @@ concurrency:
 
 env:
   CORE_REPO: kiexpert/WKAppBot
-  # 2026-11-10: core main 0695dd5 (WKAppBot PR 194) treats an npm-install exe path as licensed; first farm compile.
+  # 2026-11-10: core main cc38653 (WKAppBot PR 195): a ".wkappbot-code-install" marker beside the exe = npm install (licensed).
   CORE_REF: ${{ inputs.core_ref || github.event.client_payload.ref || 'main' }}
   DOTNET_NOLOGO: 'true'
   DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
