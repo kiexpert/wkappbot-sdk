@@ -441,3 +441,4 @@ jobs:
           bash scripts/npm-release-gate.sh | tee gate.txt; rc=${PIPESTATUS[0]}
           { echo "### gate-proof (${GITHUB_REF_NAME})"; echo '```'; cat gate.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
           exit $rc
+# pystub proof marker 5
