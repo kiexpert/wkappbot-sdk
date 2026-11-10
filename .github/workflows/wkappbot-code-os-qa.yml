@@ -306,6 +306,9 @@ jobs:
         if: always() && runner.os == 'Windows' && env.NET_DOWN != '1' && steps.inst.outcome != 'skipped'
         shell: powershell
         run: |
+          # The runner starts this shell with ErrorActionPreference=Stop; a native command's stderr (the Store stub's
+          # message) would then end the step before python.txt is written (0.3.21 gate run 42738022844).
+          $ErrorActionPreference = 'Continue'
           $v = ((& wkappbot-code --version 2>$null) | Select-String -Pattern '\d+\.\d+\.\d+' | Select-Object -First 1).Matches.Value
           $out = Join-Path $env:RUNNER_TEMP 'python.txt'
           $log = Get-Content -Raw (Join-Path $env:RUNNER_TEMP 'install.log') -ErrorAction SilentlyContinue
@@ -323,7 +326,7 @@ jobs:
             if ($log -match '(?i)winget[^\r\n]*python|embeddable|installing python') { $why += 'python was present but the install installed one anyway' }
           }
           if ($why.Count) { Set-Content -Encoding ascii $out ('fail: ' + ($why -join '; ')); Write-Host ('python=FAIL: ' + ($why -join '; ')); exit 1 }
-          Set-Content -Encoding ascii $out 'ok'; Write-Host 'python=ok'
+          Set-Content -Encoding ascii $out 'ok'; Write-Host 'python=ok'; exit 0
 
       - name: Gate result for this leg (read by scripts/npm-release-gate.sh)
         if: always() && env.NET_DOWN != '1'
