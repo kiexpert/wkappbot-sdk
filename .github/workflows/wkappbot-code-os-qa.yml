@@ -328,6 +328,25 @@ jobs:
           if ($why.Count) { Set-Content -Encoding ascii $out ('fail: ' + ($why -join '; ')); Write-Host ('python=FAIL: ' + ($why -join '; ')); exit 1 }
           Set-Content -Encoding ascii $out 'ok'; Write-Host 'python=ok'; exit 0
 
+      - name: License smoke on an npm install (Windows core; a Pro-tier command must not refuse for the license)
+        # Owner 2026-11-10: an npm-install core counts as licensed (WKAppBot PR 194, core 7.12.35+). Report only, not
+        # gated: ask needs a browser the runner may not have, so only a license refusal counts as a FAIL here.
+        if: always() && runner.os == 'Windows' && env.NET_DOWN != '1' && steps.inst.outcome == 'success'
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Continue'
+          $out = Join-Path $env:RUNNER_TEMP 'license.txt'
+          $cv = ((& wkappbot --version 2>&1 | Out-String) -split "`n" | Select-String -Pattern 'wkappbot v' | Select-Object -First 1)
+          $j = Start-Job { & wkappbot ask gpt "say: test" --timeout 20 2>&1 | Out-String }
+          if (-not (Wait-Job $j -Timeout 90)) { Stop-Job $j }
+          $o = (Receive-Job $j | Out-String).Trim(); Remove-Job $j -Force
+          $first = (($o -split "`n") | Where-Object { $_.Trim() } | Select-Object -First 4) -join ' | '
+          Write-Host "core: $cv"
+          Write-Host "ask gpt: $first"
+          if ($o -match '(?i)licen[cs]e|pro tier|subscri|upgrade to|sudo license') { Set-Content -Encoding ascii $out 'refused'; Write-Host 'license=REFUSED' }
+          else { Set-Content -Encoding ascii $out 'ok'; Write-Host 'license=ok (no license refusal)' }
+          exit 0
+
       - name: Gate result for this leg (read by scripts/npm-release-gate.sh)
         if: always() && env.NET_DOWN != '1'
         run: |
@@ -340,8 +359,9 @@ jobs:
           v="$(wkappbot-code --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)"
           door="$(cat "$RUNNER_TEMP/door.txt" 2>/dev/null || echo missing)"
           py="$(cat "$RUNNER_TEMP/python.txt" 2>/dev/null || echo none)"; [ "$RUNNER_OS" = Windows ] || py=none
-          printf 'leg=%s\nversion=%s\ninstall=%s\ndoctor_fail=%s\nopencode=%s\ne2e=%s\ndoor=%s\npython=%s\n' \
-            "${{ matrix.leg }}" "$v" "$inst" "$dfail" "$oc" "${{ steps.e2e.outcome }}" "$door" "$py" | tee "$r"
+          lic="$(cat "$RUNNER_TEMP/license.txt" 2>/dev/null || echo none)"
+          printf 'leg=%s\nversion=%s\ninstall=%s\ndoctor_fail=%s\nopencode=%s\ne2e=%s\ndoor=%s\npython=%s\nlicense=%s\n' \
+            "${{ matrix.leg }}" "$v" "$inst" "$dfail" "$oc" "${{ steps.e2e.outcome }}" "$door" "$py" "$lic" | tee "$r"
       - name: Respawn this leg on a fresh runner (network down; capped at 2 respawns, the third is a real red)
         if: always() && env.NET_DOWN == '1'
         env:
