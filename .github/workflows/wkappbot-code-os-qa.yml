@@ -1,5 +1,6 @@
 name: wkappbot-code-os-qa
 
+# Manual verification refresh: registry install across the complete OS matrix.
 # All-OS install + hook QA of the published wkappbot-code package (owner 2026-11-06: "QA every OS from the SDK").
 # Each OS starts from a fresh HOME and the npm registry, exactly as a new user would:
 #   npm i -g wkappbot-code -> wkappbot-code install -> wkappbot-code doctor
