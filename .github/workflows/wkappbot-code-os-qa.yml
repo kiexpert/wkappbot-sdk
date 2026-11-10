@@ -346,14 +346,26 @@ jobs:
         run: |
           $ErrorActionPreference = 'Continue'
           $out = Join-Path $env:RUNNER_TEMP 'license.txt'
-          $cv = ((& wkappbot --version 2>&1 | Out-String) -split "`n" | Select-String -Pattern 'wkappbot v' | Select-Object -First 1)
-          $j = Start-Job { & wkappbot ask gpt "say: test" --timeout 20 2>&1 | Out-String }
-          if (-not (Wait-Job $j -Timeout 90)) { Stop-Job $j }
-          $o = (Receive-Job $j | Out-String).Trim(); Remove-Job $j -Force
+          # The npm install puts the core under HOME\.local\share\wkappbot (doctor: "PASS bin ...wkappbot.exe"); call the
+          # exe by its full path with redirected output and a hard timeout, so an empty or hung run is never "ok".
+          $dir = Join-Path ($env:HOME -replace '/', '\') '.local\share\wkappbot'
+          $exe = @('wkappbot.exe', 'wkappbot-core.exe') | ForEach-Object { Join-Path $dir $_ } | Where-Object { Test-Path $_ } | Select-Object -First 1
+          $run = {
+            param($argv)
+            $o1 = Join-Path $env:RUNNER_TEMP 'lic-out.txt'; $o2 = Join-Path $env:RUNNER_TEMP 'lic-err.txt'
+            $p = Start-Process -FilePath $exe -ArgumentList $argv -NoNewWindow -PassThru -RedirectStandardOutput $o1 -RedirectStandardError $o2
+            if (-not $p.WaitForExit(90000)) { try { $p.Kill() } catch {} ; $t = ' [timeout 90 s]' } else { $t = " [rc $($p.ExitCode)]" }
+            ((Get-Content -Raw $o1 -ErrorAction SilentlyContinue) + (Get-Content -Raw $o2 -ErrorAction SilentlyContinue) + $t).Trim()
+          }
+          if (-not $exe) { Set-Content -Encoding ascii $out 'unknown'; Write-Host "license=unknown (no core under $dir)"; exit 0 }
+          $marker = Test-Path (Join-Path (Split-Path $exe) '.wkappbot-code-install')
+          $cv = & $run @('--version')
+          $o = & $run @('ask', 'gpt', '"say: test"', '--timeout', '20')
           $first = (($o -split "`n") | Where-Object { $_.Trim() } | Select-Object -First 4) -join ' | '
-          Write-Host "core: $cv"
+          Write-Host "core: $exe ($(($cv -split "`n")[0])); install marker beside it: $marker"
           Write-Host "ask gpt: $first"
           if ($o -match '(?i)licen[cs]e|pro tier|subscri|upgrade to|sudo license') { Set-Content -Encoding ascii $out 'refused'; Write-Host 'license=REFUSED' }
+          elseif (($o -replace '\[(rc -?\d+|timeout 90 s)\]', '').Trim() -eq '') { Set-Content -Encoding ascii $out 'unknown'; Write-Host 'license=unknown (no output)' }
           else { Set-Content -Encoding ascii $out 'ok'; Write-Host 'license=ok (no license refusal)' }
           exit 0
 
