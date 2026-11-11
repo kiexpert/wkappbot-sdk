@@ -31,7 +31,7 @@ jobs:
           prs=$(gh api "repos/$REPO/pulls?state=open&per_page=100" --paginate --slurp | jq -c 'add')
           deleted=0; held=0; unmerged=0
           report="$RUNNER_TEMP/branch-success-review.tsv"
-          printf 'branch\ttip\tahead\tlast_commit_subject\tdecision\treason\n' > "$report"
+          printf 'branch\ttip\tahead\tlast_commit_subject\tdecision\treason\tchanged_files\tchanged_paths\n' > "$report"
           while IFS= read -r b; do
             case "$b" in main|master|develop|development|release|release/*|stable/*|backup*|autobackup/*|gh-pages|relay/*|archive/*|production|prod) continue;; esac
             [[ "$b" =~ ^[A-Za-z0-9._/-]+$ ]] || continue
@@ -56,11 +56,17 @@ jobs:
               else
                 unique_patches="unknown"
               fi
-              if [[ "$unique_patches" == 0 ]]; then
+              # Compare final trees as well as patch identity; report actual differing files.
+              changed_paths=$(git diff --name-only origin/main FETCH_HEAD | head -40 | paste -sd "," -)
+              changed_files=$(git diff --name-only origin/main FETCH_HEAD | wc -l | tr -d " ")
+              if git diff --quiet origin/main FETCH_HEAD; then
+                echo "TREE_EQUIVALENT $b ahead=$ahead tip=$tip"
+                ahead=0
+              elif [[ "$unique_patches" == 0 ]]; then
                 echo "PATCH_EQUIVALENT $b ahead=$ahead tip=$tip"
                 ahead=0
               else
-                printf '%s\\t%s\\t%s\\t%s\\t%s\\t%s\\n' "$b" "$tip" "$ahead" "$subject" "REVIEW" "unique-work-needs-success-proof" >> "$report"
+                printf '%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\n' "$b" "$tip" "$ahead" "$subject" "REVIEW" "unique-work-needs-success-proof" "$changed_files" "$changed_paths" >> "$report"
               echo "CANDIDATE unmerged $b ahead=$ahead unique_patches=$unique_patches tip=$tip subject=$subject"; unmerged=$((unmerged+1)); continue
               fi
             fi
@@ -73,12 +79,12 @@ jobs:
             now=$(gh api "repos/$REPO/git/ref/heads/$b" --jq '.object.sha')
             [[ "$now" == "$tip" ]] || { echo "KEEP moved $b"; held=$((held+1)); continue; }
             gh api -X DELETE "repos/$REPO/git/refs/heads/$b" >/dev/null
-            printf '%s\\t%s\\t%s\\t%s\\t%s\\t%s\\n' "$b" "$tip" "$ahead" "$subject" "ARCHIVED_AND_DELETED" "merged-or-patch-equivalent-no-live-reference" >> "$report"
+            printf '%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\n' "$b" "$tip" "$ahead" "$subject" "ARCHIVED_AND_DELETED" "merged-or-patch-or-tree-equivalent-no-live-reference" "${changed_files:-0}" "${changed_paths:-}" >> "$report"
             echo "DELETED $b archive=$tag"
             deleted=$((deleted+1))
           done < <(jq -r '.[].name' <<<"$branches")
           echo "Deleted=$deleted Held=$held UnmergedCandidates=$unmerged" | tee -a "$GITHUB_STEP_SUMMARY"
-          echo "Success-path policy: merged or patch-equivalent + no live reference => archived/deleted; unique patches => review with commit evidence." >> "$GITHUB_STEP_SUMMARY"
+          echo "Success-path policy: merged/patch-equivalent/tree-identical + no live reference => archived/deleted; remaining branches => review with actual changed paths." >> "$GITHUB_STEP_SUMMARY"
           cp "$report" branch-success-review.tsv
       - name: Publish branch success review
         if: always()
