@@ -19,6 +19,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+          fetch-depth: 0
       - name: Audit references, archive, prune merged orphan heads
         shell: bash
         env:
@@ -48,8 +49,20 @@ jobs:
             ahead=$(gh api "repos/$REPO/compare/main...$tip" --jq '.ahead_by')
             subject=$(gh api "repos/$REPO/commits/$tip" --jq '.commit.message | split("\\n")[0]' | tr "\\t\\r\\n" "   ")
             if [[ "$ahead" != 0 ]]; then
-              printf '%s\\t%s\\t%s\\t%s\\t%s\\t%s\\n' "$b" "$tip" "$ahead" "$subject" "REVIEW" "unique-work-needs-success-proof" >> "$report"
-              echo "CANDIDATE unmerged $b ahead=$ahead tip=$tip subject=$subject"; unmerged=$((unmerged+1)); continue
+              # Distinguish unique commit IDs from unique patches (squash/rebase/cherry-pick).
+              # A shallow comparison of ahead_by alone cannot establish unmerged work.
+              if git fetch --quiet --no-tags origin "refs/heads/$b" 2>/dev/null; then
+                unique_patches=$(git cherry origin/main FETCH_HEAD | grep -c '^+' || true)
+              else
+                unique_patches="unknown"
+              fi
+              if [[ "$unique_patches" == 0 ]]; then
+                echo "PATCH_EQUIVALENT $b ahead=$ahead tip=$tip"
+                ahead=0
+              else
+                printf '%s\\t%s\\t%s\\t%s\\t%s\\t%s\\n' "$b" "$tip" "$ahead" "$subject" "REVIEW" "unique-work-needs-success-proof" >> "$report"
+              echo "CANDIDATE unmerged $b ahead=$ahead unique_patches=$unique_patches tip=$tip subject=$subject"; unmerged=$((unmerged+1)); continue
+              fi
             fi
             tag="archive/orphan-pruned/$b"
             if existing=$(gh api "repos/$REPO/git/ref/tags/$tag" --jq '.object.sha' 2>/dev/null); then
@@ -60,12 +73,12 @@ jobs:
             now=$(gh api "repos/$REPO/git/ref/heads/$b" --jq '.object.sha')
             [[ "$now" == "$tip" ]] || { echo "KEEP moved $b"; held=$((held+1)); continue; }
             gh api -X DELETE "repos/$REPO/git/refs/heads/$b" >/dev/null
-            printf '%s\\t%s\\t%s\\t%s\\t%s\\t%s\\n' "$b" "$tip" "$ahead" "$subject" "ARCHIVED_AND_DELETED" "fully-in-main-no-live-reference" >> "$report"
+            printf '%s\\t%s\\t%s\\t%s\\t%s\\t%s\\n' "$b" "$tip" "$ahead" "$subject" "ARCHIVED_AND_DELETED" "merged-or-patch-equivalent-no-live-reference" >> "$report"
             echo "DELETED $b archive=$tag"
             deleted=$((deleted+1))
           done < <(jq -r '.[].name' <<<"$branches")
           echo "Deleted=$deleted Held=$held UnmergedCandidates=$unmerged" | tee -a "$GITHUB_STEP_SUMMARY"
-          echo "Success-path policy: merged + no live reference => archived/deleted; unique work => review with commit evidence." >> "$GITHUB_STEP_SUMMARY"
+          echo "Success-path policy: merged or patch-equivalent + no live reference => archived/deleted; unique patches => review with commit evidence." >> "$GITHUB_STEP_SUMMARY"
           cp "$report" branch-success-review.tsv
       - name: Publish branch success review
         if: always()
