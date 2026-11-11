@@ -1,0 +1,85 @@
+name: Prune wkwhisperkey orphan branches
+on:
+  push:
+    paths:
+      - .github/workflows/prune-wkwhisperkey-orphan-branches.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: prune-wkwhisperkey-orphan-branches
+  cancel-in-progress: false
+jobs:
+  prune:
+    if: github.repository == 'kiexpert/wkappbot-sdk' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      REPO: kiexpert/WkWhisperKey
+      TOKEN_A: ${{ secrets.WKAPPBOT_PAT }}
+      TOKEN_B: ${{ secrets.WKAPPBOT_CORE_PAT }}
+      TOKEN_C: ${{ secrets.GH_LICENSE_TOKEN }}
+    steps:
+      - name: Archive then prune branches not referenced in private workflows
+        shell: bash
+        run: |
+          set -euo pipefail
+          for candidate in "$TOKEN_A" "$TOKEN_B" "$TOKEN_C"; do
+            [[ -n "$candidate" ]] || continue
+            echo "::add-mask::$candidate"
+            if GH_TOKEN="$candidate" gh api "repos/$REPO" --jq '.full_name' >/dev/null 2>&1; then
+              export GH_TOKEN="$candidate"
+              break
+            fi
+          done
+          [[ -n "${GH_TOKEN:-}" ]] || { echo "No token can access wkwhisperkey target"; exit 1; }
+          default=$(gh api "repos/$REPO" --jq '.default_branch')
+          branches=$(gh api "repos/$REPO/branches?per_page=100" --paginate --slurp | jq -c 'add')
+          # Read wkwhisperkey workflow definitions via the authenticated GitHub API.
+          files=$(gh api "repos/$REPO/contents/.github/workflows" --jq '.[] | select(.type=="file") | .path' 2>/dev/null || true)
+          # A missing workflow directory is normal; gh may return a JSON error body.
+          if [[ "$files" == *'"message"'* ]] || [[ "$files" == *'"status"'* ]]; then files=''; fi
+          refs="$RUNNER_TEMP/workflow-references.txt"
+          : > "$refs"
+          while IFS= read -r file; do
+            [[ -n "$file" ]] || continue
+            gh api "repos/$REPO/contents/$file" -H 'Accept: application/vnd.github.raw+json' >> "$refs"
+            printf '\n' >> "$refs"
+          done <<< "$files"
+          report="$RUNNER_TEMP/wkwhisperkey-branch-prune.tsv"
+          printf 'branch\ttip\tdecision\treason\n' > "$report"
+          deleted=0; kept=0; failed=0
+          while IFS= read -r b; do
+            [[ "$b" != "$default" ]] || continue
+            [[ "$b" =~ ^[A-Za-z0-9._/-]+$ ]] || continue
+            info=$(jq -c --arg b "$b" '.[] | select(.name==$b)' <<<"$branches")
+            tip=$(jq -r '.commit.sha' <<<"$info")
+            if [[ "$(jq -r '.protected' <<<"$info")" != false ]] || grep -Fq -- "$b" "$refs"; then
+              printf '%s\t%s\tKEEP\tprotected-or-workflow-reference\n' "$b" "$tip" >> "$report"
+              kept=$((kept+1)); continue
+            fi
+            tag="archive/orphan-pruned/$b"
+            if existing=$(gh api "repos/$REPO/git/ref/tags/$tag" --jq '.object.sha' 2>/dev/null); then
+              if [[ "$existing" != "$tip" ]]; then
+                printf '%s\t%s\tKEEP\tarchive-conflict\n' "$b" "$tip" >> "$report"
+                failed=$((failed+1)); continue
+              fi
+            elif ! gh api -X POST "repos/$REPO/git/refs" -f ref="refs/tags/$tag" -f sha="$tip" >/dev/null; then
+              printf '%s\t%s\tKEEP\tarchive-failed\n' "$b" "$tip" >> "$report"
+              failed=$((failed+1)); continue
+            fi
+            now=$(gh api "repos/$REPO/git/ref/heads/$b" --jq '.object.sha')
+            if [[ "$now" != "$tip" ]]; then
+              printf '%s\t%s\tKEEP\tbranch-moved\n' "$b" "$tip" >> "$report"
+              failed=$((failed+1)); continue
+            fi
+            if gh api -X DELETE "repos/$REPO/git/refs/heads/$b" >/dev/null; then
+              printf '%s\t%s\tARCHIVED_AND_DELETED\tunreferenced\n' "$b" "$tip" >> "$report"
+              deleted=$((deleted+1))
+            else
+              printf '%s\t%s\tKEEP\tdelete-failed\n' "$b" "$tip" >> "$report"
+              failed=$((failed+1))
+            fi
+          done < <(jq -r '.[].name' <<<"$branches")
+          echo "Deleted=$deleted Kept=$kept Failed=$failed" >> "$GITHUB_STEP_SUMMARY"
+          cat "$report" >> "$GITHUB_STEP_SUMMARY"
