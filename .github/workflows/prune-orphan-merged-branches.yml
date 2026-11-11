@@ -1,4 +1,4 @@
-name: Prune orphan merged branches
+name: Archive and prune unreferenced branches
 on:
   push:
     paths:
@@ -6,7 +6,6 @@ on:
   workflow_dispatch:
 permissions:
   contents: write
-  pull-requests: read
 concurrency:
   group: prune-orphan-merged-branches
   cancel-in-progress: false
@@ -19,8 +18,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-          fetch-depth: 0
-      - name: Audit references, archive, prune merged orphan heads
+      - name: Archive then delete branches absent from workflows
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -28,68 +26,57 @@ jobs:
         run: |
           set -euo pipefail
           branches=$(gh api "repos/$REPO/branches?per_page=100" --paginate --slurp | jq -c 'add')
-          prs=$(gh api "repos/$REPO/pulls?state=open&per_page=100" --paginate --slurp | jq -c 'add')
-          deleted=0; held=0; unmerged=0
-          report="$RUNNER_TEMP/branch-success-review.tsv"
-          printf 'branch\ttip\tahead\tlast_commit_subject\tdecision\treason\tchanged_files\tchanged_paths\n' > "$report"
+          deleted=0; kept=0; failed=0
+          report="$RUNNER_TEMP/branch-prune.tsv"
+          printf 'branch\ttip\tdecision\treason\n' > "$report"
           while IFS= read -r b; do
-            case "$b" in main|master|develop|development|release|release/*|stable/*|backup*|autobackup/*|gh-pages|relay/*|archive/*|production|prod) continue;; esac
+            [[ "$b" != main ]] || continue
             [[ "$b" =~ ^[A-Za-z0-9._/-]+$ ]] || continue
             info=$(jq -c --arg b "$b" '.[] | select(.name==$b)' <<<"$branches")
-            [[ "$(jq -r '.protected' <<<"$info")" == false ]] || continue
             tip=$(jq -r '.commit.sha' <<<"$info")
-            # Exact open PR head or base: never prune
-            if jq -e --arg b "$b" 'any(.[]; .head.ref==$b or .base.ref==$b)' <<<"$prs" >/dev/null; then
-              echo "KEEP PR $b"; held=$((held+1)); continue
+            if [[ "$(jq -r '.protected' <<<"$info")" != false ]]; then
+              printf '%s\t%s\tKEEP\tprotected\n' "$b" "$tip" >> "$report"
+              kept=$((kept+1)); continue
             fi
-            # Detect direct references to this branch in tracked workflows and repository automation configs.
-            if git grep -F -q -- "$b" -- .github/workflows .github/actions scripts 2>/dev/null; then
-              echo "KEEP referenced $b"; held=$((held+1)); continue
-            fi
-            ahead=$(gh api "repos/$REPO/compare/main...$tip" --jq '.ahead_by')
-            subject=$(gh api "repos/$REPO/commits/$tip" --jq '.commit.message | split("\\n")[0]' | tr "\\t\\r\\n" "   ")
-            if [[ "$ahead" != 0 ]]; then
-              # Distinguish unique commit IDs from unique patches (squash/rebase/cherry-pick).
-              # A shallow comparison of ahead_by alone cannot establish unmerged work.
-              if git fetch --quiet --no-tags origin "refs/heads/$b" 2>/dev/null; then
-                unique_patches=$(git cherry origin/main FETCH_HEAD | grep -c '^+' || true)
-              else
-                unique_patches="unknown"
-              fi
-              # Compare final trees as well as patch identity; report actual differing files.
-              changed_paths=$(git diff --name-only origin/main FETCH_HEAD | head -40 | paste -sd "," -)
-              changed_files=$(git diff --name-only origin/main FETCH_HEAD | wc -l | tr -d " ")
-              if git diff --quiet origin/main FETCH_HEAD; then
-                echo "TREE_EQUIVALENT $b ahead=$ahead tip=$tip"
-                ahead=0
-              elif [[ "$unique_patches" == 0 ]]; then
-                echo "PATCH_EQUIVALENT $b ahead=$ahead tip=$tip"
-                ahead=0
-              else
-                printf '%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\n' "$b" "$tip" "$ahead" "$subject" "REVIEW" "unique-work-needs-success-proof" "$changed_files" "$changed_paths" >> "$report"
-              echo "CANDIDATE unmerged $b ahead=$ahead unique_patches=$unique_patches tip=$tip subject=$subject"; unmerged=$((unmerged+1)); continue
-              fi
+            # Only workflow references exempt a branch; no age, ahead, or PR exemptions.
+            if git grep -F -q -- "$b" -- .github/workflows 2>/dev/null; then
+              printf '%s\t%s\tKEEP\tworkflow-reference\n' "$b" "$tip" >> "$report"
+              kept=$((kept+1)); continue
             fi
             tag="archive/orphan-pruned/$b"
             if existing=$(gh api "repos/$REPO/git/ref/tags/$tag" --jq '.object.sha' 2>/dev/null); then
-              [[ "$existing" == "$tip" ]] || { echo "KEEP archive-conflict $b"; held=$((held+1)); continue; }
-            else
-              gh api -X POST "repos/$REPO/git/refs" -f ref="refs/tags/$tag" -f sha="$tip" >/dev/null
+              if [[ "$existing" != "$tip" ]]; then
+                echo "KEEP archive-conflict $b"
+                printf '%s\t%s\tKEEP\tarchive-conflict\n' "$b" "$tip" >> "$report"
+                failed=$((failed+1)); continue
+              fi
+            elif ! gh api -X POST "repos/$REPO/git/refs" -f ref="refs/tags/$tag" -f sha="$tip" >/dev/null; then
+              echo "KEEP archive-failed $b"
+              printf '%s\t%s\tKEEP\tarchive-failed\n' "$b" "$tip" >> "$report"
+              failed=$((failed+1)); continue
             fi
             now=$(gh api "repos/$REPO/git/ref/heads/$b" --jq '.object.sha')
-            [[ "$now" == "$tip" ]] || { echo "KEEP moved $b"; held=$((held+1)); continue; }
-            gh api -X DELETE "repos/$REPO/git/refs/heads/$b" >/dev/null
-            printf '%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\n' "$b" "$tip" "$ahead" "$subject" "ARCHIVED_AND_DELETED" "merged-or-patch-or-tree-equivalent-no-live-reference" "${changed_files:-0}" "${changed_paths:-}" >> "$report"
-            echo "DELETED $b archive=$tag"
-            deleted=$((deleted+1))
+            if [[ "$now" != "$tip" ]]; then
+              echo "KEEP moved $b"
+              printf '%s\t%s\tKEEP\tbranch-moved\n' "$b" "$tip" >> "$report"
+              failed=$((failed+1)); continue
+            fi
+            if gh api -X DELETE "repos/$REPO/git/refs/heads/$b" >/dev/null; then
+              echo "DELETED $b archive=$tag"
+              printf '%s\t%s\tARCHIVED_AND_DELETED\tunreferenced-in-workflows\n' "$b" "$tip" >> "$report"
+              deleted=$((deleted+1))
+            else
+              echo "KEEP delete-failed $b"
+              printf '%s\t%s\tKEEP\tdelete-failed\n' "$b" "$tip" >> "$report"
+              failed=$((failed+1))
+            fi
           done < <(jq -r '.[].name' <<<"$branches")
-          echo "Deleted=$deleted Held=$held UnmergedCandidates=$unmerged" | tee -a "$GITHUB_STEP_SUMMARY"
-          echo "Success-path policy: merged/patch-equivalent/tree-identical + no live reference => archived/deleted; remaining branches => review with actual changed paths." >> "$GITHUB_STEP_SUMMARY"
-          cp "$report" branch-success-review.tsv
-      - name: Publish branch success review
+          echo "Deleted=$deleted Kept=$kept Failed=$failed" | tee -a "$GITHUB_STEP_SUMMARY"
+          cp "$report" branch-prune.tsv
+      - name: Publish branch prune report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: branch-success-review
-          path: branch-success-review.tsv
+          name: branch-prune-report
+          path: branch-prune.tsv
           if-no-files-found: warn
