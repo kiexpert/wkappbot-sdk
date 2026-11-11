@@ -35,7 +35,9 @@ jobs:
           [[ -n "${GH_TOKEN:-}" ]] || { echo "No token can access private target"; exit 1; }
           branches=$(gh api "repos/$REPO/branches?per_page=100" --paginate --slurp | jq -c 'add')
           # Read private workflow definitions via the authenticated GitHub API.
-          files=$(gh api "repos/$REPO/contents/.github/workflows" --jq '.[].path' 2>/dev/null || true)
+          files=$(gh api "repos/$REPO/contents/.github/workflows" --jq '.[] | select(.type=="file") | .path' 2>/dev/null || true)
+          # A missing workflow directory is normal; gh may return a JSON error body.
+          if [[ "$files" == *'"message"'* ]] || [[ "$files" == *'"status"'* ]]; then files=''; fi
           refs="$RUNNER_TEMP/workflow-references.txt"
           : > "$refs"
           while IFS= read -r file; do
