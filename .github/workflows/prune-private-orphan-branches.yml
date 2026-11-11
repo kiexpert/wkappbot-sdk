@@ -34,10 +34,7 @@ jobs:
           done
           [[ -n "${GH_TOKEN:-}" ]] || { echo "No token can access private target"; exit 1; }
           branches=$(gh api "repos/$REPO/branches?per_page=100" --paginate --slurp | jq -c 'add')
-          git init -q private-tree
-          git -C private-tree -c http.extraheader="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)" fetch -q --depth=1 "https://github.com/$REPO.git" main
-          mkdir -p private-tree/.github/workflows
-          # Fetch workflow definitions via authenticated API (not just the shallow git checkout).
+          # Read private workflow definitions via the authenticated GitHub API.
           files=$(gh api "repos/$REPO/contents/.github/workflows" --jq '.[].path' 2>/dev/null || true)
           refs="$RUNNER_TEMP/workflow-references.txt"
           : > "$refs"
