@@ -29,6 +29,8 @@ jobs:
           branches=$(gh api "repos/$REPO/branches?per_page=100" --paginate --slurp | jq -c 'add')
           prs=$(gh api "repos/$REPO/pulls?state=open&per_page=100" --paginate --slurp | jq -c 'add')
           deleted=0; held=0; unmerged=0
+          report="$RUNNER_TEMP/branch-success-review.tsv"
+          printf 'branch\ttip\tahead\tlast_commit_subject\tdecision\treason\n' > "$report"
           while IFS= read -r b; do
             case "$b" in main|master|develop|development|release|release/*|stable/*|backup*|autobackup/*|gh-pages|relay/*|archive/*|production|prod) continue;; esac
             [[ "$b" =~ ^[A-Za-z0-9._/-]+$ ]] || continue
@@ -44,8 +46,10 @@ jobs:
               echo "KEEP referenced $b"; held=$((held+1)); continue
             fi
             ahead=$(gh api "repos/$REPO/compare/main...$tip" --jq '.ahead_by')
+            subject=$(gh api "repos/$REPO/commits/$tip" --jq '.commit.message | split("\\n")[0]' | tr "\\t\\r\\n" "   ")
             if [[ "$ahead" != 0 ]]; then
-              echo "CANDIDATE unmerged $b ahead=$ahead tip=$tip reason=unreferenced-no-open-pr"; unmerged=$((unmerged+1)); continue
+              printf '%s\\t%s\\t%s\\t%s\\t%s\\t%s\\n' "$b" "$tip" "$ahead" "$subject" "REVIEW" "unique-work-needs-success-proof" >> "$report"
+              echo "CANDIDATE unmerged $b ahead=$ahead tip=$tip subject=$subject"; unmerged=$((unmerged+1)); continue
             fi
             tag="archive/orphan-pruned/$b"
             if existing=$(gh api "repos/$REPO/git/ref/tags/$tag" --jq '.object.sha' 2>/dev/null); then
@@ -56,7 +60,17 @@ jobs:
             now=$(gh api "repos/$REPO/git/ref/heads/$b" --jq '.object.sha')
             [[ "$now" == "$tip" ]] || { echo "KEEP moved $b"; held=$((held+1)); continue; }
             gh api -X DELETE "repos/$REPO/git/refs/heads/$b" >/dev/null
+            printf '%s\\t%s\\t%s\\t%s\\t%s\\t%s\\n' "$b" "$tip" "$ahead" "$subject" "ARCHIVED_AND_DELETED" "fully-in-main-no-live-reference" >> "$report"
             echo "DELETED $b archive=$tag"
             deleted=$((deleted+1))
           done < <(jq -r '.[].name' <<<"$branches")
           echo "Deleted=$deleted Held=$held UnmergedCandidates=$unmerged" | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "Success-path policy: merged + no live reference => archived/deleted; unique work => review with commit evidence." >> "$GITHUB_STEP_SUMMARY"
+          cp "$report" branch-success-review.tsv
+      - name: Publish branch success review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: branch-success-review
+          path: branch-success-review.tsv
+          if-no-files-found: warn
