@@ -321,31 +321,39 @@ jobs:
         run: |
           set -eu
           SHA=$(sha256sum "$TGZ" | cut -d' ' -f1)
-          git clone -q --depth 1 --branch main "https://x-access-token:${TOK}@github.com/${REPO}.git" pages
+          # Ship where Pages actually serves (2026-11-12: the source moved to the gh-pages branch root that webvm-x64
+          # writes, so main/docs/wkappbot-code was committed but served 404 and two runs failed "Pages never served").
+          # Read the configured source; fall back to main /docs when the API gives none.
+          SRC=$(GH_TOKEN="$TOK" gh api "repos/${REPO}/pages" -q '.source.branch + " " + .source.path' 2>/dev/null || true)
+          BR=${SRC%% *}; PD=${SRC#* }
+          if [ -z "$BR" ] || [ "$BR" = "$SRC" ] || [ "$BR" = null ]; then BR=main; PD=/docs; fi
+          PD=${PD#/}; PD=${PD%/}; D="pages${PD:+/$PD}"; A="${PD:+$PD/}"
+          echo "Pages source: branch=$BR path=/$PD (files go to $D)"
+          git clone -q --depth 1 --branch "$BR" "https://x-access-token:${TOK}@github.com/${REPO}.git" pages
           # Canonical: wkappbot-code/wkappbot-code.tgz + the versioned copy + SHA256SUMS + version.json.
-          mkdir -p pages/docs/wkappbot-code
-          cp "$TGZ" "pages/docs/wkappbot-code/wkappbot-code-$VER.tgz"
-          cp "$TGZ" pages/docs/wkappbot-code/wkappbot-code.tgz
-          (cd pages/docs/wkappbot-code && sha256sum wkappbot-code*.tgz > SHA256SUMS && cat SHA256SUMS)
-          printf '{"name":"%s","version":"%s","tgz":"wkappbot-code.tgz","sha256":"%s"}\n' "$PKG" "$VER" "$SHA" > pages/docs/wkappbot-code/version.json
+          mkdir -p "$D/wkappbot-code"
+          cp "$TGZ" "$D/wkappbot-code/wkappbot-code-$VER.tgz"
+          cp "$TGZ" "$D/wkappbot-code/wkappbot-code.tgz"
+          (cd "$D/wkappbot-code" && sha256sum wkappbot-code*.tgz > SHA256SUMS && cat SHA256SUMS)
+          printf '{"name":"%s","version":"%s","tgz":"wkappbot-code.tgz","sha256":"%s"}\n' "$PKG" "$VER" "$SHA" > "$D/wkappbot-code/version.json"
           # OLD URL, KEPT ON PURPOSE: `npm i -g <pages>/appbot-code/wk-appbot-code.tgz` was already handed out,
           # so the same bytes stay reachable there. Do not remove this block.
-          mkdir -p pages/docs/appbot-code
-          cp "$TGZ" pages/docs/appbot-code/wk-appbot-code.tgz
-          (cd pages/docs/appbot-code && sha256sum wk-appbot-code*.tgz > SHA256SUMS)
-          printf '{"name":"%s","version":"%s","tgz":"wk-appbot-code.tgz","sha256":"%s","moved_to":"wkappbot-code/wkappbot-code.tgz"}\n' "$PKG" "$VER" "$SHA" > pages/docs/appbot-code/version.json
+          mkdir -p "$D/appbot-code"
+          cp "$TGZ" "$D/appbot-code/wk-appbot-code.tgz"
+          (cd "$D/appbot-code" && sha256sum wk-appbot-code*.tgz > SHA256SUMS)
+          printf '{"name":"%s","version":"%s","tgz":"wk-appbot-code.tgz","sha256":"%s","moved_to":"wkappbot-code/wkappbot-code.tgz"}\n' "$PKG" "$VER" "$SHA" > "$D/appbot-code/version.json"
           cd pages
           git config user.name "pages-relay"
           git config user.email "pages-relay@users.noreply.github.com"
-          git add docs/wkappbot-code docs/appbot-code
+          git add "${A}wkappbot-code" "${A}appbot-code"
           if git diff --cached --quiet; then echo "wkappbot-code on Pages unchanged"; exit 0; fi
           git commit -q -m "wkappbot-code $VER $(date -u +%FT%TZ)"
-          # webvm-x64 and the pages relay push main too: on a lost race, rebase onto the new tip and retry.
+          # webvm-x64 and the pages relay push this branch too: on a lost race, rebase onto the new tip and retry.
           for i in 1 2 3 4 5; do
-            git push -q "https://x-access-token:${TOK}@github.com/${REPO}.git" HEAD:main && break
+            git push -q "https://x-access-token:${TOK}@github.com/${REPO}.git" "HEAD:$BR" && break
             [ "$i" = 5 ] && exit 1
             sleep 15
-            git pull -q --rebase "https://x-access-token:${TOK}@github.com/${REPO}.git" main
+            git pull -q --rebase "https://x-access-token:${TOK}@github.com/${REPO}.git" "$BR"
           done
           echo "wkappbot-code $VER on Pages"
           echo "PUSHED=1" >> "$GITHUB_ENV"
