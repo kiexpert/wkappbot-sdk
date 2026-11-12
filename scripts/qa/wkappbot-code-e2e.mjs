@@ -36,7 +36,8 @@ const CFG = path.join(process.env.XDG_CONFIG_HOME || path.join(HOME, ".config"),
 // The project lives under HOME, as a user's would, and is a repo WITH a commit (OpenCode keys its project on it).
 const PROJ = fs.mkdtempSync(path.join(HOME, "wkcode-e2e-"));
 let pass = 0, total = 0;
-const ok = (name, cond, why) => { total++; if (cond) { pass++; console.log("PASS " + name); } else console.log("FAIL " + name + " -- " + String(why).slice(0, 500)); };
+// max: how much of the reason to print (default 500; the uninstall case passes more so its cause lines stay whole).
+const ok = (name, cond, why, max = 500) => { total++; if (cond) { pass++; console.log("PASS " + name); } else console.log("FAIL " + name + " -- " + String(why).slice(0, max)); };
 
 // ---- mock OpenAI-compatible model ----
 let calls = 0, withRules = 0;
@@ -129,7 +130,7 @@ if (before) {
   const after = snapshot(), was = fs.readFileSync(before, "utf8");
   // On a failure, also show every line that names the cause (a short tail can cut it off, as on win-x64).
   const why = ((u.stdout || "") + "\n" + (u.stderr || "")).split(/\r?\n/).filter((l) => /could not|blocked by|error|fail|denied|EBUSY|EPERM|rc[ =][1-9]/i.test(l)).slice(0, 12).join("\n");
-  ok("uninstall rc 0 and the machine state equals the pre-install snapshot", u.status === 0 && after === was, "rc=" + u.status + "\nbefore:\n" + was + "after:\n" + after + (why ? "cause lines:\n" + why + "\n" : "") + "stdout tail: " + (u.stdout || "").slice(-300) + "\nstderr tail: " + (u.stderr || "").slice(-300));
+  ok("uninstall rc 0 and the machine state equals the pre-install snapshot", u.status === 0 && after === was, "rc=" + u.status + "\n" + (why ? "cause lines:\n" + why + "\n" : "") + "before:\n" + was + "after:\n" + after + "stdout tail: " + (u.stdout || "").slice(-300) + "\nstderr tail: " + (u.stderr || "").slice(-300), 4000);
 }
 console.log("model calls: " + calls + "  platform: " + process.platform + "/" + process.arch);
 console.log("RESULT " + pass + "/" + total);
