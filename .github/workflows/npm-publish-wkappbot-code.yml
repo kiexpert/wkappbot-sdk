@@ -279,6 +279,44 @@ jobs:
           mkdir -p "$RUNNER_TEMP/iso-reg"; HOME="$RUNNER_TEMP/iso-reg" USERPROFILE="$RUNNER_TEMP/iso-reg" XDG_CONFIG_HOME="$RUNNER_TEMP/iso-reg/.config" npm install -g --prefer-online --prefix "$RUNNER_TEMP/reg" "$PKG@$VER"
           HOME="$RUNNER_TEMP/iso-reg" USERPROFILE="$RUNNER_TEMP/iso-reg" XDG_CONFIG_HOME="$RUNNER_TEMP/iso-reg/.config" "$RUNNER_TEMP/reg/bin/$CLI" --help
 
+  # 5. pages: the web copy, started IN PARALLEL with the registry publish as soon as the gate passes (owner
+  #    2026-11-12: start the web build early, in parallel). Both ship the same gated tgz. Run 43309568069 hit the
+  #    20-minute job limit with registry wait + Pages ship + build in one job, and was cancelled after npm had 0.3.33.
+  pages:
+    needs: [pack, gate]
+    if: always() && (needs.gate.result == 'success' || needs.pack.outputs.pages_only == 'true')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      TARGET_HASH: 23ade98d428c8527
+      T1: ${{ secrets.GH_LICENSE_TOKEN }}
+      T2: ${{ secrets.WKAPPBOT_PAT }}
+      T3: ${{ secrets.WKAPPBOT_CORE_PAT }}
+      VER: ${{ needs.pack.outputs.ver }}
+      PKG: ${{ needs.pack.outputs.pkg }}
+      CLI: wkappbot-code
+    steps:
+      - uses: actions/checkout@v4
+      - name: Find the target repo and a token that can reach it
+        run: bash .github/scripts/npm-find-target.sh
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4
+        if: needs.gate.result == 'success'
+        with:
+          name: wkappbot-code-tgz
+          path: ${{ runner.temp }}/tgz
+      - name: The gated bytes (for a Pages catch-up, the registry's own tarball of this version)
+        run: |
+          set -eu
+          if [ "${{ needs.gate.result }}" != success ]; then
+            mkdir -p "$RUNNER_TEMP/tgz" && (cd "$RUNNER_TEMP/tgz" && npm pack -s "$PKG@$VER" >/dev/null)
+            echo "Pages catch-up: $PKG@$VER from the registry"
+          fi
+          t="$(ls "$RUNNER_TEMP"/tgz/*.tgz | head -1)"; echo "TGZ=$t" >> "$GITHUB_ENV"
+          echo "shipping $PKG@$VER to Pages: $(basename "$t") sha256=$(sha256sum "$t" | cut -d' ' -f1)"
+
       - name: Ship to the harness Pages web (wkappbot-code/, plus the old appbot-code/ URL)
         run: |
           set -eu
