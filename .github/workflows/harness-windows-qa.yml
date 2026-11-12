@@ -1,5 +1,5 @@
 name: Harness QA (Windows + macOS)
-# (kih ROOT 3: seventh proof run on kih-root3-lockfix 9bdbcaf, Windows uninstall EPERM wait and intent-lock fix)
+# (kih ROOT 3: eighth proof run on kih-root3-lockfix 5f0f230, wkappbot-code 0.3.30 detached-child cwd fix and holder report)
 
 # Runs the harness repo's own self-tests on Windows and macOS runners, so a harness change made on a
 # Linux cloud VM is proven on the owner's two desktop platforms too. On macOS the Bash self-tests run a
