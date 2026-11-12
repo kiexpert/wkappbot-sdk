@@ -30,3 +30,5 @@
 0.3.27
 # 0.3.29: kih main 2645ddd (PR 172 shim twins, first-stop auto-update, macOS portable bound; PR 173 provider-add guard, uninstall settings backup; PR 174 uninstall waits for the archive child so the Windows EPERM is gone, intent-lock fixes, opencode.json backup). SDK harness-qa run 43232319257 windows and macos opencode-e2e SUCCESS (u1-uninstall PASS 16/16). The gate still publishes only when every leg passes. 0.3.28 skipped (win-x64-nopy EPERM in run 43227049219). Owner order 2026-11-12 15:17 (publish npm once every bug is caught).
 0.3.29
+# 0.3.30: kih PR 175 (detached shadow and skill-draft children start outside the harness copy, the 0.3.29 win-x64-nopy EPERM holder; uninstall prints harness holders on failure; hippo reader drops subagent brief rows). SDK harness-qa run 43253735554 windows and macos opencode-e2e SUCCESS (u1-uninstall PASS 16/16). The gate still publishes only when every leg passes. Owner order 2026-11-12 15:17 (publish npm once every bug is caught).
+0.3.30
