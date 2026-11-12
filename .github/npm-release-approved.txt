@@ -28,3 +28,5 @@
 0.3.26
 # 0.3.27: kih main d912671 and after (PR 169: provider add|list|remove for OpenAI-compatible endpoints, u1-uninstall fix; PR 171 install.cmd and parity fixes); npm-publish run 43208909735 green on all legs (win-x64 full e2e success; the run 43200116092 EPERM did not recur), refused only on G1. The Windows --no-bin .cmd shim twin fix (kih 296bbcba6) follows in 0.3.28. Owner order 2026-11-12 (publish npm once every bug is caught).
 0.3.27
+# 0.3.29: kih main 2645ddd (PR 172 shim twins, first-stop auto-update, macOS portable bound; PR 173 provider-add guard, uninstall settings backup; PR 174 uninstall waits for the archive child so the Windows EPERM is gone, intent-lock fixes, opencode.json backup). SDK harness-qa run 43232319257 windows and macos opencode-e2e SUCCESS (u1-uninstall PASS 16/16). The gate still publishes only when every leg passes. 0.3.28 skipped (win-x64-nopy EPERM in run 43227049219). Owner order 2026-11-12 15:17 (publish npm once every bug is caught).
+0.3.29
