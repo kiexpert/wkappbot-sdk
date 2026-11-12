@@ -1311,10 +1311,15 @@ jobs:
         run: |
           set +e
           n=0; ok=0
+          portable=0
+          case "$(./wkappbot a11y --help 2>&1)" in *"portable minimal build"*) portable=1;; esac
           run() { label="$1"; shift; n=$((n+1))
             out=$(./wkappbot "$@" 2>&1); rc=$?
             lines=$(printf '%s\n' "$out" | grep -c .)
-            if [ "$rc" = 0 ] && [ "$lines" -gt 0 ]; then ok=$((ok+1)); s=PASS; else s=FAIL; fi
+            if [ "$portable" = 1 ] && [ "$1" = a11y ]; then
+              # Portable build: a11y is out of scope; each a11y command must fail with its own message, so a silent change stays visible.
+              if [ "$rc" != 0 ] && printf '%s\n' "$out" | grep -q "Unknown command: a11y"; then ok=$((ok+1)); s=PASS; else s=FAIL; fi
+            elif [ "$rc" = 0 ] && [ "$lines" -gt 0 ]; then ok=$((ok+1)); s=PASS; else s=FAIL; fi
             echo "$s $label rc=$rc lines=$lines"
             printf '%s\n' "$out" | head -8 | cut -c1-160 | sed 's/^/    /'
           }
@@ -1331,6 +1336,7 @@ jobs:
             run "a11y find ${{ matrix.probe }} button ${{ matrix.button }}" a11y find '${{ matrix.probe }}#${{ matrix.button }}'
           fi
           echo "RESULT $ok/$n (${{ runner.os }} ${{ matrix.mode }} a11y)"
+          if [ "$portable" = 1 ] && [ "$ok" = "$n" ]; then echo "PORTABLE a11y out of scope (expected)"; fi
           [ "$ok" = "$n" ]
       - name: AT-SPI reference probe (python pyatspi, the platform path wkappbot a11y must match)
         if: (always() && runner.os == 'Linux' && matrix.mode == 'desktop') && env.LEG_OFF != '1'
@@ -1348,12 +1354,19 @@ jobs:
               for i in range(a.childCount):
                   try: yield from walk(a.getChildAtIndex(i), depth + 1)
                   except Exception: pass
+          def find_win():
+              for app in desk:
+                  for node in walk(app):
+                      if node.getRoleName() in ("dialog", "frame", "alert") and "wkappbot-probe" in (node.name or ""):
+                          return node
+              return None
+          # Poll the lookup every 1 s, up to 20 s (zenity may still be mapping its window).
           win = None
-          for app in desk:
-              for node in walk(app):
-                  if node.getRoleName() in ("dialog", "frame", "alert") and "wkappbot-probe" in (node.name or ""):
-                      win = node; break
-              if win: break
+          deadline = time.time() + 20
+          while True:
+              win = find_win()
+              if win or time.time() >= deadline: break
+              time.sleep(1)
           ok = n = 0
           n += 1
           if win: ok += 1; print("PASS ref window found by name: wkappbot-probe")
