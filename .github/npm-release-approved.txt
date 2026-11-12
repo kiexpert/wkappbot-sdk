@@ -34,3 +34,5 @@
 0.3.30
 # 0.3.31: kih main 6cea3d4 (PR 176: provider add creates the missing ~/.config/opencode on a clean machine instead of ENOENT; the provider backup goes to the wkappbot-code state dir and uninstall removes it). selftest-provider 8/8, selftest-provider-backup 6/6, selftest.sh 174 PASS. The gate still publishes only when every leg passes. Owner order 2026-11-12 15:17 (publish npm once every bug is caught).
 0.3.31
+# 0.3.32: kih PR 178 (uninstall waits, bounded 20 s, for every process whose command line names the harness copy, the 0.3.31 win-x64 EPERM holder was a live bash.exe; the holder report is one untruncated line; selftest.sh wiring fixed, 184/184). SDK harness-qa run 43277791124 windows and macos opencode-e2e SUCCESS (u1-uninstall PASS 16/16). The gate still publishes only when every leg passes. Owner order 2026-11-12 15:17 (publish npm once every bug is caught).
+0.3.32
