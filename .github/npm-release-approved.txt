@@ -36,3 +36,5 @@
 0.3.31
 # 0.3.32: kih PR 178 (uninstall waits, bounded 20 s, for every process whose command line names the harness copy, the 0.3.31 win-x64 EPERM holder was a live bash.exe; the holder report is one untruncated line; selftest.sh wiring fixed, 184/184). SDK harness-qa run 43277791124 windows and macos opencode-e2e SUCCESS (u1-uninstall PASS 16/16). The gate still publishes only when every leg passes. Owner order 2026-11-12 15:17 (publish npm once every bug is caught).
 0.3.32
+# 0.3.33: kih main 08cb1cc (uninstall holder wait matches the Git Bash, Cygwin and WSL spellings of the harness dir, then ends only leftover bash/sh/flock/setsid/nohup/python children; the 0.3.32 win-x64-nopy EPERM of push run 43284028291). SDK harness-qa run 43302293446 windows and macos opencode-e2e SUCCESS. The gate still publishes only when every leg passes. Owner order 2026-11-12 15:17 (publish npm once every bug is caught).
+0.3.33
