@@ -1,8 +1,8 @@
 name: Prune wkappbot-kih orphan branches
-# Owner rule 2026-11-12: a kih branch that is not the default branch and that no workflow or script
-# references is deleted by this GitHub job (never by the owner). Merged ones go at once; unmerged ones
-# only after IDLE_DAYS without a commit, so a live root work branch is never cut mid-task. Every tip is
-# archived as tags/archive/orphan-pruned/<branch> first, so a deletion can be undone.
+# Owner rule 2026-11-12: a kih branch that is not the default branch and that no workflow, script or important md
+# (HANDOFF.md, CLAUDE.md, SPOKESMAN.md) references is deleted by this GitHub job (never by the owner). Merged ones go
+# at once; unmerged ones only after IDLE_DAYS without a commit, so a live root work branch is never cut mid-task.
+# Every tip is archived as tags/archive/orphan-pruned/<branch> first, so a deletion can be undone.
 on:
   push:
     paths:
@@ -27,7 +27,7 @@ jobs:
       TOKEN_B: ${{ secrets.WKAPPBOT_CORE_PAT }}
       TOKEN_C: ${{ secrets.GH_LICENSE_TOKEN }}
     steps:
-      - name: Archive then prune branches no workflow or script references
+      - name: Archive then prune branches no workflow, script or important md references
         shell: bash
         run: |
           set -euo pipefail
@@ -42,14 +42,15 @@ jobs:
           [[ -n "${GH_TOKEN:-}" ]] || { echo "No token can access wkappbot-kih target"; exit 1; }
           default=$(gh api "repos/$REPO" --jq '.default_branch')
           branches=$(gh api "repos/$REPO/branches?per_page=100" --paginate --slurp | jq -c 'add')
-          # References: every workflow, script and source file on the default branch (not history/ transcripts).
+          # References: every workflow, script, source file and important md on the default branch (not history/ transcripts).
           tree="$RUNNER_TEMP/tree"
           mkdir -p "$tree"
           gh api "repos/$REPO/tarball/$default" > "$RUNNER_TEMP/default.tgz"
           tar -xzf "$RUNNER_TEMP/default.tgz" -C "$tree" --strip-components=1
           refs="$RUNNER_TEMP/references.txt"
           find "$tree" -type f \( -path '*/.github/*' -o -name '*.sh' -o -name '*.ps1' -o -name '*.psm1' -o -name '*.cmd' -o -name '*.bat' \
-            -o -name '*.py' -o -name '*.js' -o -name '*.mjs' -o -name '*.ts' -o -name '*.json' -o -name '*.yml' -o -name '*.yaml' -o -name '*.toml' \) \
+            -o -name '*.py' -o -name '*.js' -o -name '*.mjs' -o -name '*.ts' -o -name '*.json' -o -name '*.yml' -o -name '*.yaml' -o -name '*.toml' \
+            -o -name 'HANDOFF.md' -o -name 'CLAUDE.md' -o -name 'SPOKESMAN.md' \) \
             -not -path "$tree/history/*" -not -path "$tree/skills/*" -print0 | xargs -0 cat > "$refs" 2>/dev/null || true
           now_epoch=$(date -u +%s)
           report="$RUNNER_TEMP/wkappbot-kih-branch-prune.tsv"
@@ -65,7 +66,7 @@ jobs:
               kept=$((kept+1)); continue;;
             esac
             if [[ "$(jq -r '.protected' <<<"$info")" != false ]] || grep -Fq -- "$b" "$refs"; then
-              printf '%s\t%s\tKEEP\tprotected-or-referenced-by-workflow-or-script\n' "$b" "$tip" >> "$report"
+              printf '%s\t%s\tKEEP\tprotected-or-referenced-by-workflow-script-or-md\n' "$b" "$tip" >> "$report"
               kept=$((kept+1)); continue
             fi
             st=$(gh api "repos/$REPO/compare/$default...$tip" --jq '.status' 2>/dev/null || echo unknown)
