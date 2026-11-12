@@ -32,3 +32,5 @@
 0.3.29
 # 0.3.30: kih PR 175 (detached shadow and skill-draft children start outside the harness copy, the 0.3.29 win-x64-nopy EPERM holder; uninstall prints harness holders on failure; hippo reader drops subagent brief rows). SDK harness-qa run 43253735554 windows and macos opencode-e2e SUCCESS (u1-uninstall PASS 16/16). The gate still publishes only when every leg passes. Owner order 2026-11-12 15:17 (publish npm once every bug is caught).
 0.3.30
+# 0.3.31: kih main 6cea3d4 (PR 176: provider add creates the missing ~/.config/opencode on a clean machine instead of ENOENT; the provider backup goes to the wkappbot-code state dir and uninstall removes it). selftest-provider 8/8, selftest-provider-backup 6/6, selftest.sh 174 PASS. The gate still publishes only when every leg passes. Owner order 2026-11-12 15:17 (publish npm once every bug is caught).
+0.3.31
