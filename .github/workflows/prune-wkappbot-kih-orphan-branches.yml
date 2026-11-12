@@ -20,7 +20,7 @@ jobs:
       TOKEN_B: ${{ secrets.WKAPPBOT_CORE_PAT }}
       TOKEN_C: ${{ secrets.GH_LICENSE_TOKEN }}
     steps:
-      - name: Archive then prune branches not referenced in private workflows
+      - name: Archive then prune branches merged into main and not referenced in workflows
         shell: bash
         run: |
           set -euo pipefail
@@ -54,8 +54,19 @@ jobs:
             [[ "$b" =~ ^[A-Za-z0-9._/-]+$ ]] || continue
             info=$(jq -c --arg b "$b" '.[] | select(.name==$b)' <<<"$branches")
             tip=$(jq -r '.commit.sha' <<<"$info")
+            case "$b" in gh-pages|relay/*)
+              printf '%s\t%s\tKEEP\tpages-or-relay\n' "$b" "$tip" >> "$report"
+              kept=$((kept+1)); continue;;
+            esac
             if [[ "$(jq -r '.protected' <<<"$info")" != false ]] || grep -Fq -- "$b" "$refs"; then
               printf '%s\t%s\tKEEP\tprotected-or-workflow-reference\n' "$b" "$tip" >> "$report"
+              kept=$((kept+1)); continue
+            fi
+            # Owner 2026-11-12: only branches fully merged into main are deleted. A branch that is ahead or
+            # diverged (a live root work branch, unmerged commits) is kept.
+            st=$(gh api "repos/$REPO/compare/$default...$tip" --jq '.status' 2>/dev/null || echo unknown)
+            if [[ "$st" != behind && "$st" != identical ]]; then
+              printf '%s\t%s\tKEEP\tnot-merged:%s\n' "$b" "$tip" "$st" >> "$report"
               kept=$((kept+1)); continue
             fi
             tag="archive/orphan-pruned/$b"
@@ -74,7 +85,7 @@ jobs:
               failed=$((failed+1)); continue
             fi
             if gh api -X DELETE "repos/$REPO/git/refs/heads/$b" >/dev/null; then
-              printf '%s\t%s\tARCHIVED_AND_DELETED\tunreferenced\n' "$b" "$tip" >> "$report"
+              printf '%s\t%s\tARCHIVED_AND_DELETED\tmerged-unreferenced\n' "$b" "$tip" >> "$report"
               deleted=$((deleted+1))
             else
               printf '%s\t%s\tKEEP\tdelete-failed\n' "$b" "$tip" >> "$report"
