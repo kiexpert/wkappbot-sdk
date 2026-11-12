@@ -24,3 +24,5 @@
 0.3.23
 # 0.3.25: kih main 90b54e2 (PRs 144, 147, 150: ~/.local/bin links for wkappbot and wkappbot-core, doctor PATH row required, re-install link ownership, Windows persistent user PATH and wkappbot-core.cmd shim); npm-publish run 43161198457 green on all six legs, refused only on G1. Owner order 2026-11-12 (appbot and core links in ~/.local/bin; improvements auto-approved). 0.3.24 is skipped (never published).
 0.3.25
+# 0.3.26: kih main 212b7e6 (PR 154: uninstall deletes an empty ~/.profile the install created; a dev seat keeps one full Stop chain); npm-publish run 43175139949 green on all six legs, refused only on G1. Owner order 2026-11-12 (publish npm once every bug is caught).
+0.3.26
