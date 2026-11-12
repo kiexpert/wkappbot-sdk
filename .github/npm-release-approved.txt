@@ -26,3 +26,5 @@
 0.3.25
 # 0.3.26: kih main 212b7e6 (PR 154: uninstall deletes an empty ~/.profile the install created; a dev seat keeps one full Stop chain); npm-publish run 43175139949 green on all six legs, refused only on G1. Owner order 2026-11-12 (publish npm once every bug is caught).
 0.3.26
+# 0.3.27: kih main d912671 and after (PR 169: provider add|list|remove for OpenAI-compatible endpoints, u1-uninstall fix; PR 171 install.cmd and parity fixes); npm-publish run 43208909735 green on all legs (win-x64 full e2e success; the run 43200116092 EPERM did not recur), refused only on G1. The Windows --no-bin .cmd shim twin fix (kih 296bbcba6) follows in 0.3.28. Owner order 2026-11-12 (publish npm once every bug is caught).
+0.3.27
