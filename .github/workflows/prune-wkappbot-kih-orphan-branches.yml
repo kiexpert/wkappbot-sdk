@@ -1,8 +1,14 @@
 name: Prune wkappbot-kih orphan branches
+# Owner rule 2026-11-12: a kih branch that is not the default branch and that no workflow or script
+# references is deleted by this GitHub job (never by the owner). Merged ones go at once; unmerged ones
+# only after IDLE_DAYS without a commit, so a live root work branch is never cut mid-task. Every tip is
+# archived as tags/archive/orphan-pruned/<branch> first, so a deletion can be undone.
 on:
   push:
     paths:
       - .github/workflows/prune-wkappbot-kih-orphan-branches.yml
+  schedule:
+    - cron: '17 3 * * *'
   workflow_dispatch:
 permissions:
   contents: read
@@ -16,11 +22,12 @@ jobs:
     timeout-minutes: 30
     env:
       REPO: kiexpert/wkappbot-kih
+      IDLE_DAYS: '3'
       TOKEN_A: ${{ secrets.WKAPPBOT_PAT }}
       TOKEN_B: ${{ secrets.WKAPPBOT_CORE_PAT }}
       TOKEN_C: ${{ secrets.GH_LICENSE_TOKEN }}
     steps:
-      - name: Archive then prune branches merged into main and not referenced in workflows
+      - name: Archive then prune branches no workflow or script references
         shell: bash
         run: |
           set -euo pipefail
@@ -35,17 +42,16 @@ jobs:
           [[ -n "${GH_TOKEN:-}" ]] || { echo "No token can access wkappbot-kih target"; exit 1; }
           default=$(gh api "repos/$REPO" --jq '.default_branch')
           branches=$(gh api "repos/$REPO/branches?per_page=100" --paginate --slurp | jq -c 'add')
-          # Read wkappbot-kih workflow definitions via the authenticated GitHub API.
-          files=$(gh api "repos/$REPO/contents/.github/workflows" --jq '.[] | select(.type=="file") | .path' 2>/dev/null || true)
-          # A missing workflow directory is normal; gh may return a JSON error body.
-          if [[ "$files" == *'"message"'* ]] || [[ "$files" == *'"status"'* ]]; then files=''; fi
-          refs="$RUNNER_TEMP/workflow-references.txt"
-          : > "$refs"
-          while IFS= read -r file; do
-            [[ -n "$file" ]] || continue
-            gh api "repos/$REPO/contents/$file" -H 'Accept: application/vnd.github.raw+json' >> "$refs"
-            printf '\n' >> "$refs"
-          done <<< "$files"
+          # References: every workflow, script and source file on the default branch (not history/ transcripts).
+          tree="$RUNNER_TEMP/tree"
+          mkdir -p "$tree"
+          gh api "repos/$REPO/tarball/$default" > "$RUNNER_TEMP/default.tgz"
+          tar -xzf "$RUNNER_TEMP/default.tgz" -C "$tree" --strip-components=1
+          refs="$RUNNER_TEMP/references.txt"
+          find "$tree" -type f \( -path '*/.github/*' -o -name '*.sh' -o -name '*.ps1' -o -name '*.psm1' -o -name '*.cmd' -o -name '*.bat' \
+            -o -name '*.py' -o -name '*.js' -o -name '*.mjs' -o -name '*.ts' -o -name '*.json' -o -name '*.yml' -o -name '*.yaml' -o -name '*.toml' \) \
+            -not -path "$tree/history/*" -not -path "$tree/skills/*" -print0 | xargs -0 cat > "$refs" 2>/dev/null || true
+          now_epoch=$(date -u +%s)
           report="$RUNNER_TEMP/wkappbot-kih-branch-prune.tsv"
           printf 'branch\ttip\tdecision\treason\n' > "$report"
           deleted=0; kept=0; failed=0
@@ -59,15 +65,21 @@ jobs:
               kept=$((kept+1)); continue;;
             esac
             if [[ "$(jq -r '.protected' <<<"$info")" != false ]] || grep -Fq -- "$b" "$refs"; then
-              printf '%s\t%s\tKEEP\tprotected-or-workflow-reference\n' "$b" "$tip" >> "$report"
+              printf '%s\t%s\tKEEP\tprotected-or-referenced-by-workflow-or-script\n' "$b" "$tip" >> "$report"
               kept=$((kept+1)); continue
             fi
-            # Owner 2026-11-12: only branches fully merged into main are deleted. A branch that is ahead or
-            # diverged (a live root work branch, unmerged commits) is kept.
             st=$(gh api "repos/$REPO/compare/$default...$tip" --jq '.status' 2>/dev/null || echo unknown)
             if [[ "$st" != behind && "$st" != identical ]]; then
-              printf '%s\t%s\tKEEP\tnot-merged:%s\n' "$b" "$tip" "$st" >> "$report"
-              kept=$((kept+1)); continue
+              when=$(gh api "repos/$REPO/commits/$tip" --jq '.commit.committer.date' 2>/dev/null || echo '')
+              age=999
+              [[ -n "$when" ]] && age=$(( (now_epoch - $(date -u -d "$when" +%s)) / 86400 ))
+              if (( age < IDLE_DAYS )); then
+                printf '%s\t%s\tKEEP\tunmerged-active:%s:%sd\n' "$b" "$tip" "$st" "$age" >> "$report"
+                kept=$((kept+1)); continue
+              fi
+              why="unmerged-idle:${age}d"
+            else
+              why="merged"
             fi
             tag="archive/orphan-pruned/$b"
             if existing=$(gh api "repos/$REPO/git/ref/tags/$tag" --jq '.object.sha' 2>/dev/null); then
@@ -85,7 +97,7 @@ jobs:
               failed=$((failed+1)); continue
             fi
             if gh api -X DELETE "repos/$REPO/git/refs/heads/$b" >/dev/null; then
-              printf '%s\t%s\tARCHIVED_AND_DELETED\tmerged-unreferenced\n' "$b" "$tip" >> "$report"
+              printf '%s\t%s\tARCHIVED_AND_DELETED\t%s-unreferenced\n' "$b" "$tip" "$why" >> "$report"
               deleted=$((deleted+1))
             else
               printf '%s\t%s\tKEEP\tdelete-failed\n' "$b" "$tip" >> "$report"
@@ -94,3 +106,4 @@ jobs:
           done < <(jq -r '.[].name' <<<"$branches")
           echo "Deleted=$deleted Kept=$kept Failed=$failed" >> "$GITHUB_STEP_SUMMARY"
           cat "$report" >> "$GITHUB_STEP_SUMMARY"
+          cat "$report"
