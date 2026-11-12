@@ -20,3 +20,5 @@
 0.3.21
 # 0.3.22: Windows npm Core license marker; release remains blocked unless packed-tgz all-OS QA passes.
 0.3.22
+# 0.3.23: kih main 46bc828 (PRs 139-143: wkskill removal and stale-link uninstall, per-OS QA, opencode hippo reader, lite history push, py fixture fix, one-branch gate); npm-publish run 43141426347 green on all five legs, refused only on G1. Owner order 2026-11-12 (wkskill 제거 완료면 엔피엠 배포절차 시작하삼; 개선작업은 자동승인).
+0.3.23
