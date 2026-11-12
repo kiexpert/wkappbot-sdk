@@ -1,5 +1,5 @@
 name: Harness QA (Windows + macOS)
-# (kih ROOT 2: fourth proof run on kih-root2-pyfix 296bbcba6, the Windows .cmd shim twins recorded for uninstall)
+# (kih ROOT 2: fifth proof run on kih-root2-pyfix dde7a8a20, the portable 20 s update bound on stock macOS)
 
 # Runs the harness repo's own self-tests on Windows and macOS runners, so a harness change made on a
 # Linux cloud VM is proven on the owner's two desktop platforms too. On macOS the Bash self-tests run a
