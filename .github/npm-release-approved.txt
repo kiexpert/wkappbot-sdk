@@ -22,3 +22,5 @@
 0.3.22
 # 0.3.23: kih main 46bc828 (PRs 139-143: wkskill removal and stale-link uninstall, per-OS QA, opencode hippo reader, lite history push, py fixture fix, one-branch gate); npm-publish run 43141426347 green on all five legs, refused only on G1. Owner order 2026-11-12 (wkskill 제거 완료면 엔피엠 배포절차 시작하삼; 개선작업은 자동승인).
 0.3.23
+# 0.3.25: kih main 90b54e2 (PRs 144, 147, 150: ~/.local/bin links for wkappbot and wkappbot-core, doctor PATH row required, re-install link ownership, Windows persistent user PATH and wkappbot-core.cmd shim); npm-publish run 43161198457 green on all six legs, refused only on G1. Owner order 2026-11-12 (appbot and core links in ~/.local/bin; improvements auto-approved). 0.3.24 is skipped (never published).
+0.3.25
