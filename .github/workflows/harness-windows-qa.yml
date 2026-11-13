@@ -3,7 +3,7 @@ name: Harness QA (Windows + macOS)
 # Runs the harness repo's own self-tests on Windows and macOS runners, so a harness change made on a
 # Linux cloud VM is proven on the owner's two desktop platforms too. On macOS the Bash self-tests run a
 # second time under /bin/bash 3.2, the shell a stock Mac starts hooks with.
-# Only RESULT and CASE lines are printed; nothing from the harness repo is published.
+# Only RESULT and CASE lines are printed; nothing from the harness repo is published. (kih root 7 proof run)
 
 # RESPAWN ON A BAD NETWORK (owner 2026-11-09, the scalper-runner road; the same road as wkappbot-code-os-qa.yml): every
 # job leg first probes the hosts it needs (curl --retry 6 --retry-delay 5). A leg whose runner has a dead network does
