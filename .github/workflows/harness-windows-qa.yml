@@ -957,7 +957,7 @@ jobs:
           fail=0
           for t in tools/wkjs/selftest.js tools/wkjs/skill-remote/remote-cache.selftest.js \
                    tools/wkjs/post/like-trace.selftest.js tools/wkjs/guards/stop/intent-coverage.selftest.js \
-                   tools/wkjs/guards/pre/busy-fleet.selftest.js; do
+                   tools/wkjs/guards/pre/busy-fleet.selftest.js tools/wkjs/guards/pre/skill-autopush-guard.selftest.js; do
             if [ ! -f "$t" ]; then echo "SELFTEST $t MISSING"; fail=1; continue; fi
             out=$(node "$t" 2>&1); rc=$?
             printf '%s\n' "$out" | grep -E '^(FAIL|SKIP)|L0[1-4]' | head -12 | cut -c1-300
