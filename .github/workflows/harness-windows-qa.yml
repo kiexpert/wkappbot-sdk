@@ -34,6 +34,7 @@ on:
         required: false
         default: '0'
       harness_ref:
+        # Rerun 2026-11-13: kih-root7-claude-post 219fcebe3 (selftest bake start/done markers for the Windows step-8 hang).
         description: 'Harness branch, tag or commit to test'
         required: false
         default: 'main'
