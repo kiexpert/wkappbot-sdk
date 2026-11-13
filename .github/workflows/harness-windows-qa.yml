@@ -948,6 +948,23 @@ jobs:
           echo "GUARDS registered=$want reported=$got" | tee -a "$out_f"
           [ "$want" = "$got" ] || { echo "GUARD COUNT MISMATCH"; [ "$rc" = 0 ] && rc=1; }
           exit $rc
+      - name: wkjs unit selftests (branch, kih PR 200 proof)
+        if: env.LEG_OFF != '1'
+        shell: bash
+        working-directory: kih
+        run: |
+          set +e
+          fail=0
+          for t in tools/wkjs/selftest.js tools/wkjs/skill-remote/remote-cache.selftest.js \
+                   tools/wkjs/post/like-trace.selftest.js tools/wkjs/guards/stop/intent-coverage.selftest.js; do
+            if [ ! -f "$t" ]; then echo "SELFTEST $t MISSING"; fail=1; continue; fi
+            out=$(node "$t" 2>&1); rc=$?
+            printf '%s\n' "$out" | grep -E '^(FAIL|SKIP)' | head -10 | cut -c1-300
+            r=$(printf '%s\n' "$out" | grep -E '^RESULT' | tail -1)
+            echo "SELFTEST $t rc=$rc ${r:-no RESULT line}"
+            [ "$rc" = 0 ] || { printf '%s\n' "$out" | tail -8; fail=1; }
+          done
+          exit $fail
       - name: Upload RESULT table
         if: (always()) && env.LEG_OFF != '1'
         uses: actions/upload-artifact@v4
