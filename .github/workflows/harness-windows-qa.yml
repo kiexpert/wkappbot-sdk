@@ -34,6 +34,7 @@ on:
         required: false
         default: '0'
       harness_ref:
+        # Proof 2026-11-13 (branch only): kih-root7-claude-post 81d1b3771 Windows step-8 fixes, sparse checkout + 50 min.
         description: 'Harness branch, tag or commit to test'
         required: false
         default: 'main'
