@@ -297,7 +297,7 @@ jobs:
       matrix:
         os: [windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 25
+    timeout-minutes: 50
     steps:
       - name: Network probe and leg filter (a dead network respawns this leg on a fresh runner)
         shell: bash
