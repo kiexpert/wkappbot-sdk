@@ -324,6 +324,19 @@ jobs:
           ref: ${{ inputs.harness_ref || 'main' }}
           token: ${{ secrets.WKAPPBOT_CORE_PAT }}
           path: kih
+          # This job never reads the session archive (history/, 1.2 GB) or the platform binaries (bin/<rid>/, ~510 MB):
+          # the core comes from the SDK release and the selftests mock it (kih ROOT 7, 2026-11-13). A full tip checkout
+          # took ~10 min on windows-latest. blob:none + sparse fetches only the blobs of the paths that are checked out.
+          filter: blob:none
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /*
+            !/history/
+            !/bin/osx-arm64/
+            !/bin/osx-x64/
+            !/bin/linux-x64/
+            !/bin/win-x64/
+            !/skills.zip
       - name: Harness ref from the commit message (push runs)
         # A push whose head commit message has a line "harness-ref: <kih branch or sha>" tests that kih head
         # instead of main, so a kih branch can be proven here before it merges.
