@@ -63,6 +63,7 @@ env:
   # 2026-11-10: core main cc38653 (WKAppBot PR 195): a ".wkappbot-code-install" marker beside the exe = npm install (licensed).
   # Branch build 2026-11-13 (this claude/release-* branch only): a push here builds core claude/pr-build-ci.
   # Rerun 2 2026-11-13: core claude/pr-build-ci head 4ce37af5c (CLI.Linux links SkillTagEditor + SkillAutoCommitTargets; test Main -> RunAll).
+  # Rerun 3 2026-11-13: head e1819541b (CdpPortResolver.Live.cs: using WKAppBot.Win32.Native).
   CORE_REF: ${{ inputs.core_ref || github.event.client_payload.ref || 'claude/pr-build-ci' }}
   DOTNET_NOLOGO: 'true'
   DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
