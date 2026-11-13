@@ -34,6 +34,7 @@ on:
         required: false
         default: '0'
       harness_ref:
+        # Baseline 2026-11-13: kih main, to compare the Windows step-8 time with PR 199.
         description: 'Harness branch, tag or commit to test'
         required: false
         default: 'main'
