@@ -34,7 +34,7 @@ on:
         required: false
         default: '0'
       harness_ref:
-        # Rerun 2026-11-13: kih-root8-remote-skills head 089e46d (skill-remote, like-trace, intent-coverage).
+        # Rerun 2026-11-13: kih-root8-remote-skills pinned to 398d5b4 (busy-fleet 64, skill-autopush-guard 16).
         description: 'Harness branch, tag or commit to test'
         required: false
         default: 'main'
