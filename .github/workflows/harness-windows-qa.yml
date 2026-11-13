@@ -298,7 +298,8 @@ jobs:
       matrix:
         os: [windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 25
+    # 50 (was 25): the windows kih checkout alone can take 10 min, which cut step 8 (about 4 min) off at 11 min.
+    timeout-minutes: 50
     steps:
       - name: Network probe and leg filter (a dead network respawns this leg on a fresh runner)
         shell: bash
