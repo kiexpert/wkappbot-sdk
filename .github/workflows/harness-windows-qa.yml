@@ -1,5 +1,5 @@
 name: Harness QA (Windows + macOS)
-# (spokesman: proof run on kih main 5c7d5b7 full sha, wkappbot-code 0.3.35 plugin layout fix, lock mds, allow list, lock wait)
+# (spokesman: proof run on kih main c55d86a full sha, wkappbot-code 0.3.36 study lock default-deny for unregistered sources)
 
 # Runs the harness repo's own self-tests on Windows and macOS runners, so a harness change made on a
 # Linux cloud VM is proven on the owner's two desktop platforms too. On macOS the Bash self-tests run a
