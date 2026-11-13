@@ -50,7 +50,7 @@ on:
       version: { description: "the version the tgz carries", type: string, default: '' }
       fake_net_fail: { description: "1 = fake a dead network on the first attempt, all = on every attempt (proof hooks)", type: string, default: '0' }
   push:
-    branches: [main, 'qa/respawn-a-*', 'qa/respawn-b-*', 'qa/pystub-*']
+    branches: [main, 'qa/respawn-a-*', 'qa/respawn-b-*', 'qa/pystub-*', 'claude/os-qa-*']
     paths:
       - .github/workflows/wkappbot-code-os-qa.yml
       - scripts/qa/wkappbot-code-e2e.mjs
@@ -201,6 +201,26 @@ jobs:
           fi
           wkappbot-code install $EXTRA 2>&1 | tee "$RUNNER_TEMP/install.log"; rc=${PIPESTATUS[0]}
           echo "install rc=$rc"; exit $rc
+
+      - name: Hook events wired into ~/.claude/settings.json after install (PreToolUse / PostToolUse / Stop)
+        if: env.NET_DOWN != '1' && steps.inst.outcome == 'success'
+        run: |
+          set +e
+          # The pre-install step seeded one user PreToolUse hook (my-own-linter.sh), so count only wk harness commands.
+          node -e '
+            const fs = require("fs"), p = require("path").join(require("os").homedir(), ".claude", "settings.json");
+            const h = (JSON.parse(fs.readFileSync(p, "utf8")).hooks) || {};
+            console.log("HOOKS-KEYS " + Object.keys(h).sort().join(","));
+            let miss = [];
+            for (const ev of ["PreToolUse", "PostToolUse", "Stop", "UserPromptSubmit", "SessionStart"]) {
+              const cmds = (h[ev] || []).flatMap(e => (e.hooks || []).map(x => String(x.command || "")));
+              const wk = cmds.filter(c => !/my-own-linter/.test(c));
+              console.log("HOOK " + ev + " wk=" + wk.length + " user=" + (cmds.length - wk.length) + (wk[0] ? " first=" + wk[0].slice(0, 160) : ""));
+              if (["PreToolUse", "PostToolUse", "Stop"].includes(ev) && wk.length === 0) miss.push(ev);
+            }
+            console.log("HOOKS-MISSING " + (miss.join(",") || "none"));
+            if (miss.length) { console.log("::warning::wkappbot-code install wired no wk hook for " + miss.join(", ")); }
+          '
 
       - name: Was the install failure the network? (5xx / unreachable downloads respawn the leg)
         if: failure() && env.NET_DOWN != '1' && (steps.npmi.outcome == 'failure' || steps.inst.outcome == 'failure')
