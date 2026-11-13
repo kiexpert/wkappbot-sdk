@@ -2,21 +2,6 @@ name: Protect Critical Files
 
 on:
   pull_request:
-    paths:
-      - '.github/workflows/paypal-license.yml'
-      - '.github/workflows/sponsor-license.yml'
-      - '.github/scripts/paypal_license.py'
-      - '.github/scripts/sponsor_license.py'
-      - '.github/scripts/license_store.py'
-      - '.github/CODEOWNERS'
-      - '.github/workflows/protect-critical-files.yml'
-      - '.github/workflows/admin-history-cleanup.yml'
-      - '.github/workflows/license-cleanup.yml'
-      - '.github/workflows/member-joined.yml'
-      - '.github/workflows/release.yml'
-      - '.github/workflows/build.yml'
-      - 'PRICING.md'
-      - 'SUBSCRIBE.md'
 
 permissions:
   contents: read
@@ -25,9 +10,24 @@ jobs:
   block:
     runs-on: ubuntu-latest
     steps:
-      - name: Block critical file changes via PR
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Block critical file changes via PR (no-op pass otherwise)
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          echo "SECURITY: This PR modifies critical license/payment files."
+          # Runs on every PR so the required check "block" always reports.
+          # Keep this list in sync with the critical paths below.
+          CRITICAL='^(\.github/workflows/paypal-license\.yml|\.github/workflows/sponsor-license\.yml|\.github/scripts/paypal_license\.py|\.github/scripts/sponsor_license\.py|\.github/scripts/license_store\.py|\.github/CODEOWNERS|\.github/workflows/protect-critical-files\.yml|\.github/workflows/admin-history-cleanup\.yml|\.github/workflows/license-cleanup\.yml|\.github/workflows/member-joined\.yml|\.github/workflows/release\.yml|\.github/workflows/build\.yml|PRICING\.md|SUBSCRIBE\.md)$'
+          hits=$(git diff --name-only "$BASE_SHA"..."$HEAD_SHA" | grep -E "$CRITICAL" || true)
+          if [ -z "$hits" ]; then
+            echo "No critical files touched -- pass."
+            exit 0
+          fi
+          echo "SECURITY: This PR modifies critical license/payment files:"
+          echo "$hits"
           echo ""
           echo "These files cannot be merged via PR -- push directly to main as admin."
           exit 1
