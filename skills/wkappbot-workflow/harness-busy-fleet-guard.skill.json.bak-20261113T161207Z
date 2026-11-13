@@ -1,0 +1,44 @@
+{
+  "id": "harness-busy-fleet-guard",
+  "app": "wkappbot-workflow",
+  "title": "Busy-fleet guard: delegate or top up the fleet",
+  "title_ko": null,
+  "desc": "Blocks ROOT (any model, not just Opus) from running direct non-wk commands when no delegation was dispatched or completed in the last 3 minutes. Forces fleet usage -- ROOT conducts, agents execute. Dated incidents and design history: harness-busy-fleet-guard-ref.",
+  "steps": [
+    "SAFETY: fires when ROOT session (any model -- Haiku/Sonnet/Opus alike) runs a direct Bash/PowerShell/Edit/Write/Update/NotebookEdit/MultiEdit/Artifact/EnterWorktree/ExitWorktree command (non-wk-prefix, non-git, non-skill) and no delegation was dispatched or completed in the last 3 minutes. ROOT equals the main orchestrating session, regardless of which model is running it. Subagents are exempt (detected via session-file, e.g. a subagents/agent-*.jsonl transcript path, never an env flag). Agy sessions are exempt.@@SOLUTION: dispatch work to cheap agents -- Agent.cmd --model haiku task or wkcodex.sh task. This resets the fleet dispatch timestamp and allows subsequent direct commands. Kill switch: set WKHARNESS_BUSYFLEET=0 to disable for the session.@@PREVENTION: as ROOT, always delegate mechanical or execution work first. Run at least one Agent.cmd or wkcodex.sh dispatch before attempting direct file edits or shell commands. Orchestrate; do not grind.@@WINDOW equals 3 MINUTES (authoritative). The fleet must be fed (a delegation dispatched or completed) at least every 3 minutes or a direct-exec tool is hard-blocked. Kill switch WKHARNESS_BUSYFLEET=0 unchanged.@@CURRENT DESIGN (stateless, deployed): busy-fleet is ONE rule in wkharness-guards-infra.ps1 -- block ROOT direct-exec UNLESS this session had a delegation DISPATCH or COMPLETION within the last 3 min, derived from the session JSONL via Get-WkLastDelegationTs (no marker file, no mtime liveness). The window also opens on a delegation COMPLETION (a finishing agent grants ROOT 3 more minutes to review or merge). A long-running agent does NOT extend the window from its own activity -- only dispatch-start or completion time counts.@@TOOLNAME ALLOWLIST GOTCHA (2026-07-05): the direct-exec detection uses a hardcoded toolName list. Any Claude Code tool NOT in that list silently never triggers busy-fleet even if it does direct mutation -- this is a recurring maintenance trap whenever a new built-in tool ships. Current list: Bash, PowerShell, shell_command, Edit, Write, Update, NotebookEdit, MultiEdit, Artifact, EnterWorktree, ExitWorktree. When a new direct-mutation tool is added to Claude Code, add it here too, and check the parallel toolName list in wkharness-guards-write.ps1 (the pace-guard) for the same drift.@@ROOT scope is model-agnostic: every non-subagent ROOT family/tier is covered; only actual subagents and internal spawns are exempt.@@CLEAN-BASELINE is ALSO model-agnostic, not tier-based -- it requires a clean tree before ANY delegation (including Opus), uniformly with busy-fleet itself. Do not diagnose a tier-exemption bug here without first checking the SAME gate against a different model tier.@@CROSS-LINK: when this gate blocks a wkedit source edit, dispatch something small to open the 3-min window and RETRY wkedit -- never switch to the built-in Edit tool just to dodge the gate, since that defeats wkedit's backup/undo/encoding-safety net.@@NAVIGATION: dated incident history, the blind-spot idle bug, the two-gates discovery, the internal-spawn regression, and the graded delegation incentive design live in harness-busy-fleet-guard-ref.",
+    "SCOPE CLARIFICATION (user directive 2026-07-05): busy-fleet should ONLY catch tools that represent ROOT doing clear USER-REPO-WORK directly with unambiguous mutation intent -- Bash, PowerShell, shell_command, Edit, Write, Update, NotebookEdit, MultiEdit are the core set. Tools like DesignSync (writes to a claude.ai cloud design project, not the local repo), PushNotification (external side-effect, not repo state), CronCreate/CronDelete (schedules automation, not direct work), and similar system/plumbing-level tools are OUT OF SCOPE by design -- do not add them to the allowlist, and do not flag their absence as a gap in future audits. Artifact/EnterWorktree/ExitWorktree stay IN scope (they mutate local/repo-adjacent state as direct ROOT work). The dividing line: does this tool do the USER's actual work (repo edits, shell execution) that should have been delegated, or is it harness/system-adjacent plumbing? Only the former belongs in the busy-fleet allowlist.",
+    "GH-EXEMPTION GAP FIXED (2026-07-05): Test-WkGhCommand (wkharness-common-classify.ps1) already existed and treats gh (GitHub CLI) as co-equal to git for knowledge-ification purposes, but busy-fleet's direct-exec check only called Test-WkGitCommand, never Test-WkGhCommand -- so gh pr create / gh issue view etc were silently NOT exempt and would hard-block after 3 idle minutes, unlike git itself. FIX: added -not (Test-WkGhCommand  ) alongside the existing git check in wkharness-guards-infra.ps1's bfIsDirectExec condition. Confirmed matching parameter signature (ToolName, Command) before wiring. Same class of drift as the toolName-allowlist gap -- a helper function existing elsewhere does not mean every consumer actually calls it; audit call-sites, not just definitions."
+  ],
+  "requirements": [
+    {
+      "cmd": "wkappbot skill read harness-busy-fleet-guard",
+      "expect": "delegate or top up the fleet",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read harness-busy-fleet-guard",
+      "expect": "WINDOW equals 3 MINUTES",
+      "prompt": null
+    },
+    {
+      "cmd": "wkappbot skill read harness-busy-fleet-guard",
+      "expect": "TOOLNAME ALLOWLIST GOTCHA",
+      "prompt": null
+    }
+  ],
+  "primary_cmd": null,
+  "tags": [
+    "harness",
+    "guard",
+    "opus",
+    "delegation",
+    "fleet",
+    "cost"
+  ],
+  "source_refs": null,
+  "regression_script": null,
+  "author": "claude",
+  "created": "2026-06-11T08:10:01.2914414Z",
+  "updated": "2026-07-05T04:39:50.9982379Z",
+  "version": "1.33"
+}
