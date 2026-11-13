@@ -620,7 +620,17 @@ jobs:
           # Needs node, npm and python3 (aliased above). Drives the OpenCode plugin the way OpenCode does, plus the
           # installer, doctor, update and config parts with every network part mocked.
           set +e   # the runner's bash -e would exit on the failing $( ) before any FAIL line is printed
-          out=$(bash wkappbot-code/selftest.sh --synthetic-only 2>&1); rc=$?
+          # Diagnostic (branch only, 2026-11-13): run in the background into a file and print a heartbeat with the last
+          # lines every 30 s, so a hang shows where it stopped (a plain $( ) prints nothing until the command exits).
+          st="$RUNNER_TEMP/wkcode-selftest.log"
+          bash wkappbot-code/selftest.sh --synthetic-only > "$st" 2>&1 &
+          pid=$!
+          while kill -0 "$pid" 2>/dev/null; do
+            sleep 30
+            echo "[heartbeat] $(date -u +%H:%M:%S) lines=$(wc -l < "$st")"; tail -n 3 "$st" | cut -c1-300
+          done
+          wait "$pid"; rc=$?
+          out=$(cat "$st")
           # a FAIL detail can span lines: print each FAIL line plus its continuation up to the next PASS/FAIL/RESULT line
           printf '%s\n' "$out" | awk '/^(PASS|FAIL|RESULT)/{f=0} /^FAIL/{f=1} f||/^RESULT/' | cut -c1-600
           r=$(printf '%s\n' "$out" | grep '^RESULT' | tail -1); set -- $r
