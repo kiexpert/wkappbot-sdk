@@ -746,7 +746,7 @@ jobs:
             echo "== $sh ($($sh -c 'echo $BASH_VERSION')) rc=$rc"
             printf '%s\n' "$out" | grep -E '^(PASS|FAIL|SKIP|CASE|RESULT)' | head -80
             # The driver's install diagnostics (printed only when e2-install fails), already masked above.
-            printf '%s\n' "$out" | grep -E '^(INSTALL-LOG|INSTALL-PATH|INSTALL-PREREQ)' | head -80
+            printf '%s\n' "$out" | grep -E '^(INSTALL-LOG|INSTALL-PATH|INSTALL-PREREQ|INSTALL-TAIL|INSTALL-STEP)' | head -160
             set -- $r
             [ "$rc" = 0 ] && [ -n "$r" ] && [ "${2%%/*}" = "${2##*/}" ] || { fail=1; echo "-- last lines:"; printf '%s\n' "$out" | grep -v 'DROP ' | tail -20; }
             # Driver case blocks ("--- case <name>" + up to 8 lines: MOCK-DONE / guard refusal text) for diagnosis.
