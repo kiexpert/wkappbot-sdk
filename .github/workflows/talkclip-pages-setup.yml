@@ -1,0 +1,63 @@
+name: talkclip-pages-setup
+# One-shot owner-PAT job (owner 2026-11-15: control it with a workflow): turn on
+# GitHub Pages (GitHub Actions source) for kiexpert/wktalkclip, delete the stale
+# release build-1, then start its pages.yml. Cloud sessions cannot call these
+# repo-admin APIs (proxy 403), so the SDK runner does it with the shared PATs,
+# the same token-picking shape as prune-*-orphan-branches.yml.
+on:
+  push:
+    paths:
+      - .github/workflows/talkclip-pages-setup.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: talkclip-pages-setup
+  cancel-in-progress: false
+jobs:
+  setup:
+    if: github.repository == 'kiexpert/wkappbot-sdk' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      REPO: kiexpert/wktalkclip
+      TOKEN_A: ${{ secrets.WKAPPBOT_PAT }}
+      TOKEN_B: ${{ secrets.WKAPPBOT_CORE_PAT }}
+      TOKEN_C: ${{ secrets.GH_LICENSE_TOKEN }}
+    steps:
+      - name: Pick a token with admin on the target
+        run: |
+          for c in "$TOKEN_A" "$TOKEN_B" "$TOKEN_C"; do
+            [ -n "$c" ] || continue
+            echo "::add-mask::$c"
+            if GH_TOKEN="$c" gh api "repos/$REPO" --jq .permissions.admin 2>/dev/null | grep -q true; then
+              echo "GH_TOKEN=$c" >> "$GITHUB_ENV"
+              echo "token: admin token found"
+              exit 0
+            fi
+          done
+          echo "No token has admin on $REPO"
+          exit 1
+      - name: Enable Pages with the GitHub Actions source
+        run: |
+          if gh api "repos/$REPO/pages" >/dev/null 2>&1; then
+            gh api -X PUT "repos/$REPO/pages" -f build_type=workflow
+            echo "pages: switched to workflow source"
+          else
+            gh api -X POST "repos/$REPO/pages" -f build_type=workflow
+            echo "pages: enabled"
+          fi
+          gh api "repos/$REPO/pages" --jq '"pages url=\(.html_url) build_type=\(.build_type)"' | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Delete the stale release build-1
+        run: |
+          if gh release view build-1 --repo "$REPO" >/dev/null 2>&1; then
+            gh release delete build-1 --repo "$REPO" --cleanup-tag --yes
+            echo "build-1: deleted" | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            echo "build-1: already gone" | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Start the Pages deploy
+        run: |
+          gh workflow run pages.yml --repo "$REPO" --ref main
+          sleep 15
+          gh run list --repo "$REPO" --workflow pages.yml --limit 1 --json databaseId,status,url --jq '.[0] | "pages run \(.databaseId) \(.status) \(.url)"' | tee -a "$GITHUB_STEP_SUMMARY"
