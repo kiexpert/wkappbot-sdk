@@ -38,10 +38,12 @@ npm i -g "$SRC" > "$QA_OUT/m23-npm.log" 2>&1
 nrc=$?
 hg_res npm_global_rc "$nrc"
 hg_check npm_global_install "$nrc"
+[ "$nrc" = 0 ] || tail -n 15 "$QA_OUT/m23-npm.log" | sed 's/^/NPM| /'
 
 wkappbot-code install > "$QA_OUT/m23-install.log" 2>&1
 irc=$?
 hg_res install_rc "$irc"
+tail -n 25 "$QA_OUT/m23-install.log" | sed 's/^/INSTALL| /'
 
 if [ "$irc" = 0 ]; then
   hg_res outcome success
