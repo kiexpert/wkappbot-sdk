@@ -3,6 +3,7 @@
 # call creates a standard local user, copies this file and the tgz to a stage folder, and re-runs the body as that
 # user with -Inner. Otherwise the body runs as the runner and the result says admin=yes. Writes qa-result-m24-win.
 # Written ASCII-only (Korean is built from [char] codes) so PowerShell 5.1 reads it correctly with no BOM.
+# A leg that cannot create the user or start the inner run FAILS (exit 1): it never passes vacuously.
 param(
   [switch]$Inner,
   [string]$TgzDir = '',
@@ -30,14 +31,26 @@ function Test-Admin {
   $id = [Security.Principal.WindowsIdentity]::GetCurrent()
   return ([Security.Principal.WindowsPrincipal]$id).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 }
+function Stop-Red([string]$why) {
+  Res 'outer_error' $why
+  Res 'verdict' 'FAIL'
+  Write-Output ('HARSH-LEG ' + $HG_LEG + ' fails=1 (' + $why + ')')
+  exit 1
+}
 
 # ---- outer: when admin, run the body as a standard local user ----
 if ((-not $Inner) -and (Test-Admin)) {
   Res 'runner_admin' 'yes'
   $user = 'wkqa'
-  $pw = ([guid]::NewGuid().ToString('N')) + 'Aa1!x'
-  & net.exe user $user $pw /add > $null 2>&1
-  & net.exe user $user $pw > $null 2>&1
+  $pw = ([guid]::NewGuid().ToString('N')).Substring(0, 10) + 'Aa1!x'
+  $sec = ConvertTo-SecureString -String $pw -AsPlainText -Force
+  try {
+    New-LocalUser -Name $user -Password $sec -PasswordNeverExpires -ErrorAction Stop | Out-Null
+    Add-LocalGroupMember -Group 'Users' -Member $user -ErrorAction Stop
+    Res 'user_created' 'yes'
+  } catch {
+    Stop-Red ('could not create the local user: ' + $_.Exception.Message)
+  }
   $stage = Join-Path $env:PUBLIC ('wkqa-harsh-' + [guid]::NewGuid().ToString('N').Substring(0, 8))
   $stageTgz = Join-Path $stage 'tgz'
   New-Item -ItemType Directory -Force -Path $stageTgz | Out-Null
@@ -45,15 +58,24 @@ if ((-not $Inner) -and (Test-Admin)) {
   Copy-Item -Path (Join-Path $TgzDir '*') -Destination $stageTgz -ErrorAction SilentlyContinue
   & icacls.exe $stage /grant ($user + ':(OI)(CI)M') > $null
   & icacls.exe $Out /grant ($user + ':(OI)(CI)M') > $null
-  $sec = ConvertTo-SecureString -String $pw -AsPlainText -Force
   $cred = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $user, $sec
   $psExe = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
   $argList = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ('"' + (Join-Path $stage 'm24-win.ps1') + '"'),
     '-Inner', '-TgzDir', ('"' + $stageTgz + '"'), '-Version', ('"' + $Version + '"'), '-Out', ('"' + $Out + '"'))
-  $p = Start-Process -FilePath $psExe -ArgumentList $argList -Credential $cred -WorkingDirectory $stage `
-    -LoadUserProfile -Wait -PassThru -RedirectStandardOutput (Join-Path $Out 'm24-inner.out.log') `
-    -RedirectStandardError (Join-Path $Out 'm24-inner.err.log')
+  $p = $null
+  try {
+    $p = Start-Process -FilePath $psExe -ArgumentList $argList -Credential $cred -WorkingDirectory $stage `
+      -LoadUserProfile -Wait -PassThru -RedirectStandardOutput (Join-Path $Out 'm24-inner.out.log') `
+      -RedirectStandardError (Join-Path $Out 'm24-inner.err.log') -ErrorAction Stop
+  } catch {
+    Stop-Red ('could not start the inner run as the standard user: ' + $_.Exception.Message)
+  }
+  if (-not $p) { Stop-Red 'the inner run returned no process' }
   Res 'inner_exit' $p.ExitCode
+  foreach ($lf in @('m24-inner.out.log', 'm24-inner.err.log')) {
+    $lp = Join-Path $Out $lf
+    if (Test-Path -LiteralPath $lp) { Get-Content -LiteralPath $lp -Tail 60 | ForEach-Object { Write-Output ('INNER| ' + $_) } }
+  }
   exit $p.ExitCode
 }
 
@@ -104,6 +126,7 @@ $installRc = $LASTEXITCODE
 $installOut | Out-File -FilePath (Join-Path $Out 'm24-install.log') -Encoding UTF8
 Res 'install_rc' $installRc
 Check 'wkappbot_code_install' ($installRc -eq 0)
+@($installOut) | Select-Object -Last 25 | ForEach-Object { Write-Output ('INSTALL| ' + $_) }
 
 # seven symbols in the installed harness
 $harness = Join-Path $homeDir '.wk-harness'
