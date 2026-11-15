@@ -148,14 +148,25 @@ Res 'symbols_present' $present
 Res 'symbols_missing' $missTxt
 Check 'symbols_7' ($present -eq 7)
 
-# both --help exit 0
-& wkappbot.cmd --help > $null 2>&1
-$a = $LASTEXITCODE
-& wkhippo.cmd --help > $null 2>&1
-$b = $LASTEXITCODE
+# both --help exit 0: find the links the installer made under HOME, run them by FULL path, and report PATH separately
+$wkapp = @(Get-ChildItem -LiteralPath $homeDir -Recurse -File -Filter 'wkappbot.cmd' -ErrorAction SilentlyContinue | Select-Object -First 1)
+$wkhip = @(Get-ChildItem -LiteralPath $homeDir -Recurse -File -Filter 'wkhippo.cmd' -ErrorAction SilentlyContinue | Select-Object -First 1)
+Res 'link_wkappbot_cmd' $(if ($wkapp.Count) { $wkapp[0].FullName } else { 'missing' })
+Res 'link_wkhippo_cmd' $(if ($wkhip.Count) { $wkhip[0].FullName } else { 'missing' })
+$a = 127
+$b = 127
+if ($wkapp.Count) { & $wkapp[0].FullName --help > $null 2>&1; $a = $LASTEXITCODE }
+if ($wkhip.Count) { & $wkhip[0].FullName --help > $null 2>&1; $b = $LASTEXITCODE }
 Res 'help_wkappbot_rc' $a
 Res 'help_wkhippo_rc' $b
 Check 'help_both' (($a -eq 0) -and ($b -eq 0))
+$linkDirOnPath = 'no'
+if ($wkapp.Count) {
+  $ld = Split-Path -Parent $wkapp[0].FullName
+  if (($env:Path -split ';') -contains $ld) { $linkDirOnPath = 'yes' }
+}
+Res 'link_dir_on_path' $linkDirOnPath
+if (($installOut | Out-String) -match 'PATH:') { Res 'install_printed_path_advice' 'yes' } else { Res 'install_printed_path_advice' 'no' }
 
 # one Stop event through the Stop command settings.json names for the harness
 $settingsPath = Join-Path $homeDir '.claude\settings.json'
