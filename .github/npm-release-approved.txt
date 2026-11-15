@@ -42,3 +42,5 @@
 0.3.35
 # 0.3.39: kih main cb72257 (PRs 213-214: probe retry loop, shared resume lock, Windows .cmd shim version probe fix). npm-publish run 43694453144 green on all six legs (linux-x64, linux-x64-lite, osx-arm64, osx-x64, win-x64, win-x64-nopy), refused only on G1. Owner order 2026-11-08 (a green-gated npm release is pre-approved), relayed by the spokesman. 0.3.36-0.3.38 skipped (never published).
 0.3.39
+# 0.3.41: kih main b84a25b (PR 223: the harness manifest ships the seven hippo modules the 0.3.40 bake missed). npm-publish run 43713933282 (0.3.40 content) green on all six legs, refused only on G1; 0.3.40 skipped. The gate still publishes only when every leg passes. Owner order 2026-11-08 (a green-gated npm release is pre-approved), relayed by the spokesman.
+0.3.41
