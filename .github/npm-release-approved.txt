@@ -40,3 +40,5 @@
 0.3.33
 # 0.3.35: kih PR 192 (5c7d5b7): installed plugin ships every helper it imports (lib/plugin-files.js PLUGIN_LIBS, prepack refuses an unlisted import; 0.3.34 copied wk-hook.js without rmguard.js and every guard went dead), lock mds merged into ~/.claude/REFLEX.md, postinstall on the allow list, lock wait and retry, study lock honoured after an emergency grant. kih selftest.sh 222/222. SDK harness-qa run 43342764563 windows and macos opencode-e2e SUCCESS. 0.3.34 skipped (never green). Owner order 2026-11-12 15:17 (publish npm once every bug is caught).
 0.3.35
+# 0.3.39: kih main cb72257 (PRs 213-214: probe retry loop, shared resume lock, Windows .cmd shim version probe fix). npm-publish run 43694453144 green on all six legs (linux-x64, linux-x64-lite, osx-arm64, osx-x64, win-x64, win-x64-nopy), refused only on G1. Owner order 2026-11-08 (a green-gated npm release is pre-approved), relayed by the spokesman. 0.3.36-0.3.38 skipped (never published).
+0.3.39
