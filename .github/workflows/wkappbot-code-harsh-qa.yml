@@ -1,0 +1,95 @@
+# Harsh-environment release gates M22 (alpine, busybox sh, no python or pwsh), M23 (read-only /usr, 190 MB tmpfs),
+# M24 (Windows non-admin, HOME with a space and Korean, PowerShell 5.1). Owner 2026-11-15, 0.3.42.
+# Scripts: scripts/qa/harsh/ (common.sh, m22-alpine.sh, m23-readonly.sh, m24-win.ps1).
+name: wkappbot-code-harsh-qa
+on:
+  workflow_dispatch:
+    inputs:
+      tgz_artifact: { description: "packed wkappbot-code tgz artifact name (empty = registry)", type: string, default: '' }
+      tgz_run_id: { description: "run id that holds tgz_artifact (empty = this run)", type: string, default: '' }
+      version: { description: "wkappbot-code version for the registry road (empty = latest)", type: string, default: '' }
+      leg: { description: "m22-alpine, m23-readonly or m24-win (empty = all)", type: string, default: '' }
+  push:
+    branches: ['qa/harsh-*']
+    paths:
+      - '.github/workflows/wkappbot-code-harsh-qa.yml'
+      - 'scripts/qa/harsh/**'
+permissions:
+  contents: read
+concurrency:
+  group: wkappbot-code-harsh-qa-${{ (inputs.tgz_artifact != '' || inputs.leg != '' || github.ref_name != 'main') && github.run_id || 'registry' }}
+  cancel-in-progress: false
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.m.outputs.matrix }}
+    steps:
+      - id: m
+        env:
+          LEG: ${{ inputs.leg }}
+        run: |
+          set -eu
+          all='[{"os":"ubuntu-latest","leg":"m22-alpine"},{"os":"ubuntu-latest","leg":"m23-readonly"},{"os":"windows-latest","leg":"m24-win"}]'
+          m="$all"
+          if [ -n "$LEG" ]; then m="$(printf '%s' "$all" | jq -c --arg l "$LEG" '[.[] | select(.leg == $l)]')"; [ "$m" != "[]" ] || { echo "unknown leg: $LEG"; exit 1; }; fi
+          echo "matrix={\"include\":$m}" >> "$GITHUB_OUTPUT"
+  qa:
+    needs: plan
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            scripts/qa/harsh
+          sparse-checkout-cone-mode: false
+      - name: "Packed tgz (only when tgz_artifact is set; otherwise the registry road)"
+        if: inputs.tgz_artifact != ''
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4
+        with:
+          name: ${{ inputs.tgz_artifact }}
+          path: ${{ runner.temp }}/tgz
+          run-id: ${{ inputs.tgz_run_id || github.run_id }}
+          github-token: ${{ github.token }}
+      - name: "Run leg (Linux, docker: busybox alpine for M22, node:20-alpine read-only for M23)"
+        if: runner.os == 'Linux'
+        shell: bash
+        env:
+          LEG: ${{ matrix.leg }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -eu
+          OUT="$RUNNER_TEMP/qa-result"; TGZ="$RUNNER_TEMP/tgz"
+          mkdir -p "$OUT" "$TGZ"
+          case "$LEG" in
+            m22-alpine)   IMG=alpine:3.20;   SCRIPT=m22-alpine.sh; RO="" ;;
+            m23-readonly) IMG=node:20-alpine; SCRIPT=m23-readonly.sh; RO="--read-only --tmpfs /tmp:size=190m,exec" ;;
+            *) echo "no Linux leg named $LEG"; exit 1 ;;
+          esac
+          # RO is deliberately unquoted: it holds several docker flags
+          # shellcheck disable=SC2086
+          docker run --rm $RO \
+            -e HG_LEG="$LEG" -e VERSION="$VERSION" -e QA_OUT=/qa-result \
+            -v "$OUT:/qa-result" \
+            -v "$TGZ:/qa/tgz:ro" \
+            -v "$GITHUB_WORKSPACE/scripts/qa/harsh:/qa/harsh:ro" \
+            "$IMG" sh "/qa/harsh/$SCRIPT"
+      - name: "Run leg (Windows PowerShell 5.1, non-admin HOME with space and Korean)"
+        if: runner.os == 'Windows'
+        shell: powershell
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          & "$env:GITHUB_WORKSPACE\scripts\qa\harsh\m24-win.ps1" -TgzDir "$env:RUNNER_TEMP\tgz" -Version "$env:VERSION" -Out "$env:RUNNER_TEMP\qa-result"
+          exit $LASTEXITCODE
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7
+        if: always()
+        with:
+          name: qa-result-${{ matrix.leg }}
+          path: ${{ runner.temp }}/qa-result/
+          retention-days: 14
