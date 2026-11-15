@@ -35,6 +35,7 @@ wkappbot-code install > "$QA_OUT/m22-install.log" 2>&1
 irc=$?
 hg_res install_rc "$irc"
 hg_check wkappbot_code_install "$irc"
+tail -n 25 "$QA_OUT/m22-install.log" | sed 's/^/INSTALL| /'
 
 hg_tail_checks
 
