@@ -1,0 +1,65 @@
+# Retire the repository kiexpert/wkappbot-harness (owner order 2026-11-15: delete the confusing duplicate repo).
+# Manual only. Step 1 mirrors the repository into a 90-day artifact (the backup is mandatory and runs first).
+# Step 2 deletes it with a token that has the delete_repo scope. GITHUB_TOKEN cannot delete another repository.
+# Secret needed: WKAPPBOT_REPO_DELETE_TOKEN (a personal token of the repository owner with repo and delete_repo scopes).
+# This workflow touches ONLY kiexpert/wkappbot-harness; the target name is fixed in the file, never an input.
+name: retire-wkappbot-harness
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "type delete-wkappbot-harness to confirm (backup runs first either way)"
+        type: string
+        default: ''
+permissions:
+  contents: read
+env:
+  TARGET: kiexpert/wkappbot-harness
+jobs:
+  retire:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Token present?
+        env:
+          T: ${{ secrets.WKAPPBOT_REPO_DELETE_TOKEN }}
+        run: |
+          set -eu
+          if [ -z "$T" ]; then
+            echo "::error::secret WKAPPBOT_REPO_DELETE_TOKEN is not set (needs repo + delete_repo scope). Nothing was backed up or deleted."
+            exit 1
+          fi
+          echo "token present"
+      - name: Backup first - mirror clone
+        env:
+          T: ${{ secrets.WKAPPBOT_REPO_DELETE_TOKEN }}
+        run: |
+          set -eu
+          git clone --mirror "https://x-access-token:${T}@github.com/${TARGET}.git" "$RUNNER_TEMP/wkappbot-harness.git"
+          git -C "$RUNNER_TEMP/wkappbot-harness.git" count-objects -vH
+          git -C "$RUNNER_TEMP/wkappbot-harness.git" for-each-ref | head -20
+          tar -C "$RUNNER_TEMP" -czf "$RUNNER_TEMP/wkappbot-harness-mirror.tgz" wkappbot-harness.git
+          ls -l "$RUNNER_TEMP/wkappbot-harness-mirror.tgz"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7
+        with:
+          name: wkappbot-harness-mirror
+          path: ${{ runner.temp }}/wkappbot-harness-mirror.tgz
+          retention-days: 90
+      - name: Delete the repository (needs the confirm input)
+        env:
+          T: ${{ secrets.WKAPPBOT_REPO_DELETE_TOKEN }}
+          CONFIRM: ${{ inputs.confirm }}
+        run: |
+          set -eu
+          if [ "$CONFIRM" != "delete-wkappbot-harness" ]; then
+            echo "backup done; confirm input not given, nothing deleted"
+            exit 0
+          fi
+          code="$(curl -sS -o "$RUNNER_TEMP/del.json" -w '%{http_code}' -X DELETE \
+            -H "Authorization: Bearer ${T}" -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${TARGET}")"
+          echo "DELETE https://api.github.com/repos/${TARGET} -> HTTP ${code}"
+          cat "$RUNNER_TEMP/del.json" || true
+          if [ "$code" != 204 ]; then echo "::error::expected 204, got ${code}"; exit 1; fi
+          after="$(curl -sS -o /dev/null -w '%{http_code}' -H "Authorization: Bearer ${T}" "https://api.github.com/repos/${TARGET}")"
+          echo "after delete: GET repo -> HTTP ${after} (expect 404)"
