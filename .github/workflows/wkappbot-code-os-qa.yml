@@ -296,6 +296,14 @@ jobs:
           ein="$(node -e 'console.log(JSON.stringify({session_id:"door1",hook_event_name:"PreToolUse",tool_name:"Edit",tool_input:{file_path:process.argv[1],old_string:"a",new_string:"a"}}))' "$F")"
           eout="$(hook pre "$ein")"
           erc=$?
+          if printf '%s' "$eout" | grep -q 'study-locked'; then
+            for sid in $(printf '%s\n' "$eout" | grep -oE 'wkappbot skill read [A-Za-z0-9._-]+' | awk '{print $4}' | sort -u); do
+              rd="$(node -e 'console.log(JSON.stringify({session_id:"door1",hook_event_name:"PreToolUse",tool_name:"Bash",tool_input:{command:"wkappbot skill read "+process.argv[1]}}))' "$sid")"
+              hook pre "$rd" >/dev/null 2>&1
+              echo "DOOR   study read paid: $sid"
+            done
+            eout="$(hook pre "$ein")"; erc=$?
+          fi
           printf '%s\n' "$pout" "$eout" | tail -12 | sed 's/^/DOOR   /'
           res=FAIL; [ "$rc" = 2 ] && [ "$rg" = yes ] && [ "$gr" = yes ] && [ "$erc" = 0 ] && res=PASS
           echo "DOOR (1) user install ${{ matrix.leg }}: refusal rc=$rc risk-guard=$rg granted=$gr; prompt rc=$prc; edit $F rc=$erc -> $res"
