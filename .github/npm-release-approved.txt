@@ -48,3 +48,5 @@
 #   re-fired 2026-11-16 11:2xZ on Pages harness 4253118ba9a1b169 (built 11:12:37Z, carries tools/wkjs/stop-brief.js via kih 223abd1 and the 540 s warm-up via kih 2db42ef).
 0.3.43
 # door-check fix 2026-11-16: the QA step now pays the installed harness study lock; comment-only touch to re-fire npm-publish (spokesman 1116)
+# 0.3.44: kih main aceba70 (PR 260: finish-setup reruns per step and per version, every shipped tool finishes an owed setup first; carries PR 259 78331a6). kih selftest.sh 334/334 on the bumped package (one SKIP fu8, root ignores modes). Owner order 2026-11-16 (다 고쳤으면 엔피엠 배포하시오), relayed by spokesman 1116.
+0.3.44
