@@ -45,4 +45,5 @@
 # 0.3.41: kih main b84a25b (PR 223: the harness manifest ships the seven hippo modules the 0.3.40 bake missed). npm-publish run 43713933282 (0.3.40 content) green on all six legs, refused only on G1; 0.3.40 skipped. The gate still publishes only when every leg passes. Owner order 2026-11-08 (a green-gated npm release is pre-approved), relayed by the spokesman.
 0.3.41
 # 0.3.43: kih main 85c6a3e and after (PR 236 merged a67879e: finish-setup on the first call of any bin, Git Bash absolute fallback, install.cmd polyglot entry, npm 12 allow-scripts; selftest 334/334) with the harness fixes PR 249 63624f0, PR 250 652ea09 and PR 251 1856900. 0.3.42 skipped (verify FAIL 2/6 on every leg of run 43825227715). Owner order 2026-11-16 (release is auto-approved improvement work), relayed by spokesman 1116.
+#   re-fired 2026-11-16 11:2xZ on Pages harness 4253118ba9a1b169 (built 11:12:37Z, carries tools/wkjs/stop-brief.js via kih 223abd1 and the 540 s warm-up via kih 2db42ef).
 0.3.43
