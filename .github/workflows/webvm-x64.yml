@@ -155,6 +155,8 @@ jobs:
           ls -la harnessdist
 
       - name: Publish the harness tarball when its content changed
+        # A failure here (a gh-pages push race, a Pages hiccup) must never block the bake or the page-only publish after it.
+        continue-on-error: true
         run: |
           set -eu
           # Spokesman 1117: a seat install said "up to date" while the target repo had changed a tools file, because the
