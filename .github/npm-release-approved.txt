@@ -58,3 +58,5 @@
 0.3.47
 # 0.3.48: kih main d5481a68 (PR 270: the harness tarball manifest carries lib/python-pick.js, which hook-wire.js imports; case mf1 RED then GREEN; kih selftest 344/344). Owner standing order (green-gated npm releases pre-approved), relayed by spokesman 1117.
 0.3.48
+# 0.3.49: kih main 54aae698 (PR 272, F-4: a python-less install records ensurePython as fail, not ok; case st4 RED then GREEN; kih selftest 345/345). Owner standing order (green-gated npm releases pre-approved), relayed by spokesman 1117.
+0.3.49
