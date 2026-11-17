@@ -123,6 +123,19 @@ jobs:
           # files Write/Edit load, and a manifest-only hash would never have noticed a fix to them). ~30 s, deterministic.
           # Road A: the pruned harness copy; the script exits 1 unless the scrub gate prints hits=0.
           bash src/tools/wk-harness-min-copy.sh "$PWD/src" "$PWD/ctx/harness" src/tools/wk-harness-min-manifest.txt
+          # HARNESS STAMP (spokesman 1117): the published harness version is the CONTENT hash of the packed tree (every file the
+          # copier packed, tools/ included), not an image hash, so a changed tools file always changes it. The dist folder is
+          # built here, before the BAKE decision, so the next step can publish it without waiting for an image bake.
+          HARNESS_HASH=$( (cd ctx/harness && find . -type f -not -path './.git/*' | LC_ALL=C sort | xargs sha256sum) | sha256sum | cut -c1-16)
+          echo "HARNESS_HASH=$HARNESS_HASH" >> "$GITHUB_ENV"
+          mkdir -p harnessdist
+          tar --exclude=.git -czf harnessdist/wk-harness-min.tar.gz -C ctx/harness .
+          cp src/webvm/x64-build/harness-install.sh harnessdist/install.sh
+          for f in install.ps1 wk-harness-update.sh; do [ ! -f "src/webvm/x64-build/$f" ] || cp "src/webvm/x64-build/$f" "harnessdist/$f"; done
+          HSHA=$(sha256sum harnessdist/wk-harness-min.tar.gz | cut -d' ' -f1)
+          printf '%s  wk-harness-min.tar.gz\n' "$HSHA" > harnessdist/wk-harness-min.tar.gz.sha256
+          printf '{"version":"%s","sha256":"%s","built":"%s","files":%s}\n' "$HARNESS_HASH" "$HSHA" "$(date -u +%FT%TZ)" "$(tar -tzf harnessdist/wk-harness-min.tar.gz | grep -vc '/$')" > harnessdist/version.json
+          (cd harnessdist && sha256sum -c wk-harness-min.tar.gz.sha256 && cat version.json)
           IMG_HASH=$( { sha256sum "$GITHUB_WORKSPACE/wf/.github/workflows/webvm-x64.yml" | cut -c1-64; echo "$C2W_ASSETS_REV";
             (cd src && find webvm/x64-build -type f | LC_ALL=C sort | xargs sha256sum);
             (cd ctx/harness && find . -type f -not -path './.git/*' | LC_ALL=C sort | xargs sha256sum); } | sha256sum | cut -c1-16)
@@ -137,8 +150,32 @@ jobs:
           git -C c2w-assets diff --stat
           du -sh ctx/harness
           cp src/webvm/x64-build/wk-ai.sh ctx/wk-ai
-          # Harness web install (owner 2026-11-04): the same scrubbed minimal harness as a tarball for the page.
-          mkdir -p harnesspkg && tar --exclude=.git -czf harnesspkg/wk-harness-min.tar.gz -C ctx/harness . && ls -la harnesspkg
+          # Harness web install (owner 2026-11-04): the same scrubbed minimal harness as a tarball for the page; it is
+          # built above as harnessdist/ (HARNESS STAMP) and published by its own step before the bake.
+          ls -la harnessdist
+
+      - name: Publish the harness tarball when its content changed
+        run: |
+          set -eu
+          # Spokesman 1117: a seat install said "up to date" while the target repo had changed a tools file, because the
+          # published stamp only moved with a full image bake (and a bake that fails never moves it). The stamp is now the
+          # content hash of the packed tree and this step publishes the tarball on every run (schedule: every 10 minutes),
+          # before and independent of the bake. RED: an unchanged stamp with a changed tools file. GREEN: the stamp moves.
+          PUBV=$(curl -fsSL "https://${REPO%%/*}.github.io/${REPO#*/}/webvm/x64/harness/version.json?t=$(date +%s)" 2>/dev/null | python3 -c 'import json,sys; print(json.load(sys.stdin).get("version",""))' 2>/dev/null || true)
+          echo "harness stamp $HARNESS_HASH, published ${PUBV:-none}"
+          if [ "$HARNESS_HASH" = "$PUBV" ]; then echo "harness unchanged"; exit 0; fi
+          git clone -q --depth 1 --branch gh-pages "https://x-access-token:${TOK}@github.com/${REPO}.git" hpages
+          rm -rf hpages/webvm/x64/harness
+          mkdir -p hpages/webvm/x64
+          cp -r harnessdist hpages/webvm/x64/harness
+          cd hpages
+          git config user.name "pages-relay"
+          git config user.email "pages-relay@users.noreply.github.com"
+          git add -A webvm/x64/harness
+          git commit -q -m "webvm x64 harness $HARNESS_HASH" || { echo "harness tree unchanged"; exit 0; }
+          for i in 1 2 3; do git push -q "https://x-access-token:${TOK}@github.com/${REPO}.git" gh-pages && break; [ "$i" = 3 ] && exit 1; sleep 20; done
+          echo "harness published, stamp $HARNESS_HASH"
+          echo "PUSHED=1" >> "$GITHUB_ENV"
 
       - name: Build the x86_64 image and convert it to a browser bundle
         if: env.BAKE == '1'
@@ -195,13 +232,10 @@ jobs:
         run: |
           set -eu
           cp src/webvm/x64/index.html out/index.html
-          mkdir -p out/harness && cp harnesspkg/wk-harness-min.tar.gz out/harness/ && cp src/webvm/x64-build/harness-install.sh out/harness/install.sh
           # Harness dist v2: sha256 + version.json beside the tarball (install.sh refuses a mismatch), the Windows
-          # install.ps1 and the daily wk-harness-update.sh. version = the image hash, so it changes only with the harness.
-          SHA=$(sha256sum out/harness/wk-harness-min.tar.gz | cut -d' ' -f1)
-          printf '%s  wk-harness-min.tar.gz\n' "$SHA" > out/harness/wk-harness-min.tar.gz.sha256
-          printf '{"version":"%s","sha256":"%s","built":"%s","files":%s}\n' "$IMG_HASH" "$SHA" "$(date -u +%FT%TZ)" "$(tar -tzf out/harness/wk-harness-min.tar.gz | grep -vc '/$')" > out/harness/version.json
-          for f in install.ps1 wk-harness-update.sh; do [ ! -f "src/webvm/x64-build/$f" ] || cp "src/webvm/x64-build/$f" "out/harness/$f"; done
+          # install.ps1 and the daily wk-harness-update.sh. Built once per run as harnessdist/ (version = HARNESS_HASH, the
+          # content hash of the packed tree); the same folder was already published by the harness step.
+          cp -r harnessdist out/harness
           (cd out/harness && sha256sum -c wk-harness-min.tar.gz.sha256 && cat version.json)
           cp cli-versions.json out/cli-versions.json
           npm pack -s coi-serviceworker@0.1.7 >/dev/null
