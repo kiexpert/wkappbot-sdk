@@ -54,3 +54,5 @@
 0.3.45
 # 0.3.46: kih main adf1739a (PR 265: first-run text fix; kih selftest 340/340). Owner order (green-gated npm releases pre-approved, 2026-11-08), relayed by spokesman 1117.
 0.3.46
+# 0.3.47: kih main 280e9828 (PR 268: H6 read-only stamp dir falls back to tmp, F-3 no setup banner on --help; npm ROOT selftest 343/343). Owner standing order (green-gated npm releases pre-approved), relayed by spokesman 1117.
+0.3.47
