@@ -56,3 +56,5 @@
 0.3.46
 # 0.3.47: kih main 280e9828 (PR 268: H6 read-only stamp dir falls back to tmp, F-3 no setup banner on --help; npm ROOT selftest 343/343). Owner standing order (green-gated npm releases pre-approved), relayed by spokesman 1117.
 0.3.47
+# 0.3.48: kih main d5481a68 (PR 270: the harness tarball manifest carries lib/python-pick.js, which hook-wire.js imports; case mf1 RED then GREEN; kih selftest 344/344). Owner standing order (green-gated npm releases pre-approved), relayed by spokesman 1117.
+0.3.48
