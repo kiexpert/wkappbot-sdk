@@ -50,3 +50,5 @@
 # door-check fix 2026-11-16: the QA step now pays the installed harness study lock; comment-only touch to re-fire npm-publish (spokesman 1116)
 # 0.3.44: kih main aceba70 (PR 260: finish-setup reruns per step and per version, every shipped tool finishes an owed setup first; carries PR 259 78331a6). kih selftest.sh 334/334 on the bumped package (one SKIP fu8, root ignores modes). Owner order 2026-11-16 (다 고쳤으면 엔피엠 배포하시오), relayed by spokesman 1116.
 0.3.44
+# 0.3.45: kih main 9c020d7f (PR 262: package.json scripts = prepack only, no install lifecycle script; kih selftest 339/339, selftest-noscript ns1-ns6+ns3b 7/7 on npm 10.9.9, 11.20.0, 12.2.2). Owner order 2026-11-08 (green-gated npm releases pre-approved), relayed by spokesman 1117.
+0.3.45
