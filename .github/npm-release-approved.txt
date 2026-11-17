@@ -52,3 +52,5 @@
 0.3.44
 # 0.3.45: kih main 9c020d7f (PR 262: package.json scripts = prepack only, no install lifecycle script; kih selftest 339/339, selftest-noscript ns1-ns6+ns3b 7/7 on npm 10.9.9, 11.20.0, 12.2.2). Owner order 2026-11-08 (green-gated npm releases pre-approved), relayed by spokesman 1117.
 0.3.45
+# 0.3.46: kih main adf1739a (PR 265: first-run text fix; kih selftest 340/340). Owner order (green-gated npm releases pre-approved, 2026-11-08), relayed by spokesman 1117.
+0.3.46
