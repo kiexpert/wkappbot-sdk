@@ -60,3 +60,5 @@
 0.3.48
 # 0.3.49: kih main 54aae698 (PR 272, F-4: a python-less install records ensurePython as fail, not ok; case st4 RED then GREEN; kih selftest 345/345). Owner standing order (green-gated npm releases pre-approved), relayed by spokesman 1117.
 0.3.49
+# 0.3.50: kih main 6e1925d82e6290973e4cda9a0286210f12822fec, approval line from the kih ROOT, pre-approved by spokesman 1117 (owner order 2026-11-17: ship npm at minimum tokens). The pack job and the gate check the version against the packed package.
+0.3.50
