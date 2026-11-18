@@ -583,6 +583,14 @@ jobs:
           Write-Host ("CASE pwsh-install-cmd {0} (rc=$rc)" -f $(if ($ok) { 'PASS' } else { 'FAIL' }))
           if (-not $ok) { exit 1 }
 
+      - name: 6a. wkappbot.cmd shim selftest (ask, agent, chat refused with exit 3; read budget 7777)
+        if: env.LEG_OFF != '1'
+        shell: bash
+        working-directory: kih
+        run: |
+          # Runs before step 6 so the shim cases are judged even while step 6 is red. The Windows leg runs the shim under cmd.exe (ws4a-ws4c).
+          node --input-type=module -e 'import { pathToFileURL } from "node:url"; let p=0,t=0; const ok=(n,c,d)=>{t++; if(c){p++;console.log("PASS "+n)}else console.log("FAIL "+n+" -- "+String(d).slice(0,200))}; await (await import(pathToFileURL(process.cwd()+"/wkappbot-code/selftest-winshim.mjs").href)).default({ok,kih:process.cwd()}); console.log("RESULT "+p+"/"+t); process.exit(p===t?0:1)'
+
       - name: 6. Bash self-tests
         if: env.LEG_OFF != '1'
         shell: bash
