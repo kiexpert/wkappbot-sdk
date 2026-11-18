@@ -62,3 +62,5 @@
 0.3.49
 # 0.3.50: kih main 6e1925d82e6290973e4cda9a0286210f12822fec, approval line from the kih ROOT, pre-approved by spokesman 1117 (owner order 2026-11-17: ship npm at minimum tokens). The pack job and the gate check the version against the packed package.
 0.3.50
+# 0.3.51: kih main f1e38bb2b9208fbdddd5cd7bf13213b4227f3b68 (PR 277: installed stop requires the Reflex-reinforce paragraph, Windows wkappbot.cmd refuses ask/agent/chat and defaults the read budget to 7777, send_message reports to the parent are linted). Owner order 2026-11-18 relayed by spokesman 1118 (publish npm once every bug is caught; green-gated releases pre-approved).
+0.3.51
