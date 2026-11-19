@@ -1,6 +1,6 @@
 name: Harness QA (Windows + macOS)
 
-# QA trigger for kih PR 279 b5c213cf6.Runs the harness repo's own self-tests on Windows and macOS runners, so a harness change made on a
+# QA trigger for kih PR 279 441540785.Runs the harness repo's own self-tests on Windows and macOS runners, so a harness change made on a
 # Linux cloud VM is proven on the owner's two desktop platforms too. On macOS the Bash self-tests run a
 # second time under /bin/bash 3.2, the shell a stock Mac starts hooks with.
 # Only RESULT and CASE lines are printed; nothing from the harness repo is published.
@@ -620,7 +620,7 @@ jobs:
           # Needs node, npm and python3 (aliased above). Drives the OpenCode plugin the way OpenCode does, plus the
           # installer, doctor, update and config parts with every network part mocked.
           set +e   # the runner's bash -e would exit on the failing $( ) before any FAIL line is printed
-          out=$(bash wkappbot-code/selftest.sh --synthetic-only 2>&1); rc=$?
+          out=$(set -o pipefail; bash wkappbot-code/selftest.sh --synthetic-only 2>&1 | awk '{ print; print > "/dev/stderr"; fflush() }'); rc=$?
           # a FAIL detail can span lines: print each FAIL line plus its continuation up to the next PASS/FAIL/RESULT line
           printf '%s\n' "$out" | awk '/^(PASS|FAIL|RESULT)/{f=0} /^FAIL/{f=1} f||/^RESULT/' | cut -c1-600
           r=$(printf '%s\n' "$out" | grep '^RESULT' | tail -1); set -- $r
