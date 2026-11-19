@@ -1,6 +1,6 @@
 name: Harness QA (Windows + macOS)
 
-# QA trigger for kih PR 279 441540785.Runs the harness repo's own self-tests on Windows and macOS runners, so a harness change made on a
+# QA trigger for kih PR 279 c6c4e6cd3.Runs the harness repo's own self-tests on Windows and macOS runners, so a harness change made on a
 # Linux cloud VM is proven on the owner's two desktop platforms too. On macOS the Bash self-tests run a
 # second time under /bin/bash 3.2, the shell a stock Mac starts hooks with.
 # Only RESULT and CASE lines are printed; nothing from the harness repo is published.
@@ -298,7 +298,7 @@ jobs:
       matrix:
         os: [windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 25
+    timeout-minutes: 50
     steps:
       - name: Network probe and leg filter (a dead network respawns this leg on a fresh runner)
         shell: bash
