@@ -67,3 +67,4 @@
 # 0.3.52: kih PR 279 (npm short name wkcode is the official package name, wkappbot-code stays an alias bin; intent-lock read arm top 7, ENGLISH-KEYWORD-CHAIN shape, token-waste post guard, wk-stop-lint nudge rows, archive branch guard, selftest fixes). Owner order 2026-11-19 (wkcode as the official name; take over PR 279, finish it, publish npm), relayed by spokesman 1120. The gate still publishes only when every packed-tgz OS leg passes.
 0.3.52
 # refire 2026-11-20 00:3xZ after QA snapshot filter fix (PR 583); comment-only touch (spokesman 1120)
+# refire 2026-11-20 after the package name returned to wkappbot-code (kih PR 280, spokesman 1120 option A); comment-only touch
