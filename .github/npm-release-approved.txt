@@ -68,3 +68,5 @@
 0.3.52
 # refire 2026-11-20 00:3xZ after QA snapshot filter fix (PR 583); comment-only touch (spokesman 1120)
 # refire 2026-11-20 after the package name returned to wkappbot-code (kih PR 280, spokesman 1120 option A); comment-only touch
+# 0.3.53: kih main after 0.3.52 (PR 281 like-trace eviction fix, PRs 283/286 wkcmd launcher variable expansion and Linux SystemRoot fallback, 5178ca44 studylock stamp refresh, PR 288 intent-lock one-search-per-sentence four-slot wording). Owner order 2026-11-20 (엔피엠 배포하삼), relayed by spokesman 1120. The gate still publishes only when every packed-tgz OS leg passes.
+0.3.53
