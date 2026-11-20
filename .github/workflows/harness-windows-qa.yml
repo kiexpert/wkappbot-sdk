@@ -1209,6 +1209,21 @@ jobs:
           [ "$new" = 0 ]; chk $? ".tmp-free (new .tmp files: $new)"
           echo "RESULT $ok/$n"
           [ "$ok" = "$n" ]
+      - name: wkcmd launcher selftest (shared .cmd runner; macOS under the stock /bin/bash 3.2)
+        if: env.LEG_OFF != '1'
+        working-directory: kih
+        run: |
+          set +e
+          [ -f tools/wkcmd-selftest.sh ] || { echo "FAIL tools/wkcmd-selftest.sh is not in this kih ref"; echo "RESULT 0/1 (wkcmd)"; exit 1; }
+          if [ "$RUNNER_OS" = macOS ]; then
+            mkdir -p "$RUNNER_TEMP/stockbash"; ln -sf /bin/bash "$RUNNER_TEMP/stockbash/bash"
+            /bin/bash --version | head -1
+            out=$(PATH="$RUNNER_TEMP/stockbash:$PATH" /bin/bash tools/wkcmd-selftest.sh 2>&1); rc=$?
+          else
+            out=$(bash tools/wkcmd-selftest.sh 2>&1); rc=$?
+          fi
+          printf '%s\n' "$out"
+          [ "$rc" = 0 ] && printf '%s\n' "$out" | grep -qE '^RESULT wkcmd [0-9]+/[0-9]+$'
 
       - name: Respawn this leg on a fresh runner (network down; capped at 2 respawns, the third is a real red)
         if: always() && env.NET_DOWN == '1'
