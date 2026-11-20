@@ -269,7 +269,8 @@ jobs:
         run: |
           set -eu
           # Only the unified name goes to the registry: the old wk-appbot-code package is Pages-only.
-          if [ "$PKG" != "wkappbot-code" ]; then echo "package is still named $PKG (target not renamed yet) -- registry publish skipped (Pages still published)"; exit 0; fi
+          # wkcode is the official short name since 0.3.52; wkappbot-code stays an alias bin.
+          if [ "$PKG" != "wkappbot-code" ] && [ "$PKG" != "wkcode" ]; then echo "package is still named $PKG (target not renamed yet) -- registry publish skipped (Pages still published)"; exit 0; fi
           if npm view "$PKG@$VER" version >/dev/null 2>&1; then echo "$PKG@$VER already on the registry -- registry publish skipped (Pages still published)"; exit 0; fi
           if [ -z "$NODE_AUTH_TOKEN" ]; then echo "NPM_TOKEN not set -- registry publish skipped (Pages still published)"; exit 0; fi
           npm publish "$TGZ" --access public --provenance
