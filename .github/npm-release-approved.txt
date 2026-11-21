@@ -70,3 +70,5 @@
 # refire 2026-11-20 after the package name returned to wkappbot-code (kih PR 280, spokesman 1120 option A); comment-only touch
 # 0.3.53: kih main after 0.3.52 (PR 281 like-trace eviction fix, PRs 283/286 wkcmd launcher variable expansion and Linux SystemRoot fallback, 5178ca44 studylock stamp refresh, PR 288 intent-lock one-search-per-sentence four-slot wording). Owner order 2026-11-20 (엔피엠 배포하삼), relayed by spokesman 1120. The gate still publishes only when every packed-tgz OS leg passes.
 0.3.53
+# 0.3.54: kih main f339180b2d97213827e636387d4a6c87f78e9315 (PR 302 bump on top of PR 300 selftest fixture and doctor-path runner fixes and PR 301 installer AI CLIs; kih selftest.sh --synthetic-only 356/356 on a clean main checkout). Owner order 2026-11-21 (하네스 버그 다 잡혔으면 엔피엠 배포해주고), relayed by spokesman 1121. The gate still publishes only when every packed-tgz OS leg passes.
+0.3.54
