@@ -1,7 +1,6 @@
 # The Reflex Constitution
 
-### AppBot and the Hongik Knowledge-Intelligence Reflex Harness
-#### — the Wisdom Kernel (= Reflex Driver), the knowledge-intelligence (KI) harness
+### AppBot and the Wisdom Kernel (= Wisdom Reflex Driver)
 
 > **We build an intelligence that grows *alongside* the ecosystem people already live in, and we
 > write the way it does so into the harness as norms that execute — in real time.**
