@@ -566,3 +566,4 @@ Repository text assets should be treated as UTF-8 by default.
 - Use file-editing tools that preserve encoding correctly. If a tool may re-encode content incorrectly, prefer `wkedit` or another UTF-8-safe path.
 - Binary files such as `.pdf`, `.mp4`, images, and archives should be preserved as-is and not text-converted.
 - Multibyte filenames are allowed, but repository writes should still use UTF-8 so downstream tools and web viewers can read them reliably.
+
