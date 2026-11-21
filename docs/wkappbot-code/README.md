@@ -1,6 +1,6 @@
 # Wisdom Kernel AppBot Code (`wkappbot-code`)
 
-> **An AI coding agent with a wisdom reflex body, wired to an a11y-linked harness and A11Y QA.**
+> **An AI coding agent built on the Wisdom Kernel (= Reflex Driver), wired to an a11y-linked harness and A11Y QA.**
 >
 > Skills are its memory. Reflex guards refuse a bad tool call *before* it runs, and every refusal names the skill that fixes it.
 > The lesson from each refusal is written back into a skill, so the same mistake costs less the next time.
@@ -19,9 +19,9 @@ Published from this repository's [`npm-publish-wkappbot-code`](../../.github/wor
 
 ## 한국어 요약
 
-**Wisdom Kernel AppBot Code(`wkappbot-code`)는 AI 코딩 에이전트(OpenCode)에 "지혜 반사체"를 입힌 개발자용 배포판입니다.**
+**Wisdom Kernel AppBot Code(`wkappbot-code`)는 AI 코딩 에이전트(OpenCode)에 "위즈덤 커널(= 리플렉스 드라이버)"을 입힌 개발자용 배포판입니다.**
 
-- **지혜 반사체:** 스킬이 기억 역할을 합니다. 잘못된 도구 호출은 실행되기 *전에* 반사 가드가 거부하고, 거부할 때마다 해결 방법이 담긴 스킬 이름을 알려 줍니다. 거부에서 얻은 교훈은 다시 스킬에 새겨집니다.
+- **위즈덤 커널:** 스킬이 기억 역할을 합니다. 잘못된 도구 호출은 실행되기 *전에* 반사 가드가 거부하고, 거부할 때마다 해결 방법이 담긴 스킬 이름을 알려 줍니다. 거부에서 얻은 교훈은 다시 스킬에 새겨집니다.
 - **a11y 연동 하네스:** Windows UIA, Chrome CDP, macOS AX 같은 접근성 트리로 실제 데스크톱·웹 앱을 다룹니다. 컨트롤을 **이름으로** 찾고, 화면 좌표를 쓰지 않으며, 창이 화면 밖에 있어도 동작하고, 사용자의 창 크기를 바꾸지 않습니다.
 - **A11Y QA:** 사람이 하듯 실제 앱을 접근성 트리로 클릭하고 읽는 QA입니다. 그래서 테스트 통과가 곧 실제 화면이 동작한다는 뜻입니다.
 - **설치:** `npm i -g wkappbot-code` 한 줄이면 끝입니다. 설정, 상태 점검, 셀프테스트가 설치 뒤에 자동으로 돌고, 처음 `wkappbot-code`를 실행하면 결과가 한 줄로 나옵니다.
@@ -41,7 +41,7 @@ So the guards here gate on the **falsifier**, not on the claim:
 
 A refusal is not a dead end. It names the skill that holds the fix, so the agent reads it and continues.
 
-## (b) The wisdom reflex body
+## (b) The Wisdom Kernel (= Reflex Driver)
 
 ```
             ┌──────────────────────── lesson engraved back (like / heal) ─────────────────────┐

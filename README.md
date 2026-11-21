@@ -18,7 +18,7 @@
 Focusless. Self-healing. AI-native. The open-source bridge between LLMs and the apps humans already use.
 
 > 🧠 **NEW — [Wisdom Kernel AppBot Code (`wkappbot-code`) →](docs/wkappbot-code/README.md)**
-> **An AI coding agent with a wisdom reflex body, wired to an a11y-linked harness and A11Y QA.**
+> **An AI coding agent built on the Wisdom Kernel (= Reflex Driver), wired to an a11y-linked harness and A11Y QA.**
 > Reflex guards refuse a bad tool call before it runs, and every refusal names the skill that fixes it. A11Y QA clicks and reads the real app through its accessibility tree, so a passing test means the screen works.
 >
 > ```sh
@@ -26,7 +26,7 @@ Focusless. Self-healing. AI-native. The open-source bridge between LLMs and the 
 > ```
 >
 > Setup, the health check and the selftest run by themselves after the install; the first `wkappbot-code` run prints the result. Then set a model with `wkappbot-code config`. On Windows the wkappbot core binary comes from the [SDK installer](docs/INSTALL.md), not from npm.
-> *개발자용 지혜 반사체 AI 코딩 에이전트 + a11y 연동 하네스 + A11Y QA — [소개와 설치 안내](docs/wkappbot-code/README.md#한국어-요약)*
+> *개발자용 위즈덤 커널(= 리플렉스 드라이버) AI 코딩 에이전트 + a11y 연동 하네스 + A11Y QA — [소개와 설치 안내](docs/wkappbot-code/README.md#한국어-요약)*
 
 > ⚖️ **[The Reflex Constitution →](./REFLEX-CONSTITUTION.md)** · *[read as a page](https://kiexpert.github.io/wkappbot-sdk/reflex-constitution.html)*
 > How this project governs the speed of its own AI: norms that **execute** rather than a document that is filed.
@@ -109,7 +109,7 @@ The Moat: Intelligence converges across vendors. Your skill tree diverges and ca
 
 The harness is the piece that decides how fast an AI is allowed to act, not just what it is told to do:
 
-- **Real-time mechanical enforcement.** A knowledge-intelligence (KI) harness evaluates every AI tool call against an accumulated rule set before it runs, and blocks the calls that repeat a known mistake. The AI reads and maintains this policy itself: when a guard misfires or falls out of date, the same session that hit it corrects the rule and records why, so the fix becomes a check the next session cannot skip -- not a note the next session might not read.
+- **Real-time mechanical enforcement.** The Wisdom Kernel (= Reflex Driver), the knowledge-intelligence (KI) harness, evaluates every AI tool call against an accumulated rule set before it runs, and blocks the calls that repeat a known mistake. The AI reads and maintains this policy itself: when a guard misfires or falls out of date, the same session that hit it corrects the rule and records why, so the fix becomes a check the next session cannot skip -- not a note the next session might not read.
 - **Cross-family collaboration.** Claude, Codex/GPT, and Gemini can operate against the same skill and guard set for a given repository, so a task moves between model families without losing the accumulated operating rules for that codebase.
 - **a11y-first control of legacy apps.** Automation is built on the accessibility tree first -- the same information a screen reader exposes -- and only falls back to CDP or a purpose-built module when accessibility data is insufficient. The state a human (or assistive technology) can observe is treated as the app's real, official state.
 - **Living with legacy.** No repository's accumulated knowledge is discarded to make room for a new AI session: skills, guards, and prior sessions' notes stay local to the repository, and a new session is expected to read and obey that knowledge before acting -- the same way it reads a legacy app's UI instead of demanding an API. The aim is intelligence, humans, and legacy systems working together, not one replacing the others.
