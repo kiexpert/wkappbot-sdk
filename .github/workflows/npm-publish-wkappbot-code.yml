@@ -277,7 +277,14 @@ jobs:
           # The registry can take minutes to serve a fresh version (run 42584249295: still E404 after 2 min), so wait
           # up to 10 min for it to appear, then verify the install exactly as before (a real failure still fails here).
           for i in $(seq 1 30); do npm view "$PKG@$VER" version --prefer-online && break; sleep 20; done
-          mkdir -p "$RUNNER_TEMP/iso-reg"; HOME="$RUNNER_TEMP/iso-reg" USERPROFILE="$RUNNER_TEMP/iso-reg" XDG_CONFIG_HOME="$RUNNER_TEMP/iso-reg/.config" npm install -g --prefer-online --prefix "$RUNNER_TEMP/reg" "$PKG@$VER"
+          mkdir -p "$RUNNER_TEMP/iso-reg"
+          # The packument is served before the tarball path (run 44929902267: npm view ok at 17:36:01, tarball GET 404 one second later), so retry the install itself.
+          ok=0
+          for i in $(seq 1 30); do
+            if HOME="$RUNNER_TEMP/iso-reg" USERPROFILE="$RUNNER_TEMP/iso-reg" XDG_CONFIG_HOME="$RUNNER_TEMP/iso-reg/.config" npm install -g --prefer-online --prefix "$RUNNER_TEMP/reg" "$PKG@$VER"; then ok=1; break; fi
+            sleep 20
+          done
+          [ "$ok" = 1 ]
           HOME="$RUNNER_TEMP/iso-reg" USERPROFILE="$RUNNER_TEMP/iso-reg" XDG_CONFIG_HOME="$RUNNER_TEMP/iso-reg/.config" "$RUNNER_TEMP/reg/bin/$CLI" --help
 
   # 5. pages: the web copy, started IN PARALLEL with the registry publish as soon as the gate passes (owner
