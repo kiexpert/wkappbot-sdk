@@ -1,4 +1,4 @@
-name: Hongik Knowledge-Intelligence QA
+name: Wisdom Kernel QA
 
 on:
   schedule:
@@ -19,7 +19,7 @@ jobs:
   hongik-qa:
     runs-on: windows-latest
     timeout-minutes: 20
-    name: Hongik Reflex QA
+    name: Wisdom Kernel QA
 
     steps:
       - uses: actions/checkout@v4
@@ -227,7 +227,7 @@ jobs:
             }
           }
 
-          Write-Host "## Hongik QA Results" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8
+          Write-Host "## Wisdom Kernel QA Results" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8
           Write-Host "" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append
           Write-Host "| Check | Status |" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append
           Write-Host "|-------|--------|" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append
