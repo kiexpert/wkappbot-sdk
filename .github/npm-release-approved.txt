@@ -72,3 +72,5 @@
 0.3.53
 # 0.3.54: kih main f339180b2d97213827e636387d4a6c87f78e9315 (PR 302 bump on top of PR 300 selftest fixture and doctor-path runner fixes and PR 301 installer AI CLIs; kih selftest.sh --synthetic-only 356/356 on a clean main checkout). Owner order 2026-11-21 (하네스 버그 다 잡혔으면 엔피엠 배포해주고), relayed by spokesman 1121. The gate still publishes only when every packed-tgz OS leg passes.
 0.3.54
+# 0.3.55: kih main 750035076623008ca342e96bdcd3efc36b43a38b (PR 312 bump on top of PRs 309-311: Windows installer selftest fixes e913a9f; SDK Harness QA run 44924443116 on 6ecb07c read harness-qa windows-latest and macos-latest success, remaining reds are the known pre-existing ones). Owner order 2026-11-21 relayed by spokesman 1121 (green-gated npm releases pre-approved). The gate still publishes only when every packed-tgz OS leg passes.
+0.3.55
