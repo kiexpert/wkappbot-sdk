@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // wkappbot-code end-to-end QA: drives REAL OpenCode with the installed wkappbot-code plugin against a scripted mock
-// model, so the reflex body is judged by what it REFUSES, what it lets change on disk, and what every model request
+// model, so the Wisdom Kernel (= Reflex Driver) is judged by what it REFUSES, what it lets change on disk, and what every model request
 // carries. Cases mirror the kih driver wkappbot-code/selftest-opencode-e2e.sh (owner order 2026-11-06).
 //
 // Usage (after `npm i -g wkappbot-code && wkappbot-code install` in a fresh HOME):
