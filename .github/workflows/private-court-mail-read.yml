@@ -140,5 +140,10 @@ jobs:
           git add -A resume/applications/20260824_2026ah12916_court_costs/court_mail
           if git diff --cached --quiet; then echo "no change"; exit 0; fi
           git commit -q -m "court notices from inbox $(date -u +%F)"
-          git push -q origin HEAD:main
+          # Another writer may land on main while this runs: rebase onto it and retry.
+          for i in 1 2 3; do
+            if git push -q origin HEAD:main; then break; fi
+            git pull -q --rebase origin main
+            [ "$i" = 3 ] && { echo "push failed after retries"; exit 1; }
+          done
           echo "notices committed"
