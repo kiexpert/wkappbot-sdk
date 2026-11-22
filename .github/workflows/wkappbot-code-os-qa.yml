@@ -249,6 +249,17 @@ jobs:
           wkappbot-code doctor 2>&1 | tee "$RUNNER_TEMP/doctor.log"; rc=${PIPESTATUS[0]}
           echo "doctor rc=$rc"; exit $rc
 
+      - name: agy may be absent only with the doctor remedy line (hard on a packed tgz, INFO on the registry package)
+        id: agyrem
+        if: always() && env.NET_DOWN != '1' && inputs.skip_install != '1' && !contains(github.event.head_commit.message, '[skip-install]')
+        shell: bash
+        run: |
+          set -u
+          line="$(grep -E '^(PASS|WARN) +ai-cli agy' "$RUNNER_TEMP/doctor.log" 2>/dev/null | head -1)"
+          if [ -n "$line" ] && printf '%s' "$line" | grep -qi 'antigravity'; then echo "CASE ai-cli-agy-remedy PASS ($line)"; exit 0; fi
+          if [ -n "${{ inputs.tgz_artifact }}" ]; then echo "CASE ai-cli-agy-remedy FAIL doctor prints no agy remedy line (packed tgz): ${line:-no ai-cli agy row}"; exit 1; fi
+          echo "CASE ai-cli-agy-remedy INFO registry package prints no agy remedy line yet: ${line:-no ai-cli agy row}"
+
       - name: Windows npm core license marker (real installed binary)
         if: matrix.leg == 'win-x64'
         shell: pwsh
