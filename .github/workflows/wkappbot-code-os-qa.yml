@@ -40,6 +40,7 @@ on:
       parent: { type: string, default: '' }
       tgz_run_id: { type: string, default: '' }
       fake_net_fail: { type: string, default: '0' }
+      skip_install: { type: string, default: '0' }
   workflow_dispatch:
     inputs:
       leg: { description: "run only this leg (empty = all)", type: string, default: '' }
@@ -49,6 +50,7 @@ on:
       tgz_run_id: { description: "run that holds tgz_artifact", type: string, default: '' }
       version: { description: "the version the tgz carries", type: string, default: '' }
       fake_net_fail: { description: "1 = fake a dead network on the first attempt, all = on every attempt (proof hooks)", type: string, default: '0' }
+      skip_install: { description: "1 = skip npm i + wkappbot-code install (RED proof of the AI-CLI CASE step)", type: string, default: '0' }
   push:
     branches: [main, 'qa/respawn-a-*', 'qa/respawn-b-*', 'qa/pystub-*']
     paths:
@@ -175,7 +177,7 @@ jobs:
 
       - name: npm i -g wkappbot-code (packed tgz before publish, else the registry)
         id: npmi
-        if: env.NET_DOWN != '1'
+        if: env.NET_DOWN != '1' && inputs.skip_install != '1'
         run: |
           set -eu
           src=wkappbot-code
@@ -188,7 +190,7 @@ jobs:
 
       - name: wkappbot-code install
         id: inst
-        if: env.NET_DOWN != '1'
+        if: env.NET_DOWN != '1' && inputs.skip_install != '1'
         run: |
           set -u
           # Windows: wkappbot-code >= 0.3.13 takes wkappbot.exe + wkappbot-core.exe.xz from the SDK release itself
@@ -232,6 +234,12 @@ jobs:
           console.log("node->sh verify rc=" + v.status + ": " + String(v.stdout + v.stderr).trim().split("\n").slice(-3).join(" / "));
           JS
           node "$RUNNER_TEMP/diag.cjs"
+
+      - name: Well-known AI CLIs installed (claude, codex, gemini, qwen required; agy INFO)
+        id: aiclis
+        if: always() && env.NET_DOWN != '1'
+        shell: bash
+        run: bash scripts/qa/ai-cli-cases.sh 2>&1 | tee "$RUNNER_TEMP/ai-cli-cases.log"; exit "${PIPESTATUS[0]}"
 
       - name: wkappbot-code doctor
         if: env.NET_DOWN != '1'

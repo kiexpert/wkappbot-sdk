@@ -37,6 +37,10 @@ on:
         description: 'Harness branch, tag or commit to test'
         required: false
         default: 'main'
+      skip_install:
+        description: 'Proof hook: 1 = skip step 5d (RED proof of the AI-CLI CASE step)'
+        required: false
+        default: '0'
       break_guard:
         description: 'Parity proof: corrupt one JS guard in the runner copy so the parity job must go RED'
         type: boolean
@@ -521,7 +525,7 @@ jobs:
           if ($pass -ne 3) { exit 1 }
 
       - name: 5d. Install the family CLIs (claude, codex, grok, muse, agy)
-        if: env.LEG_OFF != '1'
+        if: env.LEG_OFF != '1' && inputs.skip_install != '1'
         shell: bash
         run: |
           # Every family the harness delegates to, installed the way its vendor documents (owner 2026-10-29).
@@ -548,6 +552,22 @@ jobs:
           done
           if python3 -c "import muse_cli" 2>/dev/null; then n=$((n + 1)); echo "INSTALL muse PASS (muse-cli $(python3 -m pip show muse-cli 2>/dev/null | sed -n "s/^Version: //p"))"; else echo "INSTALL muse FAIL"; fi
           echo "RESULT $n/5"
+
+      - name: 5d1. Check out the SDK CASE script
+        if: env.LEG_OFF != '1'
+        uses: actions/checkout@v5
+        with:
+          path: sdk-qa
+          sparse-checkout: scripts/qa
+          sparse-checkout-cone-mode: true
+
+      - name: 5d2. Well-known AI CLIs resolve after the install step (claude, codex required here; others INFO)
+        if: env.LEG_OFF != '1'
+        shell: bash
+        env:
+          # 5d installs claude and codex itself; gemini, qwen and agy come from the wkappbot-code installer, checked by wkappbot-code-os-qa.yml.
+          AI_CLI_REQUIRED: claude codex
+        run: bash sdk-qa/scripts/qa/ai-cli-cases.sh
 
       # On Windows agy answers a no-login run by opening Edge for its login; the NATIVE scan skips files Edge still holds open or removes mid-scan (run 40803302559).
       - name: 5e. Live -- each CLI run with no login lands its login error in the agent-run ledger (NATIVE lines measure the CLI's own session file)
