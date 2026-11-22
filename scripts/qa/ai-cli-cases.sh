@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # One CASE line per well-known AI CLI after an install step (owner 2026-11-22).
+# RED proof: a head commit whose message carries the skip token (see the workflows) skips the install steps, so every CASE line must FAIL.
 #   CASE ai-cli-<name> <PASS|FAIL|INFO> path=<resolved> version-rc=<rc> [reason]
 # REQUIRED (env, space separated, default "claude codex gemini qwen") must resolve and answer --version with rc 0.
 # agy is not in the installer's AI_CLIS list: always INFO, never fails the leg.
