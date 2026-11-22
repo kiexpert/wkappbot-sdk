@@ -525,7 +525,7 @@ jobs:
           if ($pass -ne 3) { exit 1 }
 
       - name: 5d. Install the family CLIs (claude, codex, grok, muse, agy)
-        if: env.LEG_OFF != '1' && inputs.skip_install != '1'
+        if: env.LEG_OFF != '1' && inputs.skip_install != '1' && !contains(github.event.head_commit.message, '[skip-install]')
         shell: bash
         run: |
           # Every family the harness delegates to, installed the way its vendor documents (owner 2026-10-29).
