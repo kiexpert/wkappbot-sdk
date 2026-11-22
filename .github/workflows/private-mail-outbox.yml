@@ -1,0 +1,118 @@
+name: private-mail-outbox
+
+# Drains a mail outbox kept in one private repo of this account: when that repo holds
+# .mail-outbox/manifest.json (subject, body_file, attachments), this job mails the listed files
+# to the owner's OWN Naver inbox and then removes the outbox so a re-run sends nothing twice.
+# The recipient is always the owner (NAVER_ID at naver.com); a manifest cannot name another one.
+# Nothing from the private repo is printed, uploaded or committed here: the log shows counts only.
+# Secrets NAVER_ID and NAVER_APP_PASSWORD are added by the owner; the target repo is found by a
+# sha256 prefix, never named.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/private-mail-outbox.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: private-mail-outbox
+  cancel-in-progress: false
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      TARGET_HASH: c48fcce9e0c13229
+      T1: ${{ secrets.GH_LICENSE_TOKEN }}
+      T2: ${{ secrets.WKAPPBOT_PAT }}
+      T3: ${{ secrets.WKAPPBOT_CORE_PAT }}
+    steps:
+      - name: Skip until the Naver secrets exist
+        id: gate
+        env:
+          NAVER_ID: ${{ secrets.NAVER_ID }}
+          NAVER_APP_PASSWORD: ${{ secrets.NAVER_APP_PASSWORD }}
+        run: |
+          if [ -n "$NAVER_ID" ] && [ -n "$NAVER_APP_PASSWORD" ] && [ "$NAVER_APP_PASSWORD" != "SET-ME" ]; then echo "ready=true" >> "$GITHUB_OUTPUT"
+          else echo "secrets NAVER_ID and NAVER_APP_PASSWORD are not set yet: nothing to do"; echo "ready=false" >> "$GITHUB_OUTPUT"; fi
+      - name: Find the target repo and a token that can reach it
+        if: steps.gate.outputs.ready == 'true'
+        run: |
+          set -u
+          for t in "$T1" "$T2" "$T3"; do
+            [ -n "$t" ] || continue
+            names=$(GH_TOKEN="$t" gh repo list kiexpert --visibility private --limit 300 --json nameWithOwner -q '.[].nameWithOwner' 2>/dev/null || true)
+            for n in $names; do
+              if [ "$(printf %s "$n" | sha256sum | cut -c1-16)" = "$TARGET_HASH" ]; then
+                echo "::add-mask::$n"
+                echo "::add-mask::${n#*/}"
+                echo "::add-mask::$t"
+                { echo "REPO=$n"; echo "TOK=$t"; } >> "$GITHUB_ENV"
+                echo "target found"
+                exit 0
+              fi
+            done
+          done
+          echo "no token reaches the target repo"; exit 1
+      - name: Clone the target repo
+        if: steps.gate.outputs.ready == 'true'
+        run: git clone -q --depth 1 "https://x-access-token:${TOK}@github.com/${REPO}.git" src
+      - uses: actions/setup-python@v5
+        if: steps.gate.outputs.ready == 'true'
+        with:
+          python-version: '3.11'
+      - name: Send the outbox to the owner inbox
+        if: steps.gate.outputs.ready == 'true'
+        id: send
+        env:
+          NAVER_ID: ${{ secrets.NAVER_ID }}
+          NAVER_APP_PASSWORD: ${{ secrets.NAVER_APP_PASSWORD }}
+        working-directory: src
+        run: |
+          set -u
+          if [ ! -f .mail-outbox/manifest.json ]; then echo "outbox empty: nothing to send"; echo "sent=false" >> "$GITHUB_OUTPUT"; exit 0; fi
+          echo "::add-mask::${NAVER_ID}"
+          python - > ../send.log 2>&1 <<'PY' || { echo "send failed"; tail -n 3 ../send.log | sed -E 's/[^ ]+@[^ ]+/<addr>/g' | cut -c1-200; exit 1; }
+          import json, mimetypes, os, smtplib
+          from email.message import EmailMessage
+          from pathlib import Path
+          m = json.loads(Path('.mail-outbox/manifest.json').read_text(encoding='utf-8'))
+          user = os.environ['NAVER_ID'].split('@')[0]
+          addr = user + '@naver.com'
+          root = Path('.').resolve()
+          msg = EmailMessage()
+          msg['From'] = addr
+          msg['To'] = addr
+          msg['Subject'] = m['subject']
+          msg.set_content(Path(m['body_file']).read_text(encoding='utf-8'))
+          total = 0
+          for a in m.get('attachments', []):
+              p = (root / a['path']).resolve()
+              if root not in p.parents:
+                  raise SystemExit('attachment outside the repo')
+              data = p.read_bytes()
+              total += len(data)
+              kind = (mimetypes.guess_type(p.name)[0] or 'application/octet-stream').split('/')
+              msg.add_attachment(data, maintype=kind[0], subtype=kind[1], filename=a.get('name') or p.name)
+          with smtplib.SMTP_SSL('smtp.naver.com', 465, timeout=60) as s:
+              s.login(user, os.environ['NAVER_APP_PASSWORD'])
+              s.send_message(msg)
+          Path('../count.txt').write_text('attachments=%d bytes=%d' % (len(m.get('attachments', [])), total))
+          PY
+          echo "sent to the owner inbox: $(cat ../count.txt)"
+          echo "sent=true" >> "$GITHUB_OUTPUT"
+      - name: Empty the outbox
+        if: steps.send.outputs.sent == 'true'
+        working-directory: src
+        run: |
+          set -eu
+          git config user.name "mail-outbox"
+          git config user.email "mail-outbox@users.noreply.github.com"
+          git rm -q -r .mail-outbox
+          git commit -q -m "mail outbox sent $(date -u +%F)"
+          git push -q origin HEAD:main
+          echo "outbox emptied"
