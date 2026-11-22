@@ -7,6 +7,8 @@ name: private-court-mail-read
 # prefix, never named.
 on:
   workflow_dispatch:
+  schedule:
+    - cron: '7 */2 * * *'
   push:
     branches: [main]
     paths:
@@ -73,7 +75,7 @@ jobs:
           set -u
           echo "::add-mask::${NAVER_ID}"
           python - > ../read.log 2>&1 <<'PY' || { echo "read failed"; tail -n 3 ../read.log | sed -E 's/[^ ]+@[^ ]+/<addr>/g' | cut -c1-200; exit 1; }
-          import imaplib, email, os, re, datetime, html
+          import imaplib, email, email.utils, os, re, datetime, html
           from email.header import decode_header, make_header
           from pathlib import Path
           user = os.environ['NAVER_ID'].split('@')[0]
@@ -109,10 +111,22 @@ jobs:
               text = re.sub(r'[ \t]+', ' ', text)
               text = re.sub(r'\n\s*\n+', '\n\n', text).strip()
               out += ['## ' + subj, '', '- Date: ' + date, '', text[:6000], '']
+              # One file per message, never overwritten, so the history outlives the 4-day window.
+              import hashlib
+              key = hashlib.sha256((msg.get('Message-ID', '') + date + subj).encode('utf-8')).hexdigest()[:10]
+              try:
+                  stamp = email.utils.parsedate_to_datetime(date).strftime('%Y%m%d-%H%M')
+              except Exception:
+                  stamp = datetime.date.today().strftime('%Y%m%d-0000')
+              h = Path('resume/applications/20260824_2026ah12916_court_costs/court_mail')
+              h.mkdir(parents=True, exist_ok=True)
+              f = h / ('%s_%s.md' % (stamp, key))
+              if not f.exists():
+                  f.write_text('# ' + subj + '\n\n- Date: ' + date + '\n\n' + text[:6000] + '\n', encoding='utf-8')
           m.logout()
-          d = Path('resume/applications/20260824_2026ah12916_court_costs/portal_evidence_20261122')
+          d = Path('resume/applications/20260824_2026ah12916_court_costs/court_mail')
           d.mkdir(parents=True, exist_ok=True)
-          (d / 'naver_court_notices.md').write_text('\n'.join(out) + '\n', encoding='utf-8')
+          (d / 'LATEST.md').write_text('\n'.join(out) + '\n', encoding='utf-8')
           Path('../count.txt').write_text('notices=%d' % len(ids))
           PY
           echo "read done: $(cat ../count.txt)"
@@ -123,7 +137,7 @@ jobs:
           set -eu
           git config user.name "court-mail-read"
           git config user.email "court-mail-read@users.noreply.github.com"
-          git add -A resume/applications/20260824_2026ah12916_court_costs/portal_evidence_20261122
+          git add -A resume/applications/20260824_2026ah12916_court_costs/court_mail
           if git diff --cached --quiet; then echo "no change"; exit 0; fi
           git commit -q -m "court notices from inbox $(date -u +%F)"
           git push -q origin HEAD:main
