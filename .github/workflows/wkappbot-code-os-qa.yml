@@ -52,7 +52,7 @@ on:
       fake_net_fail: { description: "1 = fake a dead network on the first attempt, all = on every attempt (proof hooks)", type: string, default: '0' }
       skip_install: { description: "1 = skip npm i + wkappbot-code install (RED proof of the AI-CLI CASE step)", type: string, default: '0' }
   push:
-    branches: [main, 'qa/respawn-a-*', 'qa/respawn-b-*', 'qa/pystub-*']
+    branches: [main, 'qa/respawn-a-*', 'qa/respawn-b-*', 'qa/pystub-*', 'qa/aicli-*']
     paths:
       - .github/workflows/wkappbot-code-os-qa.yml
       - scripts/qa/wkappbot-code-e2e.mjs
@@ -177,7 +177,7 @@ jobs:
 
       - name: npm i -g wkappbot-code (packed tgz before publish, else the registry)
         id: npmi
-        if: env.NET_DOWN != '1' && inputs.skip_install != '1'
+        if: env.NET_DOWN != '1' && inputs.skip_install != '1' && !contains(github.event.head_commit.message, '[skip-install]')
         run: |
           set -eu
           src=wkappbot-code
@@ -190,7 +190,7 @@ jobs:
 
       - name: wkappbot-code install
         id: inst
-        if: env.NET_DOWN != '1' && inputs.skip_install != '1'
+        if: env.NET_DOWN != '1' && inputs.skip_install != '1' && !contains(github.event.head_commit.message, '[skip-install]')
         run: |
           set -u
           # Windows: wkappbot-code >= 0.3.13 takes wkappbot.exe + wkappbot-core.exe.xz from the SDK release itself
