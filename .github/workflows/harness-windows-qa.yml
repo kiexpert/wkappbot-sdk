@@ -50,6 +50,7 @@ on:
     # Any branch, main included, so a README change to the web-install lines is proven on main as well.
     paths:
       - '.github/workflows/harness-windows-qa.yml'
+      - 'scripts/qa/ai-cli-cases.sh'
       - 'README.md'
 
 permissions:
