@@ -1,0 +1,119 @@
+name: wkappbot-code-kih-pack-qa
+
+# QA-ONLY (never publishes): packs the CURRENT kih main wkappbot-code folder exactly as npm-publish-wkappbot-code.yml
+# does (same scrub, mask, scan), then runs wkappbot-code-os-qa.yml on that PACKED tgz on every OS leg.
+# No registry dry-run, no Pages step, no NPM_TOKEN use. Runs on pushes to qa/kih-pack-* branches only.
+on:
+  push:
+    branches: ['qa/kih-pack-*']
+    paths:
+      - .github/workflows/wkappbot-code-kih-pack-qa.yml
+
+permissions:
+  contents: read
+
+jobs:
+  pack:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      ver: ${{ steps.meta.outputs.ver }}
+      pkg: ${{ steps.meta.outputs.pkg }}
+    env:
+      TARGET_HASH: 23ade98d428c8527
+      T1: ${{ secrets.GH_LICENSE_TOKEN }}
+      T2: ${{ secrets.WKAPPBOT_PAT }}
+      T3: ${{ secrets.WKAPPBOT_CORE_PAT }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Find the target repo and a token that can reach it
+        run: bash .github/scripts/npm-find-target.sh
+      # (The SDK checkout above carries the public-safety mask, scan and marker list.)
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Fetch the package folder only (sparse, shallow)
+        run: |
+          set -eu
+          git clone -q --depth 1 --filter=blob:none --sparse "https://x-access-token:${TOK}@github.com/${REPO}.git" src
+          git -C src sparse-checkout set --no-cone /wkappbot-code/ /appbot-code/ /tools/wk-harness-min-copy.sh /bin/MANIFEST.md /bin/linux-x64/
+          # wkappbot-code/ is the canonical folder; appbot-code/ only while the target has not renamed it yet.
+          if [ -f src/wkappbot-code/package.json ]; then d=wkappbot-code; else d=appbot-code; echo "::notice::target has no wkappbot-code/ yet: reading appbot-code/"; fi
+          [ -f "src/$d/package.json" ] || { echo "no package folder in the target"; exit 1; }
+          echo "PKGDIR=$PWD/src/$d" >> "$GITHUB_ENV"
+          ls -la "src/$d" src/tools
+
+      - name: Build the package from its files list and run the scrub gate
+        run: |
+          set -eu
+          cd "$PKGDIR"
+          # Public package: drop "private", point repository and homepage at this public repo.
+          node -e '
+            const fs=require("fs"); const p=JSON.parse(fs.readFileSync("package.json","utf8"));
+            delete p.private;
+            p.repository={type:"git",url:"git+https://github.com/"+process.env.GITHUB_REPOSITORY+".git"};
+            p.homepage="https://github.com/"+process.env.GITHUB_REPOSITORY;
+            p.publishConfig={access:"public"};
+            fs.writeFileSync("package.json",JSON.stringify(p,null,2)+"\n");'
+          rm -f ./*.tgz
+          npm pack -s >/dev/null
+          mkdir -p "$RUNNER_TEMP/pkg" && tar -xzf ./*.tgz -C "$RUNNER_TEMP/pkg"
+          SCRUB=$(sed -n "s/^SCRUB='\\(.*\\)'$/\\1/p" ../tools/wk-harness-min-copy.sh)
+          [ -n "$SCRUB" ] || { echo "scrub pattern not found: nothing shipped"; exit 1; }
+          hits=$(grep -r -i -E -l -- "$SCRUB" "$RUNNER_TEMP/pkg" | wc -l)
+          echo "SCRUB GATE hits=$hits"
+          [ "$hits" = 0 ] || { grep -r -i -E -l -- "$SCRUB" "$RUNNER_TEMP/pkg"; echo "scrub gate failed: nothing shipped"; exit 1; }
+          find "$RUNNER_TEMP/pkg" -type f | sort
+          echo "VER=$(node -p 'require("./package.json").version')" >> "$GITHUB_ENV"
+          echo "PKG=$(node -p 'require("./package.json").name')" >> "$GITHUB_ENV"
+          echo "TGZ=$PWD/$(ls ./*.tgz | head -1 | xargs basename)" >> "$GITHUB_ENV"
+          # The final executable: wkappbot-code when the package ships it, else the old name.
+          echo "CLI=$(node -p 'const b=require("./package.json").bin||{}; typeof b==="string"?require("./package.json").name:(b["wkappbot-code"]?"wkappbot-code":Object.keys(b)[0])')" >> "$GITHUB_ENV"
+
+      # Publish-time mask (owner 2026-11-06: the distributable fixes itself; masking only the sensitive words
+      # with *** is fine). Same rules as the core `skill public-mask`; the gate below must then print HITS 0.
+      - name: Public-safety mask and gate on the packed files
+        run: |
+          set -eu
+          python3 -I scripts/public-safety-mask.py "$RUNNER_TEMP/pkg"
+          bash scripts/public-safety-scan.sh "$RUNNER_TEMP/pkg"
+          # Repack from the masked tree, so what ships is exactly what was scanned.
+          rm -f "$TGZ"
+          (cd "$RUNNER_TEMP/pkg/package" && npm pack -s --pack-destination "$(dirname "$TGZ")")
+          ls -la "$TGZ"
+
+      - name: The packed CLI runs before it is shipped
+        # Every verification install runs under its own throw-away HOME: 0.3.12+ runs its auto-setup at npm install,
+        # which wires a global git push-owner gate into HOME -- on the runner's real HOME that refused the Pages push
+        # (run 42509848799: "[push-owner-gate] refused: pushing as unresolved, not the owner account").
+        run: |
+          set -eu
+          mkdir -p "$RUNNER_TEMP/iso-pre"; HOME="$RUNNER_TEMP/iso-pre" USERPROFILE="$RUNNER_TEMP/iso-pre" XDG_CONFIG_HOME="$RUNNER_TEMP/iso-pre/.config" npm install -g --prefix "$RUNNER_TEMP/pre" "$TGZ"
+          HOME="$RUNNER_TEMP/iso-pre" USERPROFILE="$RUNNER_TEMP/iso-pre" XDG_CONFIG_HOME="$RUNNER_TEMP/iso-pre/.config" "$RUNNER_TEMP/pre/bin/$CLI" --help
+
+      - name: Tested kih sha and packed version
+        id: meta
+        run: |
+          set -u
+          echo "KIH-SHA $(git -C src rev-parse HEAD)"
+          echo "PACKED $PKG@$VER"
+          { echo "ver=$VER"; echo "pkg=$PKG"; } >> "$GITHUB_OUTPUT"
+          mkdir -p "$RUNNER_TEMP/tgzout" && cp "$TGZ" "$RUNNER_TEMP/tgzout/"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7
+        with:
+          name: wkappbot-code-tgz
+          path: ${{ runner.temp }}/tgzout/
+          retention-days: 3
+
+  qa:
+    needs: pack
+    uses: ./.github/workflows/wkappbot-code-os-qa.yml
+    permissions:
+      contents: read
+      actions: write
+    with:
+      tgz_artifact: wkappbot-code-tgz
+      version: ${{ needs.pack.outputs.ver }}
