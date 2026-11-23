@@ -838,6 +838,61 @@ jobs:
           echo "RESPAWNED, NETWORK: $LEG_ID -> fresh run 'leg=$LEG_ID respawn=$next parent=$PARENT' ($NET_WHY)"
           { echo "### $LEG_ID: respawned, network"; echo "$NET_WHY"; echo "fresh run: leg=$LEG_ID respawn=$next parent=$PARENT"; } >> "$GITHUB_STEP_SUMMARY"
 
+  # kih's own harness-ci never gets a runner (private repo), so its checks run here from the public SDK (spokesman order
+  # 2026-11-23): ps1 parse, committed secret values, the core skill bytecap selftest plus gate, and the wkjs selftest.
+  kih-harness-ci:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+        with: { repository: '${{ github.repository_owner }}/wkappbot-kih', ref: "${{ inputs.harness_ref || 'main' }}", token: '${{ secrets.WKAPPBOT_CORE_PAT }}', path: kih, fetch-depth: 50 }
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+      - name: Parse-check kih harness PowerShell scripts
+        shell: pwsh
+        working-directory: kih
+        run: |
+          $bad = 0; $checked = 0
+          Get-ChildItem -Recurse -Filter *.ps1 -Force | Where-Object {
+            $rel = $_.FullName.Replace('\','/')
+            $stem = $_.BaseName
+            ($rel -notmatch '/\.' ) -and ($rel -notmatch '(?i)sandbox') -and ($_.Name -notmatch '(?i)^\.tmp') -and
+            ($stem -notmatch '(?i)-(?:proto|prove|probe|snippet)$')
+          } | ForEach-Object {
+            $checked++
+            $e = $null
+            [System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$null, [ref]$e) | Out-Null
+            if ($e -and $e.Count) { $bad++; Write-Host "PARSE FAIL: $($_.FullName)"; $e | ForEach-Object { Write-Host "  $($_.Message)" } }
+          }
+          Write-Host "RESULT kih-ps1-parse $($checked - $bad)/$checked"
+          if ($bad) { Write-Error "$bad of $checked harness script(s) failed to parse"; exit 1 }
+      - name: No committed secret VALUES in kih
+        shell: bash
+        working-directory: kih
+        run: |
+          fail=0
+          if git grep -nIE '(gh[pousr]_[A-Za-z0-9]{30,}|xox[baprs]-[0-9A-Za-z]{8,}|-----BEGIN [A-Z ]*PRIVATE KEY-----|AKIA[0-9A-Z]{16}|sk-[A-Za-z0-9]{32,})' -- . ':!.github/workflows/*' ; then
+            echo "::error::literal credential token committed"; fail=1
+          fi
+          if git ls-files | grep -qE '(^|/)\.env$' ; then
+            echo "::error::a .env file is tracked"; fail=1
+          fi
+          [ "$fail" = 1 ] && exit 1
+          echo "RESULT kih-secret-scan clean"
+      - name: Core skill bytecap selftest and gate
+        shell: bash
+        working-directory: kih
+        run: |
+          python3 .githooks/lib/core_skill_bytecap_gate_selftest.py
+          base=$(git rev-list --max-count=21 HEAD | tail -1)
+          python3 .githooks/lib/core_skill_bytecap_gate.py --range "$base" HEAD
+          echo "RESULT kih-core-bytecap gate ok since $base"
+      - name: wkjs selftest
+        shell: bash
+        working-directory: kih
+        run: |
+          out=$(node tools/wkjs/selftest.js); echo "$out" | grep -E '^(FAIL|RESULT)'; ! echo "$out" | grep -q '^FAIL'
+
   # PS1 -> JS port parity proof (owner order 2026-11-06). A guard flips from shadow to authoritative JS only when its
   # corpus passes 100% here against the real ps1 on BOTH desktop platforms. ps1 runs under pwsh, and on Windows also
   # under Windows PowerShell 5.1; the "none" leg removes pwsh from PATH and proves the JS road alone still gives verdicts.
