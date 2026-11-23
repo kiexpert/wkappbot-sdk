@@ -632,6 +632,16 @@ jobs:
           done
           exit $fail
 
+      - name: 7b. Python interpreters the lite wire can resolve (python3, python, py -3)
+        if: env.LEG_OFF != '1'
+        shell: bash
+        run: |
+          # 2026-11-23 (seat 1123): selftest-lite-wire read 10/17 on windows-latest because the wire called python3 only.
+          command -v python3 || echo "python3: absent"
+          command -v python || echo "python: absent"
+          python --version || true
+          command -v py && py -3 --version || echo "py: absent"
+
       - name: 8. wkappbot-code selftest (synthetic; real-hook cases b1/c1/f2 skipped)
         if: env.LEG_OFF != '1'
         shell: bash
