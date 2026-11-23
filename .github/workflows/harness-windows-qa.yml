@@ -1709,3 +1709,4 @@ jobs:
 # kih main 1ffc220 proof run
 # qa proof 2026-11-23 kih PR 342 c0ffa018
 # qa proof 2026-11-23 kih PR 342 head 466d2b0a
+# qa proof 2026-11-23 kih PR 342 head 06779c3 (relay selftest path fix)
