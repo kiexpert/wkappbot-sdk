@@ -892,6 +892,10 @@ jobs:
         working-directory: kih
         run: |
           out=$(node tools/wkjs/selftest.js); echo "$out" | grep -E '^(FAIL|RESULT)'; ! echo "$out" | grep -q '^FAIL'
+      - name: Root summon selftest (posix shim, dry-run)
+        shell: bash
+        working-directory: kih
+        run: bash tools/wkroot-summon-selftest.sh
 
   # PS1 -> JS port parity proof (owner order 2026-11-06). A guard flips from shadow to authoritative JS only when its
   # corpus passes 100% here against the real ps1 on BOTH desktop platforms. ps1 runs under pwsh, and on Windows also
