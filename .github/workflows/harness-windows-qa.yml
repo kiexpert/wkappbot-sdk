@@ -1483,7 +1483,10 @@ jobs:
           n += 1
           if win: ok += 1; print("PASS ref window found by name: wkappbot-probe")
           else: print("FAIL ref window wkappbot-probe not found"); print("RESULT %d/%d (AT-SPI reference)" % (ok, n)); sys.exit(1)
-          buttons = [b for b in walk(win) if b.getRoleName() == "push button"]
+          # zenity on this runner exposed the buttons under a role other than "push button" (run 45203461821 a11y-qa, RESULT 1/3), so
+          # both role names count, and a miss prints every role and name under the dialog so the next red names the real one.
+          buttons = [b for b in walk(win) if b.getRoleName() in ("push button", "button")]
+          if not buttons: print("ROLES under the dialog: %s" % sorted({(c.getRoleName(), c.name or "") for c in walk(win)}))
           names = [b.name for b in buttons]
           n += 1
           if any(x in ("Yes", "No") for x in names): ok += 1; print("PASS ref buttons by name: %s" % names)
