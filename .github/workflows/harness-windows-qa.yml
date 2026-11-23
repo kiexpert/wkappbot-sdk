@@ -902,6 +902,12 @@ jobs:
         run: |
           if command -v powershell >/dev/null 2>&1; then echo "INFO powershell present"; else echo "INFO no powershell on PATH"; fi
           out=$(pwsh -NoProfile -File tools/wkroot-family-selftest.ps1 2>&1); echo "$out" | grep -E '^(FAIL|SKIP|RESULT)'; echo "$out" | grep -E '^RESULT ' | grep -q 'RESULT \([0-9]*\)/\1' && ! echo "$out" | grep -q '^FAIL'
+      - name: Core skill overcap count (no rise)
+        shell: bash
+        working-directory: kih
+        run: |
+          python3 .githooks/lib/core_skill_overcap_count_selftest.py
+          python3 .githooks/lib/core_skill_overcap_count.py --baseline .githooks/lib/core-overcap-baseline.txt
 
   # PS1 -> JS port parity proof (owner order 2026-11-06). A guard flips from shadow to authoritative JS only when its
   # corpus passes 100% here against the real ps1 on BOTH desktop platforms. ps1 runs under pwsh, and on Windows also
