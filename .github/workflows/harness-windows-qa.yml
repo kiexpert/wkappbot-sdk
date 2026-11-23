@@ -4,6 +4,7 @@ name: Harness QA (Windows + macOS)
 # Linux cloud VM is proven on the owner's two desktop platforms too. On macOS the Bash self-tests run a
 # second time under /bin/bash 3.2, the shell a stock Mac starts hooks with.
 # Only RESULT and CASE lines are printed; nothing from the harness repo is published.
+# A push whose head commit message names a harness-ref line tests that harness commit (QA of the uninstall worker fix).
 
 # RESPAWN ON A BAD NETWORK (owner 2026-11-09, the scalper-runner road; the same road as wkappbot-code-os-qa.yml): every
 # job leg first probes the hosts it needs (curl --retry 6 --retry-delay 5). A leg whose runner has a dead network does
