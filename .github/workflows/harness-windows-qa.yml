@@ -642,6 +642,16 @@ jobs:
           python --version || true
           command -v py && py -3 --version || echo "py: absent"
 
+      - name: 7c. selftest-lite-wire alone, every PASS and FAIL line (windows-latest diagnosis, seat 1123)
+        if: env.LEG_OFF != '1'
+        shell: bash
+        working-directory: kih
+        continue-on-error: true
+        run: |
+          # The wkappbot-code selftest prints only the summary RESULT 10/17 for this case; run the case alone and keep every line.
+          node wkappbot-code/selftest-lite-wire.mjs 2>&1 | cut -c1-400
+          echo "selftest-lite-wire rc=${PIPESTATUS[0]}"
+
       - name: 8. wkappbot-code selftest (synthetic; real-hook cases b1/c1/f2 skipped)
         if: env.LEG_OFF != '1'
         shell: bash
