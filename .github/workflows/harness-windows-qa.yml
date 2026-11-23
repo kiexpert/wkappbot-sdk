@@ -839,7 +839,7 @@ jobs:
           { echo "### $LEG_ID: respawned, network"; echo "$NET_WHY"; echo "fresh run: leg=$LEG_ID respawn=$next parent=$PARENT"; } >> "$GITHUB_STEP_SUMMARY"
 
   # kih's own harness-ci never gets a runner (private repo), so its checks run here from the public SDK (spokesman order
-  # 2026-11-23): ps1 parse, committed secret values, the core skill bytecap selftest plus gate, and the wkjs selftest.
+  # 2026-11-23): ps1 parse, committed secret values, the core skill bytecap selftest plus gate, the wkjs selftest, and the root summon selftest (rerun at kih main 2c764f0).
   kih-harness-ci:
     runs-on: ubuntu-latest
     timeout-minutes: 20
