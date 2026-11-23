@@ -1704,3 +1704,4 @@ jobs:
           { echo "### $LEG_ID: respawned, network"; echo "$NET_WHY"; echo "fresh run: leg=$LEG_ID respawn=$next parent=$PARENT"; } >> "$GITHUB_STEP_SUMMARY"
 
 # kih-1123a flip proof run
+# kih-1123a lite wiring proof run
