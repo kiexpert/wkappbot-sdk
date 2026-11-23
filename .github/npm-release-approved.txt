@@ -74,3 +74,5 @@
 0.3.54
 # 0.3.55: kih main 750035076623008ca342e96bdcd3efc36b43a38b (PR 312 bump on top of PRs 309-311: Windows installer selftest fixes e913a9f; SDK Harness QA run 44924443116 on 6ecb07c read harness-qa windows-latest and macos-latest success, remaining reds are the known pre-existing ones). Owner order 2026-11-21 relayed by spokesman 1121 (green-gated npm releases pre-approved). The gate still publishes only when every packed-tgz OS leg passes.
 0.3.55
+# 0.3.56: kih main fcb35cd1a531ced0de6a5a9b27aaeb7234081dc4 (PR 382 bump on top of PR 379 uninstall mark and PR 380 startWorker postinstall.log descriptor close plus opencode and bun holder names; kih selftest.sh 386/386). Owner order 2026-11-23 ("최고속으로 엔피엠 배포하삼"), relayed by spokesman 1123. The gate still publishes only when every packed-tgz OS leg passes.
+0.3.56
