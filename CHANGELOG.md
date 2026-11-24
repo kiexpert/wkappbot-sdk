@@ -3,6 +3,25 @@
 All notable changes to WKAppBot SDK are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased]
+
+### wkappbot-code (npm) 0.3.56 and 0.3.57
+
+The SDK launcher and core versions are unchanged (7.11.0-sdk); this entry covers the `wkappbot-code` npm package published from this repository's `npm-publish-wkappbot-code` workflow.
+
+**0.3.57 (2026-11-24)**
+- Uninstall finishes cleanly on Windows, macOS and Linux even while the first-use setup is still running: it finds the detached setup worker by its command line when no record exists, waits for it, and only then ends a leftover.
+- The Windows process query used by the uninstall runs in a filled Windows environment through one process runner; an empty query now names its cause (error code, exit status or signal).
+- Uninstall removes the `wkroot` and `wkpush` copies a Git Bash install leaves in the link folder; a `wkroot` or `wkpush` file of your own stays.
+- Python acquisition on Windows takes its environment from the caller, so its PowerShell calls are testable and use the absolute Windows PowerShell path.
+- Proof: Harness QA run 45317448699 read every harness leg green (Windows and macOS opencode-e2e `PASS u1-uninstall -- rc 0, state identical to before install`, 16/16).
+
+**0.3.56 (2026-11-23)**
+- A first-use finish waiting on the setup lock can no longer reinstall after an uninstall (the uninstall leaves a mark).
+- The setup worker no longer keeps the parent's copy of `postinstall.log` open, so the OpenCode host cannot pin the log and block its removal.
+
+---
+
 ## [7.11.0-sdk] - 2026-09-30
 
 ### Aligned with WKAppBot core v7.11 — macOS Portable Phase 1 + CLI Improvements
