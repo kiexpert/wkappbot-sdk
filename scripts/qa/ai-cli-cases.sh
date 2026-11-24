@@ -24,4 +24,4 @@ for c in claude codex gemini qwen agy; do
 done
 if [ -n "$missing" ]; then echo "FAIL: required AI CLI missing or --version failed:$missing"; exit 1; fi
 echo "RESULT all required AI CLIs resolve ($REQUIRED)"
-# qa-proof: kih main fa2ad21 windows+macos harness run
+# qa-proof: prove kih main fa2ad2149a3d7fd6aac2d73f54c832cba9b106fc on windows and macos (full sha)
