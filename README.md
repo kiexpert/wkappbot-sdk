@@ -25,7 +25,7 @@ Focusless. Self-healing. AI-native. The open-source bridge between LLMs and the 
 > npm i -g wkappbot-code
 > ```
 >
-> Setup, the health check and the selftest run by themselves after the install; the first `wkappbot-code` run prints the result. Then set a model with `wkappbot-code config`. On Windows the wkappbot core binary comes from the [SDK installer](docs/INSTALL.md), not from npm.
+> The first `wkappbot-code` run finishes the setup once (the health check and the selftest run in the background) and prints the result; the package ships no npm install script. Then set a model with `wkappbot-code config`. On Windows the wkappbot core binary comes from the [SDK installer](docs/INSTALL.md), not from npm.
 > *개발자용 위즈덤 커널(= 지혜반사체) AI 코딩 에이전트 + a11y 연동 하네스 + A11Y QA — [소개와 설치 안내](docs/wkappbot-code/README.md#한국어-요약)*
 
 > ⚖️ **[The Reflex Constitution →](./REFLEX-CONSTITUTION.md)** · *[read as a page](https://kiexpert.github.io/wkappbot-sdk/reflex-constitution.html)*
@@ -353,7 +353,7 @@ Per-repo isolation: each git clone gets its own Eye instance and DataDir (`{root
 npm i -g wkappbot-code
 ```
 
-Setup, the health check and the selftest run by themselves after the install; the first `wkappbot-code` run prints the result.
+The first `wkappbot-code` run finishes the setup once (the health check and the selftest run in the background) and prints the result; the package ships no npm install script.
 
 On Windows the wkappbot core binary is not installed by npm: get it from the SDK (below, or [INSTALL.md](docs/INSTALL.md)).
 
@@ -367,7 +367,7 @@ On Windows the wkappbot core binary is not installed by npm: get it from the SDK
 npm i -g wkappbot-code
 ```
 
-Setup, the health check and the selftest run by themselves after the install; the first `wkappbot-code` run prints the result.
+The first `wkappbot-code` run finishes the setup once (the health check and the selftest run in the background) and prints the result; the package ships no npm install script.
 
 **2. Harness only, no Node.js.** This installs only the lite harness for Claude Code; route 1 is the full install.
 
@@ -457,6 +457,8 @@ npm rm -g wkappbot-code
 ```
 
 `uninstall` gives back what `install` changed: your earlier global `core.hooksPath`, your `~/.claude/settings.json` entries, the shims it added, `~/.wk-harness` and the opencode plugin entry. It keeps opencode-ai and the wkappbot core with its skills.
+
+Since 0.3.57 the uninstall is safe to run while the first-use setup is still going: it takes the setup lock, finds the detached setup worker (by its recorded process id, or by its command line when no record exists) and waits for it, then removes the `wkroot` and `wkpush` copies a Git Bash install leaves on Windows. If a file is still held, the report names the process by pid, parent and command line. See the [wkappbot-code changelog](docs/wkappbot-code/README.md#release-notes).
 
 ---
 

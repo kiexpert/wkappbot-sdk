@@ -10,7 +10,7 @@
 npm i -g wkappbot-code
 ```
 
-Setup, the health check and the selftest run by themselves after the install; the first `wkappbot-code` run prints the result.
+The first `wkappbot-code` run finishes the setup once (the health check and the selftest run in the background) and prints the result; the package ships no npm install script.
 
 [![npm](https://img.shields.io/npm/v/wkappbot-code?label=npm%20wkappbot-code)](https://www.npmjs.com/package/wkappbot-code)
 Published from this repository's [`npm-publish-wkappbot-code`](../../.github/workflows/npm-publish-wkappbot-code.yml) workflow, with npm provenance.
@@ -24,7 +24,7 @@ Published from this repository's [`npm-publish-wkappbot-code`](../../.github/wor
 - **위즈덤 커널:** 스킬이 기억 역할을 합니다. 잘못된 도구 호출은 실행되기 *전에* 반사 가드가 거부하고, 거부할 때마다 해결 방법이 담긴 스킬 이름을 알려 줍니다. 거부에서 얻은 교훈은 다시 스킬에 새겨집니다.
 - **a11y 연동 하네스:** Windows UIA, Chrome CDP, macOS AX 같은 접근성 트리로 실제 데스크톱·웹 앱을 다룹니다. 컨트롤을 **이름으로** 찾고, 화면 좌표를 쓰지 않으며, 창이 화면 밖에 있어도 동작하고, 사용자의 창 크기를 바꾸지 않습니다.
 - **A11Y QA:** 사람이 하듯 실제 앱을 접근성 트리로 클릭하고 읽는 QA입니다. 그래서 테스트 통과가 곧 실제 화면이 동작한다는 뜻입니다.
-- **설치:** `npm i -g wkappbot-code` 한 줄이면 끝입니다. 설정, 상태 점검, 셀프테스트가 설치 뒤에 자동으로 돌고, 처음 `wkappbot-code`를 실행하면 결과가 한 줄로 나옵니다.
+- **설치:** `npm i -g wkappbot-code` 한 줄이면 끝입니다. 설정, 상태 점검, 셀프테스트는 처음 `wkappbot-code`를 실행할 때 한 번 자동으로 돌고, 결과가 한 줄로 나옵니다(설치 스크립트는 따로 없습니다).
 - **플랫폼:** a11y·CDP 구동은 현재 Windows에서 전부 지원합니다. Linux·macOS에서는 에이전트, 하네스, 스킬(`skill`/`file`/`suggest`)이 동작하고, a11y 구동은 준비 중입니다(아래 표 참고).
 
 ---
@@ -94,7 +94,7 @@ wkappbot a11y read "Chrome#example.com"        # a browser tab: CDP first, UIA f
 npm i -g wkappbot-code          # Node 18+; also installs the command alias wk-appbot-code
 ```
 
-Setup, the health check and the selftest run by themselves after the install; the first `wkappbot-code` run prints the result. To re-run setup later: `wkappbot-code install` (idempotent). Health check: `wkappbot-code doctor` (one PASS / WARN / FAIL / SKIP row per part).
+The first `wkappbot-code` run finishes the setup once (the health check and the selftest run in the background) and prints the result. To re-run setup later: `wkappbot-code install` (idempotent). Health check: `wkappbot-code doctor` (one PASS / WARN / FAIL / SKIP row per part).
 
 `install` takes `--no-npm`, `--no-bin`, `--no-harness`, `--no-skills`, `--web-harness`, `--config-dir DIR`. An existing `~/.config/opencode/opencode.json` is backed up (`opencode.json.bak-<stamp>`) and only the plugin entry is merged in; every other key you set stays. A config that is not plain JSON is left untouched, and `wkappbot-code.json` is written beside it for you to merge by hand.
 
@@ -102,15 +102,11 @@ Setup, the health check and the selftest run by themselves after the install; th
 
 **Pick a model:** `opencode run -m provider/model "prompt"` for one headless turn, or `/models` inside the TUI. Keys stay in your environment; nothing is stored in git.
 
-### Known issues in 0.3.0 (measured end-to-end with OpenCode 1.19.5, 2026-11-06)
+### Release notes
 
-- **The reflex plugin does not load in OpenCode 0.3.0:** OpenCode logs `failed to load plugin ... error="Plugin export is not a function"`, because the plugin file also exports helper constants. Tool calls then run **unguarded**. Fix in the next release: the plugin file exports only the plugin.
-- With that fixed, the three wired arms fire on every call: **pre** (`tool.execute.before`), **post** (`tool.execute.after`) and **stop-archive** (`session.idle`). Dangerous shell calls are refused (`git commit --no-verify`, `rm -rf ~`), and `read` passes. But `write` and `edit` of an ordinary project file are refused by a harness error (a script missing from the web harness bundle), so the agent cannot write files until the bundle is fixed.
-- **Not wired yet:** the prompt arm (UserPromptSubmit, which drives the intent lock) and the session-start arm have no OpenCode mapping.
-- Each hook arm takes about 2–5 s with the full PowerShell harness.
-
-Until a fixed release ships, treat the guards in OpenCode as **not active**.
-
+- **0.3.57 (2026-11-24):** the uninstall finishes cleanly on Windows, macOS and Linux even while the first-use setup is still running. It finds the detached setup worker by its command line when no record exists and waits for it, runs its Windows process query in a filled Windows environment (an empty query now says why), and removes the `wkroot` and `wkpush` copies a Git Bash install leaves. The SDK Windows and macOS end-to-end legs read `PASS u1-uninstall -- rc 0, state identical to before install`, 16/16.
+- **0.3.56 (2026-11-23):** a first-use finish that was waiting on the setup lock cannot reinstall after an uninstall (the uninstall leaves a mark), and the setup worker no longer keeps the parent's copy of `postinstall.log` open.
+- **Fixed since 0.3.0:** the reflex plugin loads in OpenCode (the plugin file exports only the plugin), `write` and `edit` of an ordinary project file pass, and the prompt arm (intent lock) and the session-start arm are wired to OpenCode events next to **pre**, **post** and **stop-archive**. A user install gets its verdict from the sh lite harness (about 10 ms per call); the full PowerShell harness (about 2–5 s per arm) runs only on a dev seat with `pwsh`.
 ## (e) What gets installed
 
 | Part | What | Verified by |
@@ -127,7 +123,7 @@ Until a fixed release ships, treat the guards in OpenCode as **not active**.
 - `~/.claude/settings.json` gets the harness lite hooks (PreToolUse, SessionStart, Stop, UserPromptSubmit), so Claude Code on this machine is guarded too;
 - about 20 `wk*` helper shims land in your npm global `bin` and `~/.local/bin`.
 
-**Full reflex guards need PowerShell 7 (`pwsh`) on Linux and macOS.** With `pwsh` on PATH, the OpenCode plugin calls the full guard set (for example `git commit --no-verify` and `rm -rf ~` are refused). Without it, the plugin's hook cannot start and **every call is let through** (fail-open); only the bash lite intent lock in Claude Code stays active. Install `pwsh` first (for example `dotnet tool install --global PowerShell --version 7.4.6`, or your OS package), then re-run `wkappbot-code install`.
+**Which guards run.** A user install always gets its verdict from the sh lite harness: the risk floor, the intent lock and the study lock, about 10 ms per call, no PowerShell needed. When no verdict comes back at all (no harness found, a crash, a hook killed at its time budget) a call is allowed, except the risky classes, which are refused (fail-closed): `git commit --no-verify`, `git push --force`, any change of `core.hooksPath`, `rm -r` of your home, `/` or the project, and any write under `.git`. The **full PowerShell harness** (the complete guard set) runs only on a dev seat, where `pwsh` (PowerShell 7) is on PATH; install it first (for example `dotnet tool install --global PowerShell --version 7.4.6`, or your OS package) and re-run `wkappbot-code install`.
 
 ## (f) Platform matrix
 
@@ -149,7 +145,7 @@ wkappbot-code uninstall
 npm rm -g wkappbot-code
 ```
 
-`uninstall` gives back what `install` changed: the global `core.hooksPath` you had before, your own entries in `~/.claude/settings.json` (only the harness hook arms and allow rules leave), the shims it added to the bin dirs, `~/.wk-harness`, `~/.wk-harness-hooks` and the `wisdom-kernel` plugin entry in `opencode.json`. It keeps opencode-ai and the wkappbot core with its skills; remove those by hand if you want them gone:
+`uninstall` gives back what `install` changed: the global `core.hooksPath` you had before, your own entries in `~/.claude/settings.json` (only the harness hook arms and allow rules leave), the shims it added to the bin dirs, `~/.wk-harness`, `~/.wk-harness-hooks` and the `wisdom-kernel` plugin entry in `opencode.json`. It is safe to run while the first-use setup is still going (0.3.57): it takes the setup lock, waits for the detached setup worker, and removes the `wkroot` and `wkpush` copies a Git Bash install leaves; if a file is still held, the report names the holder process. It keeps opencode-ai and the wkappbot core with its skills; remove those by hand if you want them gone:
 
 ```bash
 npm rm -g opencode-ai
