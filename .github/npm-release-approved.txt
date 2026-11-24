@@ -76,3 +76,5 @@
 0.3.55
 # 0.3.56: kih main fcb35cd1a531ced0de6a5a9b27aaeb7234081dc4 (PR 382 bump on top of PR 379 uninstall mark and PR 380 startWorker postinstall.log descriptor close plus opencode and bun holder names; kih selftest.sh 386/386). Owner order 2026-11-23 ("최고속으로 엔피엠 배포하삼"), relayed by spokesman 1123. The gate still publishes only when every packed-tgz OS leg passes.
 0.3.56
+# 0.3.57: kih main a2e11436750cf4696e08c56f0a611d3350e217b4 (PR 395 bump on top of PRs 383, 385, 389, 391 and 392: the uninstall finds setup workers by command line, runs its process query in a filled Windows environment, removes the wkroot and wkpush copies a Git Bash install leaves). SDK Harness QA run 45317448699 on 61bee5b (harness-ref c44b8fc8): Windows opencode-e2e job 138187600164, Windows harness-qa job 138187599903, macOS e2e job 138187600126, macOS harness-qa job 138187600301 and kih-harness-ci job 138187600365 all success. Owner order "모두 완료되면 엔피엠 배포하삼", relayed by spokesman 1123 (green-gated npm releases pre-approved, owner 2026-11-08). The gate still publishes only when every packed-tgz OS leg passes.
+0.3.57
