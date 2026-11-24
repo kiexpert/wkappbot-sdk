@@ -78,3 +78,5 @@
 0.3.56
 # 0.3.57: kih main a2e11436750cf4696e08c56f0a611d3350e217b4 (PR 395 bump on top of PRs 383, 385, 389, 391 and 392: the uninstall finds setup workers by command line, runs its process query in a filled Windows environment, removes the wkroot and wkpush copies a Git Bash install leaves). SDK Harness QA run 45317448699 on 61bee5b (harness-ref c44b8fc8): Windows opencode-e2e job 138187600164, Windows harness-qa job 138187599903, macOS e2e job 138187600126, macOS harness-qa job 138187600301 and kih-harness-ci job 138187600365 all success. Owner order "모두 완료되면 엔피엠 배포하삼", relayed by spokesman 1123 (green-gated npm releases pre-approved, owner 2026-11-08). The gate still publishes only when every packed-tgz OS leg passes.
 0.3.57
+# 0.3.58: kih main a991108eb7801657445c11f488b2db6fbd3c4140 (wkappbot-code/package.json 0.3.58, verified on origin/main by the kih ROOT). Approval line requested by the kih spokesman session; the gate still publishes only when every packed-tgz OS leg passes.
+0.3.58
