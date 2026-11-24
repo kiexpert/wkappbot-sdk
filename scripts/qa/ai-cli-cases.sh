@@ -5,6 +5,7 @@
 # REQUIRED (env, space separated, default "claude codex gemini qwen") must resolve and answer --version with rc 0.
 # agy is not in the installer's AI_CLIS list: always INFO, never fails the leg.
 # Exit 1 with a one-line reason when a required CLI is missing.
+# (QA trigger touch 1123d: comment only.)
 set -u
 REQUIRED="${AI_CLI_REQUIRED:-claude codex gemini qwen}"
 win=0; case "$(uname -s)" in MINGW*|MSYS*|CYGWIN*) win=1 ;; esac
