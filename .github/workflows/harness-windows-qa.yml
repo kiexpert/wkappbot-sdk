@@ -1721,6 +1721,7 @@ jobs:
           else
             probe "PATH wkroot (extensionless)" env PATH="$PWD/bin:$PATH" wkroot roots -json -alive
           fi
+          # (kih ref is resolved at checkout: rerun after the kih fix head 6c5990f6)
           # Shim install: put an extensionless wkhippo / wkroot on PATH from a temp dir, then call it by its bare name.
           SHIMS="${RUNNER_TEMP:-/tmp}/wkshims"; mkdir -p "$SHIMS"
           for t in wkhippo wkroot; do
