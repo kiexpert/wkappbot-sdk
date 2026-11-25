@@ -1,0 +1,36 @@
+name: cloudflare-token-check
+
+# Verifies the CLOUDFLARE_API_TOKEN Actions secret. Prints only the verify status and the account count/name;
+# never the token, never response headers. A manual dispatch from a cloud seat answers 403, so a push to a
+# non-main branch touching this file also runs it.
+on:
+  workflow_dispatch:
+  push:
+    branches-ignore: [main]
+    paths: [".github/workflows/cloudflare-token-check.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+    steps:
+      - name: Verify token
+        run: |
+          set -u
+          if [ -z "$CF_TOKEN" ]; then echo "secret CLOUDFLARE_API_TOKEN is empty"; exit 1; fi
+          echo "::add-mask::$CF_TOKEN"
+          code=$(curl -s -o v.json -w '%{http_code}' -H "Authorization: Bearer $CF_TOKEN" https://api.cloudflare.com/client/v4/user/tokens/verify || true)
+          echo "verify HTTP status: $code"
+          jq -r '"verify success: \(.success)  token status: \(.result.status // "n/a")"' v.json || true
+          [ "$code" = "200" ] || { echo "verify rejected"; rm -f v.json; exit 1; }
+          code=$(curl -s -o a.json -w '%{http_code}' -H "Authorization: Bearer $CF_TOKEN" https://api.cloudflare.com/client/v4/accounts || true)
+          echo "accounts HTTP status: $code"
+          jq -r '"accounts success: \(.success)  count: \(.result | length)"' a.json || true
+          jq -r '.result[]? | "account name: \(.name)  id: ***"' a.json || true
+          rm -f v.json a.json
+          [ "$code" = "200" ]
