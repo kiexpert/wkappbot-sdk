@@ -1721,6 +1721,25 @@ jobs:
           else
             probe "PATH wkroot (extensionless)" env PATH="$PWD/bin:$PATH" wkroot roots -json -alive
           fi
+          # Shim install: put an extensionless wkhippo / wkroot on PATH from a temp dir, then call it by its bare name.
+          SHIMS="${RUNNER_TEMP:-/tmp}/wkshims"; mkdir -p "$SHIMS"
+          for t in wkhippo wkroot; do
+            if [ -f "bin/$t" ]; then cp "bin/$t" "$SHIMS/$t"
+            elif [ -f "bin/$t.sh" ]; then cp "bin/$t.sh" "$SHIMS/$t"; fi
+            [ -f "bin/$t.cmd" ] && cp "bin/$t.cmd" "$SHIMS/$t.cmd"
+            [ -f "bin/$t.ps1" ] && cp "bin/$t.ps1" "$SHIMS/$t.ps1"
+            [ -f "$SHIMS/$t" ] && chmod +x "$SHIMS/$t"
+            echo "shim $t: $(ls "$SHIMS" | grep -E "^$t(\\.|$)" | tr '\n' ' ')"
+          done
+          export PATH="$SHIMS:$PATH"
+          tmo() { perl -e 'alarm 60; exec @ARGV' "$@"; }
+          probe "wkhippo bare name via PATH (--help)" tmo wkhippo --help
+          probe "wkhippo bare name, USERPROFILE unset" env -u USERPROFILE perl -e 'alarm 60; exec @ARGV' wkhippo --help
+          probe "wkroot bare name via PATH" tmo wkroot roots -json -alive
+          if [ "$RUNNER_OS" = Windows ]; then
+            probe "cmd.exe wkhippo (PATHEXT)" cmd.exe //c "set PATH=$(cygpath -w "$SHIMS");%PATH%& wkhippo --help"
+            probe "pwsh wkhippo (PATH)" pwsh -NoProfile -Command '$env:PATH=$args[0]+";"+$env:PATH; wkhippo --help; exit $LASTEXITCODE' "$(cygpath -w "$SHIMS")"
+          fi
           exit 0
 
       - name: Respawn this leg on a fresh runner (network down; capped at 2 respawns, the third is a real red)
