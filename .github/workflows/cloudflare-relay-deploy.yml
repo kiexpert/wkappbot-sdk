@@ -77,6 +77,8 @@ jobs:
       - name: Wrangler dry run
         if: env.MODE == 'dry-run'
         working-directory: target/relay-ws
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: npx --yes wrangler@3.99.0 deploy --dry-run --outdir ../../dist 2>&1 | grep -vi 'token' ; test -s ../../dist/worker.js && echo "DRY-RUN OK bundle $(wc -c < ../../dist/worker.js) bytes"
       - name: Wrangler deploy (approved commit only)
         if: env.MODE == 'deploy'
