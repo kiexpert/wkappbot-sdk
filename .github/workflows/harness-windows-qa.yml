@@ -1699,6 +1699,30 @@ jobs:
           else echo "MISSING $WKT"; fail=1; fi
           exit $fail
 
+      - name: wkroot platform diagnostics (extensionless call, USERPROFILE unset; prints stdout, stderr, rc)
+        if: always() && env.LEG_OFF != '1'
+        working-directory: kih
+        run: |
+          set +e
+          echo "RUNNER_OS=$RUNNER_OS"
+          ls -la bin/wkroot* 2>&1 | head -10
+          git ls-files -s bin/wkroot bin/wkroot.cmd bin/wkroot.ps1 bin/wkroot.sh 2>&1 | head -10
+          probe() {  # probe <label> <command...>
+            label=$1; shift
+            "$@" >/tmp/wk.out 2>/tmp/wk.err; rc=$?
+            echo "--- $label rc=$rc"; echo "stdout: $(head -c 300 /tmp/wk.out | tr '\n' ' ')"; echo "stderr: $(head -c 500 /tmp/wk.err | tr '\n' ' ')"
+          }
+          probe "bash bin/wkroot (extensionless)" bash bin/wkroot roots -json -alive
+          probe "bash bin/wkroot.cmd" bash bin/wkroot.cmd roots -json -alive
+          probe "USERPROFILE unset, bash bin/wkroot" env -u USERPROFILE bash bin/wkroot roots -json -alive
+          if [ "$RUNNER_OS" = Windows ]; then
+            probe "cmd.exe wkroot (extensionless via PATHEXT)" cmd.exe //c "set PATH=%CD%\\bin;%PATH%& wkroot roots -json -alive"
+            probe "pwsh wkroot (extensionless via PATH)" pwsh -NoProfile -Command '$env:PATH=(Resolve-Path bin).Path+";"+$env:PATH; Remove-Item Env:USERPROFILE -ErrorAction SilentlyContinue; wkroot roots -json -alive; exit $LASTEXITCODE'
+          else
+            probe "PATH wkroot (extensionless)" env PATH="$PWD/bin:$PATH" wkroot roots -json -alive
+          fi
+          exit 0
+
       - name: Respawn this leg on a fresh runner (network down; capped at 2 respawns, the third is a real red)
         if: always() && env.NET_DOWN == '1'
         shell: bash
