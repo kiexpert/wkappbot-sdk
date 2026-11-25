@@ -18,6 +18,7 @@ jobs:
     timeout-minutes: 5
     env:
       CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
     steps:
       - name: Verify token
         run: |
@@ -33,4 +34,18 @@ jobs:
           jq -r '"accounts success: \(.success)  count: \(.result | length)"' a.json || true
           jq -r '.result[]? | "account name: \(.name)  id: ***"' a.json || true
           rm -f v.json a.json
+          [ "$code" = "200" ]
+      - name: Check the account id and the Workers script list
+        run: |
+          set -u
+          [ -n "$CF_ACCOUNT" ] || { echo "secret CLOUDFLARE_ACCOUNT_ID is empty"; exit 1; }
+          echo "::add-mask::$CF_TOKEN"; echo "::add-mask::$CF_ACCOUNT"
+          code=$(curl -s -o a.json -w '%{http_code}' -H "Authorization: Bearer $CF_TOKEN" "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT" || true)
+          echo "account HTTP status: $code"
+          jq -r '"account success: \(.success)  name: \(.result.name // "n/a")  id: ***"' a.json || true
+          code=$(curl -s -o w.json -w '%{http_code}' -H "Authorization: Bearer $CF_TOKEN" "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/workers/scripts" || true)
+          echo "workers scripts HTTP status: $code"
+          jq -r '"workers scripts success: \(.success)  count: \(.result | length)"' w.json || true
+          jq -r '.errors[]? | "api error code: \(.code)  message: \(.message)"' w.json a.json || true
+          rm -f a.json w.json
           [ "$code" = "200" ]
