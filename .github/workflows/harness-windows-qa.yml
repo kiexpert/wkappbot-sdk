@@ -1689,6 +1689,14 @@ jobs:
               leg "Git Bash sh $(sh -c 'echo $BASH_VERSION')" sh "$SHT"
             fi
           fi
+          WKT=tools/wkroot-summon-selftest.sh
+          if [ -f "$WKT" ]; then
+            if [ "$RUNNER_OS" = macOS ]; then
+              leg "wkroot summon /bin/bash $(/bin/bash -c 'echo $BASH_VERSION')" /bin/bash "$WKT"
+            else
+              leg "wkroot summon Git Bash" bash "$WKT"
+            fi
+          else echo "MISSING $WKT"; fail=1; fi
           exit $fail
 
       - name: Respawn this leg on a fresh runner (network down; capped at 2 respawns, the third is a real red)
