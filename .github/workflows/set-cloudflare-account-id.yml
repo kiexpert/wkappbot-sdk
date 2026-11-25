@@ -1,0 +1,43 @@
+name: set-cloudflare-account-id
+
+# Sets the Actions secret CLOUDFLARE_ACCOUNT_ID on this repo. The value is a Cloudflare account id supplied by the owner
+# (an identifier, not a credential); the secret is written server-side with a repo token that may write secrets,
+# and the token value is masked and never printed. A push to a non-main branch touching this file runs it, since a
+# manual dispatch from a cloud seat answers 403.
+on:
+  workflow_dispatch:
+  push:
+    branches-ignore: [main]
+    paths: [".github/workflows/set-cloudflare-account-id.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  set:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      ACCOUNT_ID: 527da3ffa77f32e316211ce437f84c78
+      T1: ${{ secrets.GH_LICENSE_TOKEN }}
+      T2: ${{ secrets.WKAPPBOT_PAT }}
+      T3: ${{ secrets.WKAPPBOT_CORE_PAT }}
+    steps:
+      - name: Set CLOUDFLARE_ACCOUNT_ID
+        run: |
+          set -u
+          printf %s "$ACCOUNT_ID" | grep -Eq '^[0-9a-f]{32}$' || { echo "bad account id format"; exit 1; }
+          for t in "$T1" "$T2" "$T3"; do [ -n "$t" ] && echo "::add-mask::$t"; done
+          done_=false
+          for t in "$T1" "$T2" "$T3"; do
+            [ -n "$t" ] || continue
+            if printf %s "$ACCOUNT_ID" | GH_TOKEN="$t" gh secret set CLOUDFLARE_ACCOUNT_ID --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then done_=true; break; fi
+          done
+          $done_ || { echo "no token may set secrets"; exit 1; }
+          for t in "$T1" "$T2" "$T3"; do
+            [ -n "$t" ] || continue
+            if n=$(GH_TOKEN="$t" gh secret list --repo "$GITHUB_REPOSITORY" --json name -q '.[].name' 2>/dev/null); then
+              printf '%s\n' "$n" | grep -qx CLOUDFLARE_ACCOUNT_ID && echo "secret CLOUDFLARE_ACCOUNT_ID is set" && exit 0
+            fi
+          done
+          echo "could not read the secret list back"; exit 1
