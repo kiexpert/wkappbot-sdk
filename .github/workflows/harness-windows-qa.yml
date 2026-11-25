@@ -1721,7 +1721,7 @@ jobs:
           else
             probe "PATH wkroot (extensionless)" env PATH="$PWD/bin:$PATH" wkroot roots -json -alive
           fi
-          # (kih ref is resolved at checkout: rerun after the kih fix head 6c5990f6)
+          # (kih ref is resolved at checkout: rerun on kih head 9c7b9e64 or a descendant)
           # Shim install: the shims are the files in kih/bin themselves (siblings tools/ and wkhippo-lib/ must stay next to them), so PATH gets that dir.
           SHIMS="$PWD/bin"; chmod +x bin/wkroot bin/wkhippo 2>/dev/null
           echo "shims on PATH from: bin ($(ls bin | grep -E '^(wkhippo|wkroot)(\\.|$)' | tr '\n' ' '))"
