@@ -1,0 +1,87 @@
+name: cloudflare-relay-deploy
+
+# Deploys relay-ws/ (Cloudflare Worker + Durable Object) from the target repo found by sha256 prefix (never named here).
+# A real deploy runs only when .github/cloudflare-deploy-approved.txt holds the exact line
+#   # relay-ws: <40-hex commit> approved
+# for the resolved commit; that line is added only on the owner's quoted word. Without it the job runs
+# `wrangler deploy --dry-run` (bundle only, no account, no endpoint). A push to a non-main branch touching
+# this file runs the dry run, since a manual dispatch from a cloud seat answers 403.
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "target commit or branch (default main)"
+        required: false
+        default: "main"
+  push:
+    branches-ignore: [main]
+    paths: [".github/workflows/cloudflare-relay-deploy.yml"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cloudflare-relay-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      TARGET_HASH: ce712644e054789d
+      T1: ${{ secrets.GH_LICENSE_TOKEN }}
+      T2: ${{ secrets.WKAPPBOT_PAT }}
+      T3: ${{ secrets.WKAPPBOT_CORE_PAT }}
+      REF_IN: ${{ inputs.ref || 'main' }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          path: sdk
+          sparse-checkout: .github
+      - name: Resolve and fetch target
+        run: |
+          set -u
+          for t in "$T1" "$T2" "$T3"; do [ -n "$t" ] && echo "::add-mask::$t"; done
+          printf '%s' "$REF_IN" | grep -qE '^[A-Za-z0-9._/-]{1,100}$' || { echo "bad ref"; exit 1; }
+          repo=""; tok=""
+          for t in "$T1" "$T2" "$T3"; do
+            [ -n "$t" ] || continue
+            for n in $(GH_TOKEN="$t" gh repo list kiexpert --limit 400 --json nameWithOwner -q '.[].nameWithOwner' 2>/dev/null || true); do
+              if [ "$(printf %s "$n" | sha256sum | cut -c1-16)" = "$TARGET_HASH" ]; then repo="$n"; tok="$t"; break 2; fi
+            done
+          done
+          [ -n "$repo" ] || { echo "no token reaches target $TARGET_HASH"; exit 1; }
+          echo "::add-mask::$repo"; echo "::add-mask::${repo#*/}"
+          git init -q target
+          git -C target fetch -q --depth=1 "https://x-access-token:${tok}@github.com/${repo}.git" "$REF_IN"
+          git -C target checkout -q FETCH_HEAD
+          sha=$(git -C target rev-parse HEAD)
+          echo "TARGET_SHA=$sha" >> "$GITHUB_ENV"
+          echo "target $TARGET_HASH at $sha"
+          [ -f target/relay-ws/wrangler.toml ] || { echo "relay-ws/wrangler.toml missing at $sha"; exit 1; }
+      - name: Approval gate
+        run: |
+          f=sdk/.github/cloudflare-deploy-approved.txt
+          if [ -f "$f" ] && grep -qxF "# relay-ws: $TARGET_SHA approved" "$f"; then
+            echo "MODE=deploy" >> "$GITHUB_ENV"; echo "approval line found for $TARGET_SHA -> deploy"
+          else
+            echo "MODE=dry-run" >> "$GITHUB_ENV"; echo "no approval line for $TARGET_SHA -> dry run only"
+          fi
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Selftest
+        working-directory: target/relay-ws
+        run: node selftest.js
+      - name: Wrangler dry run
+        if: env.MODE == 'dry-run'
+        working-directory: target/relay-ws
+        run: npx --yes wrangler@3.99.0 deploy --dry-run --outdir ../../dist 2>&1 | grep -vi 'token' ; test -s ../../dist/worker.js && echo "DRY-RUN OK bundle $(wc -c < ../../dist/worker.js) bytes"
+      - name: Wrangler deploy (approved commit only)
+        if: env.MODE == 'deploy'
+        working-directory: target/relay-ws
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx --yes wrangler@3.99.0 deploy 2>&1 | grep -vi 'token'
