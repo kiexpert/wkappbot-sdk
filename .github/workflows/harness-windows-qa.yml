@@ -604,6 +604,12 @@ jobs:
           Write-Host ("CASE pwsh-install-cmd {0} (rc=$rc)" -f $(if ($ok) { 'PASS' } else { 'FAIL' }))
           if (-not $ok) { exit 1 }
 
+      - name: 5h. Every important tool runs by bare name through a link or shim under ~/.local/bin (owner 2026-11-25, all platforms)
+        if: env.LEG_OFF != '1'
+        shell: bash
+        working-directory: kih
+        run: bash tools/local-bin-links-selftest.sh
+
       - name: 6. Bash self-tests
         if: env.LEG_OFF != '1'
         shell: bash
