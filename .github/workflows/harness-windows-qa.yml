@@ -1007,6 +1007,18 @@ jobs:
           [ -f tools/wkjs/parity.js ] && for flag in --all --against-ps1 --ps-host --json; do
             echo "FLAG $flag $(grep -c -- "$flag" tools/wkjs/parity.js)"; done
           true
+      - name: Live refusal per family (node guard hub, every leg)
+        if: env.LEG_OFF != '1'
+        shell: bash
+        working-directory: kih
+        run: |
+          node tools/wkjs/live-refusal.js .
+      - name: JS harness selftest (node, no pwsh needed)
+        if: env.LEG_OFF != '1'
+        shell: bash
+        working-directory: kih
+        run: |
+          node tools/wkjs/selftest.js
       - name: Remove pwsh from PATH (none leg)
         if: (matrix.ps == 'none') && env.LEG_OFF != '1'
         run: |
