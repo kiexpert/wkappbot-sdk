@@ -84,3 +84,5 @@
 0.3.59
 # 0.3.60: kih main fc5c23b308221875f0cd0449a2ecf2439ec60797 (PR 416 on top of PR 415 3672277b: wkhippo --remote lists and opens archived sessions, debt-at-stop own-remedy row shape, intent-lock JS tag split parity, selftest-studylock 25/25, wkroot FamilyReady profile marks and summon skip no longer counted as a pass; wkappbot-code/package.json 0.3.60 verified on origin/main by spokesman seat 1126, npm view latest 0.3.59). Owner order "중요한 버그들 잡혔으면 엔피엠 핫배포 하시오" and "빠르게 배포하삼", relayed by spokesman 1126. The gate still publishes only when every packed-tgz OS leg passes.
 0.3.60
+# 0.3.61: kih main 5416e0ee6e5d56fea4e0518c10625969a9eebe0c (PR 442 bump on top of PRs 425-441: order ledger, open-TODO stop lint, parity gate, Stop node twin, pulse bound, live-refusal per family, min-manifest and hippo twin fixes; wkappbot-code/package.json 0.3.61 read on origin/main by spokesman 1126, npm view latest 0.3.60; SDK wkjs-parity five legs green on run 45900390277). Owner order "엔피엠 배포도 챙기고" and "한시간내 올 클리어 목표". The gate still publishes only when every packed-tgz OS leg passes.
+0.3.61
