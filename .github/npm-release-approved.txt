@@ -92,3 +92,5 @@
 0.3.63
 # 0.3.64: kih main e22c7b3a2d3d44d3cc75a2caba7a25b65082bb4e (PR 465: npm install links ~/.local/bin/Agent.cmd to the harness tools/Agent.cmd, recorded for uninstall, selftest-agent-link 4/4; stop lint reads the transcript once and computes skill-ref inputs once per lint; npm view latest 0.3.63). Owner order 2026-11-27 ("린트 속도도 고치삼. 에이전트씨엠디 인터프리터 지정없이 모든 플랫폼 실행가능하게 해주삼"), spokesman seat 1127. The gate still publishes only when every packed-tgz OS leg passes.
 0.3.64
+# 0.3.65: kih main 8c915cd78936622435d92ed965cf32fa918b9bbb (PR 479 bump on top of PRs 474-478: pace disabled at its source, wkhippo slim, queued interim gate allow list, per-seat draft path, interim/final TODO scope, wire-bytes selftest file-only copy; wkappbot-code/package.json 0.3.65 read on origin/main by spokesman seat 1127, npm view latest 0.3.64; selftest.sh 439/439, opencode e2e 16/16). Owner order 2026-11-27 ("빡센테스트 하시고 엔피엠 배포하삼"), spokesman seat 1127. The gate still publishes only when every packed-tgz OS leg passes.
+0.3.65
