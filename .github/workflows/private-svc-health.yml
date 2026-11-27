@@ -8,10 +8,9 @@ name: private-svc-health
 #   - never dispatch / rerun / cancel anything in those repos (GET only; no POST/DELETE/PATCH to them)
 #   - never read their secrets; never issue a broker (Hantoo) token; never touch any wavevault/hantoo cache
 #   - never run the trader (wk-scalper)
+# schedule removed 2026-11-27 (failed 32 of 32 runs, owner order to cut failure mail); restore once the probed service is back
 on:
   workflow_dispatch:
-  schedule:
-    - cron: '*/10 * * * *'
   push:
     branches: [main]
     paths:
