@@ -88,3 +88,5 @@
 0.3.61
 # 0.3.62: kih main db5aec33a8657dbbe93107bf9fd0a16538764300 (PR 462: head-only knowledge exemptions call the shared knowledgeOp, a whole unfiltered redirect passes again, pipe and chain refused; PR 461 redirect class; wkappbot-code/package.json 0.3.62 on origin/main, npm view latest 0.3.61). Owner order 2026-11-27 ("최고속으로 엔피엠 배포하시오 삼십분이내로"), spokesman seat 1127. The gate still publishes only when every packed-tgz OS leg passes.
 0.3.62
+# 0.3.63: kih main 1ecce93367a1e2233bf0a2649182a05078776a3f (PR 464: the baked harness ships Agent.cmd, Agent.ps1, Agent.routing.ps1 and the delegation backends, manifest bake missing=0; PR 463 on-load refusal arrow lines and the open-TODO status fix; npm view latest 0.3.62). Owner order 2026-11-27 ("에이전트씨엠디도 배포에 없네"), spokesman seat 1127. The gate still publishes only when every packed-tgz OS leg passes.
+0.3.63
