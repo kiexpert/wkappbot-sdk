@@ -79,13 +79,24 @@ jobs:
           timeout 30m python tools/naver_mail_archive.py --max-new 200 --purge-junk > ../mail.log 2>&1 \
             && grep -E '^(junk purged:|folder f?_?[a-z0-9_]+:|mail sync all:)' ../mail.log \
             || { echo "mail archive failed"; grep -E '^(REFUSE|Traceback|[A-Za-z]+Error)' ../mail.log | cut -c1-60; exit 1; }
+      - name: Gmail archive except spam/trash (repo script)
+        continue-on-error: true
+        env:
+          GMAIL_CLIENT_ID: ${{ secrets.GMAIL_CLIENT_ID }}
+          GMAIL_CLIENT_SECRET: ${{ secrets.GMAIL_CLIENT_SECRET }}
+          GMAIL_REFRESH_TOKEN: ${{ secrets.GMAIL_REFRESH_TOKEN }}
+          GMAIL_REFRESH_TOKEN_GKIEXPERT: ${{ secrets.GMAIL_REFRESH_TOKEN_GKIEXPERT }}
+        working-directory: src
+        run: |
+          timeout 15m python tools/gmail_mail_archive.py --max-new 300 > ../gmail.log 2>&1 \
+            ; grep -E '^(account [a-z]+:|gmail archive:)' ../gmail.log || { echo "gmail archive failed"; grep -E '^(Traceback|[A-Za-z]+Error)' ../gmail.log | cut -c1-60; exit 1; }
       - name: Commit back to the target repo
         working-directory: src
         run: |
           set -eu
           git config user.name "personal-docs-mail"
           git config user.email "personal-docs-mail@users.noreply.github.com"
-          git add -A resume/drafts/naver_mail resume/applications/20260824_2026ah12916_court_costs/court_mail
+          git add -A resume/drafts/naver_mail resume/drafts/gmail_archive resume/applications/20260824_2026ah12916_court_costs/court_mail
           if git diff --cached --quiet; then echo "no new mail"; exit 0; fi
           git commit -q -m "mail archive $(date -u +%F_%H%M) [cloud]"
           for i in 1 2 3 4; do
