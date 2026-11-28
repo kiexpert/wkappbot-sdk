@@ -181,10 +181,20 @@ jobs:
         if: env.NET_DOWN != '1' && inputs.skip_install != '1' && !contains(github.event.head_commit.message, '[skip-install]')
         run: |
           set -eu
-          src=wkappbot-code
-          if [ -n "${{ inputs.tgz_artifact }}" ]; then src="$(ls "$RUNNER_TEMP"/tgz/*.tgz | head -1)"; echo "installing the PACKED tgz: $(basename "$src")"; fi
-          npm i -g "$src" 2>&1 | tee "$RUNNER_TEMP/npm-install.log"; rc=${PIPESTATUS[0]}
+          src=wkappbot-code; core=""; plat=""
+          if [ -n "${{ inputs.tgz_artifact }}" ]; then
+            src="$(ls "$RUNNER_TEMP"/tgz/*.tgz | head -1)"; echo "installing the PACKED tgz: $(basename "$src")"
+            # A packed CLI that declares wkappbot-core-* optionalDependencies is installed together with the PACKED core
+            # of this leg (the registry does not carry it yet), so the install, doctor and e2e judge the real bytes.
+            case "${{ matrix.leg }}" in
+              linux-x64*) plat=linux-x64 ;; osx-arm64) plat=darwin-arm64 ;; osx-x64) plat=darwin-x64 ;; win-x64*) plat=win32-x64 ;;
+            esac
+            core="$(ls "$RUNNER_TEMP"/tgz/core/wkappbot-core-"$plat"-*.tgz 2>/dev/null | head -1 || true)"
+            if [ -n "$core" ]; then echo "installing the PACKED core too: $(basename "$core")"; fi
+          fi
+          npm i -g "$src" $core 2>&1 | tee "$RUNNER_TEMP/npm-install.log"; rc=${PIPESTATUS[0]}
           echo "npm install rc=$rc"; [ "$rc" = 0 ] || exit "$rc"
+          if [ -n "$core" ]; then npm ls -g --depth=0 2>&1 | grep -F "wkappbot-core-$plat@" || { echo "packed core wkappbot-core-$plat is not installed"; exit 1; }; fi
           # the first wkappbot-code run after install: 0.3.11+ prints a first-run banner
           wkappbot-code --version 2>&1 | tee "$RUNNER_TEMP/first-run.log"
           npm view wkappbot-code version
