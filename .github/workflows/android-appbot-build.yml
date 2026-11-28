@@ -1,0 +1,111 @@
+# Builds the android-appbot debug APK on ubuntu, proves on an Android emulator that the
+# localhost MCP endpoint (tools/list) works with the bearer token and refuses requests
+# without it (HTTP 401), and publishes the debug APK as a GitHub release asset from main.
+name: android-appbot-build
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "android-appbot/**"
+      - ".github/workflows/android-appbot-build.yml"
+  push:
+    branches: [main]
+    paths:
+      - "android-appbot/**"
+      - ".github/workflows/android-appbot-build.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-appbot-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-apk:
+    name: Build debug APK (ubuntu-latest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: android-appbot
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      # AGP 8.5.2 needs Gradle 8.7+, and the repo ships no wrapper: pin the version here.
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+
+      - name: Build debug APK
+        run: gradle assembleDebug --no-daemon
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-appbot-debug-apk
+          path: android-appbot/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 14
+
+  emulator-mcp:
+    name: Emulator MCP check (API 34)
+    needs: build-apk
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: android-appbot-debug-apk
+          path: apk
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run emulator and check MCP
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          script: bash .github/workflows/scripts/android-appbot-mcp-check.sh
+
+  release-apk:
+    name: Publish debug APK release asset
+    needs: [build-apk, emulator-mcp]
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: android-appbot-debug-apk
+          path: apk
+      - name: Create or update the release asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          TAG=android-appbot-v0.1.0-debug
+          APK="$(ls apk/*.apk | head -n 1)"
+          cp "$APK" apk/appbot-debug.apk
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --prerelease --target "$GITHUB_SHA" \
+              --title "AppBot Android 0.1.0 (debug build)" \
+              --notes "Debug APK of the AppBot Android app (accessibility-driven phone control with a localhost MCP server). Sideload only; built and emulator-verified by CI run ${{ github.run_id }}."
+          fi
+          gh release upload "$TAG" apk/appbot-debug.apk --clobber
+          echo "release: https://github.com/$GITHUB_REPOSITORY/releases/tag/$TAG"
