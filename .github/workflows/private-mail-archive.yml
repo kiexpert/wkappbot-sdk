@@ -65,13 +65,16 @@ jobs:
           echo "::add-mask::${NAVER_ID}"
           python tools/court_mail_read.py --days 4 > ../court.log 2>&1 && grep -E '^court notices:' ../court.log || { echo "court read failed"; exit 1; }
       - name: All-folder mail archive except spam (repo script)
+        # A backfill can outlast the job; stop at 30 min so the commit step still saves what was fetched
+        # (each saved eml marks its UID done, so the next run resumes where this one stopped).
+        continue-on-error: true
         env:
           NAVER_ID: ${{ secrets.NAVER_ID }}
           NAVER_APP_PASSWORD: ${{ secrets.NAVER_APP_PASSWORD }}
         working-directory: src
         run: |
           echo "::add-mask::${NAVER_ID}"
-          python tools/naver_mail_archive.py --max-new 400 > ../mail.log 2>&1 \
+          timeout 30m python tools/naver_mail_archive.py --max-new 200 > ../mail.log 2>&1 \
             && grep -E '^(folder f?_?[a-z0-9_]+:|mail sync all:)' ../mail.log \
             || { echo "mail archive failed"; grep -E '^(REFUSE|Traceback|[A-Za-z]+Error)' ../mail.log | cut -c1-60; exit 1; }
       - name: Commit back to the target repo
