@@ -7,6 +7,7 @@ name: private-mail-outbox
 # Nothing from the private repo is printed, uploaded or committed here: the log shows counts only.
 # Secrets NAVER_ID and NAVER_APP_PASSWORD are added by the owner; the target repo is found by a
 # sha256 prefix, never named.
+# Last push-trigger: 2026-11-28 (petition 30 final + filing guide).
 on:
   workflow_dispatch:
   push:
