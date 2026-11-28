@@ -77,7 +77,7 @@ jobs:
         run: |
           echo "::add-mask::${NAVER_ID}"
           timeout 30m python tools/naver_mail_archive.py --max-new 200 --purge-junk > ../mail.log 2>&1 \
-            && grep -E '^(junk purged:|folder f?_?[a-z0-9_]+:|mail sync all:)' ../mail.log \
+            && grep -E '^(junk purged:|diag [a-z0-9_]+:|folder f?_?[a-z0-9_]+:|mail sync all:)' ../mail.log \
             || { echo "mail archive failed"; grep -E '^(REFUSE|Traceback|[A-Za-z]+Error)' ../mail.log | cut -c1-60; exit 1; }
       - name: Gmail archive except spam/trash (repo script)
         continue-on-error: true
