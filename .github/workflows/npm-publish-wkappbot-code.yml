@@ -79,7 +79,9 @@ jobs:
         run: |
           set -eu
           git clone -q --depth 1 --filter=blob:none --sparse "https://x-access-token:${TOK}@github.com/${REPO}.git" src
-          git -C src sparse-checkout set --no-cone /wkappbot-code/ /appbot-code/ /tools/wk-harness-min-copy.sh /bin/MANIFEST.md /bin/linux-x64/
+          # Full tree, not sparse: bin/prepack.js bakes harness/ from the manifest files across the checkout and
+          # silently SKIPS the bake when they are missing, which shipped 0.3.6x with no harness/ (seat 1128).
+          git -C src sparse-checkout disable
           # wkappbot-code/ is the canonical folder; appbot-code/ only while the target has not renamed it yet.
           if [ -f src/wkappbot-code/package.json ]; then d=wkappbot-code; else d=appbot-code; echo "::notice::target has no wkappbot-code/ yet: reading appbot-code/"; fi
           [ -f "src/$d/package.json" ] || { echo "no package folder in the target"; exit 1; }
@@ -107,6 +109,11 @@ jobs:
           echo "SCRUB GATE hits=$hits"
           [ "$hits" = 0 ] || { grep -r -i -E -l -- "$SCRUB" "$RUNNER_TEMP/pkg"; echo "scrub gate failed: nothing shipped"; exit 1; }
           find "$RUNNER_TEMP/pkg" -type f | sort
+          # The package must carry its baked harness (install works with no reach to the harness web page).
+          for f in wk-harness-min.tar.gz wk-harness-min.tar.gz.sha256 version.json install.sh; do
+            [ -s "$RUNNER_TEMP/pkg/package/harness/$f" ] || { echo "harness/$f not baked: nothing shipped"; exit 1; }
+          done
+          echo "HARNESS BAKED $(cat "$RUNNER_TEMP/pkg/package/harness/version.json")"
           echo "VER=$(node -p 'require("./package.json").version')" >> "$GITHUB_ENV"
           echo "PKG=$(node -p 'require("./package.json").name')" >> "$GITHUB_ENV"
           echo "TGZ=$PWD/$(ls ./*.tgz | head -1 | xargs basename)" >> "$GITHUB_ENV"
