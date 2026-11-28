@@ -22,11 +22,13 @@ tap_button() {
 import re, sys, xml.etree.ElementTree as ET
 want = sys.argv[1]
 for n in ET.parse("ui.xml").iter("node"):
-    if n.get("text") == want:
+    if (n.get("text") or "").strip().lower() == want.lower():
         l, t, r, b = map(int, re.findall(r"\d+", n.get("bounds")))
         print((l + r) // 2, (t + b) // 2)
         break
 else:
+    print("--- ui.xml ---", file=sys.stderr)
+    print(open("ui.xml", encoding="utf-8").read(), file=sys.stderr)
     sys.exit("button not found: " + want)
 PY
   adb shell input tap $(cat tap.txt)
