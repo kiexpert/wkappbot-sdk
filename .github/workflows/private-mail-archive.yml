@@ -1,5 +1,6 @@
 name: private-mail-archive
 
+# Last push-trigger: 2026-11-28 13:05 UTC (owner filed petition 30; read the receipt notice).
 # Owner 2026-11-28: spam may be deleted before it is fetched -> --purge-junk empties the junk folders
 # on the server first (court/government senders are left in place).
 # Owner rule 2026-11-28: every received mail except spam is collected in one private repo of this
