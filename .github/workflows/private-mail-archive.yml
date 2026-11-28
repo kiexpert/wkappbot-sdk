@@ -90,6 +90,8 @@ jobs:
           git commit -q -m "mail archive $(date -u +%F_%H%M) [cloud]"
           for i in 1 2 3 4; do
             if git push -q origin HEAD:main; then echo "pushed"; break; fi
-            git pull -q --rebase origin main
+            # index files are regenerated in full each run, so on a conflict this run's copy wins (-X theirs
+            # in a rebase = the commit being replayed); the next run rebuilds them from every md on disk.
+            git pull -q --rebase -X theirs origin main || { git rebase --abort; git pull -q --no-rebase -X ours origin main; }
             [ "$i" = 4 ] && { echo "push failed after retries"; exit 1; }
           done
