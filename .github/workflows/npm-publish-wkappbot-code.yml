@@ -176,6 +176,51 @@ jobs:
           echo "kih bin core: ${kc:-unknown}"
           { echo "ver=$VER"; echo "pkg=$PKG"; echo "new=$new"; echo "pages_only=$pages_only"; echo "kih_core=$kc"; } >> "$GITHUB_OUTPUT"
           mkdir -p "$RUNNER_TEMP/tgzout" && cp "$TGZ" "$RUNNER_TEMP/tgzout/"
+
+      # Core packages (wkappbot-code >= 1.0.1 lists wkappbot-core-<os>-<cpu> as optionalDependencies at the core
+      # version). They are built from the same target checkout by scripts/make-core-pkgs.mjs (needs xz), scanned,
+      # packed, and shipped in the SAME artifact under core/, so QA installs exactly these bytes and publish pushes
+      # them BEFORE the CLI. A package that declares none (0.3.x, 1.0.0) skips this step. Any gap fails closed.
+      - name: Build the four core packages (when the packed package declares them)
+        run: |
+          set -eu
+          cd "$PKGDIR"
+          CV="$(node -e '
+            const o=require("./package.json").optionalDependencies||{};
+            const v=[...new Set(Object.entries(o).filter(([k])=>k.startsWith("wkappbot-core-")).map(([,x])=>x))];
+            if(v.length>1){console.error("core optionalDependencies disagree: "+v.join(","));process.exit(3)}
+            process.stdout.write(v[0]||"")')"
+          if [ -z "$CV" ]; then echo "package declares no wkappbot-core-* optionalDependencies: no core packages to build"; exit 0; fi
+          CV="${CV#[^0-9]}"; echo "core version $CV"
+          [ -f scripts/make-core-pkgs.mjs ] || { echo "package declares core packages but scripts/make-core-pkgs.mjs is missing: nothing shipped"; exit 1; }
+          command -v xz >/dev/null || sudo apt-get install -y xz-utils >/dev/null
+          out="$RUNNER_TEMP/core-src"; rm -rf "$out"; mkdir -p "$out"
+          node scripts/make-core-pkgs.mjs "$out" --core-version "$CV"
+          mkdir -p "$RUNNER_TEMP/tgzout/core" "$RUNNER_TEMP/core-scan"
+          for plat in linux-x64 darwin-arm64 darwin-x64 win32-x64; do
+            d="$out/wkappbot-core-$plat"
+            [ -f "$d/package.json" ] || { echo "missing core package dir $d: nothing shipped"; exit 1; }
+            ( cd "$d"
+              node -e '
+                const fs=require("fs"); const p=JSON.parse(fs.readFileSync("package.json","utf8"));
+                const want="wkappbot-core-"+process.argv[1];
+                if(p.name!==want||p.version!==process.argv[2]){console.error("core package "+p.name+"@"+p.version+" != "+want+"@"+process.argv[2]);process.exit(1)}
+                delete p.private;
+                p.repository={type:"git",url:"git+https://github.com/"+process.env.GITHUB_REPOSITORY+".git"};
+                p.homepage="https://github.com/"+process.env.GITHUB_REPOSITORY;
+                p.publishConfig={access:"public"};
+                fs.writeFileSync("package.json",JSON.stringify(p,null,2)+"\n");' "$plat" "$CV"
+              rm -f ./*.tgz; npm pack -s --pack-destination "$RUNNER_TEMP/tgzout/core" >/dev/null )
+          done
+          ls -la "$RUNNER_TEMP/tgzout/core"
+          [ "$(ls "$RUNNER_TEMP"/tgzout/core/*.tgz | wc -l)" = 4 ] || { echo "expected exactly four core tgz: nothing shipped"; exit 1; }
+          # Public-safety scan on the TEXT files of each core package (the binaries are the public release core).
+          for t in "$RUNNER_TEMP"/tgzout/core/*.tgz; do
+            x="$RUNNER_TEMP/core-x/$(basename "$t" .tgz)"; mkdir -p "$x"; tar -xzf "$t" -C "$x"
+            ( cd "$x" && find . -type f \( -name '*.json' -o -name '*.md' -o -name '*.txt' -o -name 'LICENSE*' -o -name '*.js' -o -name '*.mjs' -o -name '*.cmd' -o -name '*.sh' \) -print0 | xargs -0 -r cp --parents -t "$RUNNER_TEMP/core-scan" ) || true
+          done
+          bash scripts/public-safety-scan.sh "$RUNNER_TEMP/core-scan"
+          echo "CORE_VER=$CV" >> "$GITHUB_ENV"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7
         with:
           name: wkappbot-code-tgz
@@ -280,6 +325,21 @@ jobs:
           if [ "$PKG" != "wkappbot-code" ] && [ "$PKG" != "wkcode" ]; then echo "package is still named $PKG (target not renamed yet) -- registry publish skipped (Pages still published)"; exit 0; fi
           if npm view "$PKG@$VER" version >/dev/null 2>&1; then echo "$PKG@$VER already on the registry -- registry publish skipped (Pages still published)"; exit 0; fi
           if [ -z "$NODE_AUTH_TOKEN" ]; then echo "NPM_TOKEN not set -- registry publish skipped (Pages still published)"; exit 0; fi
+          # The four core packages go FIRST: wkappbot-code lists them as optionalDependencies, so a CLI published
+          # before them would install without its core. A tgz that declares cores but ships none is a refusal.
+          need="$(tar -xzOf "$TGZ" package/package.json | node -p 'Object.keys(JSON.parse(require("fs").readFileSync(0,"utf8")).optionalDependencies||{}).filter(k=>k.startsWith("wkappbot-core-")).length')"
+          have="$(ls "$(dirname "$TGZ")"/core/*.tgz 2>/dev/null | wc -l)"
+          echo "core packages: declared=$need shipped=$have"
+          [ "$need" = 0 ] || [ "$have" = "$need" ] || { echo "declared core packages are not all in the gated artifact: nothing published"; exit 1; }
+          for c in "$(dirname "$TGZ")"/core/*.tgz; do
+            [ -f "$c" ] || continue
+            cn="$(tar -xzOf "$c" package/package.json | node -p 'const j=JSON.parse(require("fs").readFileSync(0,"utf8")); j.name+"@"+j.version')"
+            if npm view "$cn" version >/dev/null 2>&1; then echo "$cn already on the registry -- skipped"; continue; fi
+            npm publish "$c" --access public --provenance
+            for i in $(seq 1 30); do npm view "$cn" version --prefer-online >/dev/null 2>&1 && break; sleep 20; done
+            npm view "$cn" version --prefer-online >/dev/null || { echo "$cn is not on the registry after publish: the CLI is NOT published"; exit 1; }
+            echo "published $cn"
+          done
           npm publish "$TGZ" --access public --provenance
           # The registry can take minutes to serve a fresh version (run 42584249295: still E404 after 2 min), so wait
           # up to 10 min for it to appear, then verify the install exactly as before (a real failure still fails here).
