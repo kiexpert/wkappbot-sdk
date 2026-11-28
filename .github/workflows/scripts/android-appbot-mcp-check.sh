@@ -14,7 +14,26 @@ TOKEN="$(adb shell run-as $PKG cat shared_prefs/appbot.xml | sed -n 's/.*name="t
 [ -n "$TOKEN" ] || { echo "FAIL: no token found in app prefs"; exit 1; }
 adb shell settings put secure enabled_accessibility_services $PKG/$PKG.AppBotA11yService
 adb shell settings put secure accessibility_enabled 1
-adb shell am start-foreground-service -n $PKG/.McpServer
+# McpServer is not exported, so start it the way a user does: tap the "Start MCP server" button.
+tap_button() {
+  adb shell uiautomator dump /sdcard/ui.xml >/dev/null
+  adb pull /sdcard/ui.xml ui.xml >/dev/null
+  python3 - "$1" <<'PY' > tap.txt
+import re, sys, xml.etree.ElementTree as ET
+want = sys.argv[1]
+for n in ET.parse("ui.xml").iter("node"):
+    if n.get("text") == want:
+        l, t, r, b = map(int, re.findall(r"\d+", n.get("bounds")))
+        print((l + r) // 2, (t + b) // 2)
+        break
+else:
+    sys.exit("button not found: " + want)
+PY
+  adb shell input tap $(cat tap.txt)
+}
+adb shell am start -n $PKG/.MainActivity
+sleep 3
+tap_button "Start MCP server"
 sleep 5
 adb forward tcp:8765 tcp:8765
 URL=http://127.0.0.1:8765/mcp
