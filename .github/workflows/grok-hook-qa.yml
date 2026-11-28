@@ -69,6 +69,10 @@ jobs:
           grok --help 2>&1 | grep -iE 'api|key|login|auth|trust|yolo|single|output' | head -30 || true
           grok login --help 2>&1 | head -20 || true
           grok -p "Run the shell command: echo grok-hook-qa-marker. Report whether it was allowed." --trust --yolo --output-format json > live.json 2> live.err || true
+          if grep -q "Not signed in" live.err 2>/dev/null; then
+            echo "::warning::SKIP live: grok rejected the XAI_API_KEY secret (Not signed in). Refresh the secret to enable the live leg."
+            exit 0
+          fi
           if [ -s "$GROK_QA_HOOK_LOG" ]; then
             echo "PASS live: hook fired and denied"; head -c 600 "$GROK_QA_HOOK_LOG"
           else
