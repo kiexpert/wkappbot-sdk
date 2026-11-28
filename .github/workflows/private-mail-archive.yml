@@ -1,5 +1,7 @@
 name: private-mail-archive
 
+# Owner 2026-11-28: spam may be deleted before it is fetched -> --purge-junk empties the junk folders
+# on the server first (court/government senders are left in place).
 # Owner rule 2026-11-28: every received mail except spam is collected in one private repo of this
 # account. Every 2 hours this clones that repo (found by a sha256 prefix, never named), runs the
 # repo's OWN scripts -- the all-folder incremental Naver archive (junk/spam folders skipped, only
@@ -74,8 +76,8 @@ jobs:
         working-directory: src
         run: |
           echo "::add-mask::${NAVER_ID}"
-          timeout 30m python tools/naver_mail_archive.py --max-new 200 > ../mail.log 2>&1 \
-            && grep -E '^(folder f?_?[a-z0-9_]+:|mail sync all:)' ../mail.log \
+          timeout 30m python tools/naver_mail_archive.py --max-new 200 --purge-junk > ../mail.log 2>&1 \
+            && grep -E '^(junk purged:|folder f?_?[a-z0-9_]+:|mail sync all:)' ../mail.log \
             || { echo "mail archive failed"; grep -E '^(REFUSE|Traceback|[A-Za-z]+Error)' ../mail.log | cut -c1-60; exit 1; }
       - name: Commit back to the target repo
         working-directory: src
