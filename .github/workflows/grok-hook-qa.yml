@@ -1,0 +1,80 @@
+name: grok-hook-qa
+
+# QA leg for the xAI Grok CLI: install, --version, and a refused tool call via a stub PreToolUse hook.
+# Install URL and hook schema per official docs (README of xai-org/grok-build, docs.x.ai/build/features/hooks):
+#   curl -fsSL https://x.ai/cli/install.sh | bash
+#   hooks: ~/.grok/hooks/*.json  {"hooks":{"PreToolUse":[{"matcher":"Bash","hooks":[{"type":"command","command":"..."}]}]}}
+#   deny: stdout {"decision":"deny","reason":"..."} and/or exit 2 (any other failure is fail-open)
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/grok-hook-qa.yml'
+      - '.github/grok-qa/**'
+
+permissions:
+  contents: read
+
+jobs:
+  grok:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    env:
+      GROK_QA_HOOK_LOG: ${{ github.workspace }}/grok-hook.log
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install grok CLI (official installer)
+        run: |
+          curl -fsSL https://x.ai/cli/install.sh | bash
+          echo "$HOME/.grok/bin" >> "$GITHUB_PATH"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: grok --version
+        run: |
+          command -v grok || { echo "grok not on PATH"; ls -la "$HOME/.grok" "$HOME/.local/bin" 2>&1 || true; exit 1; }
+          grok --version
+
+      - name: Install stub deny hook
+        run: |
+          mkdir -p "$HOME/.grok/hooks"
+          cp .github/grok-qa/deny-hook.sh "$HOME/.grok/deny-hook.sh"
+          chmod +x "$HOME/.grok/deny-hook.sh"
+          cat > "$HOME/.grok/hooks/qa.json" <<JSON
+          {"hooks":{"PreToolUse":[{"matcher":"Bash","hooks":[{"type":"command","command":"$HOME/.grok/deny-hook.sh","timeout":10}]}]}}
+          JSON
+          python3 -c "import json,os;json.load(open(os.path.expanduser('~/.grok/hooks/qa.json')))"
+
+      - name: Stub hook refuses a PreToolUse payload (deterministic proof)
+        run: |
+          set +e
+          out="$(printf '%s' '{"hook_event_name":"PreToolUse","toolName":"run_terminal_command","toolInput":{"command":"echo hi"}}' | "$HOME/.grok/deny-hook.sh" 2>/dev/null)"
+          rc=$?
+          echo "rc=$rc out=$out"
+          [ "$rc" = 2 ] || { echo "expected exit 2"; exit 1; }
+          echo "$out" | grep -q '"decision":"deny"' || { echo "expected deny JSON"; exit 1; }
+
+      - name: Live call (only with XAI_API_KEY)
+        env:
+          XAI_API_KEY: ${{ secrets.XAI_API_KEY }}
+        run: |
+          if [ -z "$XAI_API_KEY" ]; then echo "SKIP live: XAI_API_KEY secret not set"; exit 0; fi
+          : > "$GROK_QA_HOOK_LOG"
+          echo "--- grok auth options (no secrets) ---"
+          grok --help 2>&1 | grep -iE 'api|key|login|auth|trust|yolo|single|output' | head -30 || true
+          grok login --help 2>&1 | head -20 || true
+          grok -p "Run the shell command: echo grok-hook-qa-marker. Report whether it was allowed." --trust --yolo --output-format json > live.json 2> live.err || true
+          if grep -q "Not signed in" live.err 2>/dev/null; then
+            echo "::warning::SKIP live: grok rejected the XAI_API_KEY secret (Not signed in). Refresh the secret to enable the live leg."
+            exit 0
+          fi
+          if [ -s "$GROK_QA_HOOK_LOG" ]; then
+            echo "PASS live: hook fired and denied"; head -c 600 "$GROK_QA_HOOK_LOG"
+          else
+            echo "FAIL live: hook never fired"; head -c 1000 live.err; exit 1
+          fi
