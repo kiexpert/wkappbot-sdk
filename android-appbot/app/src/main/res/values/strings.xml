@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">AppBot</string>
+    <string name="a11y_description">AppBot reads the screen tree and performs taps, text entry, scrolls and back/home when a model calls the localhost MCP server.</string>
+</resources>
